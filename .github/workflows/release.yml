@@ -62,7 +62,7 @@ jobs:
             librsvg2-dev
 
       - name: "Install Frontend Dependencies"
-        run: npm ci
+        run: npm install --legacy-peer-deps
 
       - name: "Build Frontend & Compile desktop binaries with Tauri Action"
         uses: tauri-apps/tauri-action@v0
