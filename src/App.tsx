@@ -3699,7 +3699,39 @@ function App() {
     }
   };
 
-  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const triggerFileSelection = async () => {
+    if (typeof window !== 'undefined' && 'Neutralino' in window) {
+      if (isUploading) return;
+      try {
+        const { Neutralino } = window as any;
+        const entries = await Neutralino.os.showOpenDialog('Select Images', {
+          filters: [
+            { name: 'Images', extensions: ['jpg', 'jpeg', 'png', 'gif', 'webp'] }
+          ],
+          multiSelections: true
+        });
+        
+        if (entries && entries.length > 0) {
+          const files: File[] = [];
+          for (const entry of entries) {
+            const rawData = await Neutralino.filesystem.readBinaryFile(entry);
+            const ext = entry.split('.').pop()?.toLowerCase();
+            const mimeType = ext === 'png' ? 'image/png' : ext === 'gif' ? 'image/gif' : ext === 'webp' ? 'image/webp' : 'image/jpeg';
+            const blob = new Blob([new Uint8Array(rawData)], { type: mimeType });
+            files.push(new File([blob], entry.split(/[/\\]/).pop() || 'image.jpg', { type: mimeType }));
+          }
+          // Mock event to standard handler
+          handleFileUpload({ target: { files: files as unknown as FileList } } as any);
+        }
+      } catch (err) {
+        console.error('Failed to open native file dialog', err);
+      }
+    } else {
+      fileInputRef.current?.click();
+    }
+  };
+
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement> | any) => {
     if (isUploading) return;
     
     const files = e.target.files;
@@ -3929,7 +3961,7 @@ function App() {
       }
     }},
     'Img': { label: <ImageIcon size={20} />, action: () => {
-      fileInputRef.current?.click();
+      triggerFileSelection();
     }}
   };
 
@@ -4466,6 +4498,22 @@ function App() {
                <IconButton icon={Rocket} onClick={() => setActiveModal('publish')} title={t('publish')} className="shrink-0 size-8 bg-cyan-600 text-white hover:bg-cyan-500 shadow-lg shadow-cyan-900/40" />
             </div>
           )}
+
+          {(typeof window !== 'undefined' && ('__TAURI__' in window || 'Neutralino' in window)) && (
+            <div className="hidden lg:flex shrink-0 border-l border-slate-800 pl-2 ml-1">
+               <IconButton 
+                 icon={() => <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M18.36 6.64a9 9 0 1 1-12.73 0"></path><line x1="12" y1="2" x2="12" y2="12"></line></svg>} 
+                 onClick={async () => {
+                   if (await confirmDialog(lang === 'uk' ? 'Вийти з додатку?' : 'Exit App?')) {
+                     const ns = await import('./services/nativeService');
+                     ns.NativeService.quitApp();
+                   }
+                 }} 
+                 title={lang === 'uk' ? 'Вийти' : 'Quit'} 
+                 className="shrink-0 size-8 text-rose-400 hover:bg-rose-500/10 hover:text-rose-300"
+               />
+            </div>
+          )}
         </div>
       </header>
 
@@ -4576,7 +4624,7 @@ function App() {
                                 <div className="flex flex-wrap items-center justify-between gap-1.5">
                                   <button 
                                     onClick={() => {
-                                      fileInputRef.current?.click();
+                                      triggerFileSelection();
                                       if (window.innerWidth < 1024) setIsWidgetVisible(false);
                                     }}
                                     disabled={isUploading}
