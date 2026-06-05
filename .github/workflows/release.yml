@@ -65,7 +65,7 @@ jobs:
         run: npm ci
 
       - name: "Build Frontend & Compile desktop binaries with Tauri Action"
-        uses: tauri-apps/tauri-action@v2
+        uses: tauri-apps/tauri-action@v0
         env:
           # Token required to push binary draft release to GitHub
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
