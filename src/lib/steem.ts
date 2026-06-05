@@ -2,9 +2,8 @@ import { Client } from 'dsteem';
 
 const STEEM_NODES = [
   'https://api.steemit.com',
-  'https://api.justyy.com',
-  'https://api.steemyy.com',
-  'https://cn.steemit.com'
+  'https://api.justyy.com'
+
 ];
 
 let activeNode = STEEM_NODES[0];
