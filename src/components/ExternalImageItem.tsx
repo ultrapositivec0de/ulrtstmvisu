@@ -66,12 +66,34 @@ const ExternalImageItem: React.FC<ExternalImageItemProps> = ({
         </div>
 
         {/* Action button overlay */}
-        <div className="absolute bottom-1.5 right-1.5 opacity-0 group-hover:opacity-100 transition-opacity z-10">
+        <div className="absolute bottom-1.5 right-1.5 opacity-0 group-hover:opacity-100 transition-opacity z-10 flex bg-slate-900 border border-slate-700/50 rounded-lg p-0.5 shadow-lg overflow-hidden text-[8px] font-extrabold text-slate-300">
           <button 
             onClick={(e) => { e.stopPropagation(); onInsert(photo, 'plain'); }}
-            className="px-2 py-1 bg-cyan-600 hover:bg-cyan-500 text-white rounded text-[9px] font-bold shadow-lg flex items-center gap-1 transition-all"
+            className="px-1.5 py-0.5 hover:bg-cyan-600 hover:text-white rounded transition-colors"
+            title="Plain / Full"
           >
-            + {t('insertWord') || 'Insert'}
+            P
+          </button>
+          <button 
+            onClick={(e) => { e.stopPropagation(); onInsert(photo, 'left'); }}
+            className="px-1.5 py-0.5 hover:bg-cyan-600 hover:text-white rounded border-x border-slate-800 transition-colors"
+            title="Left"
+          >
+            L
+          </button>
+          <button 
+            onClick={(e) => { e.stopPropagation(); onInsert(photo, 'center'); }}
+            className="px-1.5 py-0.5 hover:bg-cyan-600 hover:text-white rounded transition-colors"
+            title="Center"
+          >
+            C
+          </button>
+          <button 
+            onClick={(e) => { e.stopPropagation(); onInsert(photo, 'right'); }}
+            className="px-1.5 py-0.5 hover:bg-cyan-600 hover:text-white rounded border-l border-slate-800 transition-colors"
+            title="Right"
+          >
+            R
           </button>
         </div>
       </div>

@@ -90,14 +90,37 @@ const ImageItemComp: React.FC<ImageItemCompProps> = ({
             )}
           </div>
 
-          <div className="flex items-center gap-1">
-            <button 
-              onClick={(e) => { e.stopPropagation(); onInsert(img.url, img.name, 'plain'); }}
-              className="px-1.5 py-0.5 bg-cyan-600 hover:bg-cyan-500 rounded text-white text-[9px] font-bold"
-              title={t('insertWord') || "Insert"}
-            >
-              +
-            </button>
+          <div className="flex items-center gap-1.5">
+            <div className="flex bg-slate-900 rounded border border-slate-700/50 overflow-hidden text-[8px] font-extrabold shadow">
+              <button 
+                onClick={(e) => { e.stopPropagation(); onInsert(img.url, img.name, 'plain'); }}
+                className="px-1 py-0.5 hover:bg-cyan-600 hover:text-white text-slate-300 transition-colors"
+                title="Plain / Full"
+              >
+                P
+              </button>
+              <button 
+                onClick={(e) => { e.stopPropagation(); onInsert(img.url, img.name, 'left'); }}
+                className="px-1 py-0.5 hover:bg-cyan-600 hover:text-white text-slate-400 border-x border-slate-800 transition-colors"
+                title="Align Left"
+              >
+                L
+              </button>
+              <button 
+                onClick={(e) => { e.stopPropagation(); onInsert(img.url, img.name, 'center'); }}
+                className="px-1 py-0.5 hover:bg-cyan-600 hover:text-white text-slate-400 transition-colors"
+                title="Center"
+              >
+                C
+              </button>
+              <button 
+                onClick={(e) => { e.stopPropagation(); onInsert(img.url, img.name, 'right'); }}
+                className="px-1 py-0.5 hover:bg-cyan-600 hover:text-white text-slate-400 border-l border-slate-800 transition-colors"
+                title="Align Right"
+              >
+                R
+              </button>
+            </div>
             
             {onHost && img.url.startsWith('http') && !img.url.includes('steemitimages.com') && (
               <button 

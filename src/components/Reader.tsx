@@ -51,6 +51,21 @@ import { cn } from "../lib/utils";
 import { callWithFallback } from "../lib/steem";
 import { ReaderConfig, SteemPost } from "../types";
 
+// Configure marked options for consistent rendering
+if (marked && (marked as any).use) {
+  (marked as any).use({
+    breaks: true,
+    gfm: true,
+    mangle: false,
+    headerIds: false
+  });
+} else if (marked && (marked as any).setOptions) {
+  (marked as any).setOptions({
+    breaks: true,
+    gfm: true
+  });
+}
+
 function getWordCounts(body: string) {
   const dirtyWords = body.trim().split(/\s+/).length;
   // Strip Markdown links, images
@@ -1548,7 +1563,13 @@ export default function Reader({
 
   const renderContent = (body: string, permlink?: string) => {
     if (!marked || !DOMPurify) return body;
-    let html = marked.parse(body) as string;
+    let html = '';
+    try {
+      html = marked.parse(body) as string;
+    } catch (e) {
+      console.error('Reader parse error:', e);
+      html = body;
+    }
 
     const shouldLoadImages =
       config.loadImages !== false || (permlink && revealedImages.has(permlink));
@@ -1563,7 +1584,20 @@ export default function Reader({
 
     // Add referrerpolicy="no-referrer" to all img tags
     html = html.replace(/<img /g, '<img referrerpolicy="no-referrer" ');
-    return DOMPurify.sanitize(html);
+    
+    try {
+      return DOMPurify.sanitize(html, {
+        ALLOWED_TAGS: ['b', 'i', 'em', 'strong', 'a', 'div', 'p', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'ul', 'ol', 'li', 'blockquote', 'pre', 'code', 'table', 'thead', 'tbody', 'tr', 'th', 'td', 'img', 'hr', 'br', 'span', 'strike', 'sup', 'sub', 'center'],
+        ALLOWED_ATTR: ['href', 'src', 'alt', 'class', 'className', 'style', 'title', 'target', 'rel'],
+        ADD_CLASSES: {
+          div: ['pull-left', 'pull-right', 'text-justify', 'text-right', 'text-center', 'clearfix', 'phishy', 'text-blue', 'text-green'],
+          p: ['pull-left', 'pull-right', 'text-justify', 'text-right', 'text-center', 'clearfix', 'phishy', 'text-blue', 'text-green'],
+          span: ['phishy', 'text-blue', 'text-green']
+        }
+      } as any) as unknown as string;
+    } catch (e) {
+      return DOMPurify.sanitize(html);
+    }
   };
 
   return (
