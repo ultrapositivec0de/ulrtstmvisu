@@ -4,6 +4,45 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Steem Editor Pro</title>
+    <script>
+      // Polyfill global for Node.js modules before they load
+      if (typeof window !== 'undefined') {
+        window.global = window;
+      }
+      
+      // Global error handler for debugging white screens
+      window.addEventListener('error', function(e) {
+        var errorDiv = document.createElement('div');
+        errorDiv.style.position = 'absolute';
+        errorDiv.style.top = '0';
+        errorDiv.style.left = '0';
+        errorDiv.style.zIndex = '9999';
+        errorDiv.style.backgroundColor = 'red';
+        errorDiv.style.color = 'white';
+        errorDiv.style.padding = '20px';
+        errorDiv.style.width = '100%';
+        errorDiv.style.fontFamily = 'monospace';
+        errorDiv.innerHTML = '<h3>Error: ' + e.message + '</h3><pre>' + (e.error ? e.error.stack : '') + '</pre>';
+        document.body.appendChild(errorDiv);
+      });
+      
+      window.addEventListener('unhandledrejection', function(e) {
+        var errorDiv = document.createElement('div');
+        errorDiv.style.position = 'absolute';
+        errorDiv.style.top = '200px';
+        errorDiv.style.left = '0';
+        errorDiv.style.zIndex = '9999';
+        errorDiv.style.backgroundColor = 'darkred';
+        errorDiv.style.color = 'white';
+        errorDiv.style.padding = '20px';
+        errorDiv.style.width = '100%';
+        errorDiv.style.fontFamily = 'monospace';
+        var reason = e.reason && e.reason.message ? e.reason.message : e.reason;
+        var stack = e.reason && e.reason.stack ? e.reason.stack : '';
+        errorDiv.innerHTML = '<h3>Unhandled Promise Rejection: ' + reason + '</h3><pre>' + stack + '</pre>';
+        document.body.appendChild(errorDiv);
+      });
+    </script>
   </head>
   <body>
     <div id="root"></div>
