@@ -10,7 +10,7 @@
     "preview": "vite preview",
     "clean": "rm -rf dist dist/server.cjs",
     "lint": "tsc --noEmit",
-    "generate-icon": "node generate_png.js && tauri icon app-icon.png",
+    "generate-icon": "npx tsx generate_png.js && tauri icon app-icon.png && rm -rf src-tauri/icons/android src-tauri/icons/ios app-icon.png",
     "tauri": "tauri"
   },
   "dependencies": {
