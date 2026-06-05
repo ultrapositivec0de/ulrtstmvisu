@@ -31,7 +31,7 @@
       "center": true,
       "fullScreen": false,
       "alwaysOnTop": false,
-      "icon": "/resources/favicon.ico",
+      "icon": "/resources/icon.png",
       "enableInspector": false,
       "borderless": false,
       "maximize": false,
