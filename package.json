@@ -10,6 +10,7 @@
     "preview": "vite preview",
     "clean": "rm -rf dist dist/server.cjs",
     "lint": "tsc --noEmit",
+    "generate-icon": "node generate_png.js && tauri icon app-icon.png",
     "tauri": "tauri"
   },
   "dependencies": {
