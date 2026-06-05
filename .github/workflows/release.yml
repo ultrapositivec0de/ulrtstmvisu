@@ -4,6 +4,7 @@ on:
   push:
     tags:
       - 'v*' # Triggers on semantic version tags, for example: v1.0.0
+  workflow_dispatch: # Allows manual trigger from GitHub Actions tab
 
 # Grant necessary permissions for creating GitHub Releases
 permissions:
