@@ -1,0 +1,6 @@
+{
+  "name": "Tauri Desktop Hub",
+  "description": "Comprehensive Tauri configuration dashboard, desktop packaging pipeline, and CI/CD GitHub Actions release generator for React applications.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

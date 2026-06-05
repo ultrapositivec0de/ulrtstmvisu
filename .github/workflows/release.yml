@@ -1,0 +1,92 @@
+name: "Tauri Multiplatform Build & Release"
+
+on:
+  push:
+    tags:
+      - 'v*' # Triggers on semantic version tags, for example: v1.0.0
+
+# Grant necessary permissions for creating GitHub Releases
+permissions:
+  contents: write
+
+jobs:
+  publish-tauri:
+    name: "Build & Release (${{ matrix.platform }})"
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: "macos-latest" # Builds macOS DMG and APP bundle
+            args: "--target universal-apple-darwin" # Creates universal builds (Intel + Apple Silicon)
+          - platform: "windows-latest" # Builds Windows EXE and MSI installer
+            args: ""
+          - platform: "ubuntu-22.04" # Builds Linux Debian (.deb) and AppImage packages
+            args: ""
+
+    runs-on: ${{ matrix.platform }}
+    steps:
+      - name: "Checkout code repository"
+        uses: actions/checkout@v4
+
+      - name: "Set up Node.js LTS"
+        uses: actions/setup-node@v4
+        with:
+          node-version: lts/*
+          cache: "npm"
+
+      - name: "Install Rust stable toolchain"
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          # If macOS, install cross-compilation targets for Intel and M1/M2/M3 chips
+          targets: ${{ matrix.platform == 'macos-latest' && 'aarch64-apple-darwin,x86_64-apple-darwin' || '' }}
+
+      - name: "Rust Cache"
+        uses: swatinem/rust-cache@v2
+        with:
+          workspaces: "./src-tauri -> target"
+
+      - name: "Install Linux dependencies (Debian/AppImage required libraries)"
+        if: matrix.platform == 'ubuntu-22.04'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libwebkit2gtk-4.1-dev \
+            build-essential \
+            curl \
+            wget \
+            file \
+            libxdo-dev \
+            libssl-dev \
+            libayatana-appindicator3-dev \
+            librsvg2-dev
+
+      - name: "Install Frontend Dependencies"
+        run: npm ci
+
+      - name: "Build Frontend & Compile desktop binaries with Tauri Action"
+        uses: tauri-apps/tauri-action@v2
+        env:
+          # Token required to push binary draft release to GitHub
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          
+          # Optional: Tauri Update Updater signing keys
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+          
+          # Optional: macOS Apple Developer credentials for signing and notarization
+          APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
+          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+          APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
+          APPLE_PROVIDER_SHORT_NAME: ${{ secrets.APPLE_PROVIDER_SHORT_NAME }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
+          
+          # Optional: Windows Code Signing (Certificates)
+          # Windows binaries can be signed directly using tauri CLI configurations
+        with:
+          tagName: v__VERSION__ # Auto replaced with package version by Tauri Action
+          releaseName: "Release v__VERSION__"
+          releaseBody: "Automated desktop build for Windows, macOS, and Linux.\n\n### Signatures and Hashes\nVerify your binary download signatures with Tauri native tools."
+          releaseDraft: true
+          prerelease: false
+          args: ${{ matrix.args }}
