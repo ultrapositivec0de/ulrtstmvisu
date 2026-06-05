@@ -5,7 +5,10 @@ import {defineConfig} from 'vite';
 
 export default defineConfig(() => {
   return {
-    base: '', // Use relative paths for desktop builds
+    base: './', // Use relative paths for desktop builds
+    define: {
+      global: 'window',
+    },
     plugins: [react(), tailwindcss()],
     resolve: {
       alias: {
