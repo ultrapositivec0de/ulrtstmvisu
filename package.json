@@ -42,6 +42,7 @@
     "@tauri-apps/plugin-dialog": "^2.7.1",
     "@tauri-apps/plugin-fs": "^2.5.1",
     "@tauri-apps/plugin-os": "^2.3.2",
+    "@tauri-apps/plugin-shell": "^2.2.0",
     "@vitejs/plugin-legacy": "^6.0.7",
     "@vitejs/plugin-react": "^5.0.4",
     "buffer": "^6.0.3",
