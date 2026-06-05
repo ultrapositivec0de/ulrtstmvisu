@@ -3700,35 +3700,7 @@ function App() {
   };
 
   const triggerFileSelection = async () => {
-    if (typeof window !== 'undefined' && 'Neutralino' in window) {
-      if (isUploading) return;
-      try {
-        const { Neutralino } = window as any;
-        const entries = await Neutralino.os.showOpenDialog('Select Images', {
-          filters: [
-            { name: 'Images', extensions: ['jpg', 'jpeg', 'png', 'gif', 'webp'] }
-          ],
-          multiSelections: true
-        });
-        
-        if (entries && entries.length > 0) {
-          const files: File[] = [];
-          for (const entry of entries) {
-            const rawData = await Neutralino.filesystem.readBinaryFile(entry);
-            const ext = entry.split('.').pop()?.toLowerCase();
-            const mimeType = ext === 'png' ? 'image/png' : ext === 'gif' ? 'image/gif' : ext === 'webp' ? 'image/webp' : 'image/jpeg';
-            const blob = new Blob([new Uint8Array(rawData)], { type: mimeType });
-            files.push(new File([blob], entry.split(/[/\\]/).pop() || 'image.jpg', { type: mimeType }));
-          }
-          // Mock event to standard handler
-          handleFileUpload({ target: { files: files as unknown as FileList } } as any);
-        }
-      } catch (err) {
-        console.error('Failed to open native file dialog', err);
-      }
-    } else {
-      fileInputRef.current?.click();
-    }
+    fileInputRef.current?.click();
   };
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement> | any) => {

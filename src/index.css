@@ -1,1 +1,37 @@
 @import "tailwindcss";
+@plugin "@tailwindcss/typography";
+
+/* Extra styles for ensuring line breaks are respected and code highlighting looks polished */
+.markdown-body {
+  word-wrap: break-word;
+}
+
+.markdown-body p {
+  margin-bottom: 1.25em;
+  line-height: 1.625;
+  white-space: pre-wrap; /* Ensures that single shift+enters / line-breaks are visible */
+}
+
+.markdown-body pre {
+  background-color: #0f172a !important; /* Dark background for code blocks */
+  border: 1px solid #1e293b !important;
+  border-radius: 0.5rem;
+  padding: 1rem;
+  overflow-x: auto;
+}
+
+.markdown-body code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace !important;
+  font-size: 0.875em;
+  color: #fb7185; /* light red/pink color for inline codes */
+  background-color: rgba(225, 29, 72, 0.1);
+  padding: 0.2em 0.4em;
+  border-radius: 0.25rem;
+}
+
+.markdown-body pre code {
+  color: #f1f5f9; /* Off-white for code inside pre blocks */
+  background-color: transparent !important;
+  padding: 0;
+  border-radius: 0;
+}
