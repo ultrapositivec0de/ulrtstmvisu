@@ -5,6 +5,7 @@ import {defineConfig} from 'vite';
 
 export default defineConfig(() => {
   return {
+    base: '', // Use relative paths for desktop builds
     plugins: [react(), tailwindcss()],
     resolve: {
       alias: {

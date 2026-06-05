@@ -1,8 +1,8 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "TauriApp",
+  "productName": "SteemEditor",
   "version": "1.0.0",
-  "identifier": "com.tauri.app",
+  "identifier": "com.steemeditor.app",
   "bundle": {
     "active": true,
     "targets": "all",
@@ -24,11 +24,12 @@
   "app": {
     "windows": [
       {
-        "title": "Tauri Desktop App",
+        "title": "Steem Editor",
         "width": 1024,
         "height": 768,
         "resizable": true,
-        "fullscreen": false
+        "fullscreen": false,
+        "maximized": true
       }
     ],
     "security": {
