@@ -2,6 +2,19 @@
 export const isTauri = () => typeof window !== 'undefined' && '__TAURI__' in window;
 export const isNeutralino = () => typeof window !== 'undefined' && 'Neutralino' in window;
 
+// Initialize Neutralino client safely
+export function initNeutralino() {
+  if (isNeutralino()) {
+    try {
+      const { Neutralino } = window as any;
+      Neutralino.init();
+      console.log('[Neutralino] Core client successfully initialized.');
+    } catch (e) {
+      console.error('[Neutralino] Failed to execute Neutralino.init():', e);
+    }
+  }
+}
+
 // Helper to get backup file path in the host filesystem (user's home directory)
 async function getBackupPath(): Promise<string | null> {
   if (isNeutralino()) {
@@ -16,6 +29,24 @@ async function getBackupPath(): Promise<string | null> {
   return null;
 }
 
+// Helper to wrap promise with a safety timeout
+function withTimeout<T>(promise: Promise<T>, ms: number, defaultValue: T): Promise<T> {
+  let timeoutId: any;
+  const timeoutPromise = new Promise<T>((resolve) => {
+    timeoutId = setTimeout(() => {
+      console.warn(`[Native Storage] Operation timed out after ${ms}ms. Proceeding with defaults.`);
+      resolve(defaultValue);
+    }, ms);
+  });
+  return Promise.race([
+    promise.then((res) => {
+      clearTimeout(timeoutId);
+      return res;
+    }),
+    timeoutPromise
+  ]);
+}
+
 // RESTORE: Synchronously (before rendering React) reads backup file and populates localStorage
 export async function initStorageRestore() {
   if (!isNeutralino()) return;
@@ -25,7 +56,28 @@ export async function initStorageRestore() {
 
   try {
     const { Neutralino } = window as any;
-    const fileData = await Neutralino.filesystem.readFile(path);
+    
+    // Check if the backup file actually exists using Neutralino filesystem
+    let fileExists = false;
+    try {
+      const stats = await Neutralino.filesystem.getStats(path);
+      if (stats) fileExists = true;
+    } catch {
+      fileExists = false;
+    }
+
+    if (!fileExists) {
+      console.log('[Neutralino Backup] No backup file found on disk yet. Starting fresh.');
+      return;
+    }
+
+    // Wrap reading with timeout to prevent hanging the React mounting phase
+    const fileData = await withTimeout(
+      Neutralino.filesystem.readFile(path),
+      150, // 150ms maximum wait time for local disk I/O
+      ''
+    );
+
     if (fileData) {
       const parsed = JSON.parse(fileData);
       let restoredCount = 0;
@@ -35,11 +87,10 @@ export async function initStorageRestore() {
           restoredCount++;
         }
       });
-      console.log(`[Neutralino Backup] Successfully restored ${restoredCount} keys from ${path}`);
+      console.log(`[Neutralino Backup] Successfully restored ${restoredCount} keys from disk backup.`);
     }
   } catch (err) {
-    // File likely doesn't exist yet on first boot, which is expected
-    console.log('[Neutralino Backup] No previous backup config detected to restore.', err);
+    console.log('[Neutralino Backup] No previous backup config restored or error occurred:', err);
   }
 }
 
