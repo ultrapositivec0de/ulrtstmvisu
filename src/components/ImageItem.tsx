@@ -1,5 +1,5 @@
 import React from 'react';
-import { Trash2, Image as ImageIcon, ChevronLeft, ChevronRight, Check, Globe } from 'lucide-react';
+import { Trash2, Image as ImageIcon, ChevronLeft, ChevronRight, Check, Globe, AlignLeft, AlignCenter, AlignRight } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { ImageItem } from '../types';
 
@@ -91,34 +91,34 @@ const ImageItemComp: React.FC<ImageItemCompProps> = ({
           </div>
 
           <div className="flex items-center gap-1.5">
-            <div className="flex bg-slate-900 rounded border border-slate-700/50 overflow-hidden text-[8px] font-extrabold shadow">
+            <div className="flex bg-slate-950/90 backdrop-blur-md rounded border border-slate-700/60 overflow-hidden shadow-lg items-center p-0.5">
               <button 
                 onClick={(e) => { e.stopPropagation(); onInsert(img.url, img.name, 'plain'); }}
-                className="px-1 py-0.5 hover:bg-cyan-600 hover:text-white text-slate-300 transition-colors"
-                title="Plain / Full"
+                className="p-1.5 hover:bg-cyan-600 hover:text-white text-slate-300 rounded transition-all flex items-center justify-center"
+                title="Plain / Full insert"
               >
-                P
+                <ImageIcon size={14} />
               </button>
               <button 
                 onClick={(e) => { e.stopPropagation(); onInsert(img.url, img.name, 'left'); }}
-                className="px-1 py-0.5 hover:bg-cyan-600 hover:text-white text-slate-400 border-x border-slate-800 transition-colors"
-                title="Align Left"
+                className="p-1.5 hover:bg-cyan-600 hover:text-white text-slate-400 border-x border-slate-800 transition-all flex items-center justify-center"
+                title="Align Left insert"
               >
-                L
+                <AlignLeft size={14} />
               </button>
               <button 
                 onClick={(e) => { e.stopPropagation(); onInsert(img.url, img.name, 'center'); }}
-                className="px-1 py-0.5 hover:bg-cyan-600 hover:text-white text-slate-400 transition-colors"
-                title="Center"
+                className="p-1.5 hover:bg-cyan-600 hover:text-white text-slate-400 transition-all flex items-center justify-center"
+                title="Center insert"
               >
-                C
+                <AlignCenter size={14} />
               </button>
               <button 
                 onClick={(e) => { e.stopPropagation(); onInsert(img.url, img.name, 'right'); }}
-                className="px-1 py-0.5 hover:bg-cyan-600 hover:text-white text-slate-400 border-l border-slate-800 transition-colors"
-                title="Align Right"
+                className="p-1.5 hover:bg-cyan-600 hover:text-white text-slate-400 border-l border-slate-800 transition-all flex items-center justify-center"
+                title="Align Right insert"
               >
-                R
+                <AlignRight size={14} />
               </button>
             </div>
             
@@ -203,34 +203,34 @@ const ImageItemComp: React.FC<ImageItemCompProps> = ({
           </button>
         )}
 
-        <div className="flex bg-slate-900 rounded-lg p-0.5 border border-slate-700/50">
+        <div className="flex bg-slate-950 rounded-lg p-0.5 border border-slate-700/60 items-center">
           <button 
             onClick={() => onInsert(img.url, img.name, 'plain')}
-            className="px-1.5 py-1 hover:bg-slate-800 text-[8px] uppercase font-black text-slate-400 hover:text-cyan-400 rounded-md transition-colors"
-            title="Plain / Full width"
+            className="p-1.5 hover:bg-cyan-600 hover:text-white text-slate-400 hover:text-cyan-400 rounded transition-colors flex items-center justify-center"
+            title="Plain / Full width insert"
           >
-            Plain
+            <ImageIcon size={14} />
           </button>
           <button 
             onClick={() => onInsert(img.url, img.name, 'left')}
-            className="px-1.5 py-1 hover:bg-slate-800 text-[8px] uppercase font-black text-slate-400 hover:text-cyan-400 rounded-md transition-colors border-x border-slate-800"
-            title="Float Left"
+            className="p-1.5 hover:bg-cyan-600 hover:text-white text-slate-400 hover:text-cyan-400 rounded transition-colors border-x border-slate-850 flex items-center justify-center"
+            title="Float Left insert"
           >
-            Left
+            <AlignLeft size={14} />
           </button>
           <button 
             onClick={() => onInsert(img.url, img.name, 'center')}
-            className="px-1.5 py-1 hover:bg-slate-800 text-[8px] uppercase font-black text-slate-100 hover:text-cyan-400 rounded-md transition-colors"
-            title="Center Aligned"
+            className="p-1.5 hover:bg-cyan-600 hover:text-white text-slate-100 hover:text-cyan-400 rounded transition-colors flex items-center justify-center"
+            title="Center insertion"
           >
-            Center
+            <AlignCenter size={14} />
           </button>
           <button 
             onClick={() => onInsert(img.url, img.name, 'right')}
-            className="px-1.5 py-1 hover:bg-slate-800 text-[8px] uppercase font-black text-slate-400 hover:text-cyan-400 rounded-md transition-colors border-l border-slate-800"
-            title="Float Right"
+            className="p-1.5 hover:bg-cyan-600 hover:text-white text-slate-400 hover:text-cyan-400 rounded transition-colors border-l border-slate-850 flex items-center justify-center"
+            title="Float Right insert"
           >
-            Right
+            <AlignRight size={14} />
           </button>
         </div>
 

@@ -1,5 +1,5 @@
 import React from 'react';
-import { ExternalLink, Check } from 'lucide-react';
+import { ExternalLink, Check, Image as ImageIcon, AlignLeft, AlignCenter, AlignRight } from 'lucide-react';
 import { cn } from '../lib/utils';
 
 interface ExternalImageItemProps {
@@ -66,34 +66,34 @@ const ExternalImageItem: React.FC<ExternalImageItemProps> = ({
         </div>
 
         {/* Action button overlay */}
-        <div className="absolute bottom-1.5 right-1.5 opacity-0 group-hover:opacity-100 transition-opacity z-10 flex bg-slate-900 border border-slate-700/50 rounded-lg p-0.5 shadow-lg overflow-hidden text-[8px] font-extrabold text-slate-300">
+        <div className="absolute bottom-1.5 right-1.5 opacity-0 group-hover:opacity-100 transition-opacity z-10 flex bg-slate-950/90 backdrop-blur-md border border-slate-700/60 rounded-lg p-0.5 shadow-xl items-center">
           <button 
             onClick={(e) => { e.stopPropagation(); onInsert(photo, 'plain'); }}
-            className="px-1.5 py-0.5 hover:bg-cyan-600 hover:text-white rounded transition-colors"
-            title="Plain / Full"
+            className="p-1.5 hover:bg-cyan-600 hover:text-white rounded text-slate-300 transition-all flex items-center justify-center"
+            title="Plain / Full width insert"
           >
-            P
+            <ImageIcon size={14} />
           </button>
           <button 
             onClick={(e) => { e.stopPropagation(); onInsert(photo, 'left'); }}
-            className="px-1.5 py-0.5 hover:bg-cyan-600 hover:text-white rounded border-x border-slate-800 transition-colors"
-            title="Left"
+            className="p-1.5 hover:bg-cyan-600 hover:text-white rounded border-x border-slate-800 transition-all flex items-center justify-center"
+            title="Float Left insert"
           >
-            L
+            <AlignLeft size={14} />
           </button>
           <button 
             onClick={(e) => { e.stopPropagation(); onInsert(photo, 'center'); }}
-            className="px-1.5 py-0.5 hover:bg-cyan-600 hover:text-white rounded transition-colors"
-            title="Center"
+            className="p-1.5 hover:bg-cyan-600 hover:text-white rounded transition-all flex items-center justify-center"
+            title="Center insertion"
           >
-            C
+            <AlignCenter size={14} />
           </button>
           <button 
             onClick={(e) => { e.stopPropagation(); onInsert(photo, 'right'); }}
-            className="px-1.5 py-0.5 hover:bg-cyan-600 hover:text-white rounded border-l border-slate-800 transition-colors"
-            title="Right"
+            className="p-1.5 hover:bg-cyan-600 hover:text-white rounded border-l border-slate-800 transition-all flex items-center justify-center"
+            title="Float Right insert"
           >
-            R
+            <AlignRight size={14} />
           </button>
         </div>
       </div>
@@ -139,30 +139,34 @@ const ExternalImageItem: React.FC<ExternalImageItemProps> = ({
       </div>
 
       <div className="flex items-center gap-1 shrink-0">
-        <div className="flex bg-slate-900 rounded-lg p-0.5 border border-slate-700/50">
+        <div className="flex bg-slate-950 rounded-lg p-0.5 border border-slate-700/60 items-center">
           <button 
             onClick={() => onInsert(photo, 'plain')}
-            className="px-1.5 py-1 hover:bg-slate-800 text-[8px] uppercase font-black text-slate-400 hover:text-cyan-400 rounded-md transition-colors"
+            className="p-1.5 hover:bg-cyan-600 hover:text-white text-slate-400 hover:text-cyan-400 rounded transition-colors flex items-center justify-center"
+            title="Plain / Full width insert"
           >
-            Plain
+            <ImageIcon size={14} />
           </button>
           <button 
             onClick={() => onInsert(photo, 'left')}
-            className="px-1.5 py-1 hover:bg-slate-800 text-[8px] uppercase font-black text-slate-400 hover:text-cyan-400 rounded-md transition-colors border-x border-slate-800"
+            className="p-1.5 hover:bg-cyan-600 hover:text-white text-slate-400 hover:text-cyan-400 rounded transition-colors border-x border-slate-850 flex items-center justify-center"
+            title="Float Left insert"
           >
-            Left
+            <AlignLeft size={14} />
           </button>
           <button 
             onClick={() => onInsert(photo, 'center')}
-            className="px-1.5 py-1 hover:bg-slate-800 text-[8px] uppercase font-black text-slate-100 hover:text-cyan-400 rounded-md transition-colors"
+            className="p-1.5 hover:bg-cyan-600 hover:text-white text-slate-100 hover:text-cyan-400 rounded transition-colors flex items-center justify-center"
+            title="Center insertion"
           >
-            Center
+            <AlignCenter size={14} />
           </button>
           <button 
             onClick={() => onInsert(photo, 'right')}
-            className="px-1.5 py-1 hover:bg-slate-800 text-[8px] uppercase font-black text-slate-400 hover:text-cyan-400 rounded-md transition-colors border-l border-slate-800"
+            className="p-1.5 hover:bg-cyan-600 hover:text-white text-slate-400 hover:text-cyan-400 rounded transition-colors border-l border-slate-850 flex items-center justify-center"
+            title="Float Right insert"
           >
-            Right
+            <AlignRight size={14} />
           </button>
         </div>
       </div>

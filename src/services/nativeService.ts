@@ -2,6 +2,86 @@
 export const isTauri = () => typeof window !== 'undefined' && '__TAURI__' in window;
 export const isNeutralino = () => typeof window !== 'undefined' && 'Neutralino' in window;
 
+// Helper to get backup file path in the host filesystem (user's home directory)
+async function getBackupPath(): Promise<string | null> {
+  if (isNeutralino()) {
+    try {
+      const { Neutralino } = window as any;
+      const homeDir = await Neutralino.os.getPath('home');
+      return `${homeDir}/.steem_writer_backup.json`;
+    } catch (e) {
+      console.error('Failed to resolve Neutralino home path', e);
+    }
+  }
+  return null;
+}
+
+// RESTORE: Synchronously (before rendering React) reads backup file and populates localStorage
+export async function initStorageRestore() {
+  if (!isNeutralino()) return;
+  
+  const path = await getBackupPath();
+  if (!path) return;
+
+  try {
+    const { Neutralino } = window as any;
+    const fileData = await Neutralino.filesystem.readFile(path);
+    if (fileData) {
+      const parsed = JSON.parse(fileData);
+      let restoredCount = 0;
+      Object.keys(parsed).forEach(key => {
+        if (key.startsWith('steem_') || key.startsWith('widget_')) {
+          localStorage.setItem(key, parsed[key]);
+          restoredCount++;
+        }
+      });
+      console.log(`[Neutralino Backup] Successfully restored ${restoredCount} keys from ${path}`);
+    }
+  } catch (err) {
+    // File likely doesn't exist yet on first boot, which is expected
+    console.log('[Neutralino Backup] No previous backup config detected to restore.', err);
+  }
+}
+
+// SAVE: Periodically checks localStorage for updates and saves them physically to the disk
+export function startStorageAutosave() {
+  if (!isNeutralino()) return;
+
+  let lastSavedJson = '';
+  setInterval(async () => {
+    const path = await getBackupPath();
+    if (!path) return;
+
+    try {
+      const { Neutralino } = window as any;
+      const dataToSave: Record<string, string> = {};
+      let hasKeys = false;
+
+      for (let i = 0; i < localStorage.length; i++) {
+        const key = localStorage.key(i);
+        if (key && (key.startsWith('steem_') || key.startsWith('widget_'))) {
+          const val = localStorage.getItem(key);
+          if (val !== null) {
+            dataToSave[key] = val;
+            hasKeys = true;
+          }
+        }
+      }
+
+      if (hasKeys) {
+        const jsonStr = JSON.stringify(dataToSave, null, 2);
+        if (jsonStr !== lastSavedJson) {
+          await Neutralino.filesystem.writeFile(path, jsonStr);
+          lastSavedJson = jsonStr;
+          console.log(`[Neutralino Backup] Settings, keys, and drafts autosaved to ${path}`);
+        }
+      }
+    } catch (saveError) {
+      console.error('[Neutralino Backup] Autosave to filesystem failed:', saveError);
+    }
+  }, 4000); // Check for modifications every 4 seconds
+}
+
 export const NativeService = {
   getPlatform: () => {
     if (isTauri()) return 'tauri';
@@ -55,3 +135,4 @@ export const NativeService = {
     }
   }
 };
+
