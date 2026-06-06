@@ -1799,6 +1799,7 @@ function App() {
   ], []);
 
   const [imageUploadAccount, setImageUploadAccount] = useState('');
+  const [isImageAccountDropdownOpen, setIsImageAccountDropdownOpen] = useState(false);
   const [showVaultSetup, setShowVaultSetup] = useState(false);
   const [vaultSetupWif, setVaultSetupWif] = useState('');
   const [vaultSetupPin, setVaultSetupPin] = useState('');
@@ -4665,19 +4666,77 @@ function App() {
                                 
                                 <div className="grid grid-cols-2 sm:grid-cols-3 gap-1.5">
                                   {vaultAccounts.length > 0 && (
-                                    <div className="col-span-2 sm:col-span-3 flex items-center gap-2 p-1 bg-slate-800/50 rounded border border-slate-700/50">
-                                      <select 
-                                        value={imageUploadAccount || ''}
-                                        onChange={(e) => setImageUploadAccount(e.target.value)}
-                                        className="flex-1 bg-transparent text-[10px] text-cyan-400 font-bold outline-none cursor-pointer truncate"
+                                    <div className="col-span-2 sm:col-span-3 relative">
+                                      <button
+                                        type="button"
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          setIsImageAccountDropdownOpen(!isImageAccountDropdownOpen);
+                                        }}
+                                        className="w-full flex items-center justify-between gap-1.5 p-1.5 bg-slate-800/60 hover:bg-slate-800 rounded border border-slate-700/50 text-[10px] text-cyan-400 font-bold transition-all cursor-pointer select-none"
                                       >
-                                        <option value="" className="bg-slate-900 text-slate-300">@keychain / default</option>
-                                        {vaultAccounts.map(acc => (
-                                          <option key={acc} value={acc} className="bg-slate-900 text-slate-300">
-                                            @{acc} {!SecurityService.isLocked() ? '✓' : '🔒'}
-                                          </option>
-                                        ))}
-                                      </select>
+                                        <span className="truncate">
+                                          {imageUploadAccount ? `@${imageUploadAccount}` : '@keychain / default'}
+                                        </span>
+                                        <ChevronDown size={12} className={cn("text-slate-400 transition-transform shrink-0", isImageAccountDropdownOpen ? "rotate-180" : "")} />
+                                      </button>
+                                      
+                                      {isImageAccountDropdownOpen && (
+                                        <>
+                                          <div 
+                                            className="fixed inset-0 z-40 bg-transparent" 
+                                            onClick={(e) => {
+                                              e.stopPropagation();
+                                              setIsImageAccountDropdownOpen(false);
+                                            }}
+                                          />
+                                          <div className="absolute right-0 left-0 mt-1 bg-slate-900 border border-slate-700 rounded shadow-xl overflow-hidden z-50 text-[10px] max-h-32 overflow-y-auto">
+                                            <button
+                                              type="button"
+                                              onClick={(e) => {
+                                                e.stopPropagation();
+                                                setImageUploadAccount('');
+                                                setIsImageAccountDropdownOpen(false);
+                                              }}
+                                              className={cn(
+                                                "w-full text-left px-2 py-1.5 text-slate-300 font-medium hover:bg-slate-800 hover:text-cyan-400 transition-colors flex items-center justify-between border-b border-slate-800/60 cursor-pointer",
+                                                !imageUploadAccount ? "text-cyan-400 bg-cyan-950/20" : ""
+                                              )}
+                                            >
+                                              <span>@keychain / default</span>
+                                              {!imageUploadAccount && <Check size={10} className="text-cyan-400" />}
+                                            </button>
+                                            
+                                            {vaultAccounts.map(acc => {
+                                              const isSelected = imageUploadAccount === acc;
+                                              const isLocked = SecurityService.isLocked();
+                                              return (
+                                                <button
+                                                  key={acc}
+                                                  type="button"
+                                                  onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    setImageUploadAccount(acc);
+                                                    setIsImageAccountDropdownOpen(false);
+                                                  }}
+                                                  className={cn(
+                                                    "w-full text-left px-2 py-1.5 text-slate-300 font-medium hover:bg-slate-800 hover:text-cyan-400 transition-colors flex items-center justify-between cursor-pointer",
+                                                    isSelected ? "text-cyan-400 bg-cyan-950/20" : ""
+                                                  )}
+                                                >
+                                                  <span className="truncate">@{acc}</span>
+                                                  <div className="flex items-center gap-1.5 shrink-0 ml-2">
+                                                    <span className="text-[9px] text-slate-500 font-normal">
+                                                      {isLocked ? '🔒' : '✓'}
+                                                    </span>
+                                                    {isSelected && <Check size={10} className="text-cyan-400" />}
+                                                  </div>
+                                                </button>
+                                              );
+                                            })}
+                                          </div>
+                                        </>
+                                      )}
                                     </div>
                                   )}
                                 </div>
@@ -5932,11 +5991,11 @@ function App() {
                                   setSelectedVaultUser(e.target.value);
                                   setUsername(e.target.value);
                                 }}
-                                className="w-full bg-slate-900 border border-slate-700 rounded-lg p-2 text-sm text-slate-200 outline-none"
+                                className="w-full bg-slate-900 border border-slate-700 rounded-lg p-2 text-sm text-slate-200 outline-none cursor-pointer"
                               >
-                                <option value="">{t('selectAccount')}</option>
+                                <option value="" className="bg-slate-900 text-slate-350">{t('selectAccount')}</option>
                                 {vaultAccounts.map(acc => (
-                                  <option key={acc} value={acc}>@{acc}</option>
+                                  <option key={acc} value={acc} className="bg-slate-900 text-slate-300">@{acc}</option>
                                 ))}
                               </select>
                               <div className="p-3 bg-green-500/10 border border-green-500/20 rounded-lg text-[11px] text-green-400 flex items-start gap-2">
