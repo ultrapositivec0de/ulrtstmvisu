@@ -179,8 +179,8 @@ export const NativeService = {
       const { Neutralino } = window as any;
       Neutralino.app.exit();
     } else if (isTauri()) {
-      const { window: tauriWindow } = await import('@tauri-apps/api');
-      tauriWindow.appWindow.close();
+      const { getCurrentWindow } = await import('@tauri-apps/api/window');
+      getCurrentWindow().close();
     } else {
       window.close();
     }

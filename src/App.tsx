@@ -20,6 +20,7 @@ import { Draft, Template, ImageItem, AuthType, TagGroup, Language, QueueItem, St
 import { Buffer } from 'buffer';
 import { SecurityService } from './services/securityService';
 import { PexelsService, PexelsPhoto } from './services/pexelsService';
+import { isTauri, isNeutralino } from './services/nativeService';
 import ImageItemComp from './components/ImageItem';
 import ExternalImageItem from './components/ExternalImageItem';
 import Reader from './components/Reader';
@@ -1460,6 +1461,8 @@ function App() {
     defaultValue?: string,
     placeholder?: string
   } | null>(null);
+  
+  const [cacheClearOptions, setCacheClearOptions] = useState({ cache: true, drafts: false, settings: false, vault: false });
 
   useEffect(() => {
     if (activeModal === null && !systemDialog) {
@@ -1522,20 +1525,24 @@ function App() {
         }
         
         const purifiedHtml = DOMPurify ? (DOMPurify.sanitize(finalHtml) as unknown as string) : (finalHtml as unknown as string);
-        setPreviewHtml(purifiedHtml);
-
-        if (preview && syncScrollEnabled && isAtBottom) {
-          requestAnimationFrame(() => {
-            preview.scrollTop = preview.scrollHeight;
-          });
+        if (preview) {
+          preview.innerHTML = purifiedHtml;
+          if (syncScrollEnabled && isAtBottom) {
+            requestAnimationFrame(() => {
+              preview.scrollTop = preview.scrollHeight;
+            });
+          }
+        } else {
+          setPreviewHtml(purifiedHtml);
         }
       } catch (e) {
         console.error("Marked parse error", e);
-        setPreviewHtml(`<p class="text-red-500">${t('previewError')}</p>`);
+        if (previewPaneRef.current) previewPaneRef.current.innerHTML = `<p class="text-red-500">${t('previewError')}</p>`;
       }
     };
 
-    const timer = setTimeout(updatePreview, 300); // Debounce
+    const debounceMs = content.length > 50000 ? 1000 : content.length > 10000 ? 500 : 300;
+    const timer = setTimeout(updatePreview, debounceMs); // Dynamic debounce
     return () => clearTimeout(timer);
   }, [content, t, syncScrollEnabled]);
   const [templates, setTemplates] = useState<Template[]>([]);
@@ -1543,7 +1550,9 @@ function App() {
   const [newMention, setNewMention] = useState('');
   
   // Auth & Publish
-  const [authType, setAuthType] = useState<AuthType | 'VAULT'>('KEYCHAIN');
+  const [authType, setAuthType] = useState<AuthType | 'VAULT'>(() => {
+    return (isTauri() || isNeutralino()) ? 'VAULT' : 'KEYCHAIN';
+  });
   const [username, setUsername] = useState(() => localStorage.getItem('steem_username') || '');
   const [selectedVaultUser, setSelectedVaultUser] = useState('');
   const [showAccountPrompt, setShowAccountPrompt] = useState(() => !localStorage.getItem('steem_username'));
@@ -1798,7 +1807,20 @@ function App() {
     { id: 'raleway', label: 'Raleway', family: '"Raleway", sans-serif' },
   ], []);
 
-  const [imageUploadAccount, setImageUploadAccount] = useState('');
+  const [imageUploadAccount, setImageUploadAccount] = useState(() => {
+    if (isTauri() || isNeutralino()) {
+      const stored = localStorage.getItem('steem_vault_accounts');
+      if (stored) {
+         try {
+           const parsed = JSON.parse(stored);
+           if (parsed && typeof parsed === 'object' && Object.keys(parsed).length > 0) {
+             return Object.keys(parsed)[0]; // select first vault account by default
+           }
+         } catch(e) {}
+      }
+    }
+    return ''; // default to Keychain inside the browser
+  });
   const [isImageAccountDropdownOpen, setIsImageAccountDropdownOpen] = useState(false);
   const [showVaultSetup, setShowVaultSetup] = useState(false);
   const [vaultSetupWif, setVaultSetupWif] = useState('');
@@ -3240,8 +3262,8 @@ function App() {
   };
 
   const handleUploadImageForReader = async (file: File): Promise<string> => {
-    const uploadAuthType = imageUploadAccount ? 'VAULT' : 'KEYCHAIN';
-    let activeUser = imageUploadAccount || username;
+    const uploadAuthType = (imageUploadAccount || authType === 'VAULT' || isTauri() || isNeutralino()) ? 'VAULT' : 'KEYCHAIN';
+    let activeUser = imageUploadAccount || (uploadAuthType === 'VAULT' ? selectedVaultUser : username);
 
     if (!activeUser) {
       if (uploadAuthType !== 'VAULT') {
@@ -3613,8 +3635,8 @@ function App() {
   };
 
   const uploadExternalImage = async (url: string, fileName: string = 'image.jpg') => {
-    const uploadAuthType = imageUploadAccount ? 'VAULT' : 'KEYCHAIN';
-    let activeUser = imageUploadAccount || username;
+    const uploadAuthType = (imageUploadAccount || authType === 'VAULT' || isTauri() || isNeutralino()) ? 'VAULT' : 'KEYCHAIN';
+    let activeUser = imageUploadAccount || (uploadAuthType === 'VAULT' ? selectedVaultUser : username);
     
     if (!activeUser) {
       if (uploadAuthType === 'VAULT') {
@@ -3746,8 +3768,8 @@ function App() {
     const files = e.target.files;
     if (!files || files.length === 0) return;
     
-    const uploadAuthType = imageUploadAccount ? 'VAULT' : 'KEYCHAIN';
-    let activeUser = imageUploadAccount || username;
+    const uploadAuthType = (imageUploadAccount || authType === 'VAULT' || isTauri() || isNeutralino()) ? 'VAULT' : 'KEYCHAIN';
+    let activeUser = imageUploadAccount || (uploadAuthType === 'VAULT' ? selectedVaultUser : username);
     
     if (!activeUser) {
       if (uploadAuthType === 'VAULT') {
@@ -5397,7 +5419,6 @@ function App() {
                   isFullScreen && "max-w-4xl mx-auto"
                 )}
                 ref={previewPaneRef}
-                dangerouslySetInnerHTML={{ __html: previewHtml }}
               />
             </div>
           </div>
@@ -7730,6 +7751,91 @@ function App() {
                         ))}
                       </div>
                     </div>
+
+                    <div className="pt-4 border-t border-slate-800 space-y-4">
+                       <h4 className="text-sm font-bold text-red-400 flex items-center gap-2">
+                         <Trash2 size={16} /> Очищення даних застосунку
+                       </h4>
+                       <div className="space-y-2 p-3 bg-red-900/10 border border-red-900/20 rounded-xl">
+                          <label className="flex items-start gap-3 cursor-pointer group">
+                             <input type="checkbox" checked={cacheClearOptions.cache} onChange={e => setCacheClearOptions(p => ({...p, cache: e.target.checked}))} className="mt-1 bg-slate-900 border-slate-700 rounded text-red-500 focus:ring-red-500" />
+                             <div className="flex flex-col">
+                               <span className="text-sm font-medium text-slate-300 group-hover:text-amber-100 transition-colors">Кеш зображень рідера та галереї</span>
+                               <span className="text-xs text-slate-500">Тимчасові дані, завантажені для перегляду</span>
+                             </div>
+                          </label>
+                          <label className="flex items-start gap-3 cursor-pointer group">
+                             <input type="checkbox" checked={cacheClearOptions.drafts} onChange={e => setCacheClearOptions(p => ({...p, drafts: e.target.checked}))} className="mt-1 bg-slate-900 border-slate-700 rounded text-red-500 focus:ring-red-500" />
+                             <div className="flex flex-col">
+                               <span className="text-sm font-medium text-slate-300 group-hover:text-amber-100 transition-colors">Чернетки та шаблони</span>
+                               <span className="text-xs text-slate-500">Всі збережені статті (steem_drafts, steem_templates)</span>
+                             </div>
+                          </label>
+                          <label className="flex items-start gap-3 cursor-pointer group">
+                             <input type="checkbox" checked={cacheClearOptions.settings} onChange={e => setCacheClearOptions(p => ({...p, settings: e.target.checked}))} className="mt-1 bg-slate-900 border-slate-700 rounded text-red-500 focus:ring-red-500" />
+                             <div className="flex flex-col">
+                               <span className="text-sm font-medium text-slate-300 group-hover:text-amber-100 transition-colors">Системні налаштування</span>
+                               <span className="text-xs text-slate-500">Тема, форматування, розмітка тощо</span>
+                             </div>
+                          </label>
+                          <label className="flex items-start gap-3 cursor-pointer group">
+                             <input type="checkbox" checked={cacheClearOptions.vault} onChange={e => setCacheClearOptions(p => ({...p, vault: e.target.checked}))} className="mt-1 bg-slate-900 border-slate-700 rounded text-red-500 focus:ring-red-500" />
+                             <div className="flex flex-col">
+                               <span className="text-sm font-medium text-red-400 group-hover:text-red-300 transition-colors">Сховище акаунтів (Vault)</span>
+                               <span className="text-xs text-red-500/70">Видалить усі додані акаунти та пароль. Тільки для екстрених випадків.</span>
+                             </div>
+                          </label>
+                       </div>
+
+                       <button 
+                         onClick={async () => {
+                           if (!cacheClearOptions.cache && !cacheClearOptions.drafts && !cacheClearOptions.settings && !cacheClearOptions.vault) {
+                             notify("Жодної опції не вибрано", "error");
+                             return;
+                           }
+                           if (await confirmDialog("Ви впевнені, що бажаєте видалити вибрані дані? Цю дію неможливо скасувати.")) {
+                              const keysToKeep = [];
+                              // Logic for clearing specific items
+                              if (!cacheClearOptions.vault) {
+                                  keysToKeep.push('steem_vault_accounts', 'steem_vault_encrypted', 'steem_username');
+                              }
+                              if (!cacheClearOptions.drafts) {
+                                  keysToKeep.push('steem_drafts', 'steem_templates', 'steem_queue', 'steem_editor_cursor', 'steem_tag_groups', 'steem_mentions');
+                              }
+                              if (!cacheClearOptions.settings) {
+                                  keysToKeep.push('steem_dark_mode', 'steem_visual_style', 'steem_sync_scroll', 'widget_no_border', 'steem_lang', 'steem_notif_enabled', 'steem_auto_insert_mentions');
+                              }
+                              
+                              if (cacheClearOptions.cache && cacheClearOptions.drafts && cacheClearOptions.settings && cacheClearOptions.vault) {
+                                  localStorage.clear();
+                              } else {
+                                  const temp = {};
+                                  for (const key of keysToKeep) {
+                                      const val = localStorage.getItem(key);
+                                      if (val !== null) temp[key] = val;
+                                  }
+                                  
+                                  if (cacheClearOptions.cache) {
+                                      localStorage.removeItem('steem_uploaded_images_v2');
+                                      localStorage.removeItem('steem_history_cache'); // hypothetically
+                                      // also remove any dynamically prefixed keys if they existed, but standard keys cover it
+                                  }
+                                  
+                                  localStorage.clear();
+                                  for (const [k, v] of Object.entries(temp)) {
+                                      localStorage.setItem(k, v as string);
+                                  }
+                              }
+                              notify("Очищення успішно завершено.");
+                              setTimeout(() => window.location.reload(), 1000);
+                           }
+                         }}
+                         className="w-full py-3 bg-red-900/20 border border-red-500/30 text-red-500 hover:text-white hover:bg-red-600 rounded-xl font-bold transition-all shadow-lg flex items-center justify-center gap-2"
+                       >
+                         <Trash2 size={18} /> Видалити вибрані дані
+                       </button>
+                    </div>
+
                   </section>
                 )}
 
