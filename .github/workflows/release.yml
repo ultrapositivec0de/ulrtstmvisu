@@ -19,7 +19,7 @@ jobs:
         include:
           - platform: "windows-latest" # Builds Windows EXE and MSI installer
             args: ""
-          - platform: "ubuntu-24.04" # Builds Linux Debian (.deb) and AppImage packages Using modern Ubuntu environment
+          - platform: "ubuntu-26.04" # Builds Linux Debian (.deb) and AppImage packages Using modern Ubuntu environment
             args: ""
 
     runs-on: ${{ matrix.platform }}
@@ -92,7 +92,7 @@ jobs:
 
   publish-android:
     name: "Build & Release (Android)"
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     steps:
       - name: "Checkout code repository"
         uses: actions/checkout@v4
