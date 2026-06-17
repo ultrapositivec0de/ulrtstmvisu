@@ -86,15 +86,3 @@ jobs:
           path: |
             src-tauri/gen/android/app/build/outputs/apk/release/*.apk
             src-tauri/gen/android/app/build/outputs/bundle/release/*.aab
-            
-      - name: "Upload Android Binaries to GitHub Draft Release"
-        uses: softprops/action-gh-release@v2
-        with:
-          tag_name: "v${{ steps.package-version.outputs.version }}"
-          name: "Release v${{ steps.package-version.outputs.version }}"
-          draft: true
-          files: |
-            src-tauri/gen/android/app/build/outputs/apk/release/*.apk
-            src-tauri/gen/android/app/build/outputs/bundle/release/*.aab
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

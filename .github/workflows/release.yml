@@ -89,3 +89,85 @@ jobs:
           releaseDraft: true
           prerelease: false
           args: ${{ matrix.args }}
+
+  publish-android:
+    name: "Build & Release (Android)"
+    needs: publish-tauri
+    runs-on: ubuntu-26.04
+    steps:
+      - name: "Checkout code repository"
+        uses: actions/checkout@v4
+
+      - name: "Set up Node.js LTS"
+        uses: actions/setup-node@v4
+        with:
+          node-version: lts/*
+          cache: "npm"
+
+      - name: "Setup Java (JDK 22)"
+        uses: actions/setup-java@v4
+        with:
+          distribution: "zulu"
+          java-version: "22"
+
+      - name: "Install Rust stable toolchain"
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: "aarch64-linux-android,armv7-linux-androideabi,i686-linux-android,x86_64-linux-android"
+
+      - name: "Rust Cache"
+        uses: swatinem/rust-cache@v2
+        with:
+          workspaces: "./src-tauri -> target"
+
+      - name: "Install dependencies (NDK/SDK tools if needed)"
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential
+
+      - name: "Install Frontend Dependencies"
+        run: npm install --legacy-peer-deps
+
+      - name: "Regenerate Icons"
+        run: npx tsx generate_png.js && npx tauri icon app-icon.png
+
+      - name: "Initialize Tauri Android Project"
+        run: npx tauri android init
+
+      - name: "Configure Android Manifest Permissions"
+        run: |
+          MANIFEST_PATH="src-tauri/gen/android/app/src/main/AndroidManifest.xml"
+          if [ -f "$MANIFEST_PATH" ]; then
+            # Clean existing duplicate permissions to avoid build errors
+            sed -i '/android.permission.INTERNET/d' "$MANIFEST_PATH"
+            sed -i '/android.permission.CAMERA/d' "$MANIFEST_PATH"
+            sed -i '/android.permission.READ_EXTERNAL_STORAGE/d' "$MANIFEST_PATH"
+            sed -i '/android.permission.WRITE_EXTERNAL_STORAGE/d' "$MANIFEST_PATH"
+            
+            # Inject native permissions before <application>
+            sed -i '/<application/i \    <uses-permission android:name="android.permission.INTERNET" />\n    <uses-permission android:name="android.permission.CAMERA" />\n    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" />\n    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" />' "$MANIFEST_PATH"
+            echo "Successfully updated AndroidManifest.xml permissions."
+          else
+            echo "Warning: manifest not found at $MANIFEST_PATH"
+          fi
+
+      - name: "Build Android APK & AAB"
+        run: npx tauri android build --apk --aab
+
+      - name: "Get package version"
+        id: package-version
+        run: |
+          VERSION=$(node -p "require('./package.json').version")
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+
+      - name: "Upload Android Binaries to GitHub Draft Release"
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: "v${{ steps.package-version.outputs.version }}"
+          name: "Release v${{ steps.package-version.outputs.version }}"
+          draft: true
+          files: |
+            src-tauri/gen/android/app/build/outputs/apk/release/*.apk
+            src-tauri/gen/android/app/build/outputs/bundle/release/*.aab
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
