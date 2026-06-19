@@ -155,12 +155,7 @@ jobs:
         run: keytool -genkey -v -keystore release.keystore -alias releasealias -keyalg RSA -keysize 2048 -validity 10000 -storepass android -keypass android -dname "CN=Unknown, OU=Unknown, O=Unknown, L=Unknown, ST=Unknown, C=Unknown"
 
       - name: "Build Android APK & AAB"
-        env:
-          TAURI_ANDROID_KEYSTORE: ${{ github.workspace }}/release.keystore
-          TAURI_ANDROID_KEYSTORE_PASSWORD: android
-          TAURI_ANDROID_KEY_ALIAS: releasealias
-          TAURI_ANDROID_KEY_PASSWORD: android
-        run: npx tauri android build --apk --split-per-abi
+        run: npx tauri android build --apk --split-per-abi --debug
 
       - name: "Get package version"
         id: package-version
