@@ -152,7 +152,7 @@ jobs:
           fi
 
       - name: "Build Android APK & AAB"
-        run: npx tauri android build --apk --aab
+        run: npx tauri android build --debug --apk
 
       - name: "Get package version"
         id: package-version
@@ -168,6 +168,5 @@ jobs:
           draft: true
           files: |
             src-tauri/gen/android/app/build/outputs/apk/**/*.apk
-            src-tauri/gen/android/app/build/outputs/bundle/**/*.aab
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

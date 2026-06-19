@@ -5,12 +5,15 @@ import path from 'path';
 import {defineConfig} from 'vite';
 
 export default defineConfig(() => {
+  const isTauri = process.env.TAURI_ENV_PLATFORM !== undefined;
+
   return {
     base: './', // Use relative paths for desktop builds
     plugins: [
       react(), 
       tailwindcss(),
       VitePWA({
+        injectRegister: isTauri ? null : 'auto',
         registerType: 'autoUpdate',
         manifest: {
           name: 'Steem Writer',
