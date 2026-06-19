@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "tsx server.ts",
     "build": "vite build && esbuild server.ts --bundle --platform=node --format=cjs --packages=external --sourcemap --outfile=dist/server.cjs",
-    "build:neu": "npm run build && mkdir -p /tmp/neu-assets && (cp neutralino-build/resources/js/neutralino.js /tmp/neu-assets/ || true) && rm -rf neutralino-build/resources/* && cp -r dist/* neutralino-build/resources/ && mkdir -p neutralino-build/resources/js && (cp /tmp/neu-assets/neutralino.js neutralino-build/resources/js/ || true) && cp src-tauri/icons/icon.png neutralino-build/resources/icon.png && cd neutralino-build && npx --yes @neutralinojs/neu build",
+    "build:neu": "NEU_BUILD=true npm run build && mkdir -p /tmp/neu-assets && (cp neutralino-build/resources/js/neutralino.js /tmp/neu-assets/ || true) && rm -rf neutralino-build/resources/* && cp -r dist/* neutralino-build/resources/ && mkdir -p neutralino-build/resources/js && (cp /tmp/neu-assets/neutralino.js neutralino-build/resources/js/ || true) && cp src-tauri/icons/icon.png neutralino-build/resources/icon.png && cd neutralino-build && npx --yes @neutralinojs/neu build",
     "start": "node dist/server.cjs",
     "preview": "vite preview",
     "clean": "rm -rf dist dist/server.cjs",

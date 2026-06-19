@@ -6,36 +6,39 @@ import {defineConfig} from 'vite';
 
 export default defineConfig(() => {
   const isTauri = process.env.TAURI_ENV_PLATFORM !== undefined;
+  const isNeu = process.env.NEU_BUILD === 'true';
+  const isNative = isTauri || isNeu;
 
   return {
     base: './', // Use relative paths for desktop builds
     plugins: [
       react(), 
       tailwindcss(),
-      VitePWA({
-        injectRegister: isTauri ? null : 'auto',
-        registerType: 'autoUpdate',
-        manifest: {
-          name: 'Steem Writer',
-          short_name: 'Steem Writer',
-          description: 'Local-first Markdown Editor for Steem Blockchain',
-          theme_color: '#0f172a',
-          background_color: '#0f172a',
-          display: 'standalone',
-          icons: [
-            {
-              src: '192.png',
-              sizes: '192x192',
-              type: 'image/png'
-            },
-            {
-              src: '512.png',
-              sizes: '512x512',
-              type: 'image/png'
-            }
-          ]
-        }
-      })
+      ...(isNative ? [] : [
+        VitePWA({
+          registerType: 'autoUpdate',
+          manifest: {
+            name: 'Steem Writer',
+            short_name: 'Steem Writer',
+            description: 'Local-first Markdown Editor for Steem Blockchain',
+            theme_color: '#0f172a',
+            background_color: '#0f172a',
+            display: 'standalone',
+            icons: [
+              {
+                src: '192.png',
+                sizes: '192x192',
+                type: 'image/png'
+              },
+              {
+                src: '512.png',
+                sizes: '512x512',
+                type: 'image/png'
+              }
+            ]
+          }
+        })
+      ])
     ],
     resolve: {
       alias: {
