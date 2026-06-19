@@ -153,8 +153,11 @@ export const NativeService = {
         if (entries && entries.length > 0) {
           // Read the file natively
           const rawData = await Neutralino.filesystem.readBinaryFile(entries[0]);
-          const blob = new Blob([new Uint8Array(rawData)], { type: 'image/jpeg' });
-          const file = new File([blob], entries[0].split(/[/\\]/).pop() || 'image.jpg', { type: 'image/jpeg' });
+          const arrayBuffer = (rawData && typeof rawData === 'object' && 'data' in rawData) ? rawData.data : rawData;
+          const ext = entries[0].split('.').pop()?.toLowerCase();
+          const mimeType = ext === 'png' ? 'image/png' : ext === 'gif' ? 'image/gif' : ext === 'webp' ? 'image/webp' : 'image/jpeg';
+          const blob = new Blob([arrayBuffer], { type: mimeType });
+          const file = new File([blob], entries[0].split(/[/\\]/).pop() || 'image.jpg', { type: mimeType });
           return file;
         }
       } catch (err) {

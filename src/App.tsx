@@ -3724,7 +3724,36 @@ function App() {
 
   const triggerFileSelection = async () => {
     if (isUploading) return;
-    fileInputRef.current?.click();
+    
+    if (isNeutralino()) {
+      try {
+        const { Neutralino } = window as any;
+        const entries = await Neutralino.os.showOpenDialog('Select Images', {
+          filters: [{ name: 'Images', extensions: ['jpg', 'jpeg', 'png', 'gif', 'webp'] }],
+          multiSelections: true
+        });
+        
+        if (entries && entries.length > 0) {
+          const files: File[] = [];
+          for (const entry of entries) {
+            const rawData = await Neutralino.filesystem.readBinaryFile(entry);
+            const arrayBuffer = (rawData && typeof rawData === 'object' && 'data' in rawData) ? rawData.data : rawData;
+            const ext = entry.split('.').pop()?.toLowerCase();
+            const mimeType = ext === 'png' ? 'image/png' : ext === 'gif' ? 'image/gif' : ext === 'webp' ? 'image/webp' : 'image/jpeg';
+            const blob = new Blob([arrayBuffer], { type: mimeType });
+            files.push(new File([blob], entry.split(/[/\\]/).pop() || 'image.jpg', { type: mimeType }));
+          }
+          
+          handleFileUpload({ target: { files } });
+        }
+      } catch (err) {
+        console.error('Neutralino dialog failed:', err);
+        // Sometimes users cancel the dialog, which throws an error in older Neutralino versions.
+        fileInputRef.current?.click();
+      }
+    } else {
+      fileInputRef.current?.click();
+    }
   };
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement> | any) => {

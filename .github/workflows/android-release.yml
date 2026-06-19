@@ -79,7 +79,7 @@ jobs:
           TAURI_ANDROID_KEYSTORE_PASSWORD: android
           TAURI_ANDROID_KEY_ALIAS: releasealias
           TAURI_ANDROID_KEY_PASSWORD: android
-        run: npx tauri android build --apk --target aarch64-linux-android
+        run: npx tauri android build --apk --split-per-abi
 
       - name: "Get package version"
         id: package-version
