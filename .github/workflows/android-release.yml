@@ -80,7 +80,6 @@ jobs:
           # 2. Add defaults & Map frontend names to Android format
           PERMISSIONS="INTERNET READ_EXTERNAL_STORAGE WRITE_EXTERNAL_STORAGE READ_MEDIA_IMAGES"
           for P in $RAW_PERMS; do
-            [ "$P" = "storage" ] && continue
             UPPER_P=$(echo $P | tr '[:lower:]' '[:upper:]')
             PERMISSIONS="$PERMISSIONS $UPPER_P"
           done
