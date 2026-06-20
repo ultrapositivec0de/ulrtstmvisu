@@ -1,6 +1,18 @@
 {
-  "name": "Tauri Desktop Hub",
-  "description": "Comprehensive Tauri configuration dashboard, desktop packaging pipeline, and CI/CD GitHub Actions release generator for React applications.",
-  "requestFramePermissions": [],
-  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+  "name": "Ultra Steem Editor",
+  "description": "A feature-rich editor for Steem with native Android support.",
+  "requestFramePermissions": [
+    "camera",
+    "storage"
+  ],
+  "_android_permissions_cheat_sheet": {
+    "camera": "Photos and QR scanning",
+    "microphone": "Audio recording (RECORD_AUDIO)",
+    "geolocation": "GPS access (ACCESS_FINE_LOCATION)",
+    "storage": "READ_EXTERNAL_STORAGE / WRITE_EXTERNAL_STORAGE (Auto-mapped for Android 12-)",
+    "media_images": "READ_MEDIA_IMAGES (Auto-mapped for Android 13+)"
+  },
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
 }

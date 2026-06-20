@@ -187,6 +187,26 @@ export const NativeService = {
     } else {
       window.close();
     }
+  },
+
+  /**
+   * Tries to trigger permission dialogs on mobile (Tauri).
+   * Note: On modern Android (13+), standard file pickers don't require manifest permissions.
+   * This is mainly for Camera or fine-grained storage access if needed.
+   */
+  async requestCameraPermission() {
+    if (!isTauri()) return true;
+    try {
+      // Triggering Camera dialog via standard web API
+      // Most Tauri Android WebViews will show the system dialog here
+      const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+      // Stop the stream immediately, we just wanted the dialog
+      stream.getTracks().forEach(track => track.stop());
+      return true;
+    } catch (err) {
+      console.warn('Camera permission denied or failed:', err);
+      return false;
+    }
   }
 };
 

@@ -23,11 +23,11 @@ jobs:
           node-version: lts/*
           cache: "npm"
 
-      - name: "Setup Java (JDK 22)"
+      - name: "Setup Java (JDK 24)"
         uses: actions/setup-java@v4
         with:
           distribution: "zulu"
-          java-version: "22"
+          java-version: "24"
 
       - name: "Install Rust stable toolchain"
         uses: dtolnay/rust-toolchain@stable
@@ -56,19 +56,49 @@ jobs:
       - name: "Configure Android Manifest Permissions"
         run: |
           MANIFEST_PATH="src-tauri/gen/android/app/src/main/AndroidManifest.xml"
+          
+          # --- PERMISSION CHEAT SHEET (To add, use metadata.json -> requestFramePermissions) ---
+          # INTERNET              -> Basic web/API access (Included by default)
+          # CAMERA                -> Photos and QR scanning
+          # RECORD_AUDIO          -> Microphone access
+          # ACCESS_FINE_LOCATION  -> GPS (high accuracy)
+          # ACCESS_COARSE_LOCATION -> Network-based location
+          #
+          # STORAGE (Android 12 and below):
+          # READ_EXTERNAL_STORAGE  -> Read documents/photos
+          # WRITE_EXTERNAL_STORAGE -> Save documents
+          #
+          # MEDIA (Android 13+ / API 33+):
+          # READ_MEDIA_IMAGES -> Permission for photos only
+          # READ_MEDIA_VIDEO  -> Permission for videos only
+          # READ_MEDIA_AUDIO  -> Permission for audio only
+          # ------------------------------------------------------------------------------------
+
+          # 1. READ permissions from metadata.json (handling multi-line)
+          RAW_PERMS=$(cat metadata.json | tr -d '\n' | grep -oP '(?<="requestFramePermissions":\[).*?(?=\])' | tr -d '" ' | tr ',' ' ')
+          
+          # 2. Add defaults & Map frontend names to Android format
+          PERMISSIONS="INTERNET READ_EXTERNAL_STORAGE WRITE_EXTERNAL_STORAGE READ_MEDIA_IMAGES"
+          for P in $RAW_PERMS; do
+            UPPER_P=$(echo $P | tr '[:lower:]' '[:upper:]')
+            PERMISSIONS="$PERMISSIONS $UPPER_P"
+          done
+          
           if [ -f "$MANIFEST_PATH" ]; then
-            # Clean existing duplicate permissions to avoid build errors
-            sed -i '/android.permission.INTERNET/d' "$MANIFEST_PATH"
-            sed -i '/android.permission.CAMERA/d' "$MANIFEST_PATH"
-            sed -i '/android.permission.READ_EXTERNAL_STORAGE/d' "$MANIFEST_PATH"
-            sed -i '/android.permission.WRITE_EXTERNAL_STORAGE/d' "$MANIFEST_PATH"
-            sed -i '/android.permission.READ_MEDIA_IMAGES/d' "$MANIFEST_PATH"
+            echo "Updating Android Manifest at $MANIFEST_PATH"
+            # Wipe existing permissions to avoid duplicates
+            sed -i '/android.permission./d' "$MANIFEST_PATH"
             
-            # Inject required permissions before <application>
-            sed -i '/<application/i \    <uses-permission android:name="android.permission.INTERNET" />\n    <uses-permission android:name="android.permission.CAMERA" />\n    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" />\n    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" />\n    <uses-permission android:name="android.permission.READ_MEDIA_IMAGES" />' "$MANIFEST_PATH"
-            echo "Successfully updated AndroidManifest.xml permissions."
+            # 3. Inject unique sorted permissions before <application>
+            INJECT=""
+            for P in $(echo $PERMISSIONS | tr ' ' '\n' | sort -u); do
+              INJECT="${INJECT}    <uses-permission android:name=\"android.permission.${P}\" />\n"
+            done
+            
+            sed -i "/<application/i $INJECT" "$MANIFEST_PATH"
+            echo "Successfully updated manifest with: $PERMISSIONS"
           else
-            echo "Warning: manifest not found at $MANIFEST_PATH"
+            echo "Skipping: Android manifest not found at $MANIFEST_PATH (Wait for Tauri to generate it)"
           fi
 
       - name: "Configure Release Build Signing with Debug Key"
