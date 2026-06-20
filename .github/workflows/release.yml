@@ -143,9 +143,10 @@ jobs:
             sed -i '/android.permission.CAMERA/d' "$MANIFEST_PATH"
             sed -i '/android.permission.READ_EXTERNAL_STORAGE/d' "$MANIFEST_PATH"
             sed -i '/android.permission.WRITE_EXTERNAL_STORAGE/d' "$MANIFEST_PATH"
+            sed -i '/android.permission.READ_MEDIA_IMAGES/d' "$MANIFEST_PATH"
             
-            # Inject native permissions before <application>
-            sed -i '/<application/i \    <uses-permission android:name="android.permission.INTERNET" />\n    <uses-permission android:name="android.permission.CAMERA" />\n    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" />\n    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" />' "$MANIFEST_PATH"
+            # Inject required permissions before <application>
+            sed -i '/<application/i \    <uses-permission android:name="android.permission.INTERNET" />\n    <uses-permission android:name="android.permission.CAMERA" />\n    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" />\n    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" />\n    <uses-permission android:name="android.permission.READ_MEDIA_IMAGES" />' "$MANIFEST_PATH"
             echo "Successfully updated AndroidManifest.xml permissions."
           else
             echo "Warning: manifest not found at $MANIFEST_PATH"
