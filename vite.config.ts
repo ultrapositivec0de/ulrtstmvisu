@@ -1,6 +1,5 @@
 import tailwindcss from '@tailwindcss/vite';
 import react from '@vitejs/plugin-react';
-import legacy from '@vitejs/plugin-legacy';
 import { VitePWA } from 'vite-plugin-pwa';
 import path from 'path';
 import {defineConfig} from 'vite';
@@ -15,9 +14,6 @@ export default defineConfig(() => {
     plugins: [
       react(), 
       tailwindcss(),
-      legacy({
-        targets: ['defaults', 'not IE 11', 'Android >= 5'],
-      }),
       ...(isNative ? [] : [
 
         VitePWA({
