@@ -3522,6 +3522,27 @@ function App() {
       
       const blob = await zip.generateAsync({ type: 'blob' });
       const filename = `steem_drafts_md_${new Date().toISOString().split('T')[0]}.zip`;
+
+      if (isTauri()) {
+        try {
+          const { save } = await import('@tauri-apps/plugin-dialog');
+          const { writeFile } = await import('@tauri-apps/plugin-fs');
+          const path = await save({
+            defaultPath: filename,
+            filters: [{ name: 'ZIP archive', extensions: ['zip'] }]
+          });
+          if (path) {
+            const arrayBuffer = await blob.arrayBuffer();
+            await writeFile(path, new Uint8Array(arrayBuffer));
+            notify("Exported successfully to " + path.split(/[/\\]/).pop(), "success");
+            return;
+          }
+        } catch (tauriErr) {
+          console.error("Tauri export error:", tauriErr);
+          // fallback to standard download
+        }
+      }
+
       saveAs(blob, filename);
       notify("Drafts exported as Markdown files in ZIP!", "success");
     } catch (err: any) {
@@ -3589,7 +3610,7 @@ function App() {
     }
   };
 
-  const downloadFile = () => {
+  const downloadFile = async () => {
     const lines = content.split('\n');
     const firstLine = lines[0]?.trim() || "";
     
@@ -3607,8 +3628,6 @@ function App() {
         exportContent += `# ${derivedTitle}\n\n`;
       } else if (!firstLine.startsWith('#')) {
         // First line is the title but without #, let's wrap it nicely
-        // (Actually, we'll just prepend the # to the content or let it be)
-        // For simplicity, if first line IS the title but lacks #, we just add # to the start of processing
       }
     }
     
@@ -3618,17 +3637,36 @@ function App() {
       exportContent += `\n\n---\n- **Tags**: ${pubTags}\n`;
     }
 
-    const element = document.createElement("a");
-    const file = new Blob([exportContent], {type: 'text/markdown'});
-    element.href = URL.createObjectURL(file);
-    
     const safeFilename = (derivedTitle || `steem-post-${Date.now()}`)
       .replace(/[/\\?%*:|"<>]/g, '-')
       .substring(0, 80)
       .trim();
-      
-    element.download = `${safeFilename || 'steem-post'}.md`;
-    
+    const filename = `${safeFilename || 'steem-post'}.md`;
+
+    if (isTauri()) {
+      try {
+        const { save } = await import('@tauri-apps/plugin-dialog');
+        const { writeTextFile } = await import('@tauri-apps/plugin-fs');
+        const path = await save({
+          defaultPath: filename,
+          filters: [{ name: 'Markdown', extensions: ['md'] }]
+        });
+        if (path) {
+          await writeTextFile(path, exportContent);
+          notify("Saved successfully to " + path.split(/[/\\]/).pop(), "success");
+          return;
+        }
+        return; // user cancelled
+      } catch (tauriErr) {
+        console.error("Tauri download error:", tauriErr);
+        // fallback
+      }
+    }
+
+    const element = document.createElement("a");
+    const file = new Blob([exportContent], {type: 'text/markdown'});
+    element.href = URL.createObjectURL(file);
+    element.download = filename;
     document.body.appendChild(element);
     element.click();
     document.body.removeChild(element);

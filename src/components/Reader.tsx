@@ -3351,7 +3351,7 @@ export default function Reader({
                                 </button>
                                 <button
                                   type="button"
-                                  onClick={(e) => {
+                                  onClick={async (e) => {
                                     try {
                                       const logsStr = localStorage.getItem('steem_vote_logs');
                                       const logs = logsStr ? JSON.parse(logsStr) : [];
@@ -3364,11 +3364,33 @@ export default function Reader({
                                       }
                                       const mdHeader = '| Nickname | Link | Weight | Type | Date |\n|---|---|---|---|---|\n';
                                       const mdBody = logs.map((l:any) => `| @${l.author} | [link](https://steemit.com/@${l.author}/${l.permlink}) | ${l.weight}% | ${l.isComment ? 'Comment' : 'Post'} | ${new Date(l.timestamp).toLocaleDateString()} |`).join('\n');
-                                      const blob = new Blob([mdHeader + mdBody], { type: 'text/markdown;charset=utf-8;' });
+                                      const exportContent = mdHeader + mdBody;
+                                      const filename = `curation-votes-${new Date().toISOString().split('T')[0]}.md`;
+
+                                      const { isTauri } = await import('../services/nativeService');
+                                      if (isTauri()) {
+                                        try {
+                                          const { save } = await import('@tauri-apps/plugin-dialog');
+                                          const { writeTextFile } = await import('@tauri-apps/plugin-fs');
+                                          const path = await save({
+                                            defaultPath: filename,
+                                            filters: [{ name: 'Markdown', extensions: ['md'] }]
+                                          });
+                                          if (path) {
+                                            await writeTextFile(path, exportContent);
+                                            return;
+                                          }
+                                        } catch (tauriErr) {
+                                          console.error("Tauri curation export error:", tauriErr);
+                                          // fallback
+                                        }
+                                      }
+
+                                      const blob = new Blob([exportContent], { type: 'text/markdown;charset=utf-8;' });
                                       const url = URL.createObjectURL(blob);
                                       const a = document.createElement('a');
                                       a.href = url;
-                                      a.download = `curation-votes-${new Date().toISOString().split('T')[0]}.md`;
+                                      a.download = filename;
                                       a.click();
                                     } catch(err) {
                                       console.error("Export failed", err);
@@ -4161,15 +4183,36 @@ export default function Reader({
                             />
                           </label>
                           <button
-                            onClick={() => {
+                            onClick={async () => {
+                              const exportContent = JSON.stringify(config.whiteList, null, 2);
+                              const filename = `whitelist_export_${new Date().toISOString().split("T")[0]}.json`;
+
+                              const { isTauri } = await import('../services/nativeService');
+                              if (isTauri()) {
+                                try {
+                                  const { save } = await import('@tauri-apps/plugin-dialog');
+                                  const { writeTextFile } = await import('@tauri-apps/plugin-fs');
+                                  const path = await save({
+                                    defaultPath: filename,
+                                    filters: [{ name: 'JSON', extensions: ['json'] }]
+                                  });
+                                  if (path) {
+                                    await writeTextFile(path, exportContent);
+                                    return;
+                                  }
+                                } catch (err) {
+                                  console.error("Tauri whitelist export error:", err);
+                                }
+                              }
+
                               const blob = new Blob(
-                                [JSON.stringify(config.whiteList, null, 2)],
+                                [exportContent],
                                 { type: "application/json" },
                               );
                               const url = URL.createObjectURL(blob);
                               const a = document.createElement("a");
                               a.href = url;
-                              a.download = `whitelist_export_${new Date().toISOString().split("T")[0]}.json`;
+                              a.download = filename;
                               a.click();
                               URL.revokeObjectURL(url);
                             }}
@@ -4283,15 +4326,36 @@ export default function Reader({
                             />
                           </label>
                           <button
-                            onClick={() => {
+                            onClick={async () => {
+                              const exportContent = JSON.stringify(config.blackList, null, 2);
+                              const filename = `blacklist_export_${new Date().toISOString().split("T")[0]}.json`;
+
+                              const { isTauri } = await import('../services/nativeService');
+                              if (isTauri()) {
+                                try {
+                                  const { save } = await import('@tauri-apps/plugin-dialog');
+                                  const { writeTextFile } = await import('@tauri-apps/plugin-fs');
+                                  const path = await save({
+                                    defaultPath: filename,
+                                    filters: [{ name: 'JSON', extensions: ['json'] }]
+                                  });
+                                  if (path) {
+                                    await writeTextFile(path, exportContent);
+                                    return;
+                                  }
+                                } catch (err) {
+                                  console.error("Tauri blacklist export error:", err);
+                                }
+                              }
+
                               const blob = new Blob(
-                                [JSON.stringify(config.blackList, null, 2)],
+                                [exportContent],
                                 { type: "application/json" },
                               );
                               const url = URL.createObjectURL(blob);
                               const a = document.createElement("a");
                               a.href = url;
-                              a.download = `blacklist_export_${new Date().toISOString().split("T")[0]}.json`;
+                              a.download = filename;
                               a.click();
                               URL.revokeObjectURL(url);
                             }}
