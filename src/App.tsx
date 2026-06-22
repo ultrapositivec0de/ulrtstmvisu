@@ -3522,8 +3522,27 @@ function App() {
       
       const blob = await zip.generateAsync({ type: 'blob' });
       const filename = `steem_drafts_md_${new Date().toISOString().split('T')[0]}.zip`;
-      saveAs(blob, filename);
-      notify("Drafts exported as Markdown files in ZIP!", "success");
+
+      if (isTauri()) {
+        try {
+          const arrayBuffer = await blob.arrayBuffer();
+          const uint8Array = new Uint8Array(arrayBuffer);
+          const { writeFile, BaseDirectory } = await import('@tauri-apps/plugin-fs');
+          
+          await writeFile(filename, uint8Array, {
+            baseDir: BaseDirectory.Document,
+          });
+          notify(`Saved to Documents/steem_drafts...`, "success");
+          alert(`Backup exported successfully to your Documents folder as ${filename}!`);
+        } catch (tauriError: any) {
+          console.error('[Tauri Backup Export] Failed:', tauriError);
+          saveAs(blob, filename);
+          notify("Exported via web downloader", "success");
+        }
+      } else {
+        saveAs(blob, filename);
+        notify("Drafts exported as Markdown files in ZIP!", "success");
+      }
     } catch (err: any) {
       notify("Error: " + err.message, "error");
     }
@@ -3618,17 +3637,38 @@ function App() {
       exportContent += `\n\n---\n- **Tags**: ${pubTags}\n`;
     }
 
-    const element = document.createElement("a");
-    const file = new Blob([exportContent], {type: 'text/markdown'});
-    element.href = URL.createObjectURL(file);
-    
     const safeFilename = (derivedTitle || `steem-post-${Date.now()}`)
       .replace(/[/\\?%*:|"<>]/g, '-')
       .substring(0, 80)
       .trim();
-      
-    element.download = `${safeFilename || 'steem-post'}.md`;
-    
+    const finalFilename = `${safeFilename || 'steem-post'}.md`;
+
+    if (isTauri()) {
+      import('@tauri-apps/plugin-fs').then(async ({ writeTextFile, BaseDirectory }) => {
+        try {
+          await writeTextFile(finalFilename, exportContent, {
+            baseDir: BaseDirectory.Document,
+          });
+          notify(`Saved to Documents: ${finalFilename}`, "success");
+          alert(`File saved in Documents folder as: ${finalFilename}`);
+        } catch (error: any) {
+          console.error("[Tauri Post Export] Failed:", error);
+          saveWebDownload(finalFilename, exportContent);
+        }
+      }).catch(err => {
+        console.error("Failed to import Tauri FS:", err);
+        saveWebDownload(finalFilename, exportContent);
+      });
+    } else {
+      saveWebDownload(finalFilename, exportContent);
+    }
+  };
+
+  const saveWebDownload = (fname: string, text: string) => {
+    const element = document.createElement("a");
+    const file = new Blob([text], {type: 'text/markdown'});
+    element.href = URL.createObjectURL(file);
+    element.download = fname;
     document.body.appendChild(element);
     element.click();
     document.body.removeChild(element);

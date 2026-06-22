@@ -49,88 +49,88 @@ function withTimeout<T>(promise: Promise<T>, ms: number, defaultValue: T): Promi
 
 // RESTORE: Synchronously (before rendering React) reads backup file and populates localStorage
 export async function initStorageRestore() {
-  if (!isNeutralino()) return;
-  
-  const path = await getBackupPath();
-  if (!path) return;
-
-  try {
-    const { Neutralino } = window as any;
-    
-    // Check if the backup file actually exists using Neutralino filesystem
-    let fileExists = false;
-    try {
-      const stats = await Neutralino.filesystem.getStats(path);
-      if (stats) fileExists = true;
-    } catch {
-      fileExists = false;
-    }
-
-    if (!fileExists) {
-      console.log('[Neutralino Backup] No backup file found on disk yet. Starting fresh.');
-      return;
-    }
-
-    // Wrap reading with timeout to prevent hanging the React mounting phase
-    const fileData = await withTimeout(
-      Neutralino.filesystem.readFile(path),
-      150, // 150ms maximum wait time for local disk I/O
-      ''
-    );
-
-    if (fileData) {
-      const parsed = JSON.parse(fileData);
-      let restoredCount = 0;
-      Object.keys(parsed).forEach(key => {
-        if (key.startsWith('steem_') || key.startsWith('widget_')) {
-          localStorage.setItem(key, parsed[key]);
-          restoredCount++;
-        }
-      });
-      console.log(`[Neutralino Backup] Successfully restored ${restoredCount} keys from disk backup.`);
-    }
-  } catch (err) {
-    console.log('[Neutralino Backup] No previous backup config restored or error occurred:', err);
-  }
-}
-
-// SAVE: Periodically checks localStorage for updates and saves them physically to the disk
-export function startStorageAutosave() {
-  if (!isNeutralino()) return;
-
-  let lastSavedJson = '';
-  setInterval(async () => {
+  if (isNeutralino()) {
     const path = await getBackupPath();
     if (!path) return;
 
     try {
       const { Neutralino } = window as any;
-      const dataToSave: Record<string, string> = {};
-      let hasKeys = false;
+      
+      // Check if the backup file actually exists using Neutralino filesystem
+      let fileExists = false;
+      try {
+        const stats = await Neutralino.filesystem.getStats(path);
+        if (stats) fileExists = true;
+      } catch {
+        fileExists = false;
+      }
 
-      for (let i = 0; i < localStorage.length; i++) {
-        const key = localStorage.key(i);
-        if (key && (key.startsWith('steem_') || key.startsWith('widget_'))) {
-          const val = localStorage.getItem(key);
-          if (val !== null) {
-            dataToSave[key] = val;
-            hasKeys = true;
+      if (!fileExists) {
+        console.log('[Neutralino Backup] No backup file found on disk yet. Starting fresh.');
+        return;
+      }
+
+      // Wrap reading with timeout to prevent hanging the React mounting phase
+      const fileData = await withTimeout(
+        Neutralino.filesystem.readFile(path),
+        150, // 150ms maximum wait time for local disk I/O
+        ''
+      );
+
+      if (fileData) {
+        const parsed = JSON.parse(fileData);
+        let restoredCount = 0;
+        Object.keys(parsed).forEach(key => {
+          if (key.startsWith('steem_') || key.startsWith('widget_')) {
+            localStorage.setItem(key, parsed[key]);
+            restoredCount++;
+          }
+        });
+        console.log(`[Neutralino Backup] Successfully restored ${restoredCount} keys from disk backup.`);
+      }
+    } catch (err) {
+      console.log('[Neutralino Backup] No previous backup config restored or error occurred:', err);
+    }
+  }
+}
+
+// SAVE: Periodically checks localStorage for updates and saves them physically to the disk
+export function startStorageAutosave() {
+  if (isNeutralino()) {
+    let lastSavedJson = '';
+    setInterval(async () => {
+      const path = await getBackupPath();
+      if (!path) return;
+
+      try {
+        const { Neutralino } = window as any;
+        const dataToSave: Record<string, string> = {};
+        let hasKeys = false;
+
+        for (let i = 0; i < localStorage.length; i++) {
+          const key = localStorage.key(i);
+          if (key && (key.startsWith('steem_') || key.startsWith('widget_'))) {
+            const val = localStorage.getItem(key);
+            if (val !== null) {
+              dataToSave[key] = val;
+              hasKeys = true;
+            }
           }
         }
-      }
 
-      if (hasKeys) {
-        const jsonStr = JSON.stringify(dataToSave, null, 2);
-        if (jsonStr !== lastSavedJson) {
-          await Neutralino.filesystem.writeFile(path, jsonStr);
-          lastSavedJson = jsonStr;
-          console.log(`[Neutralino Backup] Settings, keys, and drafts autosaved to ${path}`);
+        if (hasKeys) {
+          const jsonStr = JSON.stringify(dataToSave, null, 2);
+          if (jsonStr !== lastSavedJson) {
+            await Neutralino.filesystem.writeFile(path, jsonStr);
+            lastSavedJson = jsonStr;
+            console.log(`[Neutralino Backup] Settings, keys, and drafts autosaved to ${path}`);
+          }
         }
+      } catch (saveError) {
+        console.error('[Neutralino Backup] Autosave to filesystem failed:', saveError);
       }
-    } catch (saveError) {
-      console.error('[Neutralino Backup] Autosave to filesystem failed:', saveError);
-    }
-  }, 4000); // Check for modifications every 4 seconds
+    }, 4000); // Check for modifications every 4 seconds
+  }
 }
 
 export const NativeService = {

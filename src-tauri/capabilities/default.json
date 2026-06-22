@@ -7,6 +7,10 @@
     "core:path:default",
     "core:event:default",
     "core:window:default",
-    "core:app:default"
+    "core:app:default",
+    "fs:default",
+    "fs:allow-read-all",
+    "fs:allow-write-all",
+    "dialog:default"
   ]
 }
