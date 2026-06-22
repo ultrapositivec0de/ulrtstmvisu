@@ -12,7 +12,7 @@ permissions:
 jobs:
   publish-android:
     name: "Build & Release (Android)"
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
     steps:
       - name: "Checkout code repository"
         uses: actions/checkout@v4
@@ -23,11 +23,11 @@ jobs:
           node-version: lts/*
           cache: "npm"
 
-      - name: "Setup Java (JDK 26)"
+      - name: "Setup Java (JDK 24)"
         uses: actions/setup-java@v4
         with:
           distribution: "zulu"
-          java-version: "26"
+          java-version: "24"
 
       - name: "Install Rust stable toolchain"
         uses: dtolnay/rust-toolchain@stable
@@ -46,24 +46,66 @@ jobs:
 
       - name: "Set up Android SDK and NDK paths"
         run: |
-          NDK_PARENT="$ANDROID_HOME/ndk"
-          if [ -d "$NDK_PARENT" ]; then
-            SELECTED_NDK=$(ls -1 "$NDK_PARENT" | sort -V | tail -n 1)
-            if [ ! -z "$SELECTED_NDK" ]; then
-              echo "Found pre-installed NDK: $SELECTED_NDK"
-              echo "ANDROID_NDK_HOME=$NDK_PARENT/$SELECTED_NDK" >> $GITHUB_ENV
-              echo "NDK_HOME=$NDK_PARENT/$SELECTED_NDK" >> $GITHUB_ENV
-            else
-              echo "No NDK subdirectories found. Installing NDK 26.3.11579264..."
-              sdkmanager --install "ndk;26.3.11579264"
-              echo "ANDROID_NDK_HOME=$NDK_PARENT/26.3.11579264" >> $GITHUB_ENV
-              echo "NDK_HOME=$NDK_PARENT/26.3.11579264" >> $GITHUB_ENV
+          # 1. Check if ANDROID_NDK_LATEST_HOME is pre-set and exists
+          if [ ! -z "$ANDROID_NDK_LATEST_HOME" ] && [ -d "$ANDROID_NDK_LATEST_HOME" ]; then
+            echo "Using system pre-configured ANDROID_NDK_LATEST_HOME: $ANDROID_NDK_LATEST_HOME"
+            echo "ANDROID_NDK_HOME=$ANDROID_NDK_LATEST_HOME" >> $GITHUB_ENV
+            echo "NDK_HOME=$ANDROID_NDK_LATEST_HOME" >> $GITHUB_ENV
+            exit 0
+          fi
+
+          # 2. Check if ANDROID_NDK_HOME is pre-set and exists
+          if [ ! -z "$ANDROID_NDK_HOME" ] && [ -d "$ANDROID_NDK_HOME" ]; then
+            echo "Using system pre-configured ANDROID_NDK_HOME: $ANDROID_NDK_HOME"
+            echo "NDK_HOME=$ANDROID_NDK_HOME" >> $GITHUB_ENV
+            exit 0
+          fi
+
+          # 3. Find latest NDK in typical directories
+          FOUND_NDK=""
+          POSSIBLE_NDK_PARENTS=(
+            "$ANDROID_HOME/ndk"
+            "/usr/local/lib/android/sdk/ndk"
+            "/usr/local/share/android-sdk/ndk"
+            "/home/runner/Android/Sdk/ndk"
+          )
+
+          for PARENT in "${POSSIBLE_NDK_PARENTS[@]}"; do
+            if [ -d "$PARENT" ]; then
+              LATEST_SUBDIR=$(ls -1 "$PARENT" | sort -V | tail -n 1)
+              if [ ! -z "$LATEST_SUBDIR" ] && [ -d "$PARENT/$LATEST_SUBDIR" ]; then
+                FOUND_NDK="$PARENT/$LATEST_SUBDIR"
+                break
+              fi
             fi
+          done
+
+          if [ ! -z "$FOUND_NDK" ]; then
+            echo "Detected NDK at path: $FOUND_NDK"
+            echo "ANDROID_NDK_HOME=$FOUND_NDK" >> $GITHUB_ENV
+            echo "NDK_HOME=$FOUND_NDK" >> $GITHUB_ENV
           else
-            echo "NDK parent directory not found. Installing NDK 26.3.11579264..."
-            sdkmanager --install "ndk;26.3.11579264"
-            echo "ANDROID_NDK_HOME=$NDK_PARENT/26.3.11579264" >> $GITHUB_ENV
-            echo "NDK_HOME=$NDK_PARENT/26.3.11579264" >> $GITHUB_ENV
+            echo "No pre-installed NDK found. Installing NDK 26.3.11579264..."
+            # Try installing with sdkmanager (use root/sudo if needed or normal user)
+            if [ -w "$ANDROID_HOME" ]; then
+              sdkmanager --install "ndk;26.3.11579264"
+            else
+              sudo sdkmanager --install "ndk;26.3.11579264" || sdkmanager --install "ndk;26.3.11579264"
+            fi
+            
+            NDK_PATH="$ANDROID_HOME/ndk/26.3.11579264"
+            if [ ! -d "$NDK_PATH" ]; then
+              # Look if it got installed elsewhere under ndk parent
+              NDK_PARENT="$ANDROID_HOME/ndk"
+              LATEST_SUBDIR=$(ls -1 "$NDK_PARENT" | sort -V | tail -n 1)
+              if [ ! -z "$LATEST_SUBDIR" ]; then
+                NDK_PATH="$NDK_PARENT/$LATEST_SUBDIR"
+              fi
+            fi
+            
+            echo "Installed NDK is at: $NDK_PATH"
+            echo "ANDROID_NDK_HOME=$NDK_PATH" >> $GITHUB_ENV
+            echo "NDK_HOME=$NDK_PATH" >> $GITHUB_ENV
           fi
 
       - name: "Install Frontend Dependencies"
