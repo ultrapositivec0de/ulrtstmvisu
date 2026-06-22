@@ -1462,7 +1462,7 @@ function App() {
     placeholder?: string
   } | null>(null);
   
-  const [cacheClearOptions, setCacheClearOptions] = useState({ cache: true, drafts: false, settings: false, vault: false, userFilters: false });
+  const [cacheClearOptions, setCacheClearOptions] = useState({ cache: true, drafts: false, settings: false, vault: false });
 
   useEffect(() => {
     if (activeModal === null && !systemDialog) {
@@ -3522,27 +3522,8 @@ function App() {
       
       const blob = await zip.generateAsync({ type: 'blob' });
       const filename = `steem_drafts_md_${new Date().toISOString().split('T')[0]}.zip`;
-
-      if (isTauri()) {
-        try {
-          const arrayBuffer = await blob.arrayBuffer();
-          const uint8Array = new Uint8Array(arrayBuffer);
-          const { writeFile, BaseDirectory } = await import('@tauri-apps/plugin-fs');
-          
-          await writeFile(filename, uint8Array, {
-            baseDir: BaseDirectory.Document,
-          });
-          notify(`Saved to Documents/steem_drafts...`, "success");
-          alert(`Backup exported successfully to your Documents folder as ${filename}!`);
-        } catch (tauriError: any) {
-          console.error('[Tauri Backup Export] Failed:', tauriError);
-          saveAs(blob, filename);
-          notify("Exported via web downloader", "success");
-        }
-      } else {
-        saveAs(blob, filename);
-        notify("Drafts exported as Markdown files in ZIP!", "success");
-      }
+      saveAs(blob, filename);
+      notify("Drafts exported as Markdown files in ZIP!", "success");
     } catch (err: any) {
       notify("Error: " + err.message, "error");
     }
@@ -3637,38 +3618,17 @@ function App() {
       exportContent += `\n\n---\n- **Tags**: ${pubTags}\n`;
     }
 
+    const element = document.createElement("a");
+    const file = new Blob([exportContent], {type: 'text/markdown'});
+    element.href = URL.createObjectURL(file);
+    
     const safeFilename = (derivedTitle || `steem-post-${Date.now()}`)
       .replace(/[/\\?%*:|"<>]/g, '-')
       .substring(0, 80)
       .trim();
-    const finalFilename = `${safeFilename || 'steem-post'}.md`;
-
-    if (isTauri()) {
-      import('@tauri-apps/plugin-fs').then(async ({ writeTextFile, BaseDirectory }) => {
-        try {
-          await writeTextFile(finalFilename, exportContent, {
-            baseDir: BaseDirectory.Document,
-          });
-          notify(`Saved to Documents: ${finalFilename}`, "success");
-          alert(`File saved in Documents folder as: ${finalFilename}`);
-        } catch (error: any) {
-          console.error("[Tauri Post Export] Failed:", error);
-          saveWebDownload(finalFilename, exportContent);
-        }
-      }).catch(err => {
-        console.error("Failed to import Tauri FS:", err);
-        saveWebDownload(finalFilename, exportContent);
-      });
-    } else {
-      saveWebDownload(finalFilename, exportContent);
-    }
-  };
-
-  const saveWebDownload = (fname: string, text: string) => {
-    const element = document.createElement("a");
-    const file = new Blob([text], {type: 'text/markdown'});
-    element.href = URL.createObjectURL(file);
-    element.download = fname;
+      
+    element.download = `${safeFilename || 'steem-post'}.md`;
+    
     document.body.appendChild(element);
     element.click();
     document.body.removeChild(element);
@@ -7794,29 +7754,22 @@ function App() {
                           <label className="flex items-start gap-3 cursor-pointer group">
                              <input type="checkbox" checked={cacheClearOptions.cache} onChange={e => setCacheClearOptions(p => ({...p, cache: e.target.checked}))} className="mt-1 bg-slate-900 border-slate-700 rounded text-red-500 focus:ring-red-500" />
                              <div className="flex flex-col">
-                               <span className="text-sm font-medium text-slate-300 group-hover:text-amber-100 transition-colors">Кеш зображень рідера, галереї та результатів пошуку</span>
-                               <span className="text-xs text-slate-500">Тимчасові фото, результати пошуку та завантажені дописи рідера (steem_cached_posts, steem_hidden_replies, steem_history_cache)</span>
-                             </div>
-                          </label>
-                          <label className="flex items-start gap-3 cursor-pointer group">
-                             <input type="checkbox" checked={cacheClearOptions.userFilters} onChange={e => setCacheClearOptions(p => ({...p, userFilters: e.target.checked}))} className="mt-1 bg-slate-900 border-slate-700 rounded text-red-500 focus:ring-red-500" />
-                             <div className="flex flex-col">
-                               <span className="text-sm font-medium text-slate-300 group-hover:text-amber-100 transition-colors">Списки користувачів та фільтри</span>
-                               <span className="text-xs text-slate-500">Згадки, завантажені профілі, список ігнорованих, білий та чорний список рідера</span>
+                               <span className="text-sm font-medium text-slate-300 group-hover:text-amber-100 transition-colors">Кеш зображень рідера та галереї</span>
+                               <span className="text-xs text-slate-500">Тимчасові дані, завантажені для перегляду</span>
                              </div>
                           </label>
                           <label className="flex items-start gap-3 cursor-pointer group">
                              <input type="checkbox" checked={cacheClearOptions.drafts} onChange={e => setCacheClearOptions(p => ({...p, drafts: e.target.checked}))} className="mt-1 bg-slate-900 border-slate-700 rounded text-red-500 focus:ring-red-500" />
                              <div className="flex flex-col">
                                <span className="text-sm font-medium text-slate-300 group-hover:text-amber-100 transition-colors">Чернетки та шаблони</span>
-                               <span className="text-xs text-slate-500">Всі збережені статті, шаблони та черга публікацій (`steem_drafts`, `steem_templates`, `steem_queue`)</span>
+                               <span className="text-xs text-slate-500">Всі збережені статті (steem_drafts, steem_templates)</span>
                              </div>
                           </label>
                           <label className="flex items-start gap-3 cursor-pointer group">
                              <input type="checkbox" checked={cacheClearOptions.settings} onChange={e => setCacheClearOptions(p => ({...p, settings: e.target.checked}))} className="mt-1 bg-slate-900 border-slate-700 rounded text-red-500 focus:ring-red-500" />
                              <div className="flex flex-col">
                                <span className="text-sm font-medium text-slate-300 group-hover:text-amber-100 transition-colors">Системні налаштування</span>
-                               <span className="text-xs text-slate-500">Тема оформлення, шрифт, вирівнювання, синхронізація прокрутки, параметри віджетів та локалізація</span>
+                               <span className="text-xs text-slate-500">Тема, форматування, розмітка тощо</span>
                              </div>
                           </label>
                           <label className="flex items-start gap-3 cursor-pointer group">
@@ -7830,58 +7783,12 @@ function App() {
 
                        <button 
                          onClick={async () => {
-                           if (!cacheClearOptions.cache && !cacheClearOptions.userFilters && !cacheClearOptions.drafts && !cacheClearOptions.settings && !cacheClearOptions.vault) {
+                           if (!cacheClearOptions.cache && !cacheClearOptions.drafts && !cacheClearOptions.settings && !cacheClearOptions.vault) {
                              notify("Жодної опції не вибрано", "error");
                              return;
                            }
                            if (await confirmDialog("Ви впевнені, що бажаєте видалити вибрані дані? Цю дію неможливо скасувати.")) {
                               const keysToKeep = [];
-                               if (cacheClearOptions.cache) {
-                                   localStorage.removeItem('steem_uploaded_images_v2');
-                                   localStorage.removeItem('steem_gallery_cache_results');
-                                   localStorage.removeItem('steem_history_cache');
-                                   localStorage.removeItem('steem_cached_posts');
-                                   localStorage.removeItem('steem_cached_curation_posts');
-                                   localStorage.removeItem('steem_hidden_replies');
-                                   localStorage.removeItem('steem_vote_logs');
-                               }
-                               if (cacheClearOptions.userFilters) {
-                                   localStorage.removeItem('steem_muted_users');
-                                   localStorage.removeItem('steem_mentions');
-                                   localStorage.removeItem('steem_users');
-                                   try {
-                                       const readerConfRaw = localStorage.getItem('steem_reader_config_v1');
-                                       if (readerConfRaw) {
-                                           const parsed = JSON.parse(readerConfRaw);
-                                           parsed.blackList = [];
-                                           parsed.whiteList = [];
-                                           parsed.onlyWhitelist = false;
-                                           localStorage.setItem('steem_reader_config_v1', JSON.stringify(parsed));
-                                       }
-                                   } catch (e) {
-                                       console.error(e);
-                                   }
-                               }
-                               if (cacheClearOptions.drafts) {
-                                   localStorage.removeItem('steem_drafts');
-                                   localStorage.removeItem('steem_templates');
-                                   localStorage.removeItem('steem_queue');
-                                   localStorage.removeItem('steem_editor_cursor');
-                               }
-                               if (cacheClearOptions.settings) {
-                                   const keys = [
-                                       'steem_dark_mode', 'steem_visual_style', 'steem_sync_scroll', 'widget_no_border', 
-                                       'steem_lang', 'steem_notif_enabled', 'steem_auto_insert_mentions', 'steem_theme_color', 
-                                       'steem_editor_font', 'steem_performance_mode', 'steem_traffic_optimized', 
-                                       'steem_exif_enabled', 'widget_opacity', 'steem_widget_pos', 'steem_enabled_tools'
-                                   ];
-                                   keys.forEach(k => localStorage.removeItem(k));
-                               }
-                               if (cacheClearOptions.vault) {
-                                   localStorage.removeItem('steem_vault_accounts');
-                                   localStorage.removeItem('steem_vault_encrypted');
-                                   localStorage.removeItem('steem_username');
-                               }
                               // Logic for clearing specific items
                               if (!cacheClearOptions.vault) {
                                   keysToKeep.push('steem_vault_accounts', 'steem_vault_encrypted', 'steem_username');
@@ -7893,10 +7800,7 @@ function App() {
                                   keysToKeep.push('steem_dark_mode', 'steem_visual_style', 'steem_sync_scroll', 'widget_no_border', 'steem_lang', 'steem_notif_enabled', 'steem_auto_insert_mentions');
                               }
                               
-                              notify("Очищення успішно завершено.");
-                               setTimeout(() => window.location.reload(), 1000);
-                               if (true) return;
-                               if (cacheClearOptions.cache && cacheClearOptions.drafts && cacheClearOptions.settings && cacheClearOptions.vault) {
+                              if (cacheClearOptions.cache && cacheClearOptions.drafts && cacheClearOptions.settings && cacheClearOptions.vault) {
                                   localStorage.clear();
                               } else {
                                   const temp = {};
