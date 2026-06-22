@@ -2,8 +2,9 @@
   "name": "Ultra Steem Editor",
   "description": "A feature-rich editor for Steem with native Android support.",
   "requestFramePermissions": [
-    "camera",
-    "storage"
+    "storage",
+    "read_external_storage",
+    "write_external_storage"
   ],
   "_android_permissions_cheat_sheet": {
     "camera": "Photos and QR scanning",
