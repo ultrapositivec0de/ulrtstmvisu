@@ -20,7 +20,7 @@ import { Draft, Template, ImageItem, AuthType, TagGroup, Language, QueueItem, St
 import { Buffer } from 'buffer';
 import { SecurityService } from './services/securityService';
 import { PexelsService, PexelsPhoto } from './services/pexelsService';
-import { isTauri, isNeutralino } from './services/nativeService';
+import { NativeService, isTauri, isNeutralino } from './services/nativeService';
 import ImageItemComp from './components/ImageItem';
 import ExternalImageItem from './components/ExternalImageItem';
 import Reader from './components/Reader';
@@ -3522,8 +3522,10 @@ function App() {
       
       const blob = await zip.generateAsync({ type: 'blob' });
       const filename = `steem_drafts_md_${new Date().toISOString().split('T')[0]}.zip`;
-      saveAs(blob, filename);
-      notify("Drafts exported as Markdown files in ZIP!", "success");
+      const saved = await NativeService.saveFileNativeOrWeb(blob, filename, [{ name: 'ZIP Archive', extensions: ['zip'] }]);
+      if (saved) {
+        notify("Drafts exported as Markdown files in ZIP!", "success");
+      }
     } catch (err: any) {
       notify("Error: " + err.message, "error");
     }
@@ -3618,20 +3620,22 @@ function App() {
       exportContent += `\n\n---\n- **Tags**: ${pubTags}\n`;
     }
 
-    const element = document.createElement("a");
     const file = new Blob([exportContent], {type: 'text/markdown'});
-    element.href = URL.createObjectURL(file);
-    
     const safeFilename = (derivedTitle || `steem-post-${Date.now()}`)
       .replace(/[/\\?%*:|"<>]/g, '-')
       .substring(0, 80)
       .trim();
-      
-    element.download = `${safeFilename || 'steem-post'}.md`;
-    
-    document.body.appendChild(element);
-    element.click();
-    document.body.removeChild(element);
+    const filename = `${safeFilename || 'steem-post'}.md`;
+
+    NativeService.saveFileNativeOrWeb(file, filename, [{ name: 'Markdown Post', extensions: ['md'] }])
+      .then(saved => {
+        if (saved) {
+          notify("Post exported as Markdown!", "success");
+        }
+      })
+      .catch(err => {
+        notify("Export error: " + err.message, "error");
+      });
   };
 
   const uploadExternalImage = async (url: string, fileName: string = 'image.jpg') => {

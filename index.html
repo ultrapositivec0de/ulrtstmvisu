@@ -12,7 +12,53 @@
       }
       
       // Global error handler for debugging white screens
+      window.onerror = function(message, source, lineno, colno, error) {
+        var msg = '';
+        if (typeof message === 'string') {
+          msg = message;
+        } else if (message && typeof message === 'object') {
+          msg = message.message || message.type || '';
+        }
+        msg = msg.toString().toLowerCase();
+        
+        // Suppress generic "Script error" and blank errors
+        if (!msg || msg.indexOf('script error') !== -1 || msg.indexOf('object event') !== -1 || msg.indexOf('object errorevent') !== -1) {
+          return true; // Tell browser we handled it
+        }
+
+        var src = (source || '').toString();
+        if (src && src.indexOf(window.location.origin) === -1 && src.indexOf('blob:') !== 0 && src.indexOf('http') === 0) {
+          // This is a third-party script from another domain, ignore it completely
+          return true;
+        }
+      };
+
       window.addEventListener('error', function(e) {
+        var msg = '';
+        if (e.message) {
+          msg = e.message;
+        } else if (e.error && e.error.message) {
+          msg = e.error.message;
+        }
+        msg = msg.toString().toLowerCase();
+
+        // Ignore benign cross-origin Script errors and unidentifiable errors
+        if (!msg || msg.indexOf('script error') !== -1 || msg.indexOf('object event') !== -1 || msg.indexOf('object errorevent') !== -1) {
+          e.preventDefault();
+          e.stopPropagation();
+          e.stopImmediatePropagation();
+          return;
+        }
+
+        var src = (e.filename || '').toString();
+        if (src && src.indexOf(window.location.origin) === -1 && src.indexOf('blob:') !== 0 && src.indexOf('http') === 0) {
+          // This is a third-party script from another domain, ignore it completely
+          e.preventDefault();
+          e.stopPropagation();
+          e.stopImmediatePropagation();
+          return;
+        }
+
         var errorDiv = document.createElement('div');
         errorDiv.style.position = 'absolute';
         errorDiv.style.top = '0';
@@ -25,13 +71,16 @@
         errorDiv.style.fontFamily = 'monospace';
         errorDiv.innerHTML = '<h3>Error: ' + e.message + '</h3><pre>' + (e.error ? e.error.stack : '') + '</pre>';
         document.body.appendChild(errorDiv);
-      });
+      }, true);
       
       window.addEventListener('unhandledrejection', function(e) {
         var reason = e.reason && e.reason.message ? e.reason.message : e.reason;
+        var reasonStr = (reason || '').toString();
         
-        // Ignore benign Vite WebSocket errors in preview environment
-        if (typeof reason === 'string' && reason.includes('WebSocket')) {
+        // Ignore benign Vite WebSocket errors and Script errors in preview environment
+        if (reasonStr.indexOf('WebSocket') !== -1 || reasonStr === 'Script error.' || reasonStr === 'Script error' || reasonStr.toLowerCase().indexOf('script error') !== -1) {
+          e.preventDefault();
+          e.stopPropagation();
           return;
         }
 
@@ -50,7 +99,15 @@
         document.body.appendChild(errorDiv);
       });
     </script>
-    <script src="js/neutralino.js"></script>
+    <script>
+      (function() {
+        if (typeof window !== 'undefined' && (window.NL_PORT || window.NL_TOKEN || window.NL_OS || window.__TAURI__ || window.__TAURI_INTERNALS__)) {
+          var script = document.createElement('script');
+          script.src = 'js/neutralino.js';
+          document.head.appendChild(script);
+        }
+      })();
+    </script>
   </head>
   <body>
     <div id="root"></div>

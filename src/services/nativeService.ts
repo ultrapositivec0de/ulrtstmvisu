@@ -189,6 +189,39 @@ export const NativeService = {
     }
   },
 
+  async saveFileNativeOrWeb(
+    blob: Blob,
+    filename: string,
+    filters?: { name: string; extensions: string[] }[]
+  ): Promise<boolean> {
+    if (isTauri()) {
+      try {
+        const { save } = await import('@tauri-apps/plugin-dialog');
+        const { writeFile } = await import('@tauri-apps/plugin-fs');
+        
+        const filePath = await save({
+          defaultPath: filename,
+          filters: filters
+        });
+        
+        if (filePath) {
+          const arrayBuffer = await blob.arrayBuffer();
+          const uint8Array = new Uint8Array(arrayBuffer);
+          await writeFile(filePath, uint8Array);
+          return true;
+        }
+        return false;
+      } catch (err) {
+        console.error('Tauri save file dialog error:', err);
+      }
+    }
+    
+    // Web and Neutralino fallback
+    const { saveAs } = await import('file-saver');
+    saveAs(blob, filename);
+    return true;
+  },
+
   /**
    * Tries to trigger permission dialogs on mobile (Tauri).
    * Note: On modern Android (13+), standard file pickers don't require manifest permissions.

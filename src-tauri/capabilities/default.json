@@ -7,6 +7,8 @@
     "core:path:default",
     "core:event:default",
     "core:window:default",
-    "core:app:default"
+    "core:app:default",
+    "dialog:default",
+    "fs:default"
   ]
 }
