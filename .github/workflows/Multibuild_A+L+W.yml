@@ -63,7 +63,7 @@ jobs:
         run: npx tsx generate_png.js && npx tauri icon app-icon.png
 
       - name: "Build Frontend & Compile desktop binaries with Tauri Action"
-        uses: tauri-apps/tauri-action@v0
+        uses: tauri-apps/tauri-action@v1
         env:
           # Token required to push binary draft release to GitHub
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
