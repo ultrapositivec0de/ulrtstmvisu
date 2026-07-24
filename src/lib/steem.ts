@@ -1,67 +1,141 @@
-import { Client } from 'dsteem';
+import * as dsteem from 'dsteem';
 
-const STEEM_NODES = [
+export const STEEM_NODES = [
   'https://api.steemit.com',
   'https://api.justyy.com'
-
 ];
 
 let activeNode = STEEM_NODES[0];
-let client = new Client(activeNode);
+let lastProbe = 0;
 
-export function getClient(): Client {
-  if (!client) {
-    client = new Client(activeNode);
-  }
-  return client;
-}
+export const getActiveNode = () => activeNode;
 
-export async function probeNodes(): Promise<string> {
-  console.log("Probing Steem nodes...");
-  let fastestNode = activeNode;
-  let minLatency = Infinity;
+/**
+ * Побудова послідовної перевірки нод. Повертає першу робочу ноду.
+ */
+export const probeNodes = async (force = false) => {
+  const now = Date.now();
+  if (!force && now - lastProbe < 300000) return activeNode; // Перевірка кожні 5 хв
 
   for (const node of STEEM_NODES) {
-    const start = Date.now();
     try {
-      const tempClient = new Client(node);
-      await tempClient.database.getConfig();
-      const latency = Date.now() - start;
-      console.log(`Node ${node} latency: ${latency}ms`);
-      if (latency < minLatency) {
-        minLatency = latency;
-        fastestNode = node;
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 3500);
+      
+      const res = await fetch(node, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          jsonrpc: '2.0',
+          method: 'condenser_api.get_dynamic_global_properties',
+          params: [],
+          id: 1
+        }),
+        signal: controller.signal
+      });
+      
+      clearTimeout(timeoutId);
+      if (res.ok) {
+        const data = await res.json();
+        if (data.result && data.result.head_block_number) {
+          activeNode = node;
+          lastProbe = now;
+          return node;
+        }
       }
     } catch (e) {
-      console.warn(`Node ${node} failed probe:`, e);
+      console.warn(`Node ${node} probe failed:`, e);
     }
   }
-
-  activeNode = fastestNode;
-  client = new Client(activeNode);
-  console.log(`Setting active node to ${activeNode}`);
   return activeNode;
-}
+};
 
-export async function callWithFallback<T = any>(method: string, params: any): Promise<T> {
-  const nodes = [activeNode, ...STEEM_NODES.filter(n => n !== activeNode)];
-  let lastError: any = null;
-
-  for (const node of nodes) {
-    try {
-      const activeClient = new Client(node);
-      
-      const parts = method.split('.');
-      const api = parts.length > 1 ? parts[0] : 'condenser_api';
-      const actualMethod = parts.length > 1 ? parts[1] : method;
-      
-      const result = await activeClient.call(api, actualMethod, params);
-      return result as T;
-    } catch (e) {
-      console.warn(`Call failed on node ${node}:`, e);
-      lastError = e;
+export const getClient = () => {
+  const node = getActiveNode();
+  try {
+    const ClientClass = (dsteem as any).Client || (dsteem as any).default?.Client;
+    if (ClientClass) {
+      return new ClientClass(node, { timeout: 10000 });
     }
+  } catch (err) {
+    console.warn("Internal dsteem failed, fallback", err);
   }
 
-  throw lastError || new Error(`All nodes failed to execute method ${method}`);
-}
+  const dsteemExternal = (window as any).dsteem;
+  if (!dsteemExternal) return null;
+  return new dsteemExternal.Client(node, {
+    timeout: 10000
+  });
+};
+
+/**
+ * Calls a Steem RPC method with fallback to other nodes and retries
+ */
+export const callWithFallback = async (method: string, params: any, retriesPerNode = 2) => {
+  let lastError: any = null;
+  for (const node of STEEM_NODES) {
+    for (let i = 0; i <= retriesPerNode; i++) {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 12000);
+      
+      try {
+        if (i > 0) {
+          console.log(`Retrying ${method} on node ${node} (attempt ${i})...`);
+        }
+        
+        const response = await fetch(node, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            jsonrpc: '2.0',
+            method,
+            params,
+            id: Date.now()
+          }),
+          signal: controller.signal
+        });
+        
+        clearTimeout(timeoutId);
+        
+        if (response.status === 429) {
+          console.warn(`Node ${node} rate limited (429). Waiting...`);
+          await new Promise(resolve => setTimeout(resolve, 2000));
+          continue;
+        }
+
+        if (!response.ok) {
+          throw new Error(`HTTP error! status: ${response.status}`);
+        }
+
+        const data = await response.json();
+        if (data.error) {
+          // If it's a specific Steem error like "no such account", don't keep retrying other nodes
+          const msg = data.error.message || "";
+          if (msg.includes('No such') || msg.includes('not found') || msg.includes('Unknown method')) {
+             throw new Error(msg || "Steem RPC error");
+          }
+          console.warn(`Node ${node} returned error:`, data.error);
+          lastError = data.error;
+          continue; 
+        }
+        return data.result;
+      } catch (err: any) {
+        clearTimeout(timeoutId);
+        lastError = err;
+        
+        if (err.name === 'AbortError') {
+          console.warn(`Node ${node} timed out`);
+        } else if (err.message && (err.message.includes('No such') || err.message.includes('not found') || err.message.includes('Unknown method'))) {
+          throw err;
+        }
+        
+        console.warn(`Node ${node} failed (attempt ${i}):`, err);
+        if (i === retriesPerNode) continue; 
+        await new Promise(resolve => setTimeout(resolve, 1000 * i));
+      }
+    }
+  }
+  
+  const errorMessage = lastError?.message || lastError || "Unknown error";
+  throw new Error(`All Steem nodes failed. Last error: ${errorMessage}`);
+};

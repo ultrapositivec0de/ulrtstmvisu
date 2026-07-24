@@ -1,19 +1,6 @@
 {
   "name": "Ultra Steem Editor",
-  "description": "A feature-rich editor for Steem with native Android support.",
-  "requestFramePermissions": [
-    "storage",
-    "read_external_storage",
-    "write_external_storage"
-  ],
-  "_android_permissions_cheat_sheet": {
-    "camera": "Photos and QR scanning",
-    "microphone": "Audio recording (RECORD_AUDIO)",
-    "geolocation": "GPS access (ACCESS_FINE_LOCATION)",
-    "storage": "READ_EXTERNAL_STORAGE / WRITE_EXTERNAL_STORAGE (Auto-mapped for Android 12-)",
-    "media_images": "READ_MEDIA_IMAGES (Auto-mapped for Android 13+)"
-  },
-  "majorCapabilities": [
-    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
-  ]
+  "description": "Ultra Steem Editor v4.3.8 - High-performance Markdown and WYSIWYG editor.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
 }

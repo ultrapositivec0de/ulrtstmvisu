@@ -1,349 +1,464 @@
-import { Client, PrivateKey, cryptoUtils } from 'dsteem';
+import * as dsteem from 'dsteem';
+import { Buffer } from 'buffer';
+import { get, set, del } from 'idb-keyval';
 
-let currentPin: string | null = null;
-let statusCallbacks: ((unlocked: boolean) => void)[] = [];
+// Storage keys
+const STORAGE_KEY_ACCOUNTS = 'steem_vault_accounts_v3';
+const STORAGE_KEY_WRAPPED_MK = 'steem_vault_wrapped_mk_v3';
+const STORAGE_KEY_API_KEYS = 'steem_vault_api_keys_v3';
+const PEXELS_KEY = '_px_meta_v1'; // legacy
 
-function notifyCallbacks() {
-  const locked = isLocked();
-  statusCallbacks.forEach(cb => {
-    try {
-      cb(!locked);
-    } catch (e) {
-      console.error("Callback error", e);
-    }
-  });
+// Static App Secret (Static Salt)
+const APP_SECRET = "steem-editor-pro-v1-static-salt-2024";
+
+const getDSteem = () => {
+  return (dsteem as any).default || dsteem;
+};
+
+interface WrappedMasterKey {
+  wrappedKey: string; // Base64
+  salt: string;       // Base64
+  iv: string;         // Base64
+  marker: string;     // Base64 (Encrypted "VALID" string to verify PIN)
 }
 
-// Helper: derive crypto key from pin using PBKDF2
-async function deriveKey(password: string, saltHex: string): Promise<CryptoKey> {
-  const enc = new TextEncoder();
-  const passwordBuffer = enc.encode(password);
-  const salt = new Uint8Array(saltHex.match(/.{1,2}/g)!.map(byte => parseInt(byte, 16)));
-  
-  const baseKey = await window.crypto.subtle.importKey(
-    "raw",
-    passwordBuffer,
-    "PBKDF2",
-    false,
-    ["deriveKey"]
-  );
-  
-  return await window.crypto.subtle.deriveKey(
-    {
-      name: "PBKDF2",
-      salt: salt,
-      iterations: 100000,
-      hash: "SHA-256"
-    },
-    baseKey,
-    { name: "AES-GCM", length: 256 },
-    false,
-    ["encrypt", "decrypt"]
-  );
+interface VaultAccount {
+  username: string;
+  ciphertext: string; // Encrypted with Master Key
+  iv: string;         // IV for Master Key encryption
 }
 
-// Encrypt utility
-async function encrypt(text: string, pin: string): Promise<string> {
-  const enc = new TextEncoder();
-  const rawSalt = window.crypto.getRandomValues(new Uint8Array(16));
-  const saltHex = Array.from(rawSalt).map(b => b.toString(16).padStart(2, '0')).join('');
-  
-  const key = await deriveKey(pin, saltHex);
-  const iv = window.crypto.getRandomValues(new Uint8Array(12));
-  const ivHex = Array.from(iv).map(b => b.toString(16).padStart(2, '0')).join('');
-  
-  const encodedText = enc.encode(text);
-  const encryptedBuffer = await window.crypto.subtle.encrypt(
-    { name: "AES-GCM", iv: iv },
-    key,
-    encodedText
-  );
-  
-  const encryptedHex = Array.from(new Uint8Array(encryptedBuffer)).map(b => b.toString(16).padStart(2, '0')).join('');
-  return `${saltHex}:${ivHex}:${encryptedHex}`;
-}
+export class SecurityService {
+  private static masterKey: CryptoKey | null = null;
+  private static sessionTimer: any = null;
+  private static onStatusChange: ((unlocked: boolean) => void) | null = null;
+  private static unlockedUsername: string | null = null;
 
-// Decrypt utility
-async function decrypt(encryptedData: string, pin: string): Promise<string> {
-  const parts = encryptedData.split(':');
-  if (parts.length !== 3) throw new Error("Invalid encrypted format");
-  const [saltHex, ivHex, encryptedHex] = parts;
-  
-  const key = await deriveKey(pin, saltHex);
-  const iv = new Uint8Array(ivHex.match(/.{1,2}/g)!.map(byte => parseInt(byte, 16)));
-  const encryptedBuffer = new Uint8Array(encryptedHex.match(/.{1,2}/g)!.map(byte => parseInt(byte, 16)));
-  
-  const decryptedBuffer = await window.crypto.subtle.decrypt(
-    { name: "AES-GCM", iv: iv },
-    key,
-    encryptedBuffer
-  );
-  
-  const dec = new TextDecoder();
-  return dec.decode(decryptedBuffer);
-}
+  /**
+   * Первинне налаштування: генерація Master Key та захист його ПІН-кодом
+   */
+  static async setup(pin: string): Promise<void> {
+    // 1. Генеруємо випадковий Master Key (AES-GCM 256)
+    const masterKey = await window.crypto.subtle.generateKey(
+      { name: 'AES-GCM', length: 256 },
+      true,
+      ['encrypt', 'decrypt']
+    );
 
-export async function isInitialized(): Promise<boolean> {
-  return localStorage.getItem('steem_vault_marker') !== null;
-}
+    // 2. Експортуємо MK у raw формат для шифрування
+    const rawMK = await window.crypto.subtle.exportKey('raw', masterKey);
 
-export function isLocked(): boolean {
-  return currentPin === null;
-}
+    // 3. Створюємо Wrapping Key з ПІН-коду
+    const salt = window.crypto.getRandomValues(new Uint8Array(16));
+    const wrappingKey = await this.deriveWrappingKey(pin, salt);
 
-export function lock(): void {
-  currentPin = null;
-  notifyCallbacks();
-}
+    // 4. Шифруємо Master Key за допомогою Wrapping Key
+    const iv = window.crypto.getRandomValues(new Uint8Array(12));
+    const wrappedMKBuffer = await window.crypto.subtle.encrypt(
+      { name: 'AES-GCM', iv },
+      wrappingKey,
+      rawMK
+    );
 
-export function setStatusCallback(cb: (unlocked: boolean) => void): void {
-  statusCallbacks.push(cb);
-  // Initial fire
-  try {
-    cb(!isLocked());
-  } catch (e) {}
-}
+    // 5. Створюємо маркер перевірки (шифруємо слово "VALID")
+    const markerBuffer = await window.crypto.subtle.encrypt(
+      { name: 'AES-GCM', iv },
+      wrappingKey,
+      new TextEncoder().encode("VALID")
+    );
 
-export async function setup(pin: string): Promise<void> {
-  const marker = await encrypt('ok', pin);
-  localStorage.setItem('steem_vault_marker', marker);
-  currentPin = pin;
-  notifyCallbacks();
-}
+    // 6. Зберігаємо все в IndexedDB
+    const wrappedData: WrappedMasterKey = {
+      wrappedKey: this.bufferToBase64(wrappedMKBuffer),
+      salt: this.bufferToBase64(salt.buffer as ArrayBuffer),
+      iv: this.bufferToBase64(iv.buffer as ArrayBuffer),
+      marker: this.bufferToBase64(markerBuffer)
+    };
 
-export async function unlock(pin: string): Promise<void> {
-  const marker = localStorage.getItem('steem_vault_marker');
-  if (!marker) throw new Error("Vault is not initialized");
-  
-  try {
-    const dec = await decrypt(marker, pin);
-    if (dec === 'ok') {
-      currentPin = pin;
-      notifyCallbacks();
-    } else {
-      throw new Error("Incorrect PIN");
-    }
-  } catch (e) {
-    throw new Error("Incorrect PIN");
-  }
-}
-
-export async function getAccounts(): Promise<{ username: string }[]> {
-  const accountsData = localStorage.getItem('steem_vault_accounts');
-  if (!accountsData) return [];
-  try {
-    const list = JSON.parse(accountsData);
-    return list.map((a: any) => ({ username: a.username }));
-  } catch (e) {
-    return [];
-  }
-}
-
-async function getDecryptedKey(username: string): Promise<string | null> {
-  if (isLocked() || !currentPin) throw new Error("Vault is locked");
-  const accountsData = localStorage.getItem('steem_vault_accounts');
-  if (!accountsData) return null;
-  try {
-    const list = JSON.parse(accountsData);
-    const acc = list.find((a: any) => a.username.toLowerCase() === username.toLowerCase());
-    if (!acc) return null;
-    return await decrypt(acc.encryptedWif, currentPin);
-  } catch (e) {
-    return null;
-  }
-}
-
-export async function saveKey(username: string, wif: string): Promise<void> {
-  if (isLocked() || !currentPin) throw new Error("Vault is locked");
-  let accountsData = localStorage.getItem('steem_vault_accounts');
-  let list: any[] = [];
-  if (accountsData) {
-    try {
-      list = JSON.parse(accountsData);
-    } catch (e) {}
-  }
-  
-  const encryptedWif = await encrypt(wif, currentPin);
-  
-  // Remove existing
-  list = list.filter((a: any) => a.username.toLowerCase() !== username.toLowerCase());
-  list.push({ username, encryptedWif });
-  
-  localStorage.setItem('steem_vault_accounts', JSON.stringify(list));
-}
-
-export async function deleteAccount(username: string): Promise<void> {
-  let accountsData = localStorage.getItem('steem_vault_accounts');
-  if (!accountsData) return;
-  try {
-    let list = JSON.parse(accountsData);
-    list = list.filter((a: any) => a.username.toLowerCase() !== username.toLowerCase());
-    localStorage.setItem('steem_vault_accounts', JSON.stringify(list));
-  } catch (e) {}
-}
-
-export async function clearAll(): Promise<void> {
-  localStorage.removeItem('steem_vault_marker');
-  localStorage.removeItem('steem_vault_accounts');
-  localStorage.removeItem('steem_pexels_key');
-  localStorage.removeItem('steem_api_key_pixabay');
-  localStorage.removeItem('steem_api_key_unsplashAccess');
-  lock();
-}
-
-export async function getPexelsKey(): Promise<string> {
-  if (isLocked() || !currentPin) return '';
-  const encrypted = localStorage.getItem('steem_pexels_key');
-  if (!encrypted) return '';
-  try {
-    return await decrypt(encrypted, currentPin);
-  } catch (e) {
-    return '';
-  }
-}
-
-export async function savePexelsKey(key: string): Promise<void> {
-  if (isLocked() || !currentPin) throw new Error("Vault is locked");
-  const encrypted = await encrypt(key, currentPin);
-  localStorage.setItem('steem_pexels_key', encrypted);
-}
-
-export async function getApiKey(serviceName: string): Promise<string | null> {
-  if (isLocked() || !currentPin) return null;
-  const encrypted = localStorage.getItem(`steem_api_key_${serviceName}`);
-  if (!encrypted) return null;
-  try {
-    return await decrypt(encrypted, currentPin);
-  } catch (e) {
-    return null;
-  }
-}
-
-export async function saveApiKey(serviceName: string, key: string): Promise<void> {
-  if (isLocked() || !currentPin) throw new Error("Vault is locked");
-  const encrypted = await encrypt(key, currentPin);
-  localStorage.setItem(`steem_api_key_${serviceName}`, encrypted);
-}
-
-export async function clearAllApiKeys(): Promise<void> {
-  localStorage.removeItem('steem_pexels_key');
-  localStorage.removeItem('steem_api_key_pixabay');
-  localStorage.removeItem('steem_api_key_unsplashAccess');
-}
-
-export async function signBuffer(dataToSign: string | Buffer, activeUser: string): Promise<string> {
-  const wif = await getDecryptedKey(activeUser);
-  if (!wif) throw new Error(`Private key for user ${activeUser} not found in Vault.`);
-  const privateKey = PrivateKey.fromString(wif);
-  
-  let bufferToHash: Buffer;
-  if (Buffer.isBuffer(dataToSign)) {
-    bufferToHash = dataToSign;
-  } else {
-    bufferToHash = Buffer.from(dataToSign, 'utf-8');
-  }
-  
-  const hash = cryptoUtils.sha256(bufferToHash);
-  return privateKey.sign(hash).toString();
-}
-
-export function signImageChallengeWithKeychain(file: File, username: string): Promise<string> {
-  return new Promise((resolve, reject) => {
-    if (!(window as any).steem_keychain) {
-      return reject(new Error("Steem Keychain is not installed."));
-    }
+    await set(STORAGE_KEY_WRAPPED_MK, wrappedData);
     
-    const reader = new FileReader();
-    reader.onload = () => {
-      const arrayBuffer = reader.result as ArrayBuffer;
-      const fileBuffer = Buffer.from(arrayBuffer);
-      const hex = fileBuffer.toString('hex');
+    // Автоматично розблоковуємо після налаштування
+    this.masterKey = masterKey;
+    if (this.onStatusChange) this.onStatusChange(true);
+  }
+
+  /**
+   * Розблокування: отримання Master Key у пам'ять за допомогою ПІН-коду
+   */
+  static async unlock(pin: string, timeoutMs: number = 3600000): Promise<void> {
+    const data = await get<WrappedMasterKey>(STORAGE_KEY_WRAPPED_MK);
+    if (!data) throw new Error('Vault not configured. Please set a PIN first.');
+
+    const salt = this.base64ToBuffer(data.salt);
+    const iv = this.base64ToBuffer(data.iv);
+    const wrappedKey = this.base64ToBuffer(data.wrappedKey);
+    const marker = this.base64ToBuffer(data.marker);
+
+    // 1. Derive Wrapping Key
+    const wrappingKey = await this.deriveWrappingKey(pin, salt);
+
+    // 2. Verify PIN via marker
+    try {
+      const decryptedMarker = await window.crypto.subtle.decrypt(
+        { name: 'AES-GCM', iv: iv as any },
+        wrappingKey,
+        marker as any
+      );
+      const markerText = new TextDecoder().decode(decryptedMarker);
+      if (markerText !== "VALID") throw new Error("Invalid PIN");
+    } catch (e) {
+      throw new Error('Incorrect PIN', { cause: e });
+    }
+
+    // 3. Розшифрування Master Key
+    const rawMK = await window.crypto.subtle.decrypt(
+      { name: 'AES-GCM', iv: iv as any },
+      wrappingKey,
+      wrappedKey as any
+    );
+
+    this.masterKey = await window.crypto.subtle.importKey(
+      'raw',
+      rawMK,
+      { name: 'AES-GCM', length: 256 },
+      false,
+      ['encrypt', 'decrypt']
+    );
+
+    // Встановлюємо таймер автоблокування (1 година за замовчуванням)
+    if (this.sessionTimer) clearTimeout(this.sessionTimer);
+    this.sessionTimer = setTimeout(() => this.lock(), timeoutMs);
+    
+    if (this.onStatusChange) this.onStatusChange(true);
+  }
+
+  /**
+   * Закриття сесії
+   */
+  static lock(): void {
+    this.masterKey = null;
+    this.unlockedUsername = null;
+    if (this.sessionTimer) {
+      clearTimeout(this.sessionTimer);
+      this.sessionTimer = null;
+    }
+    if (this.onStatusChange) this.onStatusChange(false);
+  }
+
+  static isLocked(): boolean {
+    return this.masterKey === null;
+  }
+
+  static setStatusCallback(cb: (unlocked: boolean) => void) {
+    this.onStatusChange = cb;
+  }
+
+  /**
+   * Шифрування даних за допомогою Master Key
+   */
+  static async encryptData(data: string): Promise<{ ciphertext: string; iv: string }> {
+    if (!this.masterKey) throw new Error('Vault is locked');
+
+    const iv = window.crypto.getRandomValues(new Uint8Array(12));
+    const encrypted = await window.crypto.subtle.encrypt(
+      { name: 'AES-GCM', iv },
+      this.masterKey,
+      new TextEncoder().encode(data)
+    );
+
+    return {
+      ciphertext: this.bufferToBase64(encrypted),
+      iv: this.bufferToBase64(iv.buffer as ArrayBuffer)
+    };
+  }
+
+  /**
+   * Дешифрування даних за допомогою Master Key
+   */
+  static async decryptData(ciphertextBase64: string, ivBase64: string): Promise<string> {
+    if (!this.masterKey) throw new Error('Vault is locked');
+
+    const decrypted = await window.crypto.subtle.decrypt(
+      { name: 'AES-GCM', iv: this.base64ToBuffer(ivBase64) as any },
+      this.masterKey,
+      this.base64ToBuffer(ciphertextBase64) as any
+    );
+
+    return new TextDecoder().decode(decrypted);
+  }
+
+  /**
+   * Деривація Wrapping Key з ПІН-коду (PBKDF2)
+   */
+  private static async deriveWrappingKey(pin: string, salt: Uint8Array): Promise<CryptoKey> {
+    const encoder = new TextEncoder();
+    // Комбінуємо ПІН зі статичним секретом додатка
+    const pinMaterial = encoder.encode(pin + APP_SECRET);
+    
+    const baseKey = await window.crypto.subtle.importKey(
+      'raw',
+      pinMaterial,
+      'PBKDF2',
+      false,
+      ['deriveKey']
+    );
+
+    return window.crypto.subtle.deriveKey(
+      {
+        name: 'PBKDF2',
+        salt: salt as any,
+        iterations: 600000,
+        hash: 'SHA-256',
+      },
+      baseKey,
+      { name: 'AES-GCM', length: 256 },
+      false,
+      ['encrypt', 'decrypt']
+    );
+  }
+
+  // --- Методи для роботи з акаунтами ---
+
+  static async getAccounts(): Promise<VaultAccount[]> {
+    const data = await get<VaultAccount[]>(STORAGE_KEY_ACCOUNTS);
+    return data || [];
+  }
+
+  static async saveKey(username: string, wif: string): Promise<void> {
+    if (this.isLocked()) throw new Error('Please enter PIN first');
+    
+    const { ciphertext, iv } = await this.encryptData(wif);
+    const accounts = await this.getAccounts();
+    
+    const newAccount: VaultAccount = { username, ciphertext, iv };
+    const existingIdx = accounts.findIndex(a => a.username === username);
+    
+    if (existingIdx >= 0) {
+      accounts[existingIdx] = newAccount;
+    } else {
+      accounts.push(newAccount);
+    }
+
+    await set(STORAGE_KEY_ACCOUNTS, accounts);
+  }
+
+  static async deleteAccount(username: string): Promise<void> {
+    const accounts = await this.getAccounts();
+    const filtered = accounts.filter(a => a.username !== username);
+    await set(STORAGE_KEY_ACCOUNTS, filtered);
+  }
+
+  static async broadcastCustomJson(client: any, customJson: any, username: string): Promise<any> {
+    if (!this.masterKey) throw new Error('Vault is locked');
+    
+    const accounts = await this.getAccounts();
+    const account = accounts.find(a => a.username === username);
+    if (!account) throw new Error(`Account @${username} not found`);
+
+    const wif = await this.decryptData(account.ciphertext, account.iv);
+    
+    try {
+      const privateKey = getDSteem().PrivateKey.fromString(wif);
       
-      (window as any).steem_keychain.requestSignBuffer(username, hex, 'Posting', (response: any) => {
+      if (client.broadcast.customJson) {
+        return await client.broadcast.customJson(
+          customJson.required_auths,
+          customJson.required_posting_auths,
+          customJson.id,
+          customJson.json,
+          privateKey
+        );
+      } else {
+        const op = ['custom_json', customJson];
+        return await client.broadcast.sendOperations([op], privateKey);
+      }
+    } catch(e: any) {
+      if(e.message && e.message.includes('missing required posting authority')) {
+         throw new Error("Invalid Posting Key or unauthorized.");
+      }
+      throw e;
+    }
+  }
+
+  static async broadcastDeleteComment(client: any, author: string, permlink: string): Promise<any> {
+    if (this.isLocked()) throw new Error('Vault is locked. Enter PIN.');
+    const accounts = await this.getAccounts();
+    const account = accounts.find(a => a.username === author);
+    if (!account) throw new Error(`Account @${author} not found`);
+
+    const wif = await this.decryptData(account.ciphertext, account.iv);
+    
+    try {
+      const privateKey = getDSteem().PrivateKey.fromString(wif);
+      const op = ['delete_comment', {
+        author,
+        permlink
+      }];
+      return await client.broadcast.sendOperations([op], privateKey);
+    } catch(err: any) {
+      console.error(err);
+      throw new Error(`Broadcast logic failed: ${err.message || 'Unknown network error'}`);
+    }
+  }
+
+  static async broadcastPost(client: any, comment: any, username: string, options?: any): Promise<any> {
+    if (this.isLocked()) throw new Error('Vault is locked. Enter PIN.');
+    
+    const accounts = await this.getAccounts();
+    const account = accounts.find(a => a.username === username);
+    if (!account) throw new Error(`Account @${username} not found`);
+
+    const wif = await this.decryptData(account.ciphertext, account.iv);
+    
+    try {
+      const privateKey = getDSteem().PrivateKey.fromString(wif);
+      const ops: any[] = [['comment', comment]];
+      
+      if (options) {
+        ops.push(['comment_options', options]);
+      }
+      
+      return await client.broadcast.sendOperations(ops, privateKey);
+    } catch (e: any) {
+      throw new Error('Publish error: ' + e.message, { cause: e });
+    }
+  }
+
+  static async broadcastVote(client: any, vote: any, username: string): Promise<any> {
+    if (this.isLocked()) throw new Error('Vault is locked. Enter PIN.');
+    
+    const accounts = await this.getAccounts();
+    const account = accounts.find(a => a.username === username);
+    if (!account) throw new Error(`Account @${username} not found`);
+
+    const wif = await this.decryptData(account.ciphertext, account.iv);
+    
+    try {
+      const privateKey = getDSteem().PrivateKey.fromString(wif);
+      return await client.broadcast.vote(vote, privateKey);
+    } catch (e: any) {
+      throw new Error('Vote error: ' + e.message, { cause: e });
+    }
+  }
+
+  static async signBuffer(buffer: Buffer | Uint8Array, username: string): Promise<string> {
+    if (this.isLocked()) throw new Error('Vault is locked');
+    
+    const accounts = await this.getAccounts();
+    const account = accounts.find(a => a.username === username);
+    if (!account) throw new Error(`Account @${username} not found`);
+
+    const wif = await this.decryptData(account.ciphertext, account.iv);
+
+    try {
+      const privateKey = getDSteem().PrivateKey.fromString(wif);
+      const hash = getDSteem().cryptoUtils.sha256(Buffer.from(buffer));
+      const signature = privateKey.sign(hash);
+      return signature.toString();
+    } catch (e: any) {
+      throw new Error('Signing error: ' + e.message, { cause: e });
+    }
+  }
+
+  /**
+   * Формує підпис для завантаження зображення через Keychain
+   */
+  static async signImageChallengeWithKeychain(file: File | Blob, username: string): Promise<string> {
+    const arrayBuffer = await file.arrayBuffer();
+    const fileBuffer = Buffer.from(arrayBuffer);
+    const prefix = Buffer.from("ImageSigningChallenge", 'utf8');
+    const dataToSign = Buffer.concat([prefix, fileBuffer]);
+
+    return new Promise((resolve, reject) => {
+      if (!(window as any).steem_keychain) {
+        reject(new Error("Steem Keychain not found"));
+        return;
+      }
+      
+      // Передаємо серіалізований JSON Buffer, як того вимагає протокол для зображень
+      const message = JSON.stringify(dataToSign);
+      (window as any).steem_keychain.requestSignBuffer(username, message, 'Posting', (response: any) => {
         if (response.success) {
           resolve(response.result);
         } else {
           reject(new Error(response.message || "Keychain signing failed"));
         }
       });
-    };
-    reader.onerror = (e) => reject(e);
-    reader.readAsArrayBuffer(file);
-  });
-}
-
-export async function broadcastPost(client: Client, comment: any, author: string, options?: any): Promise<any> {
-  const wif = await getDecryptedKey(author);
-  if (!wif) throw new Error(`Private key for user ${author} not found in Vault.`);
-  const privateKey = PrivateKey.fromString(wif);
-  
-  const operations: any[] = [
-    ['comment', comment]
-  ];
-  
-  if (options) {
-    operations.push(['comment_options', options]);
+    });
   }
-  
-  return await client.broadcast.sendOperations(operations, privateKey);
-}
 
-export async function broadcastDeleteComment(client: Client, activeUser: string, permlink: string): Promise<any> {
-  const wif = await getDecryptedKey(activeUser);
-  if (!wif) throw new Error(`Private key for user ${activeUser} not found in Vault.`);
-  const privateKey = PrivateKey.fromString(wif);
-  
-  const operations: any[] = [
-    ['delete_comment', { author: activeUser, permlink }]
-  ];
-  
-  return await client.broadcast.sendOperations(operations, privateKey);
-}
+  // --- Допоміжні методи ---
 
-export async function broadcastCustomJson(client: Client, params: any, activeUser: string): Promise<any> {
-  const wif = await getDecryptedKey(activeUser);
-  if (!wif) throw new Error(`Private key for user ${activeUser} not found in Vault.`);
-  const privateKey = PrivateKey.fromString(wif);
-  
-  const operations: any[] = [
-    ['custom_json', params]
-  ];
-  
-  return await client.broadcast.sendOperations(operations, privateKey);
-}
+  private static bufferToBase64(buffer: ArrayBuffer): string {
+    return Buffer.from(buffer).toString('base64');
+  }
 
-export async function broadcastVote(client: Client, vote: any, activeUser: string): Promise<any> {
-  const wif = await getDecryptedKey(activeUser);
-  if (!wif) throw new Error(`Private key for user ${activeUser} not found in Vault.`);
-  const privateKey = PrivateKey.fromString(wif);
-  
-  const operations: any[] = [
-    ['vote', vote]
-  ];
-  
-  return await client.broadcast.sendOperations(operations, privateKey);
-}
+  private static base64ToBuffer(base64: string): Uint8Array {
+    return new Uint8Array(Buffer.from(base64, 'base64'));
+  }
 
-export const SecurityService = {
-  isInitialized,
-  isLocked,
-  lock,
-  setStatusCallback,
-  setup,
-  unlock,
-  getAccounts,
-  saveKey,
-  deleteAccount,
-  clearAll,
-  getPexelsKey,
-  savePexelsKey,
-  getApiKey,
-  saveApiKey,
-  clearAllApiKeys,
-  signBuffer,
-  signImageChallengeWithKeychain,
-  broadcastPost,
-  broadcastDeleteComment,
-  broadcastCustomJson,
-  broadcastVote
-};
+  static async isInitialized(): Promise<boolean> {
+    const data = await get(STORAGE_KEY_WRAPPED_MK);
+    return !!data;
+  }
+
+  static async clearAll(): Promise<void> {
+    await del(STORAGE_KEY_ACCOUNTS);
+    await del(STORAGE_KEY_WRAPPED_MK);
+    this.lock();
+  }
+
+  // --- Generic API Keys (Secured in Vault) ---
+  static async saveApiKey(serviceName: string, key: string): Promise<void> {
+    if (this.isLocked()) throw new Error('Vault is locked. Unlock to save API key.');
+    const { ciphertext, iv } = await this.encryptData(key);
+    const keys = await get<Record<string, { ciphertext: string; iv: string }>>(STORAGE_KEY_API_KEYS) || {};
+    keys[serviceName] = { ciphertext, iv };
+    await set(STORAGE_KEY_API_KEYS, keys);
+  }
+
+  static async getApiKey(serviceName: string): Promise<string | null> {
+    if (this.isLocked()) return null;
+    const keys = await get<Record<string, { ciphertext: string; iv: string }>>(STORAGE_KEY_API_KEYS);
+    if (!keys || !keys[serviceName]) return null;
+    try {
+      return await this.decryptData(keys[serviceName].ciphertext, keys[serviceName].iv);
+    } catch {
+      return null;
+    }
+  }
+
+  static async deleteApiKey(serviceName: string): Promise<void> {
+    const keys = await get<Record<string, { ciphertext: string; iv: string }>>(STORAGE_KEY_API_KEYS);
+    if (!keys) return;
+    delete keys[serviceName];
+    await set(STORAGE_KEY_API_KEYS, keys);
+  }
+
+  static async clearAllApiKeys(): Promise<void> {
+    await del(STORAGE_KEY_API_KEYS);
+    await del(PEXELS_KEY); // delete legacy pexels key
+  }
+
+  // --- Pexels API Key (Now secured in Vault) ---
+  static async savePexelsKey(key: string): Promise<void> {
+    if (this.isLocked()) throw new Error('Vault is locked. Unlock to save API key.');
+    const { ciphertext, iv } = await this.encryptData(key);
+    await set(PEXELS_KEY, { ciphertext, iv });
+  }
+
+  static async getPexelsKey(): Promise<string | null> {
+    if (this.isLocked()) return null;
+    const data = await get<{ ciphertext: string; iv: string }>(PEXELS_KEY);
+    if (!data) return null;
+    try {
+      return await this.decryptData(data.ciphertext, data.iv);
+    } catch {
+      return null;
+    }
+  }
+
+  static async deletePexelsKey(): Promise<void> {
+    await del(PEXELS_KEY);
+  }
+}

@@ -1,249 +1,166 @@
 import React from 'react';
-import { Trash2, Image as ImageIcon, ChevronLeft, ChevronRight, Check, Globe, AlignLeft, AlignCenter, AlignRight } from 'lucide-react';
+import { AlignLeft, AlignRight, FileText, CloudUpload, Trash2, ChevronLeft, ChevronRight, ChevronUp, ChevronDown } from 'lucide-react';
 import { cn } from '../lib/utils';
-import { ImageItem } from '../types';
+import { ImageItem as ImageItemType } from '../types';
 
-interface ImageItemCompProps {
-  img: ImageItem;
+interface ImageItemProps {
+  img: ImageItemType;
   idx: number;
   galleryView: 'grid' | 'list';
   isTrafficOptimized: boolean;
   onToggle: (idx: number) => void;
-  onInsert: (url: string, name: string, pos: 'left' | 'right' | 'center' | 'plain') => void;
-  onHost?: (url: string) => void;
+  onInsert: (url: string, name: string, pos: 'left' | 'plain' | 'right') => void;
+  onHost: (url: string, name: string) => void;
   onDelete: (idx: number) => void;
   onMoveLeft?: (idx: number) => void;
   onMoveRight?: (idx: number) => void;
-  t: (key: string) => string;
+  t: (key: any) => string;
+  isCollapsed?: boolean;
 }
 
-const ImageItemComp: React.FC<ImageItemCompProps> = ({
-  img,
-  idx,
-  galleryView,
+const ImageItem = React.memo(({ 
+  img, 
+  idx, 
+  galleryView, 
   isTrafficOptimized,
-  onToggle,
-  onInsert,
-  onHost,
+  onToggle, 
+  onInsert, 
+  onHost, 
   onDelete,
   onMoveLeft,
-  onMoveRight,
+  onMoveRight, 
   t,
-}) => {
-  const isSelected = !!img.selected;
+  isCollapsed
+}: ImageItemProps) => {
+  const displayUrl = isTrafficOptimized && img.url.startsWith('http')
+    ? `https://steemitimages.com/${galleryView === 'grid' ? '640x0' : '128x128'}/${img.url}`
+    : img.url;
 
-  if (galleryView === 'grid') {
+  if (isCollapsed) {
     return (
-      <div className={cn(
-        "relative rounded-xl overflow-hidden bg-slate-900 border transition-all h-[130px] group",
-        isSelected ? "border-cyan-500 shadow-md shadow-cyan-900/10" : "border-slate-800 hover:border-slate-700"
-      )}>
-        {/* Toggleable overlay */}
-        <div 
-          onClick={() => onToggle(idx)} 
-          className="absolute inset-0 cursor-pointer"
-        >
-          {!isTrafficOptimized && (
-            <img 
-              src={img.url} 
-              alt={img.name} 
-              className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" 
-              referrerPolicy="no-referrer"
-            />
-          )}
-          {isTrafficOptimized && (
-            <div className="w-full h-full flex flex-col items-center justify-center p-3 text-slate-500">
-              <ImageIcon size={24} className="mb-1 opacity-40" />
-              <p className="text-[10px] text-center line-clamp-2 select-none">{img.name}</p>
-            </div>
-          )}
-          <div className="absolute inset-0 bg-slate-950/40 opacity-0 group-hover:opacity-100 transition-opacity" />
-        </div>
-
-        {/* Selected badge */}
-        {isSelected && (
-          <div className="absolute top-1.5 right-1.5 w-5 h-5 bg-cyan-600 rounded-full flex items-center justify-center text-white text-[10px] shadow border border-cyan-400 z-10">
-            <Check size={12} />
-          </div>
+      <div 
+        onMouseDown={(e) => e.preventDefault()}
+        className={cn(
+          "relative rounded-lg overflow-hidden border border-slate-800 hover:border-cyan-500 hover:ring-1 hover:ring-cyan-500/50 transition-all cursor-pointer bg-slate-900 shadow-sm flex-none aspect-square w-full"
         )}
-
-        {/* Hover controls */}
-        <div className="absolute bottom-0 inset-x-0 p-1.5 bg-gradient-to-t from-slate-950/90 to-slate-950/40 flex items-center justify-between opacity-0 group-hover:opacity-100 transition-opacity z-10">
-          <div className="flex gap-0.5">
-            {onMoveLeft && (
-              <button 
-                onClick={(e) => { e.stopPropagation(); onMoveLeft(idx); }}
-                className="p-1 hover:bg-slate-800 rounded bg-slate-900/60 text-slate-300"
-                title={t('moveUp') || "Move Left"}
-              >
-                <ChevronLeft size={12} />
-              </button>
-            )}
-            {onMoveRight && (
-              <button 
-                onClick={(e) => { e.stopPropagation(); onMoveRight(idx); }}
-                className="p-1 hover:bg-slate-800 rounded bg-slate-900/60 text-slate-300"
-                title={t('moveDown') || "Move Right"}
-              >
-                <ChevronRight size={12} />
-              </button>
-            )}
-          </div>
-
-          <div className="flex items-center gap-1.5">
-            <div className="flex bg-slate-950/90 backdrop-blur-md rounded border border-slate-700/60 overflow-hidden shadow-lg items-center p-0.5">
-              <button 
-                onClick={(e) => { e.stopPropagation(); onInsert(img.url, img.name, 'plain'); }}
-                className="p-1.5 hover:bg-cyan-600 hover:text-white text-slate-300 rounded transition-all flex items-center justify-center"
-                title="Plain / Full insert"
-              >
-                <ImageIcon size={14} />
-              </button>
-              <button 
-                onClick={(e) => { e.stopPropagation(); onInsert(img.url, img.name, 'left'); }}
-                className="p-1.5 hover:bg-cyan-600 hover:text-white text-slate-400 border-x border-slate-800 transition-all flex items-center justify-center"
-                title="Align Left insert"
-              >
-                <AlignLeft size={14} />
-              </button>
-              <button 
-                onClick={(e) => { e.stopPropagation(); onInsert(img.url, img.name, 'center'); }}
-                className="p-1.5 hover:bg-cyan-600 hover:text-white text-slate-400 transition-all flex items-center justify-center"
-                title="Center insert"
-              >
-                <AlignCenter size={14} />
-              </button>
-              <button 
-                onClick={(e) => { e.stopPropagation(); onInsert(img.url, img.name, 'right'); }}
-                className="p-1.5 hover:bg-cyan-600 hover:text-white text-slate-400 border-l border-slate-800 transition-all flex items-center justify-center"
-                title="Align Right insert"
-              >
-                <AlignRight size={14} />
-              </button>
-            </div>
-            
-            {onHost && img.url.startsWith('http') && !img.url.includes('steemitimages.com') && (
-              <button 
-                onClick={(e) => { e.stopPropagation(); onHost(img.url); }}
-                className="p-1 bg-yellow-600/30 hover:bg-yellow-600 rounded text-yellow-300 hover:text-white"
-                title={t('hostOnSteem') || "Host on Steem"}
-              >
-                <Globe size={11} />
-              </button>
-            )}
-
-            <button 
-              onClick={(e) => { e.stopPropagation(); onDelete(idx); }}
-              className="p-1 bg-rose-950/50 hover:bg-rose-600 rounded text-rose-400 hover:text-white"
-              title={t('deleteWord') || "Delete"}
-            >
-              <Trash2 size={11} />
-            </button>
-          </div>
-        </div>
+        onClick={(e) => { e.stopPropagation(); onInsert(img.url, img.name, 'plain'); }}
+        title={t('asIs')}
+      >
+        <img 
+          src={displayUrl} 
+          alt={img.name} 
+          className="w-full h-full object-cover" 
+          referrerPolicy="no-referrer" 
+          loading="lazy"
+        />
       </div>
     );
   }
 
-  // List View
   return (
-    <div className={cn(
-      "p-2 bg-slate-800/40 hover:bg-slate-800/70 border border-slate-700/50 rounded-xl flex items-center justify-between gap-3 group transition-colors",
-      isSelected && "border-cyan-500/50 bg-cyan-950/5"
-    )}>
-      <div 
-        onClick={() => onToggle(idx)}
-        className="flex items-center gap-3 cursor-pointer flex-1 min-w-0"
-      >
-        <div className="w-10 h-10 rounded-lg bg-slate-950 overflow-hidden shrink-0 flex items-center justify-center border border-slate-700/60">
-          {!isTrafficOptimized ? (
-            <img 
-              src={img.url} 
-              alt={img.name} 
-              className="w-full h-full object-cover" 
-              referrerPolicy="no-referrer"
-            />
-          ) : (
-            <ImageIcon size={18} className="text-slate-500 opacity-40" />
-          )}
-        </div>
-        <div className="min-w-0">
-          <p className="font-bold text-xs text-slate-300 truncate">{img.name}</p>
-          <p className="text-[9px] text-slate-500 truncate mt-0.5 select-all">{img.url}</p>
-        </div>
+    <div 
+      onMouseDown={(e) => e.preventDefault()}
+      className={cn(
+        "group relative rounded-lg overflow-hidden border transition-all cursor-pointer bg-slate-900 shadow-sm flex-none",
+        galleryView === 'grid' ? "flex flex-col w-full min-h-[140px]" : "flex flex-row items-center p-1.5 gap-2 min-h-[50px]",
+        img.selected ? "border-cyan-500 ring-1 ring-cyan-500/20" : "border-slate-800 hover:border-slate-700"
+      )}
+      onClick={() => onToggle(idx)}
+    >
+      <div className={cn(
+        "overflow-hidden relative flex-none bg-slate-950",
+        galleryView === 'grid' ? "aspect-square w-full" : "w-10 h-10 rounded"
+      )}>
+        <img 
+          src={displayUrl} 
+          alt={img.name} 
+          className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105" 
+          referrerPolicy="no-referrer" 
+          loading="lazy"
+        />
+        
+        {galleryView === 'grid' && (
+          <div className={cn(
+            "absolute inset-x-0 bottom-0 bg-slate-950/90 backdrop-blur-sm px-1 py-1.5 flex flex-row items-center justify-center gap-1 transition-all z-10",
+            "lg:opacity-0 lg:group-hover:opacity-100"
+          )}>
+            <button onMouseDown={(e) => e.preventDefault()} onClick={(e) => { e.stopPropagation(); onInsert(img.url, img.name, 'left'); }} className="p-1.5 bg-slate-800 rounded flex-1 hover:bg-cyan-600 outline-none text-white transition-colors flex justify-center items-center" title={t('leftText')}><AlignLeft size={12} /></button>
+            <button onMouseDown={(e) => e.preventDefault()} onClick={(e) => { e.stopPropagation(); onInsert(img.url, img.name, 'plain'); }} className="p-1.5 bg-slate-800 rounded flex-1 hover:bg-cyan-600 outline-none text-white transition-colors flex justify-center items-center" title={t('asIs')}><FileText size={12} /></button>
+            <button onMouseDown={(e) => e.preventDefault()} onClick={(e) => { e.stopPropagation(); onInsert(img.url, img.name, 'right'); }} className="p-1.5 bg-slate-800 rounded flex-1 hover:bg-cyan-600 outline-none text-white transition-colors flex justify-center items-center" title={t('rightText')}><AlignRight size={12} /></button>
+            
+            {(!img.url.includes('steemitimages.com') && 
+              !img.url.includes('pexels.com') && 
+              !img.url.includes('pixabay.com') && 
+              !img.url.includes('unsplash.com')) && (
+              <button 
+                onMouseDown={(e) => e.preventDefault()}
+                onClick={(e) => { e.stopPropagation(); onHost(img.url, img.name); }} 
+                className="p-1.5 bg-slate-800 rounded flex-1 hover:bg-green-600 outline-none text-white transition-colors flex justify-center items-center" 
+                title={t('uploadToSteemit')}
+              >
+                <CloudUpload size={12} />
+              </button>
+            )}
+            <button onMouseDown={(e) => e.preventDefault()} onClick={(e) => { e.stopPropagation(); onDelete(idx); }} className="p-1.5 bg-slate-800 rounded flex-1 hover:bg-red-600 outline-none text-white transition-colors flex justify-center items-center" title={t('delete')}><Trash2 size={12} /></button>
+          </div>
+        )}
+      </div>
+      
+      <div className={cn(
+        "min-w-0 flex flex-col justify-center shrink-0",
+        galleryView === 'grid' ? "p-1.5 bg-slate-900" : "flex-1"
+      )}>
+        <p className="text-[9px] font-medium text-slate-300 truncate leading-tight uppercase tracking-tight">{img.name}</p>
+        
+        {galleryView === 'list' && (
+           <div className="flex items-center gap-2 mt-1">
+              <button onMouseDown={(e) => e.preventDefault()} title={t('leftText')} onClick={(e) => { e.stopPropagation(); onInsert(img.url, img.name, 'left'); }} className="text-slate-500 hover:text-cyan-400"><AlignLeft size={10} /></button>
+              <button onMouseDown={(e) => e.preventDefault()} title={t('asIs')} onClick={(e) => { e.stopPropagation(); onInsert(img.url, img.name, 'plain'); }} className="text-slate-500 hover:text-cyan-400"><FileText size={10} /></button>
+              <button onMouseDown={(e) => e.preventDefault()} title={t('rightText')} onClick={(e) => { e.stopPropagation(); onInsert(img.url, img.name, 'right'); }} className="text-slate-500 hover:text-cyan-400"><AlignRight size={10} /></button>
+              <button onMouseDown={(e) => e.preventDefault()} title={t('delete')} onClick={(e) => { e.stopPropagation(); onDelete(idx); }} className="text-slate-500 hover:text-red-400"><Trash2 size={10} /></button>
+           </div>
+        )}
       </div>
 
-      <div className="flex items-center gap-1 shrink-0">
-        {onMoveLeft && (
-          <button 
-            onClick={() => onMoveLeft(idx)}
-            className="p-1.5 hover:bg-slate-700 rounded text-slate-400 hover:text-slate-200"
-            title={t('moveUp') || "Move Left"}
-          >
-            <ChevronLeft size={13} />
-          </button>
-        )}
-        {onMoveRight && (
-          <button 
-            onClick={() => onMoveRight(idx)}
-            className="p-1.5 hover:bg-slate-700 rounded text-slate-400 hover:text-slate-200"
-            title={t('moveDown') || "Move Right"}
-          >
-            <ChevronRight size={13} />
-          </button>
-        )}
+       {/* Movement controls overlay */}
+       {(onMoveLeft || onMoveRight) && (
+          <div className={cn(
+            "absolute z-20 flex",
+            galleryView === 'grid' 
+               ? "top-1 right-1 flex-row gap-0.5 lg:opacity-0 lg:group-hover:opacity-100 transition-opacity" 
+               : "right-1 top-1/2 -translate-y-1/2 flex-col gap-0.5"
+          )}>
+            {onMoveLeft && (
+              <button 
+                onMouseDown={(e) => e.preventDefault()}
+                onClick={(e) => { e.stopPropagation(); onMoveLeft(idx); }} 
+                className={cn(
+                   "bg-slate-900/80 hover:bg-slate-700 backdrop-blur-sm rounded text-white transition-colors",
+                   galleryView === 'grid' ? "p-1" : "p-0.5"
+                )}
+                title={galleryView === 'grid' ? 'Вліво' : 'Вгору'}
+              >
+                {galleryView === 'grid' ? <ChevronLeft size={12} /> : <ChevronUp size={12} />}
+              </button>
+            )}
+            {onMoveRight && (
+              <button 
+                onMouseDown={(e) => e.preventDefault()}
+                onClick={(e) => { e.stopPropagation(); onMoveRight(idx); }} 
+                className={cn(
+                   "bg-slate-900/80 hover:bg-slate-700 backdrop-blur-sm rounded text-white transition-colors",
+                   galleryView === 'grid' ? "p-1" : "p-0.5"
+                )}
+                title={galleryView === 'grid' ? 'Вправо' : 'Вниз'}
+              >
+                {galleryView === 'grid' ? <ChevronRight size={12} /> : <ChevronDown size={12} />}
+              </button>
+            )}
+          </div>
+       )}
 
-        {onHost && img.url.startsWith('http') && !img.url.includes('steemitimages.com') && (
-          <button 
-            onClick={() => onHost(img.url)}
-            className="p-1.5 hover:bg-yellow-600 hover:text-white rounded text-yellow-400"
-            title={t('hostOnSteem') || "Host on Steem"}
-          >
-            <Globe size={13} />
-          </button>
-        )}
-
-        <div className="flex bg-slate-950 rounded-lg p-0.5 border border-slate-700/60 items-center">
-          <button 
-            onClick={() => onInsert(img.url, img.name, 'plain')}
-            className="p-1.5 hover:bg-cyan-600 hover:text-white text-slate-400 hover:text-cyan-400 rounded transition-colors flex items-center justify-center"
-            title="Plain / Full width insert"
-          >
-            <ImageIcon size={14} />
-          </button>
-          <button 
-            onClick={() => onInsert(img.url, img.name, 'left')}
-            className="p-1.5 hover:bg-cyan-600 hover:text-white text-slate-400 hover:text-cyan-400 rounded transition-colors border-x border-slate-850 flex items-center justify-center"
-            title="Float Left insert"
-          >
-            <AlignLeft size={14} />
-          </button>
-          <button 
-            onClick={() => onInsert(img.url, img.name, 'center')}
-            className="p-1.5 hover:bg-cyan-600 hover:text-white text-slate-100 hover:text-cyan-400 rounded transition-colors flex items-center justify-center"
-            title="Center insertion"
-          >
-            <AlignCenter size={14} />
-          </button>
-          <button 
-            onClick={() => onInsert(img.url, img.name, 'right')}
-            className="p-1.5 hover:bg-cyan-600 hover:text-white text-slate-400 hover:text-cyan-400 rounded transition-colors border-l border-slate-850 flex items-center justify-center"
-            title="Float Right insert"
-          >
-            <AlignRight size={14} />
-          </button>
-        </div>
-
-        <button 
-          onClick={() => onDelete(idx)}
-          className="p-1.5 hover:bg-rose-900 hover:text-rose-100 rounded text-rose-400 transition-colors"
-          title={t('deleteWord') || "Delete"}
-        >
-          <Trash2 size={13} />
-        </button>
-      </div>
     </div>
   );
-};
+});
 
-export default ImageItemComp;
+export default ImageItem;

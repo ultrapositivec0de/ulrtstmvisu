@@ -4,28 +4,33 @@ import {
   Bold, Italic, Strikethrough, 
   Quote, Link as LinkIcon, 
   Table as TableIcon, Minus, AlignCenter, 
-  AlignJustify, Image as ImageIcon, Settings, 
+  AlignJustify, Image as ImageIcon, Settings, RefreshCw,
   Save, FolderOpen, FileText, AtSign, Rocket, 
   Trash2, X, ChevronLeft, ChevronRight, ChevronUp, ChevronDown,
-  Eye, Edit3, Plus, ShieldCheck, Key,
-  Search, List as ListIcon, Lock, LayoutGrid, Maximize2, Calendar, Tags, Shield, Bell, ArrowRight,
-  Code, Terminal, Indent, Layers, CheckCircle, Check, AlignLeft, AlignRight, Rows, Columns, PanelLeft, PanelRight, Moon, Sun, FilePlus, Zap, MoveVertical, Info, Globe, FileUp, FileDown, Copy, SplitSquareHorizontal, Type
+  Eye, EyeOff, Edit3, Plus, ShieldCheck, Key,
+  Search, List as ListIcon, Lock, LayoutGrid, Maximize2, Minimize2, Calendar, Tags, Shield, Bell, ArrowRight, Clock,
+  Code, Terminal, Indent, Layers, CheckCircle, Check, AlignLeft, AlignRight, Rows, Columns, PanelLeft, PanelRight, PanelLeftClose, PanelLeftOpen, Moon, Sun, FilePlus, Zap, MoveVertical, Info, Globe, FileUp, FileDown, Copy, SplitSquareHorizontal, Type, Download, Sparkles
 } from 'lucide-react';
 import { motion, AnimatePresence, Reorder } from 'motion/react';
 import { marked } from 'marked';
 import DOMPurify from 'dompurify';
+// @ts-ignore
+import { Idiomorph } from 'idiomorph';
 import { cn } from './lib/utils';
 import { getClient, callWithFallback, probeNodes } from './lib/steem';
 import { Draft, Template, ImageItem, AuthType, TagGroup, Language, QueueItem, SteemPost, SteemNotification } from './types';
 import { Buffer } from 'buffer';
 import { SecurityService } from './services/securityService';
 import { PexelsService, PexelsPhoto } from './services/pexelsService';
-import { NativeService, isTauri, isNeutralino } from './services/nativeService';
+import { CodeEditor } from './components/CodeEditor';
+import { useEditorStore, getOffsetFromRowCol, getRowColFromOffset } from './store';
 import ImageItemComp from './components/ImageItem';
 import ExternalImageItem from './components/ExternalImageItem';
 import Reader from './components/Reader';
 import JSZip from 'jszip';
 import { saveAs } from 'file-saver';
+import { htmlToMarkdown, convertBareImageUrlsToMarkdown, isImageAndProxyUrl } from './lib/editorSync';
+import { useEditorWorker } from './hooks/useEditorWorker';
 
 // --- Constants ---
 const COMMUNITIES = [
@@ -58,6 +63,9 @@ const COMMUNITIES = [
 
 const COMMON_TAGS = ['life', 'betterlife', 'thediarygame', 'club5050', 'club75', 'club100', 'art', 'photography', 'travel', 'food', 'nature', 'blog', 'creative', 'dev', 'steem', 'lifestyle', 'news', 'steemit', 'sharing', 'review', 'tutorial'];
 
+// Detect native environment (Tauri / Android Wrapper)
+const IS_NATIVE = typeof window !== 'undefined' && (!!(window as any).__TAURI__ || !!(window as any).AndroidBridge || navigator.userAgent.includes('SteemEditorNative'));
+
 // --- Translations ---
 const translations = {
   uk: {
@@ -69,6 +77,7 @@ const translations = {
     general: "Загальні",
     about: "Про застосунок",
     vault: "Сховище",
+    pwa: "Встановлення",
     enterPin: "Введіть ПІН-код",
     sessionActive: "СЕСІЯ АКТИВНА",
     vaultClosed: "СХОВИЩЕ ЗАКРИТЕ",
@@ -225,7 +234,7 @@ const translations = {
     systemDialogAlert: "Повідомлення",
     systemDialogConfirm: "Підтвердіть дію",
     systemDialogPrompt: "Введіть дані",
-    aboutDesc: "Професійний редактор для Steem з безпекою на базі Web Crypto (AES-GCM), подвійним шифруванням та захистом ПІН-кодом.",
+    aboutDesc: "Ultra Steem Editor — професійний багатопотоковий редактор для Steem з безпекою на базі Web Crypto (AES-GCM), подвійним шифруванням та захистом ПІН-кодом. Оптимізовано для великих файлів.",
     aboutApp: "Про застосунок",
     packagesUsed: "Використані пакети (NPM)",
     externalLibs: "Зовнішні бібліотеки (CDN)",
@@ -368,10 +377,16 @@ const translations = {
     saved: "Збережено",
     load: "Завантажити",
     newPost: "Новий допис",
-    welcomeTitle: "Привіт! ��",
+    welcomeTitle: "Привіт! 👋",
     welcomeDesc: "Додайте свій Steem нікнейм для персоналізованих сповіщень про відповіді, завантаження зображень та швидкої публікації через Keychain.",
     saveAndStart: "Зберегти і Почати",
     skipForNow: "Пропустити (можна додати пізніше)",
+    installApp: "Встановити додаток",
+    pwaInstallDesc: "Встановіть Steem Editor як швидкий і легкий додаток на свій пристрій з підтримкою офлайн-роботи.",
+    pwaInstalled: "Додаток успішно встановлено!",
+    pwaAlreadyInstalled: "Додаток уже встановлено",
+    pwaInstallFailed: "Не вдалося запустити встановлення",
+    pwaPlatformSupport: "Підтримується на Android, iOS, Windows та macOS.",
   },
   en: {
     saveDraftBeforeNew: "Save current post as draft before starting new?",
@@ -386,7 +401,7 @@ const translations = {
     welcomeDesc: "Add your Steem username for personalized reply notifications, image uploads, and quick posting via Keychain.",
     saveAndStart: "Save & Start",
     skipForNow: "Skip for now (can add later)",
-    aboutDesc: "Professional editor for Steem with Web Crypto (AES-GCM) security, double encryption, and PIN protection.",
+    aboutDesc: "Ultra Steem Editor — professional multi-threaded editor for Steem with Web Crypto (AES-GCM) security, double encryption, and PIN protection. Optimized for large files.",
     aboutApp: "About App",
     packagesUsed: "Packages Used (NPM)",
     externalLibs: "External Libraries (CDN)",
@@ -405,6 +420,7 @@ const translations = {
     general: "General",
     about: "About",
     vault: "Vault",
+    pwa: "PWA Install",
     enterPin: "Enter PIN",
     sessionActive: "SESSION ACTIVE",
     vaultClosed: "VAULT CLOSED",
@@ -637,12 +653,19 @@ const translations = {
     textWrap: "Text Wrap",
     keysCleared: "Cleared!",
     clearApiKeys: "Clear Keys",
+    installApp: "Install App",
+    pwaInstallDesc: "Install Steem Editor as a fast, lightweight app on your device with offline support.",
+    pwaInstalled: "App successfully installed!",
+    pwaAlreadyInstalled: "App is already installed",
+    pwaInstallFailed: "Failed to launch installation",
+    pwaPlatformSupport: "Supported on Android, iOS, Windows, and macOS.",
   },
   es: {
     editor: "Editor",
     preview: "Previsualización",
     gallery: "Galería",
     settings: "Ajustes",
+    pwa: "PWA Instalar",
     publish: "Publicar",
     drafts: "Borradores",
     templates: "Plantillas",
@@ -887,12 +910,19 @@ const translations = {
     confirmClearApiKeys: "¿Limpiar claves API?",
     keysCleared: "¡Claves limpias!",
     clearApiKeys: "Limpiar claves API",
+    installApp: "Instalar App",
+    pwaInstallDesc: "Instale Steem Editor como una aplicación rápida y ligera en su dispositivo con soporte sin conexión.",
+    pwaInstalled: "¡Aplicación instalada con éxito!",
+    pwaAlreadyInstalled: "La aplicación ya está instalada",
+    pwaInstallFailed: "No se pudo iniciar la instalación",
+    pwaPlatformSupport: "Soportado en Android, iOS, Windows y macOS.",
   },
   ko: {
     editor: "에디터",
     preview: "미리보기",
     gallery: "갤러리",
     settings: "설정",
+    pwa: "PWA 설치",
     publish: "게시하기",
     drafts: "초안",
     templates: "템플릿",
@@ -1137,6 +1167,12 @@ const translations = {
     confirmClearApiKeys: "API 키를 삭제하시겠습니까?",
     keysCleared: "API 키가 삭제되었습니다!",
     clearApiKeys: "API 키 삭제",
+    installApp: "앱 설치",
+    pwaInstallDesc: "오프라인 지원을 제공하는 빠르고 가벼운 앱으로 Steem Editor를 기기에 설치하세요.",
+    pwaInstalled: "앱이 성공적으로 설치되었습니다!",
+    pwaAlreadyInstalled: "앱이 이미 설치되어 있습니다",
+    pwaInstallFailed: "설치를 시작하지 못했습니다",
+    pwaPlatformSupport: "Android, iOS, Windows 및 macOS에서 지원됩니다.",
   }
 };
 
@@ -1144,6 +1180,17 @@ const translations = {
 if (typeof window !== 'undefined') {
   (window as any).Buffer = Buffer;
 }
+
+const DOM_PURIFY_CONFIG = {
+  ALLOWED_TAGS: ['b', 'i', 'em', 'strong', 'a', 'div', 'p', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'ul', 'ol', 'li', 'blockquote', 'pre', 'code', 'table', 'thead', 'tbody', 'tr', 'th', 'td', 'img', 'hr', 'br', 'span', 'strike', 'sup', 'sub', 'center'],
+  ALLOWED_ATTR: ['href', 'src', 'alt', 'class', 'className', 'style', 'title', 'target', 'rel', 'referrerpolicy'],
+  ADD_CLASSES: {
+    div: ['pull-left', 'pull-right', 'text-justify', 'text-right', 'text-center', 'clearfix', 'phishy', 'text-blue', 'text-green'],
+    p: ['pull-left', 'pull-right', 'text-justify', 'text-right', 'text-center', 'clearfix', 'phishy', 'text-blue', 'text-green'],
+    span: ['phishy', 'text-blue', 'text-green'],
+    img: ['pull-left', 'pull-right', 'text-justify', 'text-right', 'text-center']
+  }
+};
 
 // Access libraries
 const getMarked = () => {
@@ -1166,18 +1213,78 @@ const getMarked = () => {
     parse: async (text: string) => {
       if (!marked || !marked.parse) return text;
       try {
-        // marked.parse can be sync or async
-        const html = await marked.parse(text);
-        if (DOMPurify) {
-          return DOMPurify.sanitize(html, {
-            ALLOWED_TAGS: ['b', 'i', 'em', 'strong', 'a', 'div', 'p', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'ul', 'ol', 'li', 'blockquote', 'pre', 'code', 'table', 'thead', 'tbody', 'tr', 'th', 'td', 'img', 'hr', 'br', 'span', 'strike', 'sup', 'sub', 'center'],
-            ALLOWED_ATTR: ['href', 'src', 'alt', 'class', 'className', 'style', 'title', 'target', 'rel'],
-            ADD_CLASSES: {
-              div: ['pull-left', 'pull-right', 'text-justify', 'text-right', 'text-center', 'clearfix', 'phishy', 'text-blue', 'text-green'],
-              p: ['pull-left', 'pull-right', 'text-justify', 'text-right', 'text-center', 'clearfix', 'phishy', 'text-blue', 'text-green'],
-              span: ['phishy', 'text-blue', 'text-green']
+        // Normalize line endings
+        let normalizedText = text.replace(/\r\n/g, '\n');
+
+        // Prevent non-table text from being merged into preceding tables
+        const strictTableLines = [];
+        const lines = normalizedText.split('\n');
+        let inTable = false;
+        
+        for (let i = 0; i < lines.length; i++) {
+          const line = lines[i];
+          const isSeparator = /^[\s|:-]+$/.test(line) && line.includes('-') && line.includes('|');
+          
+          if (isSeparator && i > 0 && lines[i-1].includes('|')) {
+            inTable = true;
+            strictTableLines.push(line);
+            continue;
+          }
+          
+          if (inTable) {
+            if (line.trim() === '') {
+              inTable = false;
+            } else if (!line.includes('|')) {
+              strictTableLines.push('');
+              inTable = false;
             }
-          } as any) as unknown as string;
+          }
+          
+          strictTableLines.push(line);
+        }
+        normalizedText = strictTableLines.join('\n');
+
+        // Preserve consecutive blank lines (3 or more newlines) outside of code blocks
+        normalizedText = normalizedText.replace(/(```[\s\S]*?```|`[^`\n]*`)|(\n{3,})/g, (match, code, newlines) => {
+          if (code) return code;
+          const count = newlines.length - 2;
+          return '\n\n' + Array(count).fill('<br>').join('') + '\n\n';
+        });
+
+        let textWithImageMarkdown = convertBareImageUrlsToMarkdown(normalizedText);
+        
+        // Preprocess to convert markdown images inside pull-left/pull-right divs or center tags to <img> tags
+        textWithImageMarkdown = textWithImageMarkdown.replace(/(<div[^>]*class="[^"]*pull-(?:left|right)[^"]*"[^>]*>)([\s\S]*?)(<\/div>)/gi, (m, open, htmlContent, close) => {
+          const processedContent = htmlContent.replace(/!\[([^\]]*)\]\(([^)]+)\)/g, '<img src="$2" alt="$1">');
+          return open + processedContent + close;
+        });
+        textWithImageMarkdown = textWithImageMarkdown.replace(/(<div[^>]*class='[^']*pull-(?:left|right)[^']*'[^>]*>)([\s\S]*?)(<\/div>)/gi, (m, open, htmlContent, close) => {
+          const processedContent = htmlContent.replace(/!\[([^\]]*)\]\(([^)]+)\)/g, '<img src="$2" alt="$1">');
+          return open + processedContent + close;
+        });
+        textWithImageMarkdown = textWithImageMarkdown.replace(/(<center[^>]*>)([\s\S]*?)(<\/center>)/gi, (m, open, htmlContent, close) => {
+          const processedContent = htmlContent.replace(/!\[([^\]]*)\]\(([^)]+)\)/g, '<img src="$2" alt="$1">');
+          return open + processedContent + close;
+        });
+
+        // marked.parse can be sync or async
+        let html = await marked.parse(textWithImageMarkdown);
+        
+        // Map image titles representing alignment classes to actual class attributes
+        html = html.replace(/<img([^>]*)title="([^"]+)"([^>]*)/gi, (m, p1, title, p2) => {
+          if (['pull-left', 'pull-right', 'text-justify', 'text-right', 'text-center'].includes(title)) {
+            const hasClass = p1.includes('class="') || p2.includes('class="');
+            if (hasClass) {
+              return m;
+            } else {
+              return `<img${p1}class="${title}" title="${title}"${p2}`;
+            }
+          }
+          return m;
+        });
+
+        if (DOMPurify) {
+          return DOMPurify.sanitize(html, DOM_PURIFY_CONFIG as any) as unknown as string;
         }
         return html;
       } catch (e) {
@@ -1215,6 +1322,7 @@ const IconButton = ({
 }) => (
   <button
     onClick={onClick}
+    onMouseDown={(e) => e.preventDefault()}
     title={title}
     className={cn(
       "p-2 rounded-md transition-all duration-200 flex items-center justify-center shrink-0",
@@ -1223,11 +1331,111 @@ const IconButton = ({
       className
     )}
   >
-    <Icon size={18} />
+    <Icon className="w-[clamp(1rem,1.1vw,1.25rem)] h-[clamp(1rem,1.1vw,1.25rem)]" />
   </button>
 );
 
 const APP_CHANGELOG = [
+  {
+    version: "v4.3.8",
+    date: "2026-07-23",
+    changes: [
+      "Multi-Threaded Parsing Engine: Integrated Web Workers (useEditorWorker) to offload heavy Markdown-to-HTML and HTML-to-Markdown conversions, preventing UI freezes even with 200k+ lines of text.",
+      "Ultra Steem Editor Branding: Successfully rebranded the application to Ultra Steem Editor, reflecting its high-performance professional focus.",
+      "Interface Polish: Refined list rendering (ul/li) in the WYSIWYG editor, eliminating unwanted vertical margins and fixing indentation inconsistencies.",
+      "Extreme Performance Mode: Enhanced Performance Mode to completely bypass Framer Motion animations and heavy CSS transitions for absolute zero-latency writing.",
+      "Repository Optimization: Organized the project root by moving 50+ legacy fix/diagnostic scripts into a structured /tets_and_fix directory.",
+      "Large File Stability: Improved document handling in the browser cache and local synchronization layers for maximum reliability."
+    ]
+  },
+  {
+    version: "v3.9.9",
+    date: "2026-07-18",
+    changes: [
+      "Gallery Minimization: Added support for collapsing the gallery view to save space.",
+      "Dynamic Editor Expansion: Expanded the text input area on the main screen for a more comfortable editing experience.",
+      "Developer Branding: Removed specific community/author branding from the application info panel."
+    ]
+  },
+  {
+    version: "v3.8.0",
+    date: "2026-07-16",
+    changes: [
+      "Progressive Web App (PWA) Support: Added support for installing Steem Editor Pro directly on devices (Android, iOS, Windows, macOS) for faster startup times and fully offline-capable operations.",
+      "Service Worker Caching: Implemented sw.js to automatically manage local caching of HTML, CSS, fonts, and icons, enabling reliable offline startup and content editing.",
+      "Unified Install Experience: Added a conditional PWA Install button in the header with a pulsing notification indicator, alongside a dedicated PWA Install tab in the settings modal with detailed platform compatibility instructions."
+    ]
+  },
+  {
+    version: "v3.7.3",
+    date: "2026-07-15",
+    changes: [
+      "Direct Layout Popover: Added a high-accessibility inline Spacing and Icon Size controller right next to the sync toggles in the editor header, eliminating the need to dig into the global settings menu.",
+      "Perfect Theme Adaptation: Refactored the synchronization headers, status badges, and tabs to completely support dynamic light and dark theme colors, resolving light-theme visual consistency issues.",
+      "Intelligent Breakpoint Visibility: Enhanced responsive layout constraints from `sm` to `md` for editor status labels to completely prevent text overlaps and crowded toolbar layouts on medium-sized screens."
+    ]
+  },
+  {
+    version: "v3.7.2",
+    date: "2026-07-15",
+    changes: [
+      "Custom Sizing and Spacing Engine: Added user-configurable controls for toolbar icon sizes and WYSIWYG paragraph spacing, with local storage persistence and presets (Compact, Balanced, Normal, Spacious) to minimize visual discrepancy between Code and Visual modes.",
+      "Light Theme Compatibility Optimization: Upgraded the synchronization header overlays, status badges, and tabs to dynamically adapt colors in Light and Dark modes, preventing dark-theme-only visual artifacts.",
+      "Responsive Layout Overlap Prevention: Improved breakpoints for real-time status indicators and editor pane controls to prevent content squeezing and visual overlap on smaller screens.",
+      "Zero-Transparency Floating UI: Eliminated transparency and alpha blending from the primary floating tools widget and its sub-dropdown settings, improving readability and significantly easing browser composting workloads.",
+      "No-Blur Performance Layout: Removed backdrop blurs, transition delays, and nested box-shadow effects from main overlays, side menus, and table controls to minimize GPU paint times.",
+      "Optimized Solid Containers: Reconfigured the preview panel background and toolbars as completely solid opaque surfaces to optimize sub-pixel layout rendering and eliminate flickering pixels on rapid text input."
+    ]
+  },
+  {
+    version: "v3.7.1",
+    date: "2026-07-15",
+    changes: [
+      "State Preservation Across Reloads: Persisted the active editor mode in localStorage, so users who prefer typing in Markdown Code mode stay in that mode upon reloading or returning to the page.",
+      "Visual Stale-Flag Protocol: Introduced an intelligent stale-flag (steem_visual_html_is_stale) mechanism that invalidates cached raw HTML whenever the user modifies raw Markdown content in Code mode. This ensures that switching back to Visual mode or refreshing the page correctly translates and loads the fresh edits, completely preventing data loss.",
+      "Zustand-Cascading Synchronization: Optimized the reactive state pipeline, ensuring that any asynchronous content changes gracefully cascade through the debounced save engine regardless of the active view pane."
+    ]
+  },
+  {
+    version: "v3.7.0",
+    date: "2026-07-14",
+    changes: [
+      "Visual-to-Code Sync Controller: Replaced the complex Settings gear dropdown menu with a single, highly intuitive Real-Time Sync Toggle (RefreshCw icon) on the WYSIWYG toolbar.",
+      "Two-Tier Synchronization: Real-Time Sync (Active/Immediate HTML-to-Markdown) and Background Sync (Default/Lag-Free debounced background sync engine on idle or switch) to guarantee maximum writing performance.",
+      "O(1) Spacer Optimization: Replaced expensive DOM queries (querySelectorAll) with high-performance O(1) direct relative traversal under the cursor (via .closest() and lastElementChild checks).",
+      "CSS Containment Geometry: Added 'contain: layout style' to all block elements in the WYSIWYG editor to isolate element geometry and prevent full-document browser reflows during typing."
+    ]
+  },
+  {
+    version: "v3.6.5",
+    date: "2026-07-12",
+    changes: [
+      "Precision Cursor Synchronization: Rewrote scrolling logic when switching from Code to Visual editor by mathematically calculating the exact Y-pixel coordinate of the caret and centering the exact line perfectly.",
+      "Accurate Visual-to-Markdown Cursor Restoration: Rebuilt the switching cursor algorithm to calculate exact text wrapping dimensions and restore the exact vertical scroll coordinate, eliminating under-scrolling.",
+      "Refined Widget Clearance: Decreased the bottom margin between the editor and the docked widget to 85px, eliminating the excessive blank strip while keeping a clean 13px gap above the floating UI."
+    ]
+  },
+  {
+    version: "v3.6.1",
+    date: "2026-07-10",
+    changes: [
+      "GPU Resource Optimization: Refactored heavy CSS effects, including conditional backdrop-blur and transparency, to dynamically disable/simplify on performance-limited modes. This significantly reduces GPU load and enhances responsiveness on lower-end devices.",
+      "Fixed: Resolved issue with cursor position saving, ensuring consistent behavior in both directions.",
+      "Scroll Optimization: Eliminated scroll jumping in Markdown mode and added a comfortable typing gap above the floating widget."
+    ]
+  },
+  {
+    version: "v3.6.0",
+    date: "2026-07-05",
+    changes: [
+      "Active Formatting in Widget: Connected the active format states (Bold, Italic, Strikethrough, Subscript, Superscript, Inline Code, and Color block) to the buttons on the floating widget panel, providing instant visual feedback on active text formatting.",
+      "Localized WYSIWYG Spacers: Implemented automatic generation of top and bottom visual placeholders/spacers around complex elements with language-aware guide messages.",
+      "Unified Block/Tag Breakout: Refined block container escape mechanism for BLOCKQUOTE, headings, and code blocks.",
+      "Smart Space Trimming on Formatting Exit: Added automatic cleanup of inner margins for formatting tags to prevent rendering glitches.",
+      "Code Editor Scroll Jumping: Fixed issue where inserting Markdown tables or custom presets would scroll the container back to the top.",
+      "Enhanced WYSIWYG Spacer Styling: Polished spacer visual appearance for improved editor clarity."
+    ]
+  },
   {
     version: "v3.5.0",
     date: "2026-05-24",
@@ -1312,8 +1520,138 @@ const getChangelogText = () => "SteemEditor Pro Updates:\n\n" + APP_CHANGELOG.ma
   `${log.version} (${log.date})\n` + log.changes.map(c => `- ${c}`).join('\n')
 ).join('\n\n');
 
+const isInsideTagInLine = (line: string, caretPosInLine: number, openTag: string, closeTag: string = openTag) => {
+  const openLen = openTag.length;
+  const closeLen = closeTag.length;
+  
+  if (openTag === closeTag) {
+    const tagLen = openLen;
+    const indices: number[] = [];
+    let idx = line.indexOf(openTag);
+
+    while (idx !== -1) {
+      const isEscaped = idx > 0 && line[idx - 1] === '\\';
+      const isSpuriousStar = openTag === '*' && (
+        (idx > 0 && line[idx - 1] === '*') || 
+        (idx + 1 < line.length && line[idx + 1] === '*')
+      );
+
+      if (!isEscaped && !isSpuriousStar) {
+        indices.push(idx);
+      }
+      idx = line.indexOf(openTag, idx + tagLen);
+    }
+
+    for (let i = 0; i < indices.length; i += 2) {
+      if (i + 1 < indices.length) {
+        const start = indices[i] + tagLen;
+        const end = indices[i + 1];
+        if (caretPosInLine >= start && caretPosInLine <= end) {
+          return true;
+        }
+      }
+    }
+  } else {
+    const openIndices: number[] = [];
+    let oIdx = line.indexOf(openTag);
+    while (oIdx !== -1) {
+      if (!(oIdx > 0 && line[oIdx - 1] === '\\')) {
+        openIndices.push(oIdx);
+      }
+      oIdx = line.indexOf(openTag, oIdx + openLen);
+    }
+
+    const closeIndices: number[] = [];
+    let cIdx = line.indexOf(closeTag);
+    while (cIdx !== -1) {
+      if (!(cIdx > 0 && line[cIdx - 1] === '\\')) {
+        closeIndices.push(cIdx);
+      }
+      cIdx = line.indexOf(closeTag, cIdx + closeLen);
+    }
+
+    for (let i = 0; i < openIndices.length; i++) {
+      const oPos = openIndices[i];
+      const cPos = closeIndices.find(c => c > oPos);
+      if (cPos !== undefined) {
+        if (caretPosInLine >= oPos + openLen && caretPosInLine <= cPos) {
+          return true;
+        }
+      }
+    }
+  }
+  return false;
+};
+
+// Helper functions for path-based DOM node tracking
+function getNodePath(root: Node, target: Node): number[] | null {
+  if (root === target) return [];
+  for (let i = 0; i < root.childNodes.length; i++) {
+    const path = getNodePath(root.childNodes[i], target);
+    if (path) return [i, ...path];
+  }
+  return null;
+}
+
+function getNodeByPath(root: Node, path: number[]): Node | null {
+  let curr = root;
+  for (const idx of path) {
+    if (!curr.childNodes || idx >= curr.childNodes.length) return null;
+    curr = curr.childNodes[idx];
+  }
+  return curr;
+}
+
+function MobileStatsBar({ visualStyle, isDarkMode, t }: any) {
+  const stats = useEditorStore(state => state.stats);
+  const cleanStats = useEditorStore(state => state.cleanStats);
+  return (
+    <div className={cn(
+      "lg:hidden flex items-center justify-between px-4 py-2 border-b text-[10px] font-medium uppercase tracking-widest shrink-0 transition-colors",
+      visualStyle === 'neon' ? "bg-slate-950 border-slate-800/80 text-slate-400" : (isDarkMode ? "bg-slate-900 border-slate-800 text-slate-500" : "bg-slate-50 border-slate-200 text-slate-600")
+    )}>
+      <div className="flex gap-4 items-center">
+        <span>{t('wordsLabel')}: {stats?.words || 0}</span>
+        <span className="text-cyan-400">{t('cleanWordsLabel')}: {cleanStats?.words || 0}</span>
+        <span>{t('charsLabel')}: {stats?.chars || 0}</span>
+        <ReadingTimeBadge splitWords={300} t={t} />
+      </div>
+    </div>
+  );
+}
+
+function DesktopStatsFooter({ t }: any) {
+  const stats = useEditorStore(state => state.stats);
+  const cleanStats = useEditorStore(state => state.cleanStats);
+  return (
+    <footer className="hidden lg:flex h-8 border-t border-slate-800 bg-slate-900 items-center px-4 justify-between text-[10px] font-medium text-slate-500 uppercase tracking-widest">
+      <div className="flex gap-4 items-center">
+        <span>{t('wordsLabel')}: {stats?.words || 0}</span>
+        <span className="text-cyan-400">{t('cleanWordsLabel')}: {cleanStats?.words || 0}</span>
+        <span>{t('charsLabel')}: {stats?.chars || 0}</span>
+        <ReadingTimeBadge splitWords={300} t={t} />
+      </div>
+      <div className="flex items-center gap-2">
+        <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
+        <span>{t('autosaveActive')}</span>
+      </div>
+    </footer>
+  );
+}
+
+function ReadingTimeBadge({ splitWords, t }: any) {
+  const stats = useEditorStore(state => state.stats);
+  return (
+    <span className="flex items-center gap-1 text-cyan-500 font-bold uppercase tracking-widest text-[10px]">
+      <Clock size={10} className="inline" />
+      {Math.ceil((stats?.words || 0) / (splitWords || 300))} {t('minRead')}
+    </span>
+  );
+}
+
 function App() {
   // --- State ---
+  const [activeModal, setActiveModal] = useState<string | null>(null);
   const [currentDraftId, setCurrentDraftId] = useState<string | null>(null);
   const [activeView, setActiveView] = useState<'editor' | 'reader'>('editor');
   const [lang, setLang] = useState<Language>(() => {
@@ -1326,8 +1664,9 @@ function App() {
 
   const t = useCallback((key: keyof typeof translations['uk']) => (translations[lang] as any)[key] || key, [lang]);
 
-
-  const [content, setContent] = useState('');
+  const contentForPublish = useEditorStore(state => activeModal === 'publish' ? state.content : '');
+  const setContent = useEditorStore(state => state.setContent);
+  const stats = useEditorStore(state => state.stats);
   const [splitWords, setSplitWords] = useState(300);
   const [isSidebarOpen, setIsSidebarOpen] = useState(() => window.innerWidth >= 1024);
   const [widgetOpacity, setWidgetOpacity] = useState(() => {
@@ -1345,8 +1684,8 @@ function App() {
   const [showTableSelector, setShowTableSelector] = useState(false);
   const [tableSelectorPos, setTableSelectorPos] = useState<{x: number, y: number, direction: 'up' | 'down'} | null>(null);
   const [tableHover, setTableHover] = useState({ r: 0, c: 0 });
-  const [stats, setStats] = useState({ words: 0, chars: 0 });
   const [isFullScreen, setIsFullScreen] = useState(false);
+  const [isEditorFullScreen, setIsEditorFullScreen] = useState(false);
   const previewRef = useRef<HTMLDivElement>(null);
 
   const toggleFullScreen = () => {
@@ -1360,17 +1699,43 @@ function App() {
     }
   };
 
+  const toggleEditorFullScreen = () => {
+    if (!editorPaneRef.current) return;
+    if (!document.fullscreenElement) {
+      editorPaneRef.current.requestFullscreen().catch(err => {
+        console.error(`Error attempting to enable full-screen mode: ${err.message}`);
+      });
+    } else {
+      document.exitFullscreen();
+    }
+  };
+
   useEffect(() => {
     probeNodes();
   }, []);
 
   useEffect(() => {
-    const handleFsChange = () => setIsFullScreen(!!document.fullscreenElement);
+    const handleFsChange = () => {
+      setIsFullScreen(document.fullscreenElement === previewRef.current);
+      setIsEditorFullScreen(document.fullscreenElement === editorPaneRef.current);
+    };
     document.addEventListener('fullscreenchange', handleFsChange);
     return () => document.removeEventListener('fullscreenchange', handleFsChange);
   }, []);
 
   const [isEditorFocused, setIsEditorFocused] = useState(false);
+  const [editorMode, setEditorMode] = useState<'visual' | 'markdown'>(() => {
+    return (localStorage.getItem('steem_editor_mode') as 'visual' | 'markdown') || 'visual';
+  });
+  const [activeFormats, setActiveFormats] = useState({
+    bold: false,
+    italic: false,
+    code: false,
+    strikethrough: false,
+    sub: false,
+    sup: false,
+    phishy: false
+  });
   const [floatingPos, setFloatingPos] = useState<{ x: number, y: number } | null>(null);
   const [queue, setQueue] = useState<QueueItem[]>(() => {
     const saved = localStorage.getItem(STORAGE_KEY_QUEUE);
@@ -1405,7 +1770,54 @@ function App() {
   });
   const [isSearchingPexels, setIsSearchingPexels] = useState(false);
   
-  const [performanceMode, setPerformanceMode] = useState(() => localStorage.getItem('steem_performance_mode') === 'true');
+  const [performanceMode, setPerformanceMode] = useState(() => localStorage.getItem('steem_performance_mode') !== 'false');
+
+  const saveLargeStorage = useCallback((key: string, val: string) => {
+    try {
+      localStorage.setItem(key, val);
+    } catch (e) {
+      console.warn(`LocalStorage quota exceeded for ${key} (large document):`, e);
+      try {
+        sessionStorage.setItem(key, val);
+      } catch (err) {
+        console.warn('SessionStorage quota exceeded as well:', err);
+      }
+    }
+  }, []);
+
+  const getMotionConfig = useCallback((custom?: { initial?: any; animate?: any; exit?: any }) => {
+    if (performanceMode) {
+      return {
+        initial: false,
+        animate: custom?.animate || { opacity: 1, scale: 1, y: 0, x: 0 },
+        exit: false as any,
+        transition: { duration: 0 }
+      };
+    }
+    return {
+      initial: custom?.initial || { opacity: 0, y: 10, scale: 0.95 },
+      animate: custom?.animate || { opacity: 1, y: 0, scale: 1 },
+      exit: custom?.exit || { opacity: 0, y: 10, scale: 0.95 },
+      transition: { duration: 0.15 }
+    };
+  }, [performanceMode]);
+
+  const getSidebarMotionConfig = useCallback(() => {
+    if (performanceMode) {
+      return {
+        initial: false,
+        animate: { x: 0, opacity: 1 },
+        exit: false as any,
+        transition: { duration: 0 }
+      };
+    }
+    return {
+      initial: { x: -300, opacity: 0 },
+      animate: { x: 0, opacity: 1 },
+      exit: { x: -300, opacity: 0 },
+      transition: { duration: 0.3 }
+    };
+  }, [performanceMode]);
   const [tempPexelsKey, setTempPexelsKey] = useState('');
   const [tempPixabayKey, setTempPixabayKey] = useState('');
   const [tempUnsplashAccessKey, setTempUnsplashAccessKey] = useState('');
@@ -1419,10 +1831,18 @@ function App() {
 
   const [pexelsSettings, setPexelsSettings] = useState(() => {
     const saved = localStorage.getItem('steem_pexels_settings');
-    return saved ? JSON.parse(saved) : {
-      withAttribution: true,
-      linkEmbedded: true
-    };
+    try {
+      const parsed = saved ? JSON.parse(saved) : null;
+      return (parsed && typeof parsed === 'object') ? parsed : {
+        withAttribution: true,
+        linkEmbedded: true
+      };
+    } catch {
+      return {
+        withAttribution: true,
+        linkEmbedded: true
+      };
+    }
   });
 
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -1435,9 +1855,12 @@ function App() {
   });
   const [enabledTools, setEnabledTools] = useState<string[]>(() => {
     const saved = localStorage.getItem(STORAGE_KEY_FLOAT_CONFIG);
-    const initial = saved ? JSON.parse(saved) : DEFAULT_FLOAT_TOOLS;
-    // ensure unique
-    return Array.from(new Set(initial));
+    try {
+      const initial = saved ? JSON.parse(saved) : DEFAULT_FLOAT_TOOLS;
+      return Array.isArray(initial) ? Array.from(new Set(initial)) : DEFAULT_FLOAT_TOOLS;
+    } catch {
+      return DEFAULT_FLOAT_TOOLS;
+    }
   });
 
   // Configure marked for Steem-like behavior
@@ -1447,12 +1870,21 @@ function App() {
     }
   }, []);
   
-  const [previewHtml, setPreviewHtml] = useState('');
+
   const [isDarkMode, setIsDarkMode] = useState(() => localStorage.getItem('steem_dark_mode') !== 'false');
   const [visualStyle, setVisualStyle] = useState<'standard' | 'neon'>(() => (localStorage.getItem('steem_visual_style') as 'standard' | 'neon') || 'standard');
-  const [activeModal, setActiveModal] = useState<string | null>(null);
   const [syncScrollEnabled, setSyncScrollEnabled] = useState(() => localStorage.getItem('steem_sync_scroll') !== 'false');
-  const [settingsTab, setSettingsTab] = useState<'general' | 'gallery' | 'vault' | 'keys' | 'about'>('general');
+  const [isGalleryCollapsed, setIsGalleryCollapsed] = useState(() => localStorage.getItem('steem_gallery_collapsed') === 'true');
+  const [isLivePreviewEnabled, setIsLivePreviewEnabled] = useState(() => localStorage.getItem('steem_live_preview_enabled') === 'true');
+
+  useEffect(() => {
+    localStorage.setItem('steem_gallery_collapsed', String(isGalleryCollapsed));
+  }, [isGalleryCollapsed]);
+
+  useEffect(() => {
+    localStorage.setItem('steem_live_preview_enabled', String(isLivePreviewEnabled));
+  }, [isLivePreviewEnabled]);
+  const [settingsTab, setSettingsTab] = useState<'general' | 'gallery' | 'vault' | 'keys' | 'about' | 'pwa'>('general');
   const [systemDialog, setSystemDialog] = useState<{
     type: 'confirm' | 'prompt' | 'alert',
     title: string,
@@ -1461,8 +1893,6 @@ function App() {
     defaultValue?: string,
     placeholder?: string
   } | null>(null);
-  
-  const [cacheClearOptions, setCacheClearOptions] = useState({ cache: true, drafts: false, settings: false, vault: false });
 
   useEffect(() => {
     if (activeModal === null && !systemDialog) {
@@ -1503,56 +1933,100 @@ function App() {
     return images.filter(img => img.name.toLowerCase().includes(gallerySearch.toLowerCase()));
   }, [images, gallerySearch]);
 
+  const isFirstRender = useRef(true);
+
   // Update preview HTML when content or marked changes
   useEffect(() => {
+    const preview = previewPaneRef.current;
+    if (!isLivePreviewEnabled) {
+      if (preview && !preview.querySelector('svg.opacity-40')) {
+        preview.innerHTML = `<div class="flex flex-col items-center justify-center h-full text-slate-500 text-sm gap-2 py-12 text-center select-none">
+          <svg class="w-8 h-8 opacity-40" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21" />
+          </svg>
+          <p>${lang === 'uk' ? "Прев'ю вимкнено для економії ресурсів.<br>Натисніть кнопку з оком, щоб увімкнути знову." : "Live Preview disabled to save resources.<br>Click the eye icon to enable again."}</p>
+        </div>`;
+      }
+      return;
+    }
+
     const updatePreview = async () => {
       const m = getMarked();
       if (!m) {
-        setPreviewHtml(`<p class="text-slate-500 italic">${t('loadingParser')}</p>`);
+        if (preview) {
+          Idiomorph.morph(preview, `<p class="text-slate-500 italic">${t('loadingParser')}</p>`, { morphStyle: 'innerHTML' });
+        }
         return;
       }
       try {
-        const processed = processContentForSteem(content);
+        const currentContent = import('./store').then(({ useEditorStore }) => {
+          return useEditorStore.getState().content;
+        });
+        const mdContent = await currentContent;
+        const processed = processContentForSteem(mdContent);
         let finalHtml = (await m.parse(processed)) as string;
         
-        // Add referrerpolicy="no-referrer" to all img tags for better compatibility
-        finalHtml = finalHtml.replace(/<img /g, '<img referrerpolicy="no-referrer" ');
+        // Add referrerpolicy="no-referrer" and loading="lazy" to all img tags for better compatibility and massive GPU/CPU savings
+        finalHtml = finalHtml.replace(/<img /g, '<img referrerpolicy="no-referrer" loading="lazy" ');
         
-        const preview = previewPaneRef.current;
         let isAtBottom = false;
         if (preview) {
           isAtBottom = preview.scrollHeight > 0 && preview.scrollHeight - preview.scrollTop - preview.clientHeight <= 20;
         }
         
-        const purifiedHtml = DOMPurify ? (DOMPurify.sanitize(finalHtml) as unknown as string) : (finalHtml as unknown as string);
+        const purifiedHtml = DOMPurify ? (DOMPurify.sanitize(finalHtml, DOM_PURIFY_CONFIG as any) as unknown as string) : (finalHtml as unknown as string);
+        
         if (preview) {
-          preview.innerHTML = purifiedHtml;
+          Idiomorph.morph(preview, purifiedHtml, { morphStyle: 'innerHTML' });
+          
           if (syncScrollEnabled && isAtBottom) {
             requestAnimationFrame(() => {
               preview.scrollTop = preview.scrollHeight;
             });
           }
-        } else {
-          setPreviewHtml(purifiedHtml);
         }
       } catch (e) {
         console.error("Marked parse error", e);
-        if (previewPaneRef.current) previewPaneRef.current.innerHTML = `<p class="text-red-500">${t('previewError')}</p>`;
+        if (preview) {
+          Idiomorph.morph(preview, `<p class="text-red-500">${t('previewError')}</p>`, { morphStyle: 'innerHTML' });
+        }
       }
     };
 
-    const debounceMs = content.length > 50000 ? 1000 : content.length > 10000 ? 500 : 300;
-    const timer = setTimeout(updatePreview, debounceMs); // Dynamic debounce
-    return () => clearTimeout(timer);
-  }, [content, t, syncScrollEnabled]);
+    if (isFirstRender.current) {
+      isFirstRender.current = false;
+      updatePreview();
+      return;
+    }
+
+    let timer: any;
+    const unsubscribe = import('./store').then(({ useEditorStore }) => {
+      // Trigger update immediately if needed, or wait for next changes
+      if (!isLivePreviewEnabled) updatePreview(); 
+      else {
+        timer = setTimeout(updatePreview, 300);
+      }
+      return useEditorStore.subscribe((state, prevState) => {
+        if (state.content !== prevState.content) {
+          // Skip expensive markdown preview parsing/morphing in background while user types in visual editor
+          if (editorMode === 'visual') return;
+          if (timer) clearTimeout(timer);
+          timer = setTimeout(updatePreview, 300);
+        }
+      });
+    });
+
+    return () => {
+      if (timer) clearTimeout(timer);
+      unsubscribe.then(unsub => unsub());
+    };
+  }, [t, syncScrollEnabled, isLivePreviewEnabled, lang, editorMode]);
   const [templates, setTemplates] = useState<Template[]>([]);
   const [mentions, setMentions] = useState<string[]>([]);
   const [newMention, setNewMention] = useState('');
   
   // Auth & Publish
-  const [authType, setAuthType] = useState<AuthType | 'VAULT'>(() => {
-    return (isTauri() || isNeutralino()) ? 'VAULT' : 'KEYCHAIN';
-  });
+  const [authType, setAuthType] = useState<AuthType | 'VAULT'>('KEYCHAIN');
   const [username, setUsername] = useState(() => localStorage.getItem('steem_username') || '');
   const [selectedVaultUser, setSelectedVaultUser] = useState('');
   const [showAccountPrompt, setShowAccountPrompt] = useState(() => !localStorage.getItem('steem_username'));
@@ -1807,21 +2281,7 @@ function App() {
     { id: 'raleway', label: 'Raleway', family: '"Raleway", sans-serif' },
   ], []);
 
-  const [imageUploadAccount, setImageUploadAccount] = useState(() => {
-    if (isTauri() || isNeutralino()) {
-      const stored = localStorage.getItem('steem_vault_accounts');
-      if (stored) {
-         try {
-           const parsed = JSON.parse(stored);
-           if (parsed && typeof parsed === 'object' && Object.keys(parsed).length > 0) {
-             return Object.keys(parsed)[0]; // select first vault account by default
-           }
-         } catch(e) {}
-      }
-    }
-    return ''; // default to Keychain inside the browser
-  });
-  const [isImageAccountDropdownOpen, setIsImageAccountDropdownOpen] = useState(false);
+  const [imageUploadAccount, setImageUploadAccount] = useState('');
   const [showVaultSetup, setShowVaultSetup] = useState(false);
   const [vaultSetupWif, setVaultSetupWif] = useState('');
   const [vaultSetupPin, setVaultSetupPin] = useState('');
@@ -1837,10 +2297,19 @@ function App() {
   const [showAdvancedPublish, setShowAdvancedPublish] = useState(false);
   const [themeColor, setThemeColor] = useState<string>(localStorage.getItem('steem_theme_color') || 'cyan');
   const [editorFont, setEditorFont] = useState<string>(localStorage.getItem('steem_editor_font') || 'sans');
+  const [toolbarIconSize, setToolbarIconSize] = useState<number>(() => {
+    const saved = localStorage.getItem('steem_toolbar_icon_size');
+    return saved ? parseInt(saved, 10) : 20;
+  });
+  const [wysiwygSpacing, setWysiwygSpacing] = useState<number>(() => {
+    const saved = localStorage.getItem('steem_wysiwyg_spacing');
+    return saved ? parseInt(saved, 10) : 6;
+  });
+  const [isSpacingMenuOpen, setIsSpacingMenuOpen] = useState(false);
   const [isExifEnabled, setIsExifEnabled] = useState(() => localStorage.getItem('steem_exif_enabled') === 'true');
   const [pubLog, setPubLog] = useState<{ msg: string, type: 'success' | 'error' | 'loading' | null }>({ msg: '', type: null });
 
-  // Update CSS variables for theme color and apply font
+  // Update CSS variables for theme color, font, toolbar sizing, and WYSIWYG spacing
   useEffect(() => {
     const theme = activeAssortment.find(t => t.name === themeColor) || activeAssortment[0];
     document.documentElement.style.setProperty('--accent-color', theme.rgb);
@@ -1848,7 +2317,12 @@ function App() {
     
     const font = fontOptions.find(f => f.id === editorFont) || fontOptions[0];
     document.documentElement.style.setProperty('--font-editor', font.family);
-  }, [themeColor, activeAssortment, editorFont, fontOptions]);
+
+    document.documentElement.style.setProperty('--toolbar-icon-size', `${toolbarIconSize}px`);
+    document.documentElement.style.setProperty('--toolbar-btn-size', `${toolbarIconSize + 16}px`);
+    document.documentElement.style.setProperty('--toolbar-btn-font-size', `${Math.round(toolbarIconSize * 0.85)}px`);
+    document.documentElement.style.setProperty('--wysiwyg-spacing', `${wysiwygSpacing}px`);
+  }, [themeColor, activeAssortment, editorFont, fontOptions, toolbarIconSize, wysiwygSpacing]);
 
   const getExifTableFromBlob = async (file: File | Blob): Promise<string> => {
     if (!isExifEnabled) return '';
@@ -1882,10 +2356,11 @@ function App() {
 
   useEffect(() => {
     if (activeModal === 'publish' && !pubTitle) {
+      const content = useEditorStore.getState().content;
       const firstLine = content.split('\n')[0].replace(/[#*`]/g, '').trim();
       if (firstLine) setPubTitle(firstLine.substring(0, 70));
     }
-  }, [activeModal, content, pubTitle]);
+  }, [activeModal, pubTitle]);
 
   const extractMentions = (text: string) => {
     // 1. Remove markdown links [Label](url)
@@ -1971,6 +2446,74 @@ function App() {
       }, 15000);
     }
   }, []);
+
+  // --- PWA States ---
+  const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
+  const [isPwaInstallable, setIsPwaInstallable] = useState(false);
+  const [isPwaInstalled, setIsPwaInstalled] = useState(() => {
+    if (typeof window !== 'undefined') {
+      return window.matchMedia('(display-mode: standalone)').matches || (navigator as any).standalone === true;
+    }
+    return false;
+  });
+
+  useEffect(() => {
+    // Register Service Worker
+    if (typeof window !== 'undefined' && 'serviceWorker' in navigator) {
+      navigator.serviceWorker.register('/sw.js')
+        .then((reg) => {
+          console.log('PWA Service Worker registered successfully:', reg.scope);
+        })
+        .catch((err) => {
+          console.error('PWA Service Worker registration failed:', err);
+        });
+    }
+
+    const handleBeforeInstallPrompt = (e: Event) => {
+      e.preventDefault();
+      setDeferredPrompt(e);
+      setIsPwaInstallable(true);
+    };
+
+    const handleAppInstalled = () => {
+      setIsPwaInstalled(true);
+      setIsPwaInstallable(false);
+      setDeferredPrompt(null);
+      notify(t('pwaInstalled'), 'success');
+    };
+
+    window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+    window.addEventListener('appinstalled', handleAppInstalled);
+
+    return () => {
+      window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+      window.removeEventListener('appinstalled', handleAppInstalled);
+    };
+  }, [t, notify]);
+
+  const handleInstallPwa = async () => {
+    if (!deferredPrompt) {
+      if (isPwaInstalled) {
+        notify(t('pwaAlreadyInstalled'), 'success');
+      } else {
+        notify(t('pwaInstallFailed'), 'error');
+      }
+      return;
+    }
+    try {
+      deferredPrompt.prompt();
+      const { outcome } = await deferredPrompt.userChoice;
+      console.log(`PWA installation user outcome: ${outcome}`);
+      if (outcome === 'accepted') {
+        setIsPwaInstalled(true);
+        setIsPwaInstallable(false);
+        setDeferredPrompt(null);
+      }
+    } catch (err) {
+      console.error('Failed to trigger PWA installation:', err);
+      notify(t('pwaInstallFailed'), 'error');
+    }
+  };
   const [isUnlocked, setIsUnlocked] = useState(!SecurityService.isLocked());
   const [isTextWrapEnabled, setIsTextWrapEnabled] = useState(() => {
     const saved = localStorage.getItem('steem_text_wrap');
@@ -1984,7 +2527,6 @@ function App() {
   });
   const [activeMobileTab, setActiveMobileTab] = useState<'editor' | 'preview'>('editor');
   
-  const [cleanStats, setCleanStats] = useState({ words: 0, chars: 0 });
   const [tagGroups, setTagGroups] = useState<TagGroup[]>(() => {
     const saved = localStorage.getItem('steem_tag_groups');
     return saved ? JSON.parse(saved) : [];
@@ -1994,28 +2536,1212 @@ function App() {
   const cursorPositionRef = useRef<{start: number, end: number} | null>(null);
   const previewPaneRef = useRef<HTMLDivElement>(null);
 
+  const [onDemandSyncEnabled, setOnDemandSyncEnabled] = useState<boolean>(() => {
+    const saved = localStorage.getItem('steem_on_demand_sync');
+    return saved !== null ? saved === 'true' : true;
+  });
+  const wysiwygSyncTimeoutRef = useRef<number | null>(null);
+  const wysiwygLocalBackupTimeoutRef = useRef<number | null>(null);
+  const isInitialLoadRef = useRef(true);
+
+  const toggleLivePreview = useCallback(() => {
+    const nextVal = !isLivePreviewEnabled;
+    if (editorMode === 'markdown' && editorRef.current) {
+      const val = editorRef.current.value;
+      const start = editorRef.current.selectionStart;
+      const end = editorRef.current.selectionEnd;
+      const pos = getRowColFromOffset(val, start);
+      useEditorStore.setState({
+        content: val,
+        cursor: pos,
+        selectionStart: start,
+        selectionEnd: end
+      });
+    }
+    setIsLivePreviewEnabled(nextVal);
+  }, [isLivePreviewEnabled, editorMode]);
+
+  useEffect(() => {
+    return () => {
+      if (wysiwygSyncTimeoutRef.current) {
+        clearTimeout(wysiwygSyncTimeoutRef.current);
+      }
+      if (wysiwygLocalBackupTimeoutRef.current) {
+        clearTimeout(wysiwygLocalBackupTimeoutRef.current);
+      }
+    };
+  }, []);
+
+  const [bookStructure] = useState<{ id: string; title: string; chapters: { id: string; title: string; note?: string }[] }[]>(() => {
+    const saved = localStorage.getItem('steem_book_structure');
+    return saved ? JSON.parse(saved) : [
+      {
+        id: '1',
+        title: 'Розділ 1: Вступ і Концепція',
+        chapters: [
+          { id: '1-1', title: 'Глава 1.1: Перші Кроки', note: 'Огляд структури та головний посил' },
+          { id: '1-2', title: 'Глава 1.2: Основна Мета', note: 'Опис і аналіз ваших ідей' }
+        ]
+      },
+      {
+        id: '2',
+        title: 'Розділ 2: Експерименти та Практика',
+        chapters: [
+          { id: '2-1', title: 'Глава 2.1: Детальний опис', note: 'Корисне форматування та посилання' }
+        ]
+      }
+    ];
+  });
+
+  // Save book structure
+  useEffect(() => {
+    localStorage.setItem('steem_book_structure', JSON.stringify(bookStructure));
+  }, [bookStructure]);
+
+
+  const wysiwygRef = useRef<HTMLDivElement>(null);
+  const isSyncingRef = useRef<boolean>(false);
+
+  const savedVisualRangeRef = useRef<Range | null>(null);
+
+  const saveVisualSelection = useCallback(() => {
+    const sel = window.getSelection();
+    if (sel && sel.rangeCount > 0 && wysiwygRef.current) {
+      try {
+        const range = sel.getRangeAt(0);
+        if (wysiwygRef.current.contains(range.commonAncestorContainer)) {
+          savedVisualRangeRef.current = range.cloneRange();
+
+          // Sync active formats in real-time in visual mode
+          let curr: Node | null = range.startContainer;
+          let isBold = false;
+          let isItalic = false;
+          let isCode = false;
+          let isStrike = false;
+          let isSub = false;
+          let isSup = false;
+          let isPhishy = false;
+          let isHeading = false;
+
+          while (curr && curr !== wysiwygRef.current) {
+            if (curr.nodeType === Node.ELEMENT_NODE) {
+              const el = curr as HTMLElement;
+              const tag = el.tagName.toLowerCase();
+              if (tag === 'b' || tag === 'strong') isBold = true;
+              if (tag === 'i' || tag === 'em') isItalic = true;
+              if (tag === 'code') isCode = true;
+              if (tag === 'strike' || tag === 'del' || tag === 's') isStrike = true;
+              if (tag === 'sub') isSub = true;
+              if (tag === 'sup') isSup = true;
+              if (/^h[1-6]$/.test(tag) || tag === 'th') isHeading = true;
+              if (el.classList.contains('phishy')) isPhishy = true;
+            }
+            curr = curr.parentNode;
+          }
+
+          // Check browser's queryCommandState as fallback/enhancement for active caret format
+          let queryBold = false;
+          let queryItalic = false;
+          let queryStrike = false;
+          let querySub = false;
+          let querySup = false;
+          try {
+            queryBold = document.queryCommandState('bold');
+            queryItalic = document.queryCommandState('italic');
+            queryStrike = document.queryCommandState('strikeThrough');
+            querySub = document.queryCommandState('subscript');
+            querySup = document.queryCommandState('superscript');
+          } catch (err) {
+            console.warn('queryCommandState failed:', err);
+          }
+
+          const newFormats = {
+            bold: isBold || (queryBold && !isHeading),
+            italic: isItalic || queryItalic,
+            code: isCode,
+            strikethrough: isStrike || queryStrike,
+            sub: isSub || querySub,
+            sup: isSup || querySup,
+            phishy: isPhishy
+          };
+
+          setActiveFormats(prev => {
+            if (
+              prev.bold === newFormats.bold &&
+              prev.italic === newFormats.italic &&
+              prev.code === newFormats.code &&
+              prev.strikethrough === newFormats.strikethrough &&
+              prev.sub === newFormats.sub &&
+              prev.sup === newFormats.sup &&
+              prev.phishy === newFormats.phishy
+            ) {
+              return prev; // No change, React will completely skip re-rendering
+            }
+            return newFormats;
+          });
+        }
+      } catch (e) {
+        console.warn('Could not save selection:', e);
+      }
+    }
+  }, []);
+
+
+  const scrollCaretIntoView = useCallback((block: ScrollLogicalPosition = 'center') => {
+      const editor = wysiwygRef.current;
+      if (!editor) return;
+      const sel = window.getSelection();
+      if (!sel || sel.rangeCount === 0) return;
+      const r = sel.getRangeAt(0);
+      if (!editor.contains(r.commonAncestorContainer)) return;
+      
+      let rect = r.getBoundingClientRect();
+      let hasValidRect = rect && (rect.width > 0 || rect.height > 0);
+      
+      if (!hasValidRect) {
+          const marker = document.createElement('span');
+          marker.innerHTML = '&#8203;';
+          const tempRange = r.cloneRange();
+          tempRange.collapse(true);
+          try {
+              tempRange.insertNode(marker);
+              rect = marker.getBoundingClientRect();
+              hasValidRect = rect && (rect.width > 0 || rect.height > 0);
+          } catch {
+              // ignore
+          } finally {
+              marker.remove();
+              sel.removeAllRanges();
+              sel.addRange(r);
+          }
+      }
+      
+      if (hasValidRect) {
+          const editorRect = editor.getBoundingClientRect();
+          const caretTop = rect.top - editorRect.top;
+          
+          if (block === 'center') {
+              const targetY = editor.scrollTop + caretTop - (editorRect.height / 2) + (rect.height / 2);
+              editor.scrollTo({ top: targetY, behavior: 'auto' });
+          } else if (block === 'nearest') {
+              if (caretTop < 0) {
+                  editor.scrollBy({ top: caretTop - 20, behavior: 'auto' });
+              } else if (caretTop + rect.height > editorRect.height) {
+                  editor.scrollBy({ top: caretTop + rect.height - editorRect.height + 20, behavior: 'auto' });
+              }
+          }
+      }
+  }, []);
+
+  const restoreVisualSelection = useCallback((shouldExpandWord = false) => {
+    if (savedVisualRangeRef.current && wysiwygRef.current) {
+      try {
+        const range = savedVisualRangeRef.current.cloneRange();
+        
+        if (shouldExpandWord && range.collapsed) {
+          const node = range.startContainer;
+          const offset = range.startOffset;
+          
+          if (node && node.nodeType === Node.TEXT_NODE) {
+            const textValue = node.nodeValue || '';
+            const wordBoundaryRegex = /[\s\n.,!?;:"'()[\]{}*~`<>#_]/;
+            
+            let start = offset;
+            let end = offset;
+            
+            while (start > 0 && !wordBoundaryRegex.test(textValue[start - 1])) {
+              start--;
+            }
+            while (end < textValue.length && !wordBoundaryRegex.test(textValue[end])) {
+              end++;
+            }
+            
+            if (start < end) {
+              range.setStart(node, start);
+              range.setEnd(node, end);
+              savedVisualRangeRef.current = range.cloneRange();
+            }
+          }
+        }
+
+        const sel = window.getSelection();
+        if (sel) {
+          if (document.activeElement !== wysiwygRef.current) {
+            wysiwygRef.current.focus({ preventScroll: true });
+          }
+          sel.removeAllRanges();
+          sel.addRange(range);
+          
+          const startNode = range.startContainer;
+          if (startNode) {
+             scrollCaretIntoView('nearest');
+             
+             const images = wysiwygRef.current.querySelectorAll('img');
+             images.forEach(img => {
+               if (!img.complete) {
+                 img.addEventListener('load', () => scrollCaretIntoView('nearest'), { once: true });
+               }
+             });
+             
+             setTimeout(() => scrollCaretIntoView('nearest'), 100);
+             setTimeout(() => scrollCaretIntoView('nearest'), 300);
+          }
+        }
+      } catch (e) {
+        console.warn('Could not restore selection:', e);
+      }
+    }
+  }, [scrollCaretIntoView]);
+
+  const focusVisualEditorEnd = useCallback(() => {
+    if (wysiwygRef.current) {
+      wysiwygRef.current.focus({ preventScroll: true });
+      const sel = window.getSelection();
+      if (sel) {
+        try {
+          const range = document.createRange();
+          range.selectNodeContents(wysiwygRef.current);
+          range.collapse(false);
+          sel.removeAllRanges();
+          sel.addRange(range);
+          savedVisualRangeRef.current = range.cloneRange();
+        } catch (e) {
+          console.warn('Could not focus end of visual editor:', e);
+        }
+      }
+    }
+  }, []);
+
+  const lastSyncContentRef = useRef<string>(useEditorStore.getState().content);
+
+  const updateContentFromWysiwyg = useCallback((forceImmediate = false) => {
+    if (!wysiwygRef.current) return;
+    const html = wysiwygRef.current.innerHTML;
+    
+    if (onDemandSyncEnabled && !forceImmediate) {
+      if (wysiwygLocalBackupTimeoutRef.current) clearTimeout(wysiwygLocalBackupTimeoutRef.current);
+      wysiwygLocalBackupTimeoutRef.current = setTimeout(() => {
+        localStorage.setItem('steem_autosave_temp_visual_html', html);
+      }, 2000) as any;
+      
+      if (wysiwygSyncTimeoutRef.current) clearTimeout(wysiwygSyncTimeoutRef.current);
+      wysiwygSyncTimeoutRef.current = setTimeout(() => {
+        const md = htmlToMarkdown(html);
+        const currentContent = useEditorStore.getState().content;
+        if (md !== currentContent) {
+          lastSyncContentRef.current = md;
+          setContent(md);
+          saveVisualSelection();
+        }
+      }, 5000) as any;
+    } else {
+      const md = htmlToMarkdown(html);
+      lastSyncContentRef.current = md;
+      setContent(md);
+    }
+  }, [onDemandSyncEnabled, saveVisualSelection, setContent]);
+
+  const syncWysiwygToContentIfVisual = useCallback(() => {
+    if (editorMode === 'visual' && wysiwygRef.current) {
+      const md = htmlToMarkdown(wysiwygRef.current.innerHTML);
+      if (md !== useEditorStore.getState().content) {
+        lastSyncContentRef.current = md;
+        setContent(md);
+        return md;
+      }
+    }
+    return useEditorStore.getState().content;
+  }, [editorMode, setContent]);
+
+  // Helper function to insert HTML at visual editor's selection/cursor point
+  const insertHtmlAtCursor = useCallback((html: string) => {
+    if (!wysiwygRef.current) return;
+
+    // Restore saved range or focus end of the editor
+    if (savedVisualRangeRef.current && wysiwygRef.current.contains(savedVisualRangeRef.current.commonAncestorContainer)) {
+      restoreVisualSelection(false);
+    } else {
+      focusVisualEditorEnd();
+    }
+
+    let insertedInSelection = false;
+    const sel = window.getSelection();
+    if (sel && sel.rangeCount > 0) {
+      const range = sel.getRangeAt(0);
+      if (wysiwygRef.current.contains(range.commonAncestorContainer)) {
+        range.deleteContents();
+        
+        // Append editable placeholder spacer after block structures for better cursor selection
+        const processedHtml = html;
+        
+        const el = document.createElement('div');
+        el.innerHTML = processedHtml;
+        
+        const frag = document.createDocumentFragment();
+        let node: Node | null;
+        let lastNode: Node | null = null;
+        while ((node = el.firstChild)) {
+          lastNode = frag.appendChild(node);
+        }
+        
+        // Check if there is an empty inline element that we just inserted so we can place the cursor inside it
+        let cursorNode: Node | null = null;
+        let cursorOffset = 0;
+
+        // Traverse the fragment to find the innermost empty inline element (like b, strong, i, em, sub, sup, strike, span, code)
+        const findEmptyInline = (root: Node): HTMLElement | null => {
+          if (root.nodeType === Node.ELEMENT_NODE) {
+            const el = root as HTMLElement;
+            const inlineTags = ['b', 'strong', 'i', 'em', 'sub', 'sup', 'strike', 'span', 'code'];
+            if (inlineTags.includes(el.tagName.toLowerCase())) {
+              if (el.innerHTML === '' || el.innerHTML === '\u200B') {
+                return el;
+              }
+            }
+          }
+          if (root.nodeType === Node.ELEMENT_NODE || root.nodeType === Node.DOCUMENT_FRAGMENT_NODE) {
+            for (let i = 0; i < root.childNodes.length; i++) {
+              const found = findEmptyInline(root.childNodes[i]);
+              if (found) return found;
+            }
+          }
+          return null;
+        };
+
+        const emptyEl = findEmptyInline(frag);
+        if (emptyEl) {
+          const zwsp = document.createTextNode('\u200B');
+          emptyEl.appendChild(zwsp);
+          cursorNode = zwsp;
+          cursorOffset = 1;
+        }
+
+        range.insertNode(frag);
+        
+        if (cursorNode) {
+          range.setStart(cursorNode, cursorOffset);
+          range.collapse(true);
+          sel.removeAllRanges();
+          sel.addRange(range);
+          savedVisualRangeRef.current = range.cloneRange();
+        } else if (lastNode) {
+          if (lastNode.nodeType === Node.ELEMENT_NODE && lastNode.parentNode) {
+            const zwsp = document.createTextNode('\u200B');
+            lastNode.parentNode.insertBefore(zwsp, lastNode.nextSibling);
+            range.setStart(zwsp, 1);
+            cursorNode = zwsp; // Update targetNode for scrolling
+          } else {
+            range.setStartAfter(lastNode);
+          }
+          range.collapse(true);
+          sel.removeAllRanges();
+          sel.addRange(range);
+          savedVisualRangeRef.current = range.cloneRange(); // Save updated range
+        }
+        insertedInSelection = true;
+
+        // Regain focus and scroll to the insertion point
+        if (wysiwygRef.current) {
+          wysiwygRef.current.focus({ preventScroll: true });
+          const targetNode = cursorNode || lastNode;
+          if (targetNode) {
+            const el = targetNode.nodeType === Node.TEXT_NODE ? targetNode.parentElement : targetNode as HTMLElement;
+            if (el && el.scrollIntoView && el !== wysiwygRef.current) {
+              el.scrollIntoView({ behavior: 'auto', block: 'center' });
+
+              // Keep cursor aligned if there are loading images that shift layout heights
+              const images = wysiwygRef.current.querySelectorAll('img');
+              images.forEach(img => {
+                if (!img.complete) {
+                  img.addEventListener('load', () => {
+                    if (wysiwygRef.current && wysiwygRef.current.contains(el)) {
+                      el.scrollIntoView({ behavior: 'auto', block: 'center' });
+                    }
+                  }, { once: true });
+                }
+              });
+
+              // Fallbacks for deferred loading or style calculations
+              setTimeout(() => {
+                if (wysiwygRef.current && wysiwygRef.current.contains(el)) {
+                  el.scrollIntoView({ behavior: 'auto', block: 'center' });
+                  wysiwygRef.current.focus({ preventScroll: true });
+                }
+              }, 100);
+              setTimeout(() => {
+                if (wysiwygRef.current && wysiwygRef.current.contains(el)) {
+                  el.scrollIntoView({ behavior: 'auto', block: 'center' });
+                  wysiwygRef.current.focus({ preventScroll: true });
+                }
+              }, 300);
+            }
+          }
+        }
+      }
+    }
+    
+    if (!insertedInSelection && wysiwygRef.current) {
+      const processedHtml = html;
+      wysiwygRef.current.innerHTML += processedHtml;
+      wysiwygRef.current.focus({ preventScroll: true });
+    }
+    
+    updateContentFromWysiwyg();
+  }, [restoreVisualSelection, focusVisualEditorEnd, updateContentFromWysiwyg]);
+
+  // Helper to extract highlighted HTML selected by user in the visual editor
+  const getVisualSelectionHtml = useCallback(() => {
+    if (savedVisualRangeRef.current && wysiwygRef.current) {
+      try {
+        const range = savedVisualRangeRef.current;
+        if (wysiwygRef.current.contains(range.commonAncestorContainer)) {
+          const clonedSelection = range.cloneContents();
+          const div = document.createElement('div');
+          div.appendChild(clonedSelection);
+          return div.innerHTML;
+        }
+      } catch (e) {
+        console.warn('Could not extract visual selection:', e);
+      }
+    }
+    return '';
+  }, []);
+
+  const syncCursorMarkdownToVisual = useCallback(async () => {
+    try {
+      if (!wysiwygRef.current) return;
+      
+      const startMarker = 'STARTCARETMARKER';
+      const endMarker = 'ENDCARETMARKER';
+      
+      let mdWithMarkers = '';
+      const pos = cursorPositionRef.current;
+      
+      let textContent = useEditorStore.getState().content;
+      if (!textContent.endsWith('\n')) {
+        textContent += '\n';
+      }
+      
+      if (pos) {
+        const { start, end } = pos;
+        
+        // Helper to find a safe marker position that does not break markdown syntax
+        const getSafeMarkerPosition = (text: string, index: number): number => {
+          let idx = Math.max(0, Math.min(index, text.length));
+          
+          // 1. Avoid being inside an HTML tag <...>
+          const leftLess = text.lastIndexOf('<', idx);
+          const leftGreater = text.lastIndexOf('>', idx);
+          if (leftLess !== -1 && leftLess > leftGreater) {
+            const rightGreater = text.indexOf('>', idx);
+            if (rightGreater !== -1) {
+              idx = rightGreater + 1;
+            }
+          }
+          
+          // Find the start and end of the current line
+          const lineStart = text.lastIndexOf('\n', idx - 1) + 1;
+          let lineEnd = text.indexOf('\n', idx);
+          if (lineEnd === -1) lineEnd = text.length;
+          const line = text.substring(lineStart, lineEnd);
+          const offsetInLine = idx - lineStart;
+          
+          // 2. Avoid breaking table alignment rows
+          if (/^[\s|:.-]+$/.test(line) && line.includes("-") && line.includes("|")) {
+            const prevLineStart = text.lastIndexOf("\n", lineStart - 2) + 1;
+            const prevLine = text.substring(prevLineStart, lineStart - 1);
+            const lastPipe = prevLine.lastIndexOf("|");
+            if (lastPipe > 0) {
+              return prevLineStart + lastPipe;
+            }
+            return Math.max(0, lineStart - 1);
+          }
+          // 2b. Avoid breaking the end of a table row
+          if (line.trim().startsWith("|") && line.includes("|", 1)) {
+            const lastPipe = line.lastIndexOf("|");
+            if (lastPipe > 0 && offsetInLine >= lastPipe) {
+               idx = lineStart + lastPipe;
+            }
+          }
+          // 2c. Avoid breaking Horizontal Rules (HR)
+          if (/^(\s*[-*_]\s*){3,}$/.test(line)) {
+            if (lineEnd >= text.length) {
+              return lineEnd;
+            }
+            // Always move to the next line because placing it on the previous line turns it into an H2
+            return getSafeMarkerPosition(text, lineEnd + 1);
+          }
+          // 3. Avoid being before block markers (lists, blockquotes, table pipes, headings, code fences)
+          const match = line.match(/^(\s*(?:[*\-+]|\d+\.|>|\||#{1,6}|```)\s*)/);
+          if (match) {
+            const prefixLength = match[1].length;
+            if (offsetInLine < prefixLength) {
+              idx = lineStart + prefixLength;
+            }
+          }
+          
+          return idx;
+        };
+
+        const safeStart = getSafeMarkerPosition(textContent, start);
+        const safeEnd = getSafeMarkerPosition(textContent, end);
+
+        if (safeStart === safeEnd) {
+          mdWithMarkers = textContent.substring(0, safeStart) + startMarker + textContent.substring(safeStart);
+        } else {
+          mdWithMarkers = textContent.substring(0, safeStart) + startMarker + textContent.substring(safeStart, safeEnd) + endMarker + textContent.substring(safeEnd);
+        }
+      } else {
+        mdWithMarkers = textContent;
+      }
+      
+      const m = getMarked();
+      const processed = processContentForSteem(mdWithMarkers);
+      if (m) {
+        let rawHtml = await m.parse(processed);
+        
+        // Ensure block elements have spacers so users can arrow out
+        const tempDiv = document.createElement('div');
+        tempDiv.innerHTML = rawHtml;
+
+          // Convert inline-intended divs back to spans for the visual editor
+          tempDiv.querySelectorAll('div.phishy, div.text-blue, div.text-green').forEach(div => {
+             const span = document.createElement('span');
+             span.className = div.className;
+             span.innerHTML = div.innerHTML;
+             if (div.parentNode) div.parentNode.replaceChild(span, div);
+          });
+        
+        // 1. One Top Spacer at the very top of the editor if the first element is a block element
+        const firstEl = tempDiv.firstElementChild;
+        if (firstEl && ['TABLE', 'PRE', 'BLOCKQUOTE', 'UL', 'OL', 'H1', 'H2', 'H3', 'H4', 'H5', 'H6', 'CENTER'].includes(firstEl.tagName)) {
+           const pBefore = document.createElement('p');
+           pBefore.className = 'table-spacer top-spacer';
+           pBefore.setAttribute('data-empty', 'true');
+           pBefore.setAttribute('data-placeholder', lang === 'uk' ? '↵ Початок допису...' : lang === 'es' ? '↵ Inicio de la publicación...' : lang === 'ko' ? '↵ 게시물 시작...' : '↵ Top of post...');
+           pBefore.innerHTML = '<br>';
+           tempDiv.insertBefore(pBefore, firstEl);
+        }
+        
+        // 2. One Bottom Spacer at the very bottom of the editor
+        const lastEl = tempDiv.lastElementChild;
+        if (!lastEl || lastEl.tagName !== 'P' || lastEl.getAttribute('data-empty') !== 'true' || !lastEl.classList.contains('bottom-spacer')) {
+           if (lastEl && lastEl.tagName === 'P' && (lastEl.textContent || '').trim() === '' && lastEl.querySelectorAll('img, iframe, table').length === 0) {
+              lastEl.className = 'table-spacer bottom-spacer';
+              lastEl.setAttribute('data-empty', 'true');
+              lastEl.setAttribute('data-placeholder', lang === 'uk' ? '↵ Кінець допису...' : lang === 'es' ? '↵ Fin de la publicación...' : lang === 'ko' ? '↵ 게시물 끝...' : '↵ End of post...');
+              if (!lastEl.innerHTML) lastEl.innerHTML = '<br>';
+           } else {
+              const pAfter = document.createElement('p');
+              pAfter.className = 'table-spacer bottom-spacer';
+              pAfter.setAttribute('data-empty', 'true');
+              pAfter.setAttribute('data-placeholder', lang === 'uk' ? '↵ Кінець допису...' : lang === 'es' ? '↵ Fin de la publicación...' : lang === 'ko' ? '↵ 게시물 끝...' : '↵ End of post...');
+              pAfter.innerHTML = '<br>';
+              tempDiv.appendChild(pAfter);
+           }
+        }
+        
+        rawHtml = tempDiv.innerHTML;
+        
+        // We rely on CSS padding instead of inserting <p><br></p> after block elements
+        const trimmedRaw = rawHtml.trim();
+        if (trimmedRaw === '') {
+          rawHtml = '<p><br></p>';
+        }
+        
+        isSyncingRef.current = true;
+        wysiwygRef.current.innerHTML = rawHtml;
+        lastSyncContentRef.current = useEditorStore.getState().content;
+        isSyncingRef.current = false;
+        
+        if (pos) {
+          const range = document.createRange();
+          let rangeSet = false;
+          let startNodeInfo: { node: Node, offset: number } | null = null;
+          let endNodeInfo: { node: Node, offset: number } | null = null;
+          
+          const walkAndFindMarkers = (node: Node) => {
+             if (node.nodeType === Node.TEXT_NODE) {
+                let val = node.nodeValue || '';
+                if (val.includes(startMarker) && val.includes(endMarker)) {
+                   const sIdx = val.indexOf(startMarker);
+                   val = val.replace(startMarker, '');
+                   const eIdx = val.indexOf(endMarker);
+                   val = val.replace(endMarker, '');
+                   node.nodeValue = val;
+                   startNodeInfo = { node, offset: sIdx };
+                   endNodeInfo = { node, offset: eIdx };
+                } else {
+                   if (val.includes(startMarker)) {
+                      const idx = val.indexOf(startMarker);
+                      val = val.replace(startMarker, '');
+                      node.nodeValue = val;
+                      startNodeInfo = { node, offset: idx };
+                   }
+                   if (val.includes(endMarker)) {
+                      const idx = val.indexOf(endMarker);
+                      val = val.replace(endMarker, '');
+                      node.nodeValue = val;
+                      endNodeInfo = { node, offset: idx };
+                   }
+                }
+             } else {
+                const children = Array.from(node.childNodes);
+                for (const child of children) {
+                   walkAndFindMarkers(child);
+                }
+             }
+          };
+          
+          walkAndFindMarkers(wysiwygRef.current);
+          
+          if (startNodeInfo && endNodeInfo) {
+            const sInfo = startNodeInfo as { node: Node, offset: number };
+            const eInfo = endNodeInfo as { node: Node, offset: number };
+            range.setStart(sInfo.node, sInfo.offset);
+            range.setEnd(eInfo.node, eInfo.offset);
+            rangeSet = true;
+          } else if (startNodeInfo) {
+            const sInfo = startNodeInfo as { node: Node, offset: number };
+            range.setStart(sInfo.node, sInfo.offset);
+            range.collapse(true);
+            rangeSet = true;
+          } else if (!rangeSet && pos && wysiwygRef.current) {
+            let currentLength = 0;
+            let foundNode: Node | null = null;
+            let foundOffset = 0;
+
+            const walkTextNodes = (node: Node) => {
+              if (foundNode) return;
+              if (node.nodeType === Node.TEXT_NODE) {
+                const len = (node.nodeValue || '').length;
+                if (currentLength + len >= pos.start) {
+                  foundNode = node;
+                  foundOffset = Math.max(0, Math.min(pos.start - currentLength, len));
+                } else {
+                  currentLength += len;
+                }
+              } else {
+                for (const child of Array.from(node.childNodes)) {
+                  walkTextNodes(child);
+                  if (foundNode) break;
+                }
+              }
+            };
+
+            walkTextNodes(wysiwygRef.current);
+
+            if (foundNode) {
+              range.setStart(foundNode, foundOffset);
+              range.collapse(true);
+              rangeSet = true;
+            }
+          }
+          
+          if (rangeSet) {
+            wysiwygRef.current.focus();
+            const sel = window.getSelection();
+            if (sel) {
+              sel.removeAllRanges();
+              sel.addRange(range);
+              savedVisualRangeRef.current = range.cloneRange();
+              
+              if (pos) {
+                useEditorStore.getState().setSelection(pos.start, pos.end);
+                const rowColPos = getRowColFromOffset(useEditorStore.getState().content, pos.start);
+                useEditorStore.getState().setCursor(rowColPos);
+              }
+
+              // Ensure element has active blinking cursor
+              wysiwygRef.current.focus();
+
+              if (startNodeInfo) {
+                 scrollCaretIntoView('center');
+                 
+                 const images = wysiwygRef.current.querySelectorAll('img');
+                 images.forEach(img => {
+                   if (!img.complete) {
+                     img.addEventListener('load', () => scrollCaretIntoView('center'), { once: true });
+                   }
+                 });
+                 
+                 setTimeout(() => scrollCaretIntoView('center'), 100);
+                 setTimeout(() => scrollCaretIntoView('center'), 300);
+                 setTimeout(() => scrollCaretIntoView('center'), 600);
+              }
+            }
+          }
+        } else {
+          wysiwygRef.current.focus();
+        }
+      }
+    } catch (e) {
+      console.warn('syncCursorMarkdownToVisual error:', e);
+    }
+  }, [lang, scrollCaretIntoView]);
+
+  // Bidirectional sync: sync content to visual editor unless visual editor currently has focus
+  useEffect(() => {
+    if (editorMode === 'visual' && wysiwygRef.current && !isEditorFocused && !wysiwygRef.current.contains(document.activeElement) && useEditorStore.getState().content !== lastSyncContentRef.current) {
+      if (isInitialLoadRef.current) {
+        isInitialLoadRef.current = false;
+        if (onDemandSyncEnabled) {
+          const isStale = localStorage.getItem('steem_visual_html_is_stale') === 'true';
+          const cachedHtml = localStorage.getItem('steem_autosave_temp_visual_html');
+          if (cachedHtml && !isStale) {
+            isSyncingRef.current = true;
+            wysiwygRef.current.innerHTML = cachedHtml;
+            lastSyncContentRef.current = useEditorStore.getState().content;
+            isSyncingRef.current = false;
+            return;
+          }
+        }
+      }
+      const renderHtml = async () => {
+        const m = getMarked();
+        const processed = processContentForSteem(useEditorStore.getState().content);
+        if (m) {
+          let rawHtml = await m.parse(processed);
+          
+          // Ensure block elements have spacers so users can arrow out
+          const tempDiv = document.createElement('div');
+          tempDiv.innerHTML = rawHtml;
+
+          // Convert inline-intended divs back to spans for the visual editor
+          tempDiv.querySelectorAll('div.phishy, div.text-blue, div.text-green').forEach(div => {
+             const span = document.createElement('span');
+             span.className = div.className;
+             span.innerHTML = div.innerHTML;
+             if (div.parentNode) div.parentNode.replaceChild(span, div);
+          });
+          
+          // 1. One Top Spacer at the very top of the editor if the first element is a block element
+          const firstEl = tempDiv.firstElementChild;
+          if (firstEl && ['TABLE', 'PRE', 'BLOCKQUOTE', 'UL', 'OL', 'H1', 'H2', 'H3', 'H4', 'H5', 'H6', 'CENTER'].includes(firstEl.tagName)) {
+             const pBefore = document.createElement('p');
+             pBefore.className = 'table-spacer top-spacer';
+             pBefore.setAttribute('data-empty', 'true');
+             pBefore.setAttribute('data-placeholder', lang === 'uk' ? '↵ Початок допису...' : lang === 'es' ? '↵ Inicio de la publicación...' : lang === 'ko' ? '↵ 게시물 시작...' : '↵ Top of post...');
+             pBefore.innerHTML = '<br>';
+             tempDiv.insertBefore(pBefore, firstEl);
+          }
+          
+          // 2. One Bottom Spacer at the very bottom of the editor
+          const lastEl = tempDiv.lastElementChild;
+          if (!lastEl || lastEl.tagName !== 'P' || lastEl.getAttribute('data-empty') !== 'true' || !lastEl.classList.contains('bottom-spacer')) {
+             if (lastEl && lastEl.tagName === 'P' && (lastEl.textContent || '').trim() === '' && lastEl.querySelectorAll('img, iframe, table').length === 0) {
+                lastEl.className = 'table-spacer bottom-spacer';
+                lastEl.setAttribute('data-empty', 'true');
+                lastEl.setAttribute('data-placeholder', lang === 'uk' ? '↵ Кінець допису...' : lang === 'es' ? '↵ Fin de la publicación...' : lang === 'ko' ? '↵ 게시물 끝...' : '↵ End of post...');
+                if (!lastEl.innerHTML) lastEl.innerHTML = '<br>';
+             } else {
+                const pAfter = document.createElement('p');
+                pAfter.className = 'table-spacer bottom-spacer';
+                pAfter.setAttribute('data-empty', 'true');
+                pAfter.setAttribute('data-placeholder', lang === 'uk' ? '↵ Кінець допису...' : lang === 'es' ? '↵ Fin de la publicación...' : lang === 'ko' ? '↵ 게시물 끝...' : '↵ End of post...');
+                pAfter.innerHTML = '<br>';
+                tempDiv.appendChild(pAfter);
+             }
+          }
+          
+          rawHtml = tempDiv.innerHTML;
+          
+          // We rely on CSS padding instead of inserting <p><br></p> after block elements
+          const trimmedRaw = rawHtml.trim();
+          if (trimmedRaw === '') {
+            rawHtml = '<p><br></p>';
+          }
+          if (wysiwygRef.current && lastSyncContentRef.current !== useEditorStore.getState().content && wysiwygRef.current.innerHTML !== rawHtml) {
+            isSyncingRef.current = true;
+            wysiwygRef.current.innerHTML = rawHtml;
+            lastSyncContentRef.current = useEditorStore.getState().content;
+            isSyncingRef.current = false;
+            localStorage.setItem('steem_autosave_temp_visual_html', rawHtml);
+            localStorage.setItem('steem_visual_html_is_stale', 'false');
+
+            if (!hasRestoredInitialCursorRef.current) {
+              hasRestoredInitialCursorRef.current = true;
+              syncCursorMarkdownToVisual().then(() => {
+                if (wysiwygRef.current) wysiwygRef.current.focus();
+              });
+            }
+          }
+        }
+      };
+      renderHtml();
+    }
+  }, [ editorMode, isEditorFocused, syncCursorMarkdownToVisual, lang, onDemandSyncEnabled]);
+
   // Load cursor position on start
   useEffect(() => {
      try {
         const savedCursor = localStorage.getItem('steem_editor_cursor');
         if (savedCursor) {
-            cursorPositionRef.current = JSON.parse(savedCursor);
+            const parsed = JSON.parse(savedCursor);
+            cursorPositionRef.current = parsed;
+            if (parsed && typeof parsed.start === 'number' && typeof parsed.end === 'number') {
+              useEditorStore.getState().setSelection(parsed.start, parsed.end);
+            }
         }
      } catch (e) {
         console.error("Failed to load cursor position", e);
      }
   }, []);
 
+  // Visual Viewport API for mobile virtual keyboard height detection
+  const [keyboardOffset, setKeyboardOffset] = useState(0);
+
+  useEffect(() => {
+    if (typeof window === 'undefined' || !window.visualViewport) return;
+
+    const handleVisualViewportChange = () => {
+      const vv = window.visualViewport;
+      if (!vv) return;
+      const layoutHeight = window.innerHeight;
+      const visualHeight = vv.height;
+      const diff = layoutHeight - visualHeight - vv.offsetTop;
+      if (diff > 80) {
+        setKeyboardOffset(diff);
+      } else {
+        setKeyboardOffset(0);
+      }
+    };
+
+    window.visualViewport.addEventListener('resize', handleVisualViewportChange);
+    window.visualViewport.addEventListener('scroll', handleVisualViewportChange);
+
+    return () => {
+      if (window.visualViewport) {
+        window.visualViewport.removeEventListener('resize', handleVisualViewportChange);
+        window.visualViewport.removeEventListener('scroll', handleVisualViewportChange);
+      }
+    };
+  }, []);
+
+  const hasRestoredInitialCursorRef = useRef(false);
+
   const saveCursorPosition = useCallback(() => {
+     if (isSyncingRef.current) return;
      if (editorRef.current) {
+        const start = editorRef.current.selectionStart;
+        const end = editorRef.current.selectionEnd;
         const pos = {
-           start: editorRef.current.selectionStart,
-           end: editorRef.current.selectionEnd
+           start,
+           end
         };
         cursorPositionRef.current = pos;
         localStorage.setItem('steem_editor_cursor', JSON.stringify(pos));
+
+        // Sync content and Zustand store (in-memory only, disk persistence is debounced)
+        const text = editorRef.current.value;
+        const rowColPos = getRowColFromOffset(text, start);
+        useEditorStore.getState().setCursor(rowColPos);
+        useEditorStore.getState().setSelection(start, end);
+
+        if (editorMode === 'markdown') {
+          const caretPos = start;
+
+          const lineStart = text.lastIndexOf('\n', caretPos - 1) + 1;
+          const lineEnd = text.indexOf('\n', caretPos);
+          const actualLineEnd = lineEnd === -1 ? text.length : lineEnd;
+
+          const currentLine = text.substring(lineStart, actualLineEnd);
+          const caretInLine = caretPos - lineStart;
+
+          setActiveFormats({
+            bold: isInsideTagInLine(currentLine, caretInLine, '**'),
+            italic: isInsideTagInLine(currentLine, caretInLine, '*'),
+            code: isInsideTagInLine(currentLine, caretInLine, '`'),
+            strikethrough: isInsideTagInLine(currentLine, caretInLine, '~~'),
+            sub: isInsideTagInLine(currentLine, caretInLine, '<sub>', '</sub>'),
+            sup: isInsideTagInLine(currentLine, caretInLine, '<sup>', '</sup>'),
+            phishy: isInsideTagInLine(currentLine, caretInLine, '<div class="phishy">', '</div>')
+          });
+        }
      }
+  }, [editorMode]);
+
+  const restoreMarkdownCursorAndScroll = useCallback((retryCount = 0) => {
+    if (!editorRef.current) {
+      if (retryCount < 10) {
+        setTimeout(() => restoreMarkdownCursorAndScroll(retryCount + 1), 30);
+      }
+      return;
+    }
+
+    try {
+      const ta = editorRef.current;
+      const textVal = useEditorStore.getState().content || localStorage.getItem('steem_autosave_temp') || ta.value || '';
+      
+      // Ensure the textarea has the correct value
+      if (ta.value !== textVal) {
+        ta.value = textVal;
+      }
+
+      // Get saved cursor position
+      let start = 0;
+      let end = 0;
+      if (cursorPositionRef.current) {
+        start = cursorPositionRef.current.start;
+        end = cursorPositionRef.current.end;
+      } else {
+        const saved = localStorage.getItem('steem_editor_cursor');
+        if (saved) {
+          const parsed = JSON.parse(saved);
+          if (parsed && typeof parsed.start === 'number' && typeof parsed.end === 'number') {
+            start = parsed.start;
+            end = parsed.end;
+            cursorPositionRef.current = parsed;
+          }
+        }
+      }
+
+      const safeStart = Math.min(Math.max(0, start), textVal.length);
+      const safeEnd = Math.min(Math.max(0, end), textVal.length);
+
+      isSyncingRef.current = true;
+      ta.focus({ preventScroll: true });
+      ta.setSelectionRange(safeStart, safeEnd);
+
+      // Sync to Zustand store
+      const rowColPos = getRowColFromOffset(textVal, safeStart);
+      useEditorStore.getState().setCursor(rowColPos);
+      useEditorStore.getState().setSelection(safeStart, safeEnd);
+
+      // Restore scroll position
+      const savedScroll = localStorage.getItem('steem_editor_scroll');
+      if (savedScroll !== null) {
+        const scrollTop = Number(savedScroll);
+        if (!isNaN(scrollTop) && scrollTop > 0) {
+          ta.scrollTop = scrollTop;
+        } else {
+          // Fallback to scroll calculating from caretY
+          const clone = ta.cloneNode() as HTMLTextAreaElement;
+          clone.style.visibility = 'hidden';
+          clone.style.position = 'absolute';
+          clone.style.overflow = 'hidden';
+          clone.style.height = '0px';
+          clone.style.width = ta.clientWidth + 'px';
+          clone.style.padding = window.getComputedStyle(ta).padding;
+          clone.style.paddingBottom = '0px';
+          clone.style.font = window.getComputedStyle(ta).font;
+          clone.style.lineHeight = window.getComputedStyle(ta).lineHeight;
+          clone.style.boxSizing = 'border-box';
+          clone.value = textVal.substring(0, safeStart);
+          document.body.appendChild(clone);
+          
+          const caretY = clone.scrollHeight;
+          document.body.removeChild(clone);
+          ta.scrollTop = Math.max(0, caretY - (ta.clientHeight / 2));
+        }
+      } else {
+        // Compute from caretY
+        const clone = ta.cloneNode() as HTMLTextAreaElement;
+        clone.style.visibility = 'hidden';
+        clone.style.position = 'absolute';
+        clone.style.overflow = 'hidden';
+        clone.style.height = '0px';
+        clone.style.width = ta.clientWidth + 'px';
+        clone.style.padding = window.getComputedStyle(ta).padding;
+        clone.style.paddingBottom = '0px';
+        clone.style.font = window.getComputedStyle(ta).font;
+        clone.style.lineHeight = window.getComputedStyle(ta).lineHeight;
+        clone.style.boxSizing = 'border-box';
+        clone.value = textVal.substring(0, safeStart);
+        document.body.appendChild(clone);
+        
+        const caretY = clone.scrollHeight;
+        document.body.removeChild(clone);
+        ta.scrollTop = Math.max(0, caretY - (ta.clientHeight / 2));
+      }
+
+      setTimeout(() => {
+        isSyncingRef.current = false;
+      }, 100);
+    } catch (e) {
+      console.warn('restoreMarkdownCursorAndScroll failed:', e);
+      isSyncingRef.current = false;
+    }
   }, []);
+
+  const syncCursorVisualToMarkdown = useCallback(() => {
+    try {
+      let range: Range | null = null;
+      const sel = window.getSelection();
+      if (sel && sel.rangeCount > 0 && wysiwygRef.current && wysiwygRef.current.contains(sel.getRangeAt(0).commonAncestorContainer)) {
+        range = sel.getRangeAt(0);
+      } else if (savedVisualRangeRef.current && wysiwygRef.current && wysiwygRef.current.contains(savedVisualRangeRef.current.commonAncestorContainer)) {
+        range = savedVisualRangeRef.current;
+      }
+
+      if (range && wysiwygRef.current) {
+        // Create a temporary clone to safely insert marker elements
+        const clonedWysiwyg = wysiwygRef.current.cloneNode(true) as HTMLElement;
+        
+        const pathStart = getNodePath(wysiwygRef.current, range.startContainer);
+        const pathEnd = getNodePath(wysiwygRef.current, range.endContainer);
+        
+        if (pathStart && pathEnd) {
+          const clonedStartNode = getNodeByPath(clonedWysiwyg, pathStart);
+          const clonedEndNode = getNodeByPath(clonedWysiwyg, pathEnd);
+          
+          if (clonedStartNode && clonedEndNode) {
+            // Re-create the range within the cloned DOM
+            const clonedRange = document.createRange();
+            
+            try {
+              clonedRange.setStart(clonedStartNode, range.startOffset);
+              clonedRange.setEnd(clonedEndNode, range.endOffset);
+              
+              const startMarkerNode = document.createTextNode('\x01');
+              const endMarkerNode = document.createTextNode('\x02');
+              
+              // Insert end first so it doesn't affect the start position
+              const endRange = clonedRange.cloneRange();
+              endRange.collapse(false);
+              endRange.insertNode(endMarkerNode);
+              
+              const startRange = clonedRange.cloneRange();
+              startRange.collapse(true);
+              startRange.insertNode(startMarkerNode);
+              
+              const htmlWithMarkers = clonedWysiwyg.innerHTML;
+              const rawMd = htmlToMarkdown(htmlWithMarkers);
+              
+              const startIdx = rawMd.indexOf('\x01');
+              const cleanMdAfterStart = rawMd.replace('\x01', '');
+              const endIdx = cleanMdAfterStart.indexOf('\x02');
+              
+              if (startIdx !== -1 && endIdx !== -1) {
+                const pos = { start: startIdx, end: endIdx };
+                cursorPositionRef.current = pos;
+                localStorage.setItem('steem_editor_cursor', JSON.stringify(pos));
+                
+                // Sync to Zustand store
+                const cleanMd = cleanMdAfterStart.replace('\x02', '');
+                const rowColPos = getRowColFromOffset(cleanMd, startIdx);
+                useEditorStore.getState().setCursor(rowColPos);
+                useEditorStore.getState().setSelection(startIdx, endIdx);
+              } else if (startIdx !== -1) {
+                const pos = { start: startIdx, end: startIdx };
+                cursorPositionRef.current = pos;
+                localStorage.setItem('steem_editor_cursor', JSON.stringify(pos));
+                
+                // Sync to Zustand store
+                const cleanMd = cleanMdAfterStart;
+                const rowColPos = getRowColFromOffset(cleanMd, startIdx);
+                useEditorStore.getState().setCursor(rowColPos);
+                useEditorStore.getState().setSelection(startIdx, startIdx);
+              }
+            } catch (e) {
+              console.warn("Failed to apply range on cloned DOM", e);
+            }
+          }
+        }
+      }
+    } catch (e) {
+      console.warn('syncCursorVisualToMarkdown error:', e);
+    }
+  }, []);
+
+  // Automatic Cursor & Scroll Position Restoration after page reload
+  useEffect(() => {
+    if (hasRestoredInitialCursorRef.current) return;
+
+    const getPos = () => {
+      if (cursorPositionRef.current) return cursorPositionRef.current;
+      try {
+        const saved = localStorage.getItem('steem_editor_cursor');
+        if (saved) {
+          const parsed = JSON.parse(saved);
+          if (parsed && typeof parsed.start === 'number' && typeof parsed.end === 'number') {
+            cursorPositionRef.current = parsed;
+            return parsed;
+          }
+        }
+      } catch (e) {
+        console.warn('Failed to parse saved cursor in restoration effect', e);
+      }
+      return null;
+    };
+
+    if (editorMode === 'markdown') {
+      hasRestoredInitialCursorRef.current = true;
+      restoreMarkdownCursorAndScroll();
+    } else if (editorMode === 'visual' && wysiwygRef.current) {
+      hasRestoredInitialCursorRef.current = true;
+      const timer = setTimeout(async () => {
+        const pos = getPos();
+        if (pos) {
+          useEditorStore.getState().setSelection(pos.start, pos.end);
+          await syncCursorMarkdownToVisual();
+          if (wysiwygRef.current) {
+            wysiwygRef.current.focus();
+          }
+        } else if (wysiwygRef.current) {
+          wysiwygRef.current.focus();
+        }
+
+        const savedScroll = localStorage.getItem('steem_editor_scroll');
+        if (savedScroll !== null && wysiwygRef.current) {
+          const scrollTop = Number(savedScroll);
+          if (!isNaN(scrollTop) && scrollTop > 0) {
+            wysiwygRef.current.scrollTop = scrollTop;
+          }
+        }
+      }, 250);
+      return () => clearTimeout(timer);
+    }
+  }, [editorMode, syncCursorMarkdownToVisual, restoreMarkdownCursorAndScroll]);
+
+  const handleSetEditorMode = useCallback((mode: 'visual' | 'markdown') => {
+    if (editorMode === mode) return;
+
+    localStorage.setItem('steem_editor_mode', mode);
+
+    if (mode === 'visual') {
+      if (editorRef.current) {
+        const val = editorRef.current.value;
+        const start = editorRef.current.selectionStart;
+        const end = editorRef.current.selectionEnd;
+        const pos = getRowColFromOffset(val, start);
+        useEditorStore.setState({
+          content: val,
+          cursor: pos,
+          selectionStart: start,
+          selectionEnd: end
+        });
+      }
+      saveCursorPosition();
+      
+      lastSyncContentRef.current = 'FORCE_SYNC_INITIAL_VALUE_THAT_WILL_NEVER_MATCH';
+      setEditorMode('visual');
+      
+      setTimeout(async () => {
+        await syncCursorMarkdownToVisual();
+        if (wysiwygRef.current) {
+          wysiwygRef.current.focus();
+        }
+      }, 100);
+    } else {
+      saveVisualSelection();
+      isSyncingRef.current = true;
+      syncCursorVisualToMarkdown();
+      
+      // Always synchronize when switching from visual to markdown code
+      if (wysiwygRef.current) {
+        const md = htmlToMarkdown(wysiwygRef.current.innerHTML);
+        if (md !== useEditorStore.getState().content) {
+          setContent(md);
+        }
+      }
+      setEditorMode('markdown');
+
+      setTimeout(() => {
+        restoreMarkdownCursorAndScroll();
+      }, 50);
+    }
+  }, [editorMode, saveCursorPosition, syncCursorMarkdownToVisual, syncCursorVisualToMarkdown, saveVisualSelection, setContent, restoreMarkdownCursorAndScroll]);
 
   // Save cursor position when unmounting or switching view
   useEffect(() => {
@@ -2025,31 +3751,142 @@ function App() {
   useEffect(() => {
     if (activeView === 'editor' && activeMobileTab === 'editor') {
        setTimeout(() => {
-          if (editorRef.current && cursorPositionRef.current) {
-             editorRef.current.focus();
-             editorRef.current.setSelectionRange(
-                cursorPositionRef.current.start, 
-                cursorPositionRef.current.end
-             );
+          if (editorMode === 'visual') {
+             restoreVisualSelection();
+          } else {
+             restoreMarkdownCursorAndScroll();
+             return;
           }
-       }, 50);
+          if (editorRef.current) {
+             const cursor = useEditorStore.getState().cursor;
+             if (cursor) {
+               const text = editorRef.current.value;
+               const offset = getOffsetFromRowCol(text, cursor);
+               
+               // Ensure we prevent user event handlers from overwriting while setting programmatic focus/selection
+               isSyncingRef.current = true;
+               
+               // Cross-browser reliable cursor positioning
+               const ta = editorRef.current;
+               ta.focus();
+               ta.setSelectionRange(offset, offset);
+               
+               // Robust Y-axis scroll calculation using a hidden clone
+                const clone = ta.cloneNode() as HTMLTextAreaElement;
+                clone.style.visibility = 'hidden';
+                clone.style.position = 'absolute';
+                clone.style.overflow = 'hidden';
+                clone.style.height = '0px'; // Force scrollHeight to equal content height
+                clone.style.width = ta.clientWidth + 'px';
+                clone.style.padding = window.getComputedStyle(ta).padding;
+                clone.style.paddingBottom = '0px'; // Ignore bottom padding for caret Y coord
+                clone.style.font = window.getComputedStyle(ta).font;
+                clone.style.lineHeight = window.getComputedStyle(ta).lineHeight;
+                clone.style.boxSizing = 'border-box';
+                clone.value = text.substring(0, offset);
+                document.body.appendChild(clone);
+                
+                const caretY = clone.scrollHeight;
+                document.body.removeChild(clone);
+                
+                // Scroll so the caret is exactly in the middle of the screen
+                ta.scrollTop = Math.max(0, caretY - (ta.clientHeight / 2));
+                
+                // Reset sync flag after a brief timeout so that user actions are once again captured
+                setTimeout(() => {
+                  isSyncingRef.current = false;
+                }, 100);
+             } else {
+               isSyncingRef.current = false;
+             }
+          } else {
+             isSyncingRef.current = false;
+          }
+       }, 100);
     } else {
+       saveVisualSelection();
        saveCursorPosition();
+       isSyncingRef.current = false;
     }
-  }, [activeView, activeMobileTab, saveCursorPosition]);
+  }, [activeView, activeMobileTab, editorMode, saveCursorPosition, restoreVisualSelection, saveVisualSelection, restoreMarkdownCursorAndScroll]);
 
-  const handleEditorScroll = () => {
-    if (!syncScrollEnabled) return;
-    const editor = editorRef.current;
-    const preview = previewPaneRef.current;
-    if (editor && preview) {
-      const percentage = editor.scrollTop / (editor.scrollHeight - editor.clientHeight || 1);
-      preview.scrollTop = percentage * (preview.scrollHeight - preview.clientHeight);
-    }
-  };
+  useEffect(() => {
+    // DEBOUNCED PERSISTENCE: Fast 350ms save to storage so state and cursor match without blocking UI thread during typing
+    let timer: any;
+    const unsubscribe = import('./store').then(({ useEditorStore }) => {
+      return useEditorStore.subscribe((state, prevState) => {
+        if (state.content !== prevState.content) {
+          if (timer) clearTimeout(timer);
+          timer = setTimeout(() => {
+            saveLargeStorage(STORAGE_KEY_AUTOSAVE, state.content);
+            if (cursorPositionRef.current) {
+              try {
+                localStorage.setItem('steem_editor_cursor', JSON.stringify(cursorPositionRef.current));
+              } catch (err) {
+                console.debug(err);
+              }
+            }
+            if (editorMode === 'markdown') {
+              try {
+                localStorage.setItem('steem_visual_html_is_stale', 'true');
+              } catch (err) {
+                console.debug(err);
+              }
+            }
+          }, 350);
+        }
+      });
+    });
 
-  // --- Effects ---
-  // Save images and links when they change
+    return () => {
+      if (timer) clearTimeout(timer);
+      unsubscribe.then(unsub => unsub());
+    };
+  }, [editorMode, saveLargeStorage]);
+
+  // Synchronous flush on page reload / unload
+  useEffect(() => {
+    const handleBeforeUnload = () => {
+      try {
+        if (editorMode === 'markdown' && editorRef.current) {
+          const val = editorRef.current.value;
+          useEditorStore.setState({ content: val });
+          saveLargeStorage(STORAGE_KEY_AUTOSAVE, val);
+          saveCursorPosition();
+        } else if (editorMode === 'visual' && wysiwygRef.current) {
+          const html = wysiwygRef.current.innerHTML;
+          try {
+            localStorage.setItem('steem_autosave_temp_visual_html', html);
+          } catch (err) {
+            console.debug(err);
+          }
+          const md = htmlToMarkdown(html);
+          useEditorStore.setState({ content: md });
+          saveLargeStorage(STORAGE_KEY_AUTOSAVE, md);
+          saveVisualSelection();
+          syncCursorVisualToMarkdown();
+          if (cursorPositionRef.current) {
+            try {
+              localStorage.setItem('steem_editor_cursor', JSON.stringify(cursorPositionRef.current));
+            } catch (err) {
+              console.debug(err);
+            }
+          }
+        } else {
+          saveLargeStorage(STORAGE_KEY_AUTOSAVE, useEditorStore.getState().content);
+          saveCursorPosition();
+        }
+      } catch (err) {
+        console.warn('Error flushing autosave state before unload:', err);
+      }
+    };
+
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => {
+      window.removeEventListener('beforeunload', handleBeforeUnload);
+    };
+  }, [editorMode, saveCursorPosition, saveVisualSelection, syncCursorVisualToMarkdown, saveLargeStorage]);
+
   useEffect(() => {
     if (isImagesLoaded.current) {
       localStorage.setItem(STORAGE_KEY_IMAGES, JSON.stringify(images));
@@ -2060,7 +3897,12 @@ function App() {
   }, [images, sourceInput, imageInsertFormat, isTextWrapEnabled]);
 
   useEffect(() => {
-    const saved = localStorage.getItem(STORAGE_KEY_AUTOSAVE);
+    let saved = null;
+    try {
+      saved = localStorage.getItem(STORAGE_KEY_AUTOSAVE) || sessionStorage.getItem(STORAGE_KEY_AUTOSAVE);
+    } catch (err) {
+      console.debug(err);
+    }
     if (saved) setContent(saved);
     
     const savedUser = localStorage.getItem('steem_username');
@@ -2083,46 +3925,197 @@ function App() {
     handleResize();
     window.addEventListener('resize', handleResize);
     return () => window.removeEventListener('resize', handleResize);
+  }, [setContent]);
+
+  const [activeTable, setActiveTable] = useState<HTMLTableElement | null>(null);
+  const [activeTableRow, setActiveTableRow] = useState<HTMLTableRowElement | null>(null);
+  const [activeTableCell, setActiveTableCell] = useState<HTMLTableCellElement | null>(null);
+  
+  const activeTableRef = useRef<HTMLTableElement | null>(null);
+  const activeTableRowRef = useRef<HTMLTableRowElement | null>(null);
+  const activeTableCellRef = useRef<HTMLTableCellElement | null>(null);
+
+  const [tableRect, setTableRect] = useState<DOMRect | null>(null);
+  const [isTableMenuExpanded, setIsTableMenuExpanded] = useState(false);
+  const [isTableMenuPinned, setIsTableMenuPinned] = useState(() => {
+    return localStorage.getItem('steem_table_menu_pinned') === 'true';
+  });
+
+  const updateTableRect = useCallback(() => {
+    if (activeTable) {
+      setTableRect(activeTable.getBoundingClientRect());
+    } else {
+      setTableRect(null);
+    }
+  }, [activeTable]);
+
+  useEffect(() => {
+    updateTableRect();
+    window.addEventListener('resize', updateTableRect);
+    const scrollContainer = wysiwygRef.current;
+    if (scrollContainer) {
+      scrollContainer.addEventListener('scroll', updateTableRect);
+    }
+    return () => {
+      window.removeEventListener('resize', updateTableRect);
+      if (scrollContainer) {
+        scrollContainer.removeEventListener('scroll', updateTableRect);
+      }
+    };
+  }, [updateTableRect, activeTable]);
+
+  useEffect(() => {
+    const handleSelectionChange = () => {
+      if (editorMode === 'visual' && wysiwygRef.current) {
+        const sel = window.getSelection();
+        if (sel && sel.rangeCount > 0) {
+          try {
+            const range = sel.getRangeAt(0);
+            if (wysiwygRef.current.contains(range.commonAncestorContainer)) {
+              savedVisualRangeRef.current = range.cloneRange();
+              
+              let node: Node | null = range.commonAncestorContainer;
+              if (node.nodeType === 3) node = node.parentNode;
+              const table = ((node as Element)?.closest?.('table') as HTMLTableElement) || null;
+              const row = ((node as Element)?.closest?.('tr') as HTMLTableRowElement) || null;
+              const cell = ((node as Element)?.closest?.('td, th') as HTMLTableCellElement) || null;
+
+              if (activeTableRef.current !== table) {
+                activeTableRef.current = table;
+                setActiveTable(table);
+              }
+              if (activeTableRowRef.current !== row) {
+                activeTableRowRef.current = row;
+                setActiveTableRow(row);
+              }
+              if (activeTableCellRef.current !== cell) {
+                activeTableCellRef.current = cell;
+                setActiveTableCell(cell);
+              }
+            } else {
+              if (activeTableRef.current !== null) { activeTableRef.current = null; setActiveTable(null); }
+              if (activeTableRowRef.current !== null) { activeTableRowRef.current = null; setActiveTableRow(null); }
+              if (activeTableCellRef.current !== null) { activeTableCellRef.current = null; setActiveTableCell(null); }
+            }
+          } catch {
+            if (activeTableRef.current !== null) { activeTableRef.current = null; setActiveTable(null); }
+            if (activeTableRowRef.current !== null) { activeTableRowRef.current = null; setActiveTableRow(null); }
+            if (activeTableCellRef.current !== null) { activeTableCellRef.current = null; setActiveTableCell(null); }
+          }
+        } else {
+          if (activeTableRef.current !== null) { activeTableRef.current = null; setActiveTable(null); }
+          if (activeTableRowRef.current !== null) { activeTableRowRef.current = null; setActiveTableRow(null); }
+          if (activeTableCellRef.current !== null) { activeTableCellRef.current = null; setActiveTableCell(null); }
+        }
+      } else {
+        if (activeTableRef.current !== null) { activeTableRef.current = null; setActiveTable(null); }
+        if (activeTableRowRef.current !== null) { activeTableRowRef.current = null; setActiveTableRow(null); }
+        if (activeTableCellRef.current !== null) { activeTableCellRef.current = null; setActiveTableCell(null); }
+      }
+    };
+
+    document.addEventListener('selectionchange', handleSelectionChange);
+    return () => {
+      document.removeEventListener('selectionchange', handleSelectionChange);
+    };
+  }, [editorMode]);
+
+  useEffect(() => {
+    // DEBOUNCED PERSISTENCE: Fast 350ms save to storage so state and cursor match without blocking UI thread during typing
+    let timer: any;
+    const unsubscribe = import('./store').then(({ useEditorStore }) => {
+      return useEditorStore.subscribe((state, prevState) => {
+        if (state.content !== prevState.content) {
+          if (timer) clearTimeout(timer);
+          timer = setTimeout(() => {
+            saveLargeStorage(STORAGE_KEY_AUTOSAVE, state.content);
+            if (cursorPositionRef.current) {
+              try {
+                localStorage.setItem('steem_editor_cursor', JSON.stringify(cursorPositionRef.current));
+              } catch (err) {
+                console.debug(err);
+              }
+            }
+            if (editorMode === 'markdown') {
+              try {
+                localStorage.setItem('steem_visual_html_is_stale', 'true');
+              } catch (err) {
+                console.debug(err);
+              }
+            }
+          }, 350);
+        }
+      });
+    });
+
+    return () => {
+      if (timer) clearTimeout(timer);
+      unsubscribe.then(unsub => unsub());
+    };
+  }, [editorMode, saveLargeStorage]);
+
+  // Synchronous flush on page reload / unload
+  useEffect(() => {
+    const handleBeforeUnload = () => {
+      try {
+        if (editorMode === 'markdown' && editorRef.current) {
+          const val = editorRef.current.value;
+          useEditorStore.setState({ content: val });
+          saveLargeStorage(STORAGE_KEY_AUTOSAVE, val);
+          saveCursorPosition();
+        } else if (editorMode === 'visual' && wysiwygRef.current) {
+          const html = wysiwygRef.current.innerHTML;
+          try {
+            localStorage.setItem('steem_autosave_temp_visual_html', html);
+          } catch (err) {
+            console.debug(err);
+          }
+          const md = htmlToMarkdown(html);
+          useEditorStore.setState({ content: md });
+          saveLargeStorage(STORAGE_KEY_AUTOSAVE, md);
+          saveVisualSelection();
+          syncCursorVisualToMarkdown();
+          if (cursorPositionRef.current) {
+            try {
+              localStorage.setItem('steem_editor_cursor', JSON.stringify(cursorPositionRef.current));
+            } catch (err) {
+              console.debug(err);
+            }
+          }
+        } else {
+          saveLargeStorage(STORAGE_KEY_AUTOSAVE, useEditorStore.getState().content);
+          saveCursorPosition();
+        }
+      } catch (err) {
+        console.warn('Error flushing autosave state before unload:', err);
+      }
+    };
+
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => {
+      window.removeEventListener('beforeunload', handleBeforeUnload);
+    };
+  }, [editorMode, saveCursorPosition, saveVisualSelection, syncCursorVisualToMarkdown, saveLargeStorage]);
+
+  const handleEditorScroll = useCallback(() => {
+    if (editorRef.current) {
+      localStorage.setItem('steem_editor_scroll', String(editorRef.current.scrollTop));
+    }
+    if (!syncScrollEnabled) return;
+    const editor = editorRef.current;
+    const preview = previewPaneRef.current;
+    if (editor && preview) {
+      const percentage = editor.scrollTop / (editor.scrollHeight - editor.clientHeight || 1);
+      preview.scrollTop = percentage * (preview.scrollHeight - preview.clientHeight);
+    }
+  }, [syncScrollEnabled]);
+
+  // OFF-THREAD WEB WORKER: Process stats and clean text metrics off the main UI thread!
+  const handleWorkerStats = useCallback((rawStats: { words: number; chars: number }, cleanStatsResult: { words: number; chars: number }) => {
+    useEditorStore.getState().setStats(rawStats, cleanStatsResult);
   }, []);
 
-  useEffect(() => {
-    localStorage.setItem(STORAGE_KEY_AUTOSAVE, content);
-    const words = content.trim() ? content.trim().split(/\s+/).length : 0;
-    setStats({ words, chars: content.length });
-  }, [content]);
-
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      // Clean stats calculation - moved to separate debounced effect
-      const calculateCleanStats = (text: string) => {
-        // 1. Remove attribution footers but count them as a few words
-        let cleanText = text.replace(/<hr>[\s\S]*?Photo by[\s\S]*?<\/footer>/gi, ' Attribution ');
-        cleanText = cleanText.replace(/<hr>[\s\S]*?Source:[\s\S]*?<\/footer>/gi, ' Source ');
-        
-        // 2. Remove HTML tags
-        cleanText = cleanText.replace(/<[^>]*>/g, ' ');
-        
-        // 3. Remove Markdown links [text](url) -> text
-        cleanText = cleanText.replace(/\[([^\]]+)\]\([^)]+\)/g, '$1');
-        
-        // 4. Remove Markdown images ![alt](url) -> alt (shortened)
-        cleanText = cleanText.replace(/!\[([^\]]*)\]\([^)]+\)/g, (_, alt) => {
-          return alt.split(/\s+/).slice(0, 3).join(' '); // Keep only first 3 words of alt
-        });
-        
-        // 5. Remove Blockquotes (lines starting with >)
-        cleanText = cleanText.split('\n').filter(line => !line.trim().startsWith('>')).join('\n');
-        
-        // 6. Remove Markdown formatting symbols
-        cleanText = cleanText.replace(/[#*`_~]/g, '');
-        
-        const cleanWords = cleanText.trim() ? cleanText.trim().split(/\s+/).length : 0;
-        return { words: cleanWords, chars: cleanText.length };
-      };
-      setCleanStats(calculateCleanStats(content));
-    }, 1000); // More aggressive debounce for expensive calculation
-    return () => clearTimeout(timer);
-  }, [content]);
+  useEditorWorker(handleWorkerStats);
 
   useEffect(() => {
     localStorage.setItem('steem_lang', lang);
@@ -2134,6 +4127,7 @@ function App() {
 
   // --- Logic ---
   const getSelectionOrWord = useCallback(() => {
+    const content = useEditorStore.getState().content;
     if (!editorRef.current) return { s: 0, e: 0, text: '' };
     const s = editorRef.current.selectionStart;
     const e = editorRef.current.selectionEnd;
@@ -2144,73 +4138,46 @@ function App() {
     while (start > 0 && !/[\s\n]/.test(content[start - 1])) start--;
     while (end < content.length && !/[\s\n]/.test(content[end])) end++;
     return { s: start, e: end, text: content.substring(start, end) };
-  }, [content]);
+  }, []);
 
-  const insertAtCursor = useCallback((text: string, selectionMode: 'end' | 'select' = 'end', isBlock: boolean = false) => {
+  const insertAtCursor = useCallback((text: string, selectionMode: 'end' | 'select' = 'end') => {
+    const content = useEditorStore.getState().content;
+    if (editorMode === 'visual') {
+      const runParse = async () => {
+        const m = getMarked();
+        if (m) {
+          const html = await m.parse(text);
+          insertHtmlAtCursor(html);
+        } else {
+          insertHtmlAtCursor(text);
+        }
+      };
+      runParse();
+      return;
+    }
+
     if (!editorRef.current) return;
     const start = editorRef.current.selectionStart;
     const end = editorRef.current.selectionEnd;
+    const scrollTop = editorRef.current.scrollTop;
+    const scrollLeft = editorRef.current.scrollLeft;
     
-    let finalText = text;
-
-    if (isBlock) {
-      // Find start of current line to detect indentation or list markers
-      const lastNewline = content.lastIndexOf('\n', start - 1);
-      const lineStart = lastNewline === -1 ? 0 : lastNewline + 1;
-      const currentLine = content.substring(lineStart, start);
-      
-      // Detect list indentation: matches markers like "* ", "1. ", or just spaces
-      const listMatch = currentLine.match(/^(\s*(?:[*-+]|\d+\.|>)\s+)/);
-      const indentation = listMatch ? ' '.repeat(listMatch[0].length) : (currentLine.match(/^(\s*)/)?.[0] || '');
-      
-      const lines = text.trim().split('\n');
-      // Preindent lines (except the first one as prefix handles it or it's inserted directly on current line)
-      const indentedBody = lines.map((l, i) => (i === 0 ? l : indentation + l)).join('\n');
-
-      let prefix = '';
-      const textBefore = content.substring(0, start);
-      if (textBefore.length > 0) {
-        if (textBefore.endsWith('\n\n')) {
-          prefix = indentation;
-        } else if (textBefore.endsWith('\n')) {
-          // If we are on a new line, check if it already has the indentation
-          if (currentLine === indentation) {
-            prefix = '\n' + indentation; // Adds one blank line (properly indented) before content
-          } else {
-            prefix = indentation + '\n' + indentation;
-          }
-        } else {
-          // We are at the end of a line with content
-          prefix = '\n' + indentation + '\n' + indentation; 
-        }
-      } else {
-        prefix = indentation;
-      }
-      
-      let suffix = '\n';
-      const textAfter = content.substring(end);
-      if (textAfter.length > 0) {
-        if (textAfter.startsWith('\n\n')) suffix = '\n';
-        else if (textAfter.startsWith('\n')) suffix = '\n';
-        else suffix = '\n\n';
-      }
-      
-      finalText = prefix + indentedBody + suffix;
-    }
+    const finalText = text;
 
     const newContent = content.substring(0, start) + finalText + content.substring(end);
     setContent(newContent);
     
     setTimeout(() => {
       if (!editorRef.current) return;
-      editorRef.current.focus();
       if (selectionMode === 'select') {
-        editorRef.current.setSelectionRange(start, start + finalText.length);
+        editorRef.current.focus({ preventScroll: true }); editorRef.current.setSelectionRange(start, start + finalText.length);
       } else {
-        editorRef.current.setSelectionRange(start + finalText.length, start + finalText.length);
+        editorRef.current.focus({ preventScroll: true }); editorRef.current.setSelectionRange(start + finalText.length, start + finalText.length);
       }
+      editorRef.current.scrollTop = scrollTop;
+      editorRef.current.scrollLeft = scrollLeft;
     }, 0);
-  }, [content]);
+  }, [ editorMode, insertHtmlAtCursor, setContent]);
 
   useEffect(() => {
     // Timer removed as per user request to hide only on typing
@@ -2237,30 +4204,670 @@ function App() {
     if (!isWidgetVisible) setIsWidgetVisible(true);
   }, [widgetPos, isWidgetVisible]);
 
-  const fmt = useCallback((prefix: string, suffix: string = prefix) => {
+  const handleEditorKeyDown = useCallback((e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (widgetPos === 'floating' && !e.ctrlKey && !e.metaKey && e.key !== 'Shift') {
+      if (isWidgetVisible && !isWidgetMenuOpen) {
+        setIsWidgetVisible(false);
+      }
+    }
+
+    if (e.key === 'Enter') {
+      if (!editorRef.current) return;
+      const textarea = editorRef.current;
+      const text = textarea.value;
+      const caretPos = textarea.selectionStart;
+
+      const lineStart = text.lastIndexOf('\n', caretPos - 1) + 1;
+      const lineEnd = text.indexOf('\n', caretPos);
+      const actualLineEnd = lineEnd === -1 ? text.length : lineEnd;
+      const currentLine = text.slice(lineStart, actualLineEnd);
+
+      // --- Part 1: Handle Block Elements / Lists first ---
+      const quoteMatch = currentLine.match(/^(\s*>\s*)/);
+      const unorderedListMatch = currentLine.match(/^(\s*[-*+]\s+\[[ xX]\]\s+)/) || currentLine.match(/^(\s*[-*+]\s+)/);
+      const orderedListMatch = currentLine.match(/^(\s*)(\d+)([.)]\s+)/);
+
+      if (quoteMatch) {
+        const prefix = quoteMatch[1];
+        e.preventDefault();
+        if (currentLine.trim() === '>') {
+          const before = text.slice(0, lineStart);
+          const after = text.slice(actualLineEnd);
+          const newText = before + '\n' + after;
+          const newCaretPos = lineStart + 1;
+          setContent(newText);
+          setTimeout(() => {
+            if (!editorRef.current) return;
+            editorRef.current.focus({ preventScroll: true }); editorRef.current.setSelectionRange(newCaretPos, newCaretPos);
+            saveCursorPosition();
+          }, 0);
+        } else {
+          const before = text.slice(0, caretPos);
+          const after = text.slice(caretPos);
+          const newText = before + '\n' + prefix + after;
+          const newCaretPos = caretPos + 1 + prefix.length;
+          setContent(newText);
+          setTimeout(() => {
+            if (!editorRef.current) return;
+            editorRef.current.focus({ preventScroll: true }); editorRef.current.setSelectionRange(newCaretPos, newCaretPos);
+            saveCursorPosition();
+          }, 0);
+        }
+        return;
+      }
+
+      if (unorderedListMatch) {
+        const prefix = unorderedListMatch[1];
+        e.preventDefault();
+        const cleanLine = currentLine.trim();
+        if (cleanLine === '-' || cleanLine === '*' || cleanLine === '+' || cleanLine === '- [ ]' || cleanLine === '- [x]' || cleanLine === '- [X]') {
+          const before = text.slice(0, lineStart);
+          const after = text.slice(actualLineEnd);
+          const newText = before + '\n' + after;
+          const newCaretPos = lineStart + 1;
+          setContent(newText);
+          setTimeout(() => {
+            if (!editorRef.current) return;
+            editorRef.current.focus({ preventScroll: true }); editorRef.current.setSelectionRange(newCaretPos, newCaretPos);
+            saveCursorPosition();
+          }, 0);
+        } else {
+          let newPrefix = prefix;
+          if (prefix.includes('[x]')) {
+            newPrefix = prefix.replace('[x]', '[ ]');
+          } else if (prefix.includes('[X]')) {
+            newPrefix = prefix.replace('[X]', '[ ]');
+          }
+          const before = text.slice(0, caretPos);
+          const after = text.slice(caretPos);
+          const newText = before + '\n' + newPrefix + after;
+          const newCaretPos = caretPos + 1 + newPrefix.length;
+          setContent(newText);
+          setTimeout(() => {
+            if (!editorRef.current) return;
+            editorRef.current.focus({ preventScroll: true }); editorRef.current.setSelectionRange(newCaretPos, newCaretPos);
+            saveCursorPosition();
+          }, 0);
+        }
+        return;
+      }
+
+      if (orderedListMatch) {
+        const indent = orderedListMatch[1];
+        const num = parseInt(orderedListMatch[2], 10);
+        const delimiter = orderedListMatch[3];
+        e.preventDefault();
+        
+        if (currentLine.trim() === `${num}.` || currentLine.trim() === `${num}`) {
+          const before = text.slice(0, lineStart);
+          const after = text.slice(actualLineEnd);
+          const newText = before + '\n' + after;
+          const newCaretPos = lineStart + 1;
+          setContent(newText);
+          setTimeout(() => {
+            if (!editorRef.current) return;
+            editorRef.current.focus({ preventScroll: true }); editorRef.current.setSelectionRange(newCaretPos, newCaretPos);
+            saveCursorPosition();
+          }, 0);
+        } else {
+          const nextNum = num + 1;
+          const newPrefix = indent + nextNum + delimiter;
+          const before = text.slice(0, caretPos);
+          const after = text.slice(caretPos);
+          const newText = before + '\n' + newPrefix + after;
+          const newCaretPos = caretPos + 1 + newPrefix.length;
+          setContent(newText);
+          setTimeout(() => {
+            if (!editorRef.current) return;
+            editorRef.current.focus({ preventScroll: true }); editorRef.current.setSelectionRange(newCaretPos, newCaretPos);
+            saveCursorPosition();
+          }, 0);
+        }
+        return;
+      }
+
+      // --- Part 2: Handle Inline Formatting Continuation ---
+      let activeTag = null;
+      let activeCloseTag = null;
+      let activeKey: 'bold' | 'italic' | 'code' | 'strikethrough' | 'sub' | 'sup' | 'phishy' | null = null;
+
+      if (activeFormats.bold) { activeTag = '**'; activeCloseTag = '**'; activeKey = 'bold'; }
+      else if (activeFormats.italic) { activeTag = '*'; activeCloseTag = '*'; activeKey = 'italic'; }
+      else if (activeFormats.code) { activeTag = '`'; activeCloseTag = '`'; activeKey = 'code'; }
+      else if (activeFormats.strikethrough) { activeTag = '~~'; activeCloseTag = '~~'; activeKey = 'strikethrough'; }
+      else if (activeFormats.sub) { activeTag = '<sub>'; activeCloseTag = '</sub>'; activeKey = 'sub'; }
+      else if (activeFormats.sup) { activeTag = '<sup>'; activeCloseTag = '</sup>'; activeKey = 'sup'; }
+      else if (activeFormats.phishy) { activeTag = '<div class="phishy">'; activeCloseTag = '</div>'; activeKey = 'phishy'; }
+
+      if (activeTag && activeCloseTag && activeKey) {
+        e.preventDefault();
+
+        if (currentLine === activeTag + activeCloseTag) {
+          const before = text.slice(0, lineStart);
+          const after = text.slice(actualLineEnd);
+          
+          const newText = before + '\n' + after;
+          const newCaretPos = lineStart + 1;
+
+          setContent(newText);
+          setActiveFormats(prev => ({ ...prev, [activeKey!]: false }));
+          
+          setTimeout(() => {
+            if (!editorRef.current) return;
+            editorRef.current.focus({ preventScroll: true }); editorRef.current.setSelectionRange(newCaretPos, newCaretPos);
+            saveCursorPosition();
+          }, 0);
+          return;
+        }
+
+        const tagLen = activeTag.length;
+        const closeLen = activeCloseTag.length;
+        const openIdx = text.lastIndexOf(activeTag, caretPos - tagLen);
+        const closeIdx = text.indexOf(activeCloseTag, caretPos);
+
+        let resultText = text;
+        let resultCaretPos = caretPos;
+
+        if (openIdx !== -1 && closeIdx !== -1 && openIdx < closeIdx) {
+          const before = text.slice(0, openIdx);
+          const inside = text.slice(openIdx + tagLen, closeIdx);
+          const after = text.slice(closeIdx + closeLen);
+
+          const trimmedInside = inside.trimEnd();
+          const trailingSpaces = inside.slice(trimmedInside.length);
+
+          resultText = before + activeTag + trimmedInside + activeCloseTag + trailingSpaces + after;
+          resultCaretPos = before.length + tagLen + trimmedInside.length + closeLen + trailingSpaces.length;
+        }
+
+        const before = resultText.slice(0, resultCaretPos);
+        const after = resultText.slice(resultCaretPos);
+        
+        const newText = before + '\n' + activeTag + activeCloseTag + after;
+        const newCaretPos = resultCaretPos + 1 + activeTag.length;
+
+        setContent(newText);
+        setTimeout(() => {
+          if (!editorRef.current) return;
+          editorRef.current.focus({ preventScroll: true }); editorRef.current.setSelectionRange(newCaretPos, newCaretPos);
+          saveCursorPosition();
+        }, 0);
+      }
+    }
+  }, [widgetPos, isWidgetVisible, isWidgetMenuOpen, activeFormats, saveCursorPosition, setContent]);
+
+  const handleMarkdownFormat = useCallback((tag: string, closeTag: string = tag) => {
     if (!editorRef.current) return;
+    const textarea = editorRef.current;
+    const text = textarea.value;
+    const start = textarea.selectionStart;
+    const end = textarea.selectionEnd;
+
+    let formatKey: 'bold' | 'italic' | 'code' | 'strikethrough' | 'sub' | 'sup' | 'phishy' = 'bold';
+    if (tag === '*') formatKey = 'italic';
+    else if (tag === '`') formatKey = 'code';
+    else if (tag === '~~') formatKey = 'strikethrough';
+    else if (tag === '<sub>') formatKey = 'sub';
+    else if (tag === '<sup>') formatKey = 'sup';
+    else if (tag === '<div class="phishy">') formatKey = 'phishy';
+
+    textarea.focus();
+
+    if (start !== end) {
+      const selectedText = text.slice(start, end);
+      const before = text.slice(0, start);
+      const after = text.slice(end);
+
+      const newText = before + tag + selectedText + closeTag + after;
+      setContent(newText);
+      
+      const newStart = start + tag.length;
+      const newEnd = end + tag.length;
+      setTimeout(() => {
+        if (!editorRef.current) return;
+        editorRef.current.focus({ preventScroll: true }); editorRef.current.setSelectionRange(newStart, newEnd);
+        saveCursorPosition();
+      }, 0);
+      return;
+    }
+
+    if (activeFormats[formatKey]) {
+      // 1. If we are right before the closeTag, we should simply JUMP OUT / ESCAPE the tag.
+      // We also trim spaces inside the tag at both edges, moving them outside the formatting.
+      if (text.substring(start, start + closeTag.length) === closeTag) {
+        const tagLen = tag.length;
+        const closeLen = closeTag.length;
+        const openIdx = text.lastIndexOf(tag, start - tagLen);
+
+        let newText = text;
+        let newCaretPos = start + closeLen;
+
+        if (openIdx !== -1 && openIdx < start) {
+          const before = text.slice(0, openIdx);
+          const inside = text.slice(openIdx + tagLen, start);
+          const after = text.slice(start + closeLen);
+
+          const trimmedInside = inside.trim();
+          const leadingSpaces = inside.slice(0, inside.length - inside.trimStart().length);
+          const trailingSpaces = inside.slice(inside.trimEnd().length);
+
+          newText = before + leadingSpaces + tag + trimmedInside + closeTag + trailingSpaces + after;
+          newCaretPos = before.length + leadingSpaces.length + tagLen + trimmedInside.length + closeLen + trailingSpaces.length;
+        }
+
+        setContent(newText);
+        setTimeout(() => {
+          if (!editorRef.current) return;
+          editorRef.current.focus({ preventScroll: true }); editorRef.current.setSelectionRange(newCaretPos, newCaretPos);
+          saveCursorPosition();
+        }, 0);
+        setActiveFormats(prev => ({ ...prev, [formatKey]: false }));
+        return;
+      }
+
+      // 2. Otherwise, we strip the format from the surrounding tags
+      const tagLen = tag.length;
+      const closeLen = closeTag.length;
+      const openIdx = text.lastIndexOf(tag, start - tagLen);
+      const closeIdx = text.indexOf(closeTag, start);
+
+      if (openIdx !== -1 && closeIdx !== -1 && openIdx < closeIdx) {
+        const before = text.slice(0, openIdx);
+        const inside = text.slice(openIdx + tagLen, closeIdx);
+        const after = text.slice(closeIdx + closeLen);
+
+        if (start < closeIdx) {
+          const newText = before + inside + after;
+          const newCaretPos = start - tagLen;
+          setContent(newText);
+          setTimeout(() => {
+            if (!editorRef.current) return;
+            editorRef.current.focus({ preventScroll: true }); editorRef.current.setSelectionRange(newCaretPos, newCaretPos);
+            saveCursorPosition();
+          }, 0);
+          return;
+        } 
+        
+        const trimmedInside = inside.trimEnd();
+        const trailingSpaces = inside.slice(trimmedInside.length);
+
+        const newText = before + tag + trimmedInside + closeTag + trailingSpaces + after;
+        const newCaretPos = before.length + tagLen + trimmedInside.length + closeLen + trailingSpaces.length;
+
+        setContent(newText);
+        setTimeout(() => {
+          if (!editorRef.current) return;
+          editorRef.current.focus({ preventScroll: true }); editorRef.current.setSelectionRange(newCaretPos, newCaretPos);
+          saveCursorPosition();
+        }, 0);
+      }
+    } else {
+      // 3. We are NOT inside the tag format. Let's look for a word adjacent to or under the cursor.
+      let wordStart = start;
+      let wordEnd = start;
+      while (wordStart > 0 && /\w|[\u0400-\u04FF]/.test(text[wordStart - 1])) {
+        wordStart--;
+      }
+      while (wordEnd < text.length && /\w|[\u0400-\u04FF]/.test(text[wordEnd])) {
+        wordEnd++;
+      }
+      const word = text.slice(wordStart, wordEnd);
+
+      if (word.length > 0 && start > wordStart && start < wordEnd) {
+        // Check if the word already has the tags around it, to strip them
+        const hasLeftTag = text.substring(wordStart - tag.length, wordStart) === tag;
+        const hasRightTag = text.substring(wordEnd, wordEnd + closeTag.length) === closeTag;
+
+        if (hasLeftTag && hasRightTag) {
+          const before = text.slice(0, wordStart - tag.length);
+          const after = text.slice(wordEnd + closeTag.length);
+          const newText = before + word + after;
+          setContent(newText);
+          const newCaretPos = wordStart - tag.length + word.length;
+          setTimeout(() => {
+            if (!editorRef.current) return;
+            editorRef.current.focus({ preventScroll: true }); editorRef.current.setSelectionRange(newCaretPos, newCaretPos);
+            saveCursorPosition();
+          }, 0);
+        } else {
+          // Wrap the word
+          const before = text.slice(0, wordStart);
+          const after = text.slice(wordEnd);
+          const newText = before + tag + word + closeTag + after;
+          setContent(newText);
+          const newCaretPos = start + tag.length;
+          setTimeout(() => {
+            if (!editorRef.current) return;
+            editorRef.current.focus({ preventScroll: true }); editorRef.current.setSelectionRange(newCaretPos, newCaretPos);
+            saveCursorPosition();
+          }, 0);
+        }
+      } else {
+        const before = text.slice(0, start);
+        const after = text.slice(start);
+        const newText = before + tag + closeTag + after;
+        const newCaretPos = start + tag.length;
+        
+        setContent(newText);
+        setTimeout(() => {
+          if (!editorRef.current) return;
+          editorRef.current.focus({ preventScroll: true }); editorRef.current.setSelectionRange(newCaretPos, newCaretPos);
+          saveCursorPosition();
+        }, 0);
+      }
+    }
+  }, [activeFormats, saveCursorPosition, setContent]);
+
+  const fmt = useCallback((prefix: string, suffix: string = prefix) => {
+    if (editorMode === 'visual') {
+      let formatKey: 'bold' | 'italic' | 'strikethrough' | 'sub' | 'sup' | 'code' | 'phishy' | null = null;
+      if (prefix === '**') formatKey = 'bold';
+      else if (prefix === '*') formatKey = 'italic';
+      else if (prefix === '~~') formatKey = 'strikethrough';
+      else if (prefix === '<sub>') formatKey = 'sub';
+      else if (prefix === '<sup>') formatKey = 'sup';
+      else if (prefix === '`') formatKey = 'code';
+      else if (prefix === '<div class="phishy">') formatKey = 'phishy';
+
+      const isFormatActive = formatKey ? activeFormats[formatKey] : false;
+
+      let isCollapsed = false;
+      let range: Range | null = null;
+      const sel = window.getSelection();
+      if (sel && sel.rangeCount > 0) {
+        range = sel.getRangeAt(0);
+        isCollapsed = sel.isCollapsed || range.collapsed;
+      } else if (savedVisualRangeRef.current) {
+        range = savedVisualRangeRef.current;
+        isCollapsed = range.collapsed;
+      }
+
+      // 1. If format is active AND cursor is collapsed, we handle EXITING/DEACTIVATING the format.
+      // We should jump out of the active element instead of stripping the formatting from the word.
+      if (isCollapsed && isFormatActive && formatKey && range) {
+        let activeElement: HTMLElement | null = null;
+        let temp = range.startContainer as Node | null;
+        while (temp && temp !== wysiwygRef.current) {
+          if (temp.nodeType === Node.ELEMENT_NODE) {
+            const tagName = (temp as HTMLElement).tagName.toUpperCase();
+            if (formatKey === 'bold' && (tagName === 'STRONG' || tagName === 'B')) {
+              activeElement = temp as HTMLElement;
+              break;
+            }
+            if (formatKey === 'italic' && (tagName === 'EM' || tagName === 'I')) {
+              activeElement = temp as HTMLElement;
+              break;
+            }
+            if (formatKey === 'strikethrough' && (tagName === 'STRIKE' || tagName === 'DEL' || tagName === 'S')) {
+              activeElement = temp as HTMLElement;
+              break;
+            }
+            if (formatKey === 'sub' && tagName === 'SUB') {
+              activeElement = temp as HTMLElement;
+              break;
+            }
+            if (formatKey === 'sup' && tagName === 'SUP') {
+              activeElement = temp as HTMLElement;
+              break;
+            }
+            if (formatKey === 'code' && tagName === 'CODE') {
+              activeElement = temp as HTMLElement;
+              break;
+            }
+            if (formatKey === 'phishy' && (tagName === 'SPAN' || tagName === 'DIV') && (temp as HTMLElement).classList.contains('phishy')) {
+              activeElement = temp as HTMLElement;
+              break;
+            }
+          }
+          temp = temp.parentNode;
+        }
+
+        if (activeElement) {
+          let isAtEnd = false;
+          if (range.startContainer.nodeType === Node.TEXT_NODE) {
+            const textContent = range.startContainer.textContent || '';
+            const offset = range.startOffset;
+            const remainingText = textContent.substring(offset);
+            isAtEnd = /^[\u200B]*$/.test(remainingText);
+          } else {
+            isAtEnd = range.startContainer === activeElement && range.startOffset === activeElement.childNodes.length;
+          }
+          
+          if (isAtEnd) {
+            const parent = activeElement.parentNode;
+            if (parent) {
+              const zwsp = document.createTextNode('\u200B');
+              parent.insertBefore(zwsp, activeElement.nextSibling);
+              
+              const newRange = document.createRange();
+              newRange.setStart(zwsp, 1);
+              newRange.setEnd(zwsp, 1);
+              
+              const currentSel = window.getSelection();
+              if (currentSel) {
+                currentSel.removeAllRanges();
+                currentSel.addRange(newRange);
+              }
+              
+              if (wysiwygRef.current) {
+                wysiwygRef.current.focus({ preventScroll: true });
+              }
+              
+              savedVisualRangeRef.current = newRange.cloneRange();
+              
+              setActiveFormats(prev => ({ ...prev, [formatKey!]: false }));
+              updateContentFromWysiwyg();
+              return;
+            }
+          }
+        }
+      }
+
+      // 2. Determine if we should expand the word when RESTORING selection.
+      // We only expand the word if:
+      // - The cursor is collapsed
+      // - The format is NOT currently active (we want to apply it to a word)
+      // - The cursor is strictly inside a word (not at the start or end of a word or at a space)
+      let shouldExpandWord = false;
+      if (isCollapsed && range && !isFormatActive) {
+        const node = range.startContainer;
+        const offset = range.startOffset;
+        if (node && node.nodeType === Node.TEXT_NODE) {
+          const textValue = node.nodeValue || '';
+          const wordBoundaryRegex = /[\s\n.,!?;:"'()[\]{}*~`<>#_]/;
+          let wStart = offset;
+          let wEnd = offset;
+          while (wStart > 0 && !wordBoundaryRegex.test(textValue[wStart - 1])) {
+            wStart--;
+          }
+          while (wEnd < textValue.length && !wordBoundaryRegex.test(textValue[wEnd])) {
+            wEnd++;
+          }
+          
+          // Only expand if cursor is strictly inside/adjacent to word, and not at the very end of the text node (continuous typing)
+          if (wStart < wEnd && offset > wStart && offset < wEnd) {
+            shouldExpandWord = true;
+          }
+        }
+      }
+
+      restoreVisualSelection(shouldExpandWord);
+
+      let command = '';
+      if (prefix === '**') command = 'bold';
+      else if (prefix === '*') command = 'italic';
+      else if (prefix === '~~') command = 'strikeThrough';
+      else if (prefix === '<sub>') command = 'subscript';
+      else if (prefix === '<sup>') command = 'superscript';
+
+      if (command) {
+        document.execCommand(command, false);
+        const selAfter = window.getSelection();
+        if (selAfter && selAfter.rangeCount > 0 && shouldExpandWord) {
+          selAfter.collapseToEnd();
+          savedVisualRangeRef.current = selAfter.getRangeAt(0).cloneRange();
+          updateContentFromWysiwyg();
+          return;
+        }
+        const isCollapsedAfter = selAfter ? (selAfter.isCollapsed || (selAfter.rangeCount > 0 && selAfter.getRangeAt(0).collapsed)) : true;
+
+        if (isCollapsedAfter) {
+          // Toggle local state for immediate toolbar response
+          let formatKeyToggle: 'bold' | 'italic' | 'strikethrough' | 'sub' | 'sup' = 'bold';
+          if (command === 'italic') formatKeyToggle = 'italic';
+          else if (command === 'strikeThrough') formatKeyToggle = 'strikethrough';
+          else if (command === 'subscript') formatKeyToggle = 'sub';
+          else if (command === 'superscript') formatKeyToggle = 'sup';
+          
+          setActiveFormats(prev => ({
+            ...prev,
+            [formatKeyToggle]: !prev[formatKeyToggle]
+          }));
+          
+          if (wysiwygRef.current) {
+            wysiwygRef.current.focus({ preventScroll: true });
+          }
+          return; // Skip updateContentFromWysiwyg to preserve typing command state
+        }
+      } else {
+        if (prefix === '`') {
+          const text = getVisualSelectionHtml() || '';
+          insertHtmlAtCursor(`<code>${text}</code>`);
+          if (!text) {
+            setActiveFormats(prev => ({ ...prev, code: true }));
+          }
+        } else if (prefix === '```\n') {
+          const text = getVisualSelectionHtml() || 'code block';
+          insertHtmlAtCursor(`<pre><code>${text}</code></pre>`);
+        } else if (prefix === '<div class="phishy">') {
+          const text = getVisualSelectionHtml() || '';
+          insertHtmlAtCursor(`<span class="phishy">${text}</span>`);
+          if (!text) {
+            setActiveFormats(prev => ({ ...prev, phishy: true }));
+          }
+        } else if (prefix.includes('text-left') || prefix === '<div class="text-left">\n') {
+          const text = getVisualSelectionHtml() || '';
+          insertHtmlAtCursor(`<div class="text-left">${text}</div>`);
+        } else if (prefix.includes('text-right') || prefix === '<div class="text-right">\n') {
+          const text = getVisualSelectionHtml() || '';
+          insertHtmlAtCursor(`<div class="text-right">${text}</div>`);
+        } else if (prefix.includes('text-justify') || prefix === '<div class="text-justify">\n') {
+          const text = getVisualSelectionHtml() || '';
+          insertHtmlAtCursor(`<div class="text-justify">${text}</div>`);
+        } else if (prefix.includes('<center>') || prefix === '<center>\n') {
+          const text = getVisualSelectionHtml() || '';
+          insertHtmlAtCursor(`<center>${text}</center>`);
+        } else {
+          const text = getVisualSelectionHtml() || '';
+          insertHtmlAtCursor(`${prefix}${text}${suffix}`);
+        }
+      }
+      updateContentFromWysiwyg();
+      return;
+    }
+
+    if (!editorRef.current) return;
+
+    if (prefix === '**' || prefix === '*' || prefix === '`' || prefix === '~~' || prefix === '<sub>' || prefix === '<sup>' || prefix === '<div class="phishy">') {
+      handleMarkdownFormat(prefix, suffix);
+      return;
+    }
+
     const range = getSelectionOrWord();
     
     if (range.text.length === 0) {
       const textToInsert = prefix + suffix;
-      const newContent = content.substring(0, range.s) + textToInsert + content.substring(range.e);
+      const newContent = useEditorStore.getState().content.substring(0, range.s) + textToInsert + useEditorStore.getState().content.substring(range.e);
       setContent(newContent);
       setTimeout(() => {
         if (!editorRef.current) return;
-        editorRef.current.setSelectionRange(range.s + prefix.length, range.s + prefix.length);
+        editorRef.current.focus({ preventScroll: true }); editorRef.current.setSelectionRange(range.s + prefix.length, range.s + prefix.length);
       }, 0);
     } else {
       const newText = prefix + range.text + suffix;
-      const newContent = content.substring(0, range.s) + newText + content.substring(range.e);
+      const newContent = useEditorStore.getState().content.substring(0, range.s) + newText + useEditorStore.getState().content.substring(range.e);
       setContent(newContent);
       setTimeout(() => {
         if (!editorRef.current) return;
-        editorRef.current.setSelectionRange(range.s, range.s + newText.length);
+        editorRef.current.focus({ preventScroll: true }); editorRef.current.setSelectionRange(range.s, range.s + newText.length);
       }, 0);
     }
-  }, [content, getSelectionOrWord]);
+  }, [ getSelectionOrWord, editorMode, insertHtmlAtCursor, getVisualSelectionHtml, restoreVisualSelection, handleMarkdownFormat, updateContentFromWysiwyg, activeFormats, setContent]);
+
+  const deleteActiveTableRow = useCallback(() => {
+    if (activeTableRow && wysiwygRef.current && wysiwygRef.current.contains(activeTableRow)) {
+      const table = activeTableRow.closest('table');
+      activeTableRow.remove();
+      if (table && (!table.textContent || table.textContent.trim() === '')) {
+        table.remove();
+        setActiveTable(null);
+      }
+      setActiveTableRow(null);
+      setActiveTableCell(null);
+      updateContentFromWysiwyg();
+      setIsWidgetVisible(false);
+    }
+  }, [activeTableRow, updateContentFromWysiwyg]);
+
+  const deleteActiveTableCol = useCallback(() => {
+    if (activeTableCell && activeTable && wysiwygRef.current && wysiwygRef.current.contains(activeTableCell)) {
+      const colIndex = (activeTableCell as HTMLTableCellElement).cellIndex;
+      const rows = activeTable.querySelectorAll('tr');
+      rows.forEach(row => {
+        if (row.cells[colIndex]) {
+          row.cells[colIndex].remove();
+        }
+      });
+      
+      if (activeTable.rows.length === 0 || (activeTable.rows[0] && activeTable.rows[0].cells.length === 0)) {
+        activeTable.remove();
+        setActiveTable(null);
+        setActiveTableRow(null);
+      }
+      setActiveTableCell(null);
+      
+      updateContentFromWysiwyg();
+      setIsWidgetVisible(false);
+    }
+  }, [activeTable, activeTableCell, updateContentFromWysiwyg]);
+
+  const deleteActiveTable = useCallback(() => {
+    if (activeTable && wysiwygRef.current && wysiwygRef.current.contains(activeTable)) {
+      activeTable.remove();
+      setActiveTable(null);
+      setActiveTableRow(null);
+      setActiveTableCell(null);
+      updateContentFromWysiwyg();
+      setIsWidgetVisible(false);
+    }
+  }, [activeTable, updateContentFromWysiwyg]);
 
   const fmtLine = useCallback((prefix: string) => {
+    const content = useEditorStore.getState().content;
+    if (editorMode === 'visual') {
+      restoreVisualSelection(true);
+      if (prefix === '# ') {
+        document.execCommand('formatBlock', false, '<h1>');
+      } else if (prefix === '## ') {
+        document.execCommand('formatBlock', false, '<h2>');
+      } else if (prefix === '### ') {
+        document.execCommand('formatBlock', false, '<h3>');
+      } else if (prefix === '> ') {
+        document.execCommand('formatBlock', false, '<blockquote>');
+      } else if (prefix === '- ') {
+        document.execCommand('insertUnorderedList', false);
+      } else if (prefix === '1. ') {
+        document.execCommand('insertOrderedList', false);
+      } else if (prefix === '- [ ] ') {
+        insertHtmlAtCursor('<ul class="task-list"><li><input type="checkbox" style="margin-right: 0.5rem;" /> Task</li></ul>');
+      } else {
+        const text = getVisualSelectionHtml();
+        insertHtmlAtCursor(`${prefix}${text}`);
+      }
+      updateContentFromWysiwyg();
+      return;
+    }
+
     if (!editorRef.current) return;
     const start = editorRef.current.selectionStart;
     const end = editorRef.current.selectionEnd;
@@ -2269,6 +4876,10 @@ function App() {
       const lastNewline = content.lastIndexOf('\n', start - 1) + 1;
       const newContent = content.substring(0, lastNewline) + prefix + content.substring(lastNewline);
       setContent(newContent);
+      setTimeout(() => {
+        if (!editorRef.current) return;
+        editorRef.current.focus({ preventScroll: true }); editorRef.current.setSelectionRange(start + prefix.length, start + prefix.length);
+      }, 0);
     } else {
       // Multi-line selection
       const selectedText = content.substring(start, end);
@@ -2276,10 +4887,36 @@ function App() {
       const newText = lines.map(line => line.trim() ? prefix + line : line).join('\n');
       const newContent = content.substring(0, start) + newText + content.substring(end);
       setContent(newContent);
+      setTimeout(() => {
+        if (!editorRef.current) return;
+        editorRef.current.focus({ preventScroll: true }); editorRef.current.setSelectionRange(start, start + newText.length);
+      }, 0);
     }
-  }, [content]);
+  }, [ editorMode, insertHtmlAtCursor, getVisualSelectionHtml, restoreVisualSelection, updateContentFromWysiwyg, setContent]);
 
   const handleLink = useCallback(async () => {
+    const content = useEditorStore.getState().content;
+    if (editorMode === 'visual') {
+      restoreVisualSelection(true);
+      const selectionHtml = getVisualSelectionHtml() || '';
+      const isUrl = /^(https?:\/\/|www\.)\S+$/i.test(selectionHtml.trim());
+      
+      if (isUrl) {
+        const label = await promptDialog(t('linkPrompt'), "");
+        if (label !== null) {
+          const cleanLabel = label.trim() || selectionHtml;
+          insertHtmlAtCursor(`<a href="${selectionHtml.trim()}">${cleanLabel}</a>`);
+        }
+      } else {
+        const url = await promptDialog(t('urlPrompt'), "https://");
+        if (url) {
+          document.execCommand('createLink', false, url);
+          updateContentFromWysiwyg();
+        }
+      }
+      return;
+    }
+
     const selection = getSelectionOrWord();
     const trimmed = selection.text.trim();
     const isUrl = /^(https?:\/\/|www\.)\S+$/i.test(trimmed);
@@ -2295,7 +4932,608 @@ function App() {
       const url = await promptDialog(t('urlPrompt'), "https://");
       if (url) fmt('[', `](${url})`);
     }
-  }, [content, t, getSelectionOrWord, fmt, promptDialog]);
+  }, [ t, getSelectionOrWord, fmt, promptDialog, editorMode, restoreVisualSelection, getVisualSelectionHtml, insertHtmlAtCursor, updateContentFromWysiwyg, setContent]);
+
+  const handleIndent = useCallback(() => {
+    const content = useEditorStore.getState().content;
+    if (editorMode === 'visual') {
+      restoreVisualSelection(false);
+      const sel = window.getSelection();
+      let insideList = false;
+      if (sel && sel.rangeCount > 0) {
+        let node: Node | null = sel.getRangeAt(0).startContainer;
+        if (node.nodeType === Node.TEXT_NODE) node = node.parentNode;
+        insideList = !!(node as HTMLElement)?.closest?.('li, ul, ol');
+      }
+      
+      if (insideList) {
+        document.execCommand('indent', false);
+      } else {
+        insertHtmlAtCursor('&nbsp;&nbsp;&nbsp;&nbsp;');
+      }
+      updateContentFromWysiwyg();
+      return;
+    }
+    if (!editorRef.current) return;
+    const start = editorRef.current.selectionStart;
+    const end = editorRef.current.selectionEnd;
+    const selectedText = content.substring(start, end);
+    const lines = selectedText.split('\n');
+    const newText = lines.map(line => '    ' + line).join('\n');
+    const newContent = content.substring(0, start) + newText + content.substring(end);
+    setContent(newContent);
+  }, [ editorMode, restoreVisualSelection, updateContentFromWysiwyg, insertHtmlAtCursor, setContent]);
+
+  const handleWysiwygKeyDown = useCallback((e: React.KeyboardEvent<HTMLDivElement>) => {
+    const isMod = e.ctrlKey || e.metaKey;
+    
+    if (widgetPos === 'floating' && !isMod && e.key !== 'Shift') {
+      if (isWidgetVisible && !isWidgetMenuOpen) {
+        setIsWidgetVisible(false);
+      }
+    }
+
+    if (e.key === 'Tab') {
+      e.preventDefault();
+      handleIndent();
+      return;
+    }
+
+    if (e.key === 'Enter' && !isMod && !e.shiftKey) {
+      const sel = window.getSelection();
+      if (sel && sel.rangeCount > 0 && sel.isCollapsed) {
+        let blockElement = sel.focusNode as HTMLElement | null;
+        while (blockElement && blockElement.nodeType !== Node.ELEMENT_NODE) {
+            blockElement = blockElement.parentElement as HTMLElement | null;
+        }
+        if (blockElement && blockElement.closest) {
+            const headingElement = blockElement.closest('h1, h2, h3, h4, h5, h6, blockquote, center');
+            if (headingElement && (headingElement.textContent || '').replace(/[\u200B\s\n]/g, '') === '') {
+                e.preventDefault();
+                // Instead of formatBlock, we manually replace it to ensure it becomes a paragraph
+                const p = document.createElement('p');
+                p.innerHTML = '<br>';
+                if (headingElement.parentNode) headingElement.parentNode.replaceChild(p, headingElement);
+                const newRange = document.createRange();
+                newRange.setStart(p, 0);
+                newRange.collapse(true);
+                sel.removeAllRanges();
+                sel.addRange(newRange);
+                updateContentFromWysiwyg();
+                return;
+            }
+        }
+      }
+    }
+
+    if ((e.key === ' ' || e.key === 'Enter') && !isMod) {
+      const sel = window.getSelection();
+      if (sel && sel.rangeCount > 0 && sel.isCollapsed) {
+        const node = sel.focusNode;
+        if (node && node.nodeType === Node.TEXT_NODE) {
+          const text = node.textContent || '';
+          const offset = sel.focusOffset;
+          const headText = text.substring(0, offset);
+          const words = headText.split(/[\s\n]/);
+          const lastWord = words[words.length - 1];
+          if (lastWord && isImageAndProxyUrl(lastWord.trim())) {
+            e.preventDefault();
+            const trimmedWord = lastWord.trim();
+            const beforeWord = headText.substring(0, headText.length - lastWord.length);
+            const afterCursor = text.substring(offset);
+            
+            node.nodeValue = beforeWord;
+            
+            const img = document.createElement('img');
+            img.src = trimmedWord;
+            img.alt = 'image';
+            
+            const parent = node.parentNode;
+            if (parent) {
+              const nextSib = node.nextSibling;
+              parent.insertBefore(img, nextSib);
+              
+              const spacer = e.key === ' ' ? '\u00A0' : '\n';
+              const suffixNode = document.createTextNode(spacer + afterCursor);
+              parent.insertBefore(suffixNode, img.nextSibling);
+              
+              const newRange = document.createRange();
+              newRange.setStart(suffixNode, 1);
+              newRange.collapse(true);
+              sel.removeAllRanges();
+              sel.addRange(newRange);
+              
+              updateContentFromWysiwyg();
+              return;
+            }
+          }
+        }
+      }
+    }
+
+    if (e.key === ' ' && !isMod) {
+      const sel = window.getSelection();
+      if (sel && sel.rangeCount > 0 && sel.isCollapsed) {
+        const node = sel.focusNode;
+        if (node && node.nodeType === Node.TEXT_NODE) {
+          const text = node.textContent || '';
+          const offset = sel.focusOffset;
+          if (offset === text.length) {
+            let format = null;
+            if (text === '#') format = '<h1>';
+            else if (text === '##') format = '<h2>';
+            else if (text === '###') format = '<h3>';
+            else if (text === '####') format = '<h4>';
+            else if (text === '>') format = '<blockquote>';
+            
+            if (text === '-') {
+                e.preventDefault();
+                node.textContent = '';
+                document.execCommand('insertUnorderedList', false);
+                return;
+            } else if (text === '1.') {
+                e.preventDefault();
+                node.textContent = '';
+                document.execCommand('insertOrderedList', false);
+                return;
+            } else if (format) {
+              e.preventDefault();
+              node.textContent = '';
+              document.execCommand('formatBlock', false, format);
+              return;
+            }
+          }
+        }
+      }
+    }
+
+    // Formatting keyboard shortcuts
+    if (isMod) {
+      if (e.key.toLowerCase() === 'b') {
+        e.preventDefault();
+        fmt('**');
+        return;
+      }
+      if (e.key.toLowerCase() === 'i') {
+        e.preventDefault();
+        fmt('*');
+        return;
+      }
+      if (e.key.toLowerCase() === 'k') {
+        e.preventDefault();
+        handleLink();
+        return;
+      }
+    }
+
+    if (e.shiftKey && isMod) {
+      if (e.key.toLowerCase() === 'x') {
+        e.preventDefault();
+        fmt('~~');
+        return;
+      }
+      if (e.key.toLowerCase() === 'c') {
+        e.preventDefault();
+        fmt('`');
+        return;
+      }
+    }
+    
+    // On-the-fly markdown shortcut expander
+    if (e.key === ' ') {
+      const sel = window.getSelection();
+      if (sel && sel.rangeCount > 0) {
+        const range = sel.getRangeAt(0);
+        const startNode = range.startContainer;
+        
+        if (startNode.nodeType === Node.TEXT_NODE) {
+          const textValue = startNode.nodeValue || '';
+          const offset = range.startOffset;
+          const headText = textValue.substring(0, offset);
+          
+          let match = false;
+          let blockTag = '';
+          let cmd = '';
+          
+          if (headText === '#') {
+            blockTag = 'h1';
+            match = true;
+          } else if (headText === '##') {
+            blockTag = 'h2';
+            match = true;
+          } else if (headText === '###') {
+            blockTag = 'h3';
+            match = true;
+          } else if (headText === '####') {
+            blockTag = 'h4';
+            match = true;
+          } else if (headText === '>') {
+            blockTag = 'blockquote';
+            match = true;
+          } else if (headText === '-' || headText === '*') {
+            cmd = 'insertUnorderedList';
+            match = true;
+          } else if (headText === '1.') {
+            cmd = 'insertOrderedList';
+            match = true;
+          } else if (headText === '- [ ]') {
+            blockTag = 'checklist';
+            match = true;
+          }
+          
+          if (match) {
+            e.preventDefault();
+            
+            // Remove the characters before space
+            startNode.nodeValue = textValue.substring(offset);
+            
+            if (cmd) {
+              document.execCommand(cmd, false);
+            } else if (blockTag === 'checklist') {
+              insertHtmlAtCursor('<ul class="task-list"><li><input type="checkbox" style="margin-right: 0.5rem;" /> </li></ul>');
+            } else if (blockTag === 'blockquote') {
+              document.execCommand('formatBlock', false, '<blockquote>');
+              // Ensure there is a block element inside
+              const sel2 = window.getSelection();
+              if (sel2 && sel2.rangeCount > 0) {
+                 let curr = sel2.getRangeAt(0).startContainer;
+                 if (curr.nodeType === Node.TEXT_NODE) curr = curr.parentNode as Node;
+                 if ((curr as HTMLElement).tagName === 'BLOCKQUOTE') {
+                    document.execCommand('formatBlock', false, '<p>');
+                 }
+              }
+            } else if (blockTag) {
+              document.execCommand('formatBlock', false, `<${blockTag}>`);
+            }
+            
+            updateContentFromWysiwyg();
+          }
+        }
+      }
+    }
+    
+    // Check if we are inside a table cell when pressing Enter
+    if (e.key === 'Enter') {
+      const sel = window.getSelection();
+      if (sel && sel.rangeCount > 0 && wysiwygRef.current) {
+        const range = sel.getRangeAt(0);
+        let current: Node | null = range.startContainer;
+        if (current.nodeType === Node.TEXT_NODE) current = current.parentNode;
+        
+        const spacer = (current as Element)?.closest?.('.table-spacer');
+        if (spacer && wysiwygRef.current.contains(spacer)) {
+          e.preventDefault();
+          spacer.removeAttribute('data-empty');
+          spacer.removeAttribute('data-placeholder');
+          spacer.classList.remove('table-spacer');
+          spacer.classList.remove('top-spacer');
+          spacer.classList.remove('bottom-spacer');
+          document.execCommand('insertParagraph');
+          updateContentFromWysiwyg();
+          return;
+        }
+        
+        const tableCell = (current as Element)?.closest?.('td, th');
+        if (tableCell && wysiwygRef.current.contains(tableCell)) {
+          e.preventDefault();
+          document.execCommand('insertLineBreak');
+
+          updateContentFromWysiwyg();
+          return;
+        }
+      }
+    }
+
+    // Press Enter on empty line to break out of formatting containers (quotes, centered text, etc)
+    if (e.key === 'Enter' && !e.shiftKey) {
+      const sel = window.getSelection();
+      if (sel && sel.rangeCount > 0 && wysiwygRef.current) {
+        const range = sel.getRangeAt(0);
+        const node: Node | null = range.startContainer;
+        
+        if (node) {
+          // Find the block container we might want to escape
+          let escapeTarget: HTMLElement | null = node.nodeType === Node.TEXT_NODE ? node.parentElement : node as HTMLElement;
+          while (escapeTarget && escapeTarget !== wysiwygRef.current && 
+                 !['BLOCKQUOTE', 'H1', 'H2', 'H3', 'H4', 'H5', 'H6', 'PRE', 'CENTER'].includes(escapeTarget.tagName) &&
+                 !(escapeTarget.tagName === 'DIV' && Array.from(escapeTarget.classList).some(c => c.startsWith('text-') || c.startsWith('pull-') || c === 'phishy'))) {
+            escapeTarget = escapeTarget.parentElement;
+          }
+
+          if (escapeTarget && escapeTarget !== wysiwygRef.current) {
+            // Insert a temporary marker to check the neighborhood
+            const marker = document.createElement('span');
+            marker.id = 'temp-caret-marker';
+            try {
+              range.insertNode(marker);
+
+              const hasText = (n: Node): boolean => {
+                if (n.nodeType === Node.TEXT_NODE) {
+                  return (n.nodeValue?.replace(/[\u200B\s\n]/g, '') || '').length > 0;
+                }
+                if (n.nodeType === Node.ELEMENT_NODE) {
+                  const el = n as HTMLElement;
+                  if (el.tagName === 'BR' || el.id === 'temp-caret-marker') return false;
+                  return (el.textContent?.replace(/[\u200B\s\n]/g, '') || '').length > 0;
+                }
+                return false;
+              };
+
+              // Scan left for any text on the current line
+              let isLeftEmpty = true;
+              let currLeft: Node | null = marker;
+              while (currLeft && currLeft !== escapeTarget) {
+                let sib = currLeft.previousSibling;
+                while (sib) {
+                  if (sib.nodeType === Node.ELEMENT_NODE && (sib as HTMLElement).tagName === 'BR') {
+                    break; // stopped by line break
+                  }
+                  if (hasText(sib)) {
+                    isLeftEmpty = false;
+                    break;
+                  }
+                  sib = sib.previousSibling;
+                }
+                if (!isLeftEmpty || (currLeft.previousSibling && (currLeft.previousSibling as HTMLElement).tagName === 'BR')) {
+                  break;
+                }
+                currLeft = currLeft.parentNode;
+              }
+
+              // Scan right for any text on the current line
+              let isRightEmpty = true;
+              let currRight: Node | null = marker;
+              while (currRight && currRight !== escapeTarget) {
+                let sib = currRight.nextSibling;
+                while (sib) {
+                  if (sib.nodeType === Node.ELEMENT_NODE && (sib as HTMLElement).tagName === 'BR') {
+                    break; // stopped by line break
+                  }
+                  if (hasText(sib)) {
+                    isRightEmpty = false;
+                    break;
+                  }
+                  sib = sib.nextSibling;
+                }
+                if (!isRightEmpty || (currRight.nextSibling && (currRight.nextSibling as HTMLElement).tagName === 'BR')) {
+                  break;
+                }
+                currRight = currRight.parentNode;
+              }
+
+              if (isLeftEmpty && isRightEmpty) {
+                e.preventDefault();
+
+                // Find the direct child of escapeTarget that is or contains the marker
+                let directChild: Node | null = marker;
+                while (directChild && directChild.parentNode !== escapeTarget) {
+                  directChild = directChild.parentNode;
+                }
+
+                if (directChild) {
+                  const childs: Node[] = Array.from(escapeTarget.childNodes);
+                  const directIndex = childs.indexOf(directChild);
+
+                  const leftChildren = directIndex > 0 ? childs.slice(0, directIndex) : [];
+                  const rightChildren = directIndex + 1 < childs.length ? childs.slice(directIndex + 1) : [];
+
+                  // Remove trailing <br> from left side
+                  if (leftChildren.length > 0) {
+                    const last = leftChildren[leftChildren.length - 1];
+                    if (last.nodeType === Node.ELEMENT_NODE && (last as HTMLElement).tagName === 'BR') {
+                      leftChildren.pop();
+                    }
+                  }
+
+                  // Remove leading <br> from right side
+                  if (rightChildren.length > 0) {
+                    const first = rightChildren[0];
+                    if (first.nodeType === Node.ELEMENT_NODE && (first as HTMLElement).tagName === 'BR') {
+                      rightChildren.shift();
+                    }
+                  }
+
+                  // Create the escape paragraph
+                  const p = document.createElement('p');
+                  p.innerHTML = '<br>';
+
+                  const parentNode = escapeTarget.parentNode;
+                  if (parentNode) {
+                    const leftHasContent = leftChildren.some(hasText);
+                    const rightHasContent = rightChildren.some(hasText);
+
+                    if (leftHasContent && rightHasContent) {
+                      // Split in half
+                      const leftBlock = escapeTarget;
+                      const rightBlock = document.createElement(leftBlock.tagName.toLowerCase());
+                      rightBlock.className = leftBlock.className;
+
+                      leftBlock.innerHTML = '';
+                      leftChildren.forEach(c => leftBlock.appendChild(c));
+
+                      rightChildren.forEach(c => rightBlock.appendChild(c));
+
+                      parentNode.insertBefore(rightBlock, leftBlock.nextSibling);
+                      parentNode.insertBefore(p, rightBlock);
+                    } else if (leftHasContent) {
+                      // Escape at the end
+                      escapeTarget.innerHTML = '';
+                      leftChildren.forEach(c => escapeTarget.appendChild(c));
+                      parentNode.insertBefore(p, escapeTarget.nextSibling);
+                    } else if (rightHasContent) {
+                      // Escape at the beginning
+                      escapeTarget.innerHTML = '';
+                      rightChildren.forEach(c => escapeTarget.appendChild(c));
+                      parentNode.insertBefore(p, escapeTarget);
+                    } else {
+                      // Both sides are empty, completely replace escapeTarget with paragraph
+                      parentNode.replaceChild(p, escapeTarget);
+                    }
+
+                    // Focus the new paragraph
+                    const newRange = document.createRange();
+                    newRange.selectNodeContents(p);
+                    newRange.collapse(true);
+                    sel.removeAllRanges();
+                    sel.addRange(newRange);
+                    savedVisualRangeRef.current = newRange.cloneRange();
+                    p.focus();
+
+                    updateContentFromWysiwyg();
+                    return;
+                  }
+                }
+              }
+            } catch (err) {
+              console.warn('Unified escape breakout error:', err);
+            } finally {
+              if (marker.parentNode) {
+                marker.parentNode.removeChild(marker);
+              }
+            }
+          }
+        }
+
+        let blockNode = node.nodeType === Node.TEXT_NODE ? node.parentElement : node as HTMLElement;
+        while (blockNode && blockNode !== wysiwygRef.current && !['P', 'DIV', 'BLOCKQUOTE', 'LI', 'CENTER', 'PRE'].includes(blockNode.tagName)) {
+           blockNode = blockNode.parentElement;
+        }
+
+        if (blockNode && blockNode !== wysiwygRef.current) {
+           const textContent = blockNode.textContent?.replace(/\u200B/g, '').trim();
+           if (textContent === '' || textContent === undefined) {
+               // Check if the empty block has formatting elements inside it or active formats
+               const formattingTags = ['B', 'STRONG', 'I', 'EM', 'STRIKE', 'S', 'CODE', 'SUB', 'SUP', 'SPAN'];
+               const hasFormattingElements = Array.from(blockNode.querySelectorAll('*')).some(el => 
+                 formattingTags.includes(el.tagName)
+               );
+               const hasActiveFormats = activeFormats.bold || activeFormats.italic || activeFormats.strikethrough || activeFormats.sub || activeFormats.sup || activeFormats.code || activeFormats.phishy;
+               
+               if (hasFormattingElements || hasActiveFormats) {
+                 // Clear formatting by resetting innerHTML to a single <br>
+                 blockNode.innerHTML = '<br>';
+                 
+                 // Reset browser formatting states
+                 try {
+                   if (document.queryCommandState('bold')) document.execCommand('bold', false);
+                   if (document.queryCommandState('italic')) document.execCommand('italic', false);
+                   if (document.queryCommandState('strikeThrough')) document.execCommand('strikeThrough', false);
+                   if (document.queryCommandState('subscript')) document.execCommand('subscript', false);
+                   if (document.queryCommandState('superscript')) document.execCommand('superscript', false);
+                 } catch (err) {
+                   console.warn('Failed to clear commands:', err);
+                 }
+                 
+                 setActiveFormats({
+                   bold: false,
+                   italic: false,
+                   code: false,
+                   strikethrough: false,
+                   sub: false,
+                   sup: false,
+                   phishy: false
+                 });
+               }
+
+               let curr: HTMLElement | null = blockNode as HTMLElement;
+               let containerToEscape: HTMLElement | null = null;
+               while (curr && curr !== wysiwygRef.current) {
+                  if (['BLOCKQUOTE', 'PRE', 'CENTER', 'UL', 'OL'].includes(curr.tagName) || 
+                      (curr.tagName === 'DIV' && Array.from(curr.classList).some(c => c.startsWith('text-') || c.startsWith('pull-') || c === 'phishy'))) {
+                    containerToEscape = curr;
+                    break;
+                  }
+                  curr = curr.parentNode as HTMLElement;
+               }
+
+               if (containerToEscape || hasFormattingElements || hasActiveFormats) {
+                 e.preventDefault();
+                 
+                 const p = document.createElement('p');
+                 p.innerHTML = '<br>';
+                 
+                 const targetParent = containerToEscape ? containerToEscape.parentNode : blockNode.parentNode;
+                 const targetSibling = containerToEscape ? containerToEscape.nextSibling : blockNode.nextSibling;
+
+                 if (targetSibling) {
+                   targetParent?.insertBefore(p, targetSibling);
+                 } else {
+                   targetParent?.appendChild(p);
+                 }
+                 
+                 if (containerToEscape) {
+                   const containerTextContent = containerToEscape.textContent?.replace(/\u200B/g, '').trim();
+                   if (!containerTextContent) {
+                     containerToEscape.parentNode?.removeChild(containerToEscape);
+                   } else if (blockNode !== containerToEscape && containerToEscape.contains(blockNode)) {
+                     blockNode.parentNode?.removeChild(blockNode);
+                   }
+                 }
+                 
+                 const newRange = document.createRange();
+                 newRange.selectNodeContents(p);
+                 newRange.collapse(true);
+                 sel.removeAllRanges();
+                 sel.addRange(newRange);
+                 
+                 if (wysiwygRef.current) {
+                   updateContentFromWysiwyg();
+                 }
+                 return;
+               }
+           }
+        }
+      }
+    }
+
+    if (e.key === 'Enter') {
+      const sel = window.getSelection();
+      if (!sel || sel.rangeCount === 0 || !wysiwygRef.current) return;
+      const range = sel.getRangeAt(0);
+
+      let current: Node | null = range.startContainer;
+      if (current.nodeType === Node.TEXT_NODE) current = current.parentNode;
+      
+      const isListItem = (current as Element)?.closest?.('li');
+      if (isListItem && wysiwygRef.current.contains(isListItem)) {
+        return;
+      }
+
+      if (e.ctrlKey || e.metaKey) {
+        e.preventDefault();
+        try { document.execCommand('defaultParagraphSeparator', false, 'p'); } catch { /* ignore */ }
+        document.execCommand('insertParagraph');
+        
+        // Ensure it created a p, not a div (Chrome sometimes ignores defaultParagraphSeparator if inside div)
+        setTimeout(() => {
+           if (!wysiwygRef.current) return;
+           const sel2 = window.getSelection();
+           if (sel2 && sel2.rangeCount > 0) {
+              let node = sel2.focusNode;
+              while (node && node.nodeType !== Node.ELEMENT_NODE) node = node.parentNode;
+              if (node && ((node as HTMLElement).tagName === 'DIV') && !(node as HTMLElement).className) {
+                  // It created a naked DIV instead of P
+                  const p = document.createElement('p');
+                  p.innerHTML = (node as HTMLElement).innerHTML || '<br>';
+                  if (node.parentNode) node.parentNode.replaceChild(p, node);
+                  const r = document.createRange();
+                  r.selectNodeContents(p);
+                  r.collapse(false);
+                  sel2.removeAllRanges();
+                  sel2.addRange(r);
+              }
+           }
+           updateContentFromWysiwyg();
+        }, 0);
+        return;
+      } else {
+        e.preventDefault();
+        document.execCommand('insertLineBreak');
+        updateContentFromWysiwyg();
+        return;
+      }
+    }
+  }, [fmt, handleLink, insertHtmlAtCursor, widgetPos, isWidgetVisible, isWidgetMenuOpen, setIsWidgetVisible, updateContentFromWysiwyg, activeFormats, handleIndent]);
 
   const importTable = useCallback(() => {
     setActiveModal('tableImport');
@@ -2330,7 +5568,7 @@ function App() {
           return acc;
         }, {} as Record<number, number>);
         
-        const frequency = Math.max(...(Object.values(mostFrequent) as number[]));
+        const frequency = Math.max(...Object.values(mostFrequent));
         if (frequency > maxConsistency) {
           maxConsistency = frequency;
           bestDelimiter = d;
@@ -2400,7 +5638,7 @@ function App() {
         }
       });
     } else {
-      resultTable = '<table style="width:100%">\n';
+      resultTable = '<table data-format="html" style="width:100%">\n';
       normalizedRows.forEach((cols, i) => {
         resultTable += '  <tr>\n';
         cols.forEach(col => {
@@ -2412,7 +5650,7 @@ function App() {
       resultTable += '</table>';
     }
     
-    insertAtCursor('\n\n' + resultTable, 'end', true);
+    insertAtCursor(resultTable, 'end');
     setTableImportText('');
     setActiveModal(null);
     notify(t('importTableSuccess'), 'success');
@@ -2684,7 +5922,7 @@ function App() {
       }
 
       if (!isTextWrapEnabled && (position === 'left' || position === 'right')) finalMd += '\n<div class="clearfix"></div>\n';
-      insertAtCursor('\n' + finalMd + '\n');
+      insertAtCursor(finalMd);
       if (window.innerWidth < 1024) setIsSidebarOpen(false);
       return;
     }
@@ -2696,7 +5934,7 @@ function App() {
     else if (position === 'center') html = `<center>${imgHtml}<br/>${attribution}</center>`;
 
     if (!isTextWrapEnabled && (position === 'left' || position === 'right')) html += '\n<div class="clearfix"></div>\n';
-    insertAtCursor('\n' + html + '\n');
+    insertAtCursor(html);
     if (window.innerWidth < 1024) setIsSidebarOpen(false);
   };
 
@@ -2726,7 +5964,7 @@ function App() {
         finalMd += '\n<div class="clearfix"></div>\n';
       }
 
-      insertAtCursor('\n' + finalMd + exifTable + '\n', 'end', true);
+      insertAtCursor(finalMd + exifTable, 'end');
       if (window.innerWidth < 1024) setIsSidebarOpen(false);
       return;
     }
@@ -2746,7 +5984,7 @@ function App() {
       html += '\n<div class="clearfix"></div>\n';
     }
 
-    insertAtCursor('\n' + html + exifTable + '\n', 'end', true);
+    insertAtCursor(html + exifTable, 'end');
     if (window.innerWidth < 1024) setIsSidebarOpen(false);
   };
 
@@ -2930,36 +6168,12 @@ function App() {
       result += '\n<div class="clearfix"></div>\n';
     }
     
-    insertAtCursor(result, 'end', true);
+    insertAtCursor(result, 'end');
     if (window.innerWidth < 1024) setIsSidebarOpen(false);
   };
 
   const processContentForSteem = (raw: string) => {
-    const lines = raw.split('\n');
-    const processedLines: string[] = [];
-    
-    for (let i = 0; i < lines.length; i++) {
-        const currentLine = lines[i];
-        const trimmed = currentLine.trim();
-        const prevLine = i > 0 ? lines[i-1] : null;
-        const nextLine = i + 1 < lines.length ? lines[i+1] : null;
-        
-        const isTableLine = trimmed.startsWith('|') && trimmed.includes('|', 1);
-
-        // Ensure blank line BEFORE table starts
-        if (isTableLine && prevLine !== null && prevLine.trim() !== '' && !prevLine.trim().startsWith('|')) {
-            processedLines.push('');
-        }
-        
-        processedLines.push(currentLine);
-
-        // Ensure blank line AFTER table ends
-        if (isTableLine && nextLine !== null && nextLine.trim() !== '' && !nextLine.trim().startsWith('|')) {
-            processedLines.push('');
-        }
-    }
-    
-    return processedLines.join('\n');
+    return raw;
   };
 
   const performBroadcast = async (
@@ -3031,9 +6245,11 @@ function App() {
   };
 
   const handleSplitPost = () => {
-    if (!content.trim()) return;
+    // Sync current WYSIWYG editor content to markdown if editing in visual mode
+    const currentMarkdown = syncWysiwygToContentIfVisual();
+    if (!currentMarkdown.trim()) return;
     
-    const lines = content.split('\n');
+    const lines = currentMarkdown.split('\n');
     const originalTitle = lines[0].replace(/[#*`]/g, '').trim() || t('untitled');
     const bodyLines = lines.slice(1);
     const bodyText = bodyLines.join('\n').trim();
@@ -3104,10 +6320,12 @@ function App() {
     });
   };
   const handlePublish = async () => {
-    const lines = content.split('\n');
+    // Sync current WYSIWYG editor content to markdown if editing in visual mode
+    const currentMarkdown = syncWysiwygToContentIfVisual();
+    const lines = currentMarkdown.split('\n');
     const firstLine = lines[0].trim();
     let finalTitle = pubTitle;
-    let actualContent = content;
+    let actualContent = currentMarkdown;
 
     if (!finalTitle) {
       finalTitle = firstLine.replace(/[#*`]/g, '').trim().substring(0, 100);
@@ -3166,9 +6384,11 @@ function App() {
       return;
     }
     
-    let actualContent = content;
+    // Sync current WYSIWYG editor content to markdown if editing in visual mode
+    const currentMarkdown = syncWysiwygToContentIfVisual();
+    let actualContent = currentMarkdown;
     if (removeTitleLine) {
-      const lines = content.split('\n');
+      const lines = currentMarkdown.split('\n');
       actualContent = lines.slice(1).join('\n').trim();
     }
     const processedContent = processContentForSteem(actualContent);
@@ -3193,14 +6413,17 @@ function App() {
   };
 
   const saveDraft = (status: 'working' | 'ready' = 'working') => {
-    const title = content.split('\n')[0].replace(/[#*`]/g, '').trim().substring(0, 50) || t('untitled');
+    // Sync current WYSIWYG editor content to markdown if editing in visual mode
+    const currentMarkdown = syncWysiwygToContentIfVisual();
+    
+    const title = currentMarkdown.split('\n')[0].replace(/[#*`]/g, '').trim().substring(0, 50) || t('untitled');
     const drafts = JSON.parse(localStorage.getItem(STORAGE_KEY_DRAFTS) || "[]");
     
     if (currentDraftId) {
       // Update existing draft
       const updated = drafts.map((d: Draft) => {
         if (d.id === currentDraftId) {
-          return { ...d, title, body: content, date: new Date().toLocaleString(), status };
+          return { ...d, title, body: currentMarkdown, date: new Date().toLocaleString(), status };
         }
         return d;
       });
@@ -3211,7 +6434,7 @@ function App() {
       const newDraft: Draft = {
         id: newId,
         title,
-        body: content,
+        body: currentMarkdown,
         date: new Date().toLocaleString(),
         status
       };
@@ -3262,8 +6485,8 @@ function App() {
   };
 
   const handleUploadImageForReader = async (file: File): Promise<string> => {
-    const uploadAuthType = (imageUploadAccount || authType === 'VAULT' || isTauri() || isNeutralino()) ? 'VAULT' : 'KEYCHAIN';
-    let activeUser = imageUploadAccount || (uploadAuthType === 'VAULT' ? selectedVaultUser : username);
+    const uploadAuthType = imageUploadAccount ? 'VAULT' : 'KEYCHAIN';
+    let activeUser = imageUploadAccount || username;
 
     if (!activeUser) {
       if (uploadAuthType !== 'VAULT') {
@@ -3522,10 +6745,19 @@ function App() {
       
       const blob = await zip.generateAsync({ type: 'blob' });
       const filename = `steem_drafts_md_${new Date().toISOString().split('T')[0]}.zip`;
-      const saved = await NativeService.saveFileNativeOrWeb(blob, filename, [{ name: 'ZIP Archive', extensions: ['zip'] }]);
-      if (saved) {
-        notify("Drafts exported as Markdown files in ZIP!", "success");
+      
+      if (IS_NATIVE && (window as any).AndroidBridge?.saveFile) {
+        const reader = new FileReader();
+        reader.onload = () => {
+          const base64 = (reader.result as string).split(',')[1];
+          (window as any).AndroidBridge.saveFile(base64, filename, 'application/zip');
+        };
+        reader.readAsDataURL(blob);
+      } else {
+        saveAs(blob, filename);
       }
+      
+      notify("Drafts exported as Markdown files in ZIP!", "success");
     } catch (err: any) {
       notify("Error: " + err.message, "error");
     }
@@ -3592,7 +6824,9 @@ function App() {
   };
 
   const downloadFile = () => {
-    const lines = content.split('\n');
+    // Sync current WYSIWYG editor content to markdown if editing in visual mode
+    const currentMarkdown = syncWysiwygToContentIfVisual();
+    const lines = currentMarkdown.split('\n');
     const firstLine = lines[0]?.trim() || "";
     
     let derivedTitle = pubTitle;
@@ -3614,33 +6848,37 @@ function App() {
       }
     }
     
-    exportContent += processContentForSteem(content);
+    exportContent += processContentForSteem(currentMarkdown);
     
     if (pubTags) {
       exportContent += `\n\n---\n- **Tags**: ${pubTags}\n`;
     }
 
-    const file = new Blob([exportContent], {type: 'text/markdown'});
+    const fileBlob = new Blob([exportContent], {type: 'text/markdown'});
+    
     const safeFilename = (derivedTitle || `steem-post-${Date.now()}`)
       .replace(/[/\\?%*:|"<>]/g, '-')
       .substring(0, 80)
       .trim();
-    const filename = `${safeFilename || 'steem-post'}.md`;
-
-    NativeService.saveFileNativeOrWeb(file, filename, [{ name: 'Markdown Post', extensions: ['md'] }])
-      .then(saved => {
-        if (saved) {
-          notify("Post exported as Markdown!", "success");
-        }
-      })
-      .catch(err => {
-        notify("Export error: " + err.message, "error");
-      });
+      
+    const fullFilename = `${safeFilename || 'steem-post'}.md`;
+    
+    // Use native bridge if available, otherwise fallback to saveAs
+    if (IS_NATIVE && (window as any).AndroidBridge?.saveFile) {
+      const reader = new FileReader();
+      reader.onload = () => {
+        const base64 = (reader.result as string).split(',')[1];
+        (window as any).AndroidBridge.saveFile(base64, fullFilename, 'text/markdown');
+      };
+      reader.readAsDataURL(fileBlob);
+    } else {
+      saveAs(fileBlob, fullFilename);
+    }
   };
 
   const uploadExternalImage = async (url: string, fileName: string = 'image.jpg') => {
-    const uploadAuthType = (imageUploadAccount || authType === 'VAULT' || isTauri() || isNeutralino()) ? 'VAULT' : 'KEYCHAIN';
-    let activeUser = imageUploadAccount || (uploadAuthType === 'VAULT' ? selectedVaultUser : username);
+    const uploadAuthType = imageUploadAccount ? 'VAULT' : 'KEYCHAIN';
+    let activeUser = imageUploadAccount || username;
     
     if (!activeUser) {
       if (uploadAuthType === 'VAULT') {
@@ -3726,48 +6964,14 @@ function App() {
     }
   };
 
-  const triggerFileSelection = async () => {
-    if (isUploading) return;
-    
-    if (isNeutralino()) {
-      try {
-        const { Neutralino } = window as any;
-        const entries = await Neutralino.os.showOpenDialog('Select Images', {
-          filters: [{ name: 'Images', extensions: ['jpg', 'jpeg', 'png', 'gif', 'webp'] }],
-          multiSelections: true
-        });
-        
-        if (entries && entries.length > 0) {
-          const files: File[] = [];
-          for (const entry of entries) {
-            const rawData = await Neutralino.filesystem.readBinaryFile(entry);
-            const arrayBuffer = (rawData && typeof rawData === 'object' && 'data' in rawData) ? rawData.data : rawData;
-            const ext = entry.split('.').pop()?.toLowerCase();
-            const mimeType = ext === 'png' ? 'image/png' : ext === 'gif' ? 'image/gif' : ext === 'webp' ? 'image/webp' : 'image/jpeg';
-            const blob = new Blob([arrayBuffer], { type: mimeType });
-            files.push(new File([blob], entry.split(/[/\\]/).pop() || 'image.jpg', { type: mimeType }));
-          }
-          
-          handleFileUpload({ target: { files } });
-        }
-      } catch (err) {
-        console.error('Neutralino dialog failed:', err);
-        // Sometimes users cancel the dialog, which throws an error in older Neutralino versions.
-        fileInputRef.current?.click();
-      }
-    } else {
-      fileInputRef.current?.click();
-    }
-  };
-
-  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement> | any) => {
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     if (isUploading) return;
     
     const files = e.target.files;
     if (!files || files.length === 0) return;
     
-    const uploadAuthType = (imageUploadAccount || authType === 'VAULT' || isTauri() || isNeutralino()) ? 'VAULT' : 'KEYCHAIN';
-    let activeUser = imageUploadAccount || (uploadAuthType === 'VAULT' ? selectedVaultUser : username);
+    const uploadAuthType = imageUploadAccount ? 'VAULT' : 'KEYCHAIN';
+    let activeUser = imageUploadAccount || username;
     
     if (!activeUser) {
       if (uploadAuthType === 'VAULT') {
@@ -3947,10 +7151,10 @@ function App() {
         setShowTableSelector(prev => !prev);
         setTableHover({ r: 0, c: 0 });
       } else {
-        insertAtCursor('\n\n| Header | Header |\n| --- | --- |\n| Cell | Cell |\n');
+        insertAtCursor('| Header | Header |\n| --- | --- |\n| Cell | Cell |\n');
       }
     }},
-    'Separator': { label: <SplitSquareHorizontal size={20} />, action: () => insertAtCursor('\n\n| Head |\n| --- |\n', 'end', true) },
+    'Separator': { label: <SplitSquareHorizontal size={20} />, action: () => insertAtCursor('| Head |\n| --- |\n', 'end') },
     'Import': { label: <TableIcon size={20} />, action: () => importTable() },
     'Code': { label: <Code size={20} />, action: () => fmt('```\n', '\n```') },
     'Inline': { label: <Terminal size={20} />, action: () => fmt('`') },
@@ -3958,29 +7162,29 @@ function App() {
       if (!editorRef.current) return;
       const start = editorRef.current.selectionStart;
       const end = editorRef.current.selectionEnd;
-      const selectedText = content.substring(start, end);
+      const selectedText = useEditorStore.getState().content.substring(start, end);
       const lines = selectedText.split('\n');
       const newText = lines.map(line => '    ' + line).join('\n');
-      const newContent = content.substring(0, start) + newText + content.substring(end);
+      const newContent = useEditorStore.getState().content.substring(0, start) + newText + useEditorStore.getState().content.substring(end);
       setContent(newContent);
     }},
     'Esc': { label: '\\', action: () => fmt('\\', '') },
-    'HR': { label: '—', action: () => insertAtCursor('\n---\n') },
+    'HR': { label: '—', action: () => insertAtCursor('\n\n---\n\n') },
     'Color': { label: <span className="text-red-500 font-bold text-lg">A</span>, action: () => fmt('<div class="phishy">', '</div>') },
     'Caption': { label: 'Підп', action: async () => {
       const url = await promptDialog(t('urlPrompt'));
       if (!url) return;
       const cap = await promptDialog(t('caption'), '');
-      insertAtCursor(`\n<center>\n\n| <center>![image](${url})</center> |\n|:---:|\n| <center><sub>${cap || ' ✍️ '}</sub></center> |\n\n</center>\n`);
+      insertAtCursor(`<center>\n\n| <center>![image](${url})</center> |\n|:---:|\n| <center><sub>${cap || ' ✍️ '}</sub></center> |\n\n</center>\n`);
     }},
     'Left': { label: '⬅', action: () => fmt('<div class="text-left">\n', '\n</div>') },
     'Center': { label: 'Центр', action: () => fmt('<center>\n', '\n</center>') },
     'Right': { label: '➡', action: () => fmt('<div class="text-right">\n', '\n</div>') },
     'Justify': { label: 'Вирів', action: () => fmt('<div class="text-justify">\n', '\n</div>') },
-    'Grid': { label: 'Сітка', action: () => insertAtCursor(`\n<div class="pull-left">\n${t('leftContent')}\n</div>\n<div class="pull-right">\n${t('rightContent')}\n</div>\n<div class="clearfix"></div>\n`) },
+    'Grid': { label: 'Сітка', action: () => insertAtCursor(`<div class="pull-left">\n${t('leftContent')}\n</div>\n<div class="pull-right">\n${t('rightContent')}\n</div>\n<div class="clearfix"></div>\n`) },
     'Templates': { label: <FileText size={20} />, action: () => setActiveModal('templates') },
     'Mentions': { label: <AtSign size={20} />, action: async () => {
-      const extracted = extractMentions(content);
+      const extracted = extractMentions(contentForPublish);
       if (extracted.length === 0) {
         const name = await promptDialog(t('usernameNoAt'));
         if (name) insertAtCursor(`@${name}`);
@@ -3990,7 +7194,7 @@ function App() {
       }
     }},
     'Img': { label: <ImageIcon size={20} />, action: () => {
-      triggerFileSelection();
+      fileInputRef.current?.click();
     }}
   };
 
@@ -4062,7 +7266,8 @@ function App() {
   return (
     <div className={cn(
       "flex flex-col h-screen font-sans overflow-hidden transition-colors duration-500 selection:bg-[rgb(var(--accent-color)/0.3)]",
-      visualStyle === 'neon' ? "theme-neon bg-slate-950 text-cyan-400" : (isDarkMode ? "bg-slate-950 text-slate-100" : "theme-light bg-white text-slate-900 border-slate-200")
+      visualStyle === 'neon' ? "theme-neon bg-slate-950 text-cyan-400" : (isDarkMode ? "bg-slate-950 text-slate-100" : "theme-light bg-white text-slate-900 border-slate-200"),
+      performanceMode && "perf-mode"
     )}>
       {/* Dynamic Theme Styles */}
       <style dangerouslySetInnerHTML={{ __html: `
@@ -4120,7 +7325,7 @@ function App() {
       `}} />
       {/* Header / Toolbar */}
       <header 
-        className="border-b border-slate-800 bg-slate-900/50 backdrop-blur-md flex items-center px-2 sm:px-4 h-14 z-[200] relative"
+        className="border-b border-slate-800 bg-slate-900 flex items-center px-2 sm:px-4 h-14 z-[200] relative"
       >
         <div className="flex items-center gap-1.5 xs:gap-3 shrink-0">
           <div className="flex items-center gap-1 xs:gap-2">
@@ -4139,12 +7344,12 @@ function App() {
           <div className="h-6 w-px bg-slate-800 mx-0.5 xs:mx-1 hidden md:block" />
 
           {/* View Toggler */}
-          <div className="flex bg-slate-800/80 p-0.5 rounded-lg border border-slate-700/50 shrink-0">
+          <div className="flex bg-slate-800 p-0.5 rounded-lg border border-slate-700 shrink-0">
             <button 
               onClick={() => setActiveView('editor')}
               className={cn(
-                "px-3 py-1 text-[10px] font-bold rounded transition-all flex items-center gap-1.5",
-                activeView === 'editor' ? "bg-cyan-600 text-white shadow-lg shadow-cyan-900/20 neon-tab-glow" : "text-slate-500 hover:text-slate-300"
+                "px-3 py-1 text-[10px] font-bold rounded transition-colors flex items-center gap-1.5",
+                activeView === 'editor' ? "bg-cyan-600 text-white shadow-none neon-tab-glow" : "text-slate-500 hover:text-slate-300"
               )}
             >
               <Edit3 size={16} className={cn(visualStyle === 'neon' && "neon-icon-glow")} /> <span className="hidden xs:inline">{t('editor')}</span>
@@ -4155,8 +7360,8 @@ function App() {
                 markAllAsRead();
               }}
               className={cn(
-                "px-3 py-1 text-[10px] font-bold rounded transition-all flex items-center gap-1.5 relative",
-                activeView === 'reader' ? "bg-cyan-600 text-white shadow-lg shadow-cyan-900/20 neon-tab-glow" : "text-slate-500 hover:text-slate-300"
+                "px-3 py-1 text-[10px] font-bold rounded transition-colors flex items-center gap-1.5 relative",
+                activeView === 'reader' ? "bg-cyan-600 text-white shadow-none neon-tab-glow" : "text-slate-500 hover:text-slate-300"
               )}
             >
               <Globe size={16} className={cn(visualStyle === 'neon' && "neon-icon-glow")} /> <span className="hidden xs:inline">{lang === 'uk' ? 'Читач' : 'Reader'}</span>
@@ -4172,6 +7377,7 @@ function App() {
             {/* Mobile format menu trigger */}
             <div className="relative mobile-tools-container lg:hidden shrink-0">
               <button
+                onMouseDown={(e) => e.preventDefault()}
                 onClick={(e) => {
                   e.stopPropagation();
                   setShowMobileToolsOpen(!showMobileToolsOpen);
@@ -4194,15 +7400,15 @@ function App() {
               )}>
                 {/* Group 1 */}
                 <div className="flex gap-1 bg-slate-900/50 p-1 rounded-lg">
-                  <IconButton icon={Bold} onClick={() => { fmt('**'); setShowMobileToolsOpen(false); }} title={t('bold')} className="shrink-0 size-8" />
-                  <IconButton icon={Italic} onClick={() => { fmt('*'); setShowMobileToolsOpen(false); }} title={t('italic')} className="shrink-0 size-8" />
+                  <IconButton icon={Bold} onClick={() => { fmt('**'); setShowMobileToolsOpen(false); }} title={t('bold')} className="shrink-0 size-8" active={activeFormats.bold} />
+                  <IconButton icon={Italic} onClick={() => { fmt('*'); setShowMobileToolsOpen(false); }} title={t('italic')} className="shrink-0 size-8" active={activeFormats.italic} />
                   <IconButton icon={Strikethrough} onClick={() => { fmt('~~'); setShowMobileToolsOpen(false); }} title={t('strike')} className="shrink-0 size-8" />
                 </div>
                 {/* Group 2 */}
                 <div className="flex gap-1 bg-slate-900/50 p-1 rounded-lg">
-                  <button onClick={() => { fmtLine('# '); setShowMobileToolsOpen(false); }} title={t('h1')} className="size-8 flex items-center justify-center hover:bg-slate-700 rounded-lg text-[10px] font-black text-slate-400 shrink-0">H1</button>
-                  <button onClick={() => { fmtLine('## '); setShowMobileToolsOpen(false); }} title={t('h2')} className="size-8 flex items-center justify-center hover:bg-slate-700 rounded-lg text-[10px] font-black text-slate-400 shrink-0">H2</button>
-                  <button onClick={() => { fmtLine('### '); setShowMobileToolsOpen(false); }} title={t('h3')} className="size-8 flex items-center justify-center hover:bg-slate-700 rounded-lg text-[10px] font-black text-slate-400 shrink-0">H3</button>
+                  <button onMouseDown={(e) => e.preventDefault()} onClick={() => { fmtLine('# '); setShowMobileToolsOpen(false); }} title={t('h1')} className="size-8 flex items-center justify-center hover:bg-slate-700 rounded-lg text-[10px] font-black text-slate-400 shrink-0">H1</button>
+                  <button onMouseDown={(e) => e.preventDefault()} onClick={() => { fmtLine('## '); setShowMobileToolsOpen(false); }} title={t('h2')} className="size-8 flex items-center justify-center hover:bg-slate-700 rounded-lg text-[10px] font-black text-slate-400 shrink-0">H2</button>
+                  <button onMouseDown={(e) => e.preventDefault()} onClick={() => { fmtLine('### '); setShowMobileToolsOpen(false); }} title={t('h3')} className="size-8 flex items-center justify-center hover:bg-slate-700 rounded-lg text-[10px] font-black text-slate-400 shrink-0">H3</button>
                 </div>
                 {/* Group 3 */}
                 <div className="flex gap-1 bg-slate-900/50 p-1 rounded-lg">
@@ -4215,23 +7421,16 @@ function App() {
                 <div className="flex gap-1 bg-slate-900/50 p-1 rounded-lg">
                   <IconButton icon={Quote} onClick={() => { fmtLine('> '); setShowMobileToolsOpen(false); }} title={t('quote')} className="shrink-0 size-8" />
                   <IconButton icon={LinkIcon} onClick={() => { handleLink(); setShowMobileToolsOpen(false); }} title={t('link')} className="shrink-0 size-8" />
-                  <IconButton icon={Minus} onClick={() => { insertAtCursor('---', 'end', true); setShowMobileToolsOpen(false); }} title={t('hr')} className="shrink-0 size-8" />
-                  <button onClick={() => { fmt('<div class="phishy">', '</div>'); setShowMobileToolsOpen(false); }} title={t('redText')} className="size-8 flex items-center justify-center hover:bg-slate-700 rounded-lg text-[10px] font-black text-red-500 shrink-0">A</button>
+                  <IconButton icon={Minus} onClick={() => { insertAtCursor('\n\n---\n\n', 'end'); setShowMobileToolsOpen(false); }} title={t('hr')} className="shrink-0 size-8" />
+                  <button onMouseDown={(e) => e.preventDefault()} onClick={() => { fmt('<div class="phishy">', '</div>'); setShowMobileToolsOpen(false); }} title={t('redText')} className="size-8 flex items-center justify-center hover:bg-slate-700 rounded-lg text-[10px] font-black text-red-500 shrink-0">A</button>
                 </div>
                 {/* Group 5 */}
                 <div className="flex gap-1 bg-slate-900/50 p-1 rounded-lg items-center text-slate-500 text-xs font-bold uppercase tracking-widest pl-2">
                   Code
-                  <IconButton icon={Terminal} onClick={() => { fmt('`'); setShowMobileToolsOpen(false); }} title={t('inlineCode')} className="shrink-0 size-8 ml-auto" />
+                  <IconButton icon={Terminal} onClick={() => { fmt('`'); setShowMobileToolsOpen(false); }} title={t('inlineCode')} className="shrink-0 size-8 ml-auto" active={activeFormats.code} />
                   <IconButton icon={Code} onClick={() => { fmt('```\n', '\n```'); setShowMobileToolsOpen(false); }} title={t('codeBlock')} className="shrink-0 size-8" />
                   <IconButton icon={Indent} onClick={() => {
-                    if (!editorRef.current) return;
-                    const start = editorRef.current.selectionStart;
-                    const end = editorRef.current.selectionEnd;
-                    const selectedText = content.substring(start, end);
-                    const lines = selectedText.split('\n');
-                    const newText = lines.map(line => '    ' + line).join('\n');
-                    const newContent = content.substring(0, start) + newText + content.substring(end);
-                    setContent(newContent);
+                    handleIndent();
                     setShowMobileToolsOpen(false);
                   }} title={t('indent')} className="shrink-0 size-8" />
                 </div>
@@ -4239,7 +7438,7 @@ function App() {
                 <div className="flex gap-1 bg-slate-900/50 p-1 rounded-lg items-center text-slate-500 text-xs font-bold uppercase tracking-widest pl-2">
                   {t('table')}
                   <IconButton icon={LayoutGrid} onClick={(e) => { TOOLS_MAP['Table']?.action(e); setShowMobileToolsOpen(false); }} title={t('table')} className="shrink-0 size-8 ml-auto" />
-                  <IconButton icon={SplitSquareHorizontal} onClick={() => { insertAtCursor('\n\n| Head |\n| --- |\n', 'end', true); setShowMobileToolsOpen(false); }} title="1 Col" className="shrink-0 size-8" />
+                  <IconButton icon={SplitSquareHorizontal} onClick={() => { insertAtCursor('| Head |\n| --- |\n', 'end'); setShowMobileToolsOpen(false); }} title="1 Col" className="shrink-0 size-8" />
                   <IconButton icon={TableIcon} onClick={() => { importTable(); setShowMobileToolsOpen(false); }} title={t('importTable')} className="shrink-0 size-8" />
                 </div>
                 {/* Group 7 */}
@@ -4257,14 +7456,14 @@ function App() {
                 if (container && e.deltaY !== 0) container.scrollLeft += e.deltaY;
               }}
             >
-              <div className="tools-scroll-container mx-auto flex items-center justify-center gap-1 bg-slate-800/30 p-1 rounded-xl border border-slate-700/30 overflow-x-auto no-scrollbar scroll-smooth whitespace-nowrap">
-                <IconButton icon={Bold} onClick={() => fmt('**')} title={t('bold')} className="shrink-0 size-8" />
-                <IconButton icon={Italic} onClick={() => fmt('*')} title={t('italic')} className="shrink-0 size-8" />
+              <div className="tools-scroll-container mx-auto flex items-center justify-start gap-1 bg-slate-800/30 p-1 rounded-xl border border-slate-700/30 overflow-x-auto no-scrollbar scroll-smooth whitespace-nowrap w-full lg:w-auto">
+                <IconButton icon={Bold} onClick={() => fmt('**')} title={t('bold')} className="shrink-0 size-8" active={activeFormats.bold} />
+                <IconButton icon={Italic} onClick={() => fmt('*')} title={t('italic')} className="shrink-0 size-8" active={activeFormats.italic} />
                 <IconButton icon={Strikethrough} onClick={() => fmt('~~')} title={t('strike')} className="shrink-0 size-8" />
                 <div className="h-4 w-px bg-slate-700 mx-0.5 shrink-0" />
-                <button onClick={() => fmtLine('# ')} title={t('h1')} className="size-8 flex items-center justify-center hover:bg-slate-700 rounded-lg text-[10px] font-black text-slate-400 shrink-0">H1</button>
-                <button onClick={() => fmtLine('## ')} title={t('h2')} className="size-8 flex items-center justify-center hover:bg-slate-700 rounded-lg text-[10px] font-black text-slate-400 shrink-0">H2</button>
-                <button onClick={() => fmtLine('### ')} title={t('h3')} className="size-8 flex items-center justify-center hover:bg-slate-700 rounded-lg text-[10px] font-black text-slate-400 shrink-0">H3</button>
+                <button onMouseDown={(e) => e.preventDefault()} onClick={() => fmtLine('# ')} title={t('h1')} className="size-8 flex items-center justify-center hover:bg-slate-700 rounded-lg text-[10px] font-black text-slate-400 shrink-0">H1</button>
+                <button onMouseDown={(e) => e.preventDefault()} onClick={() => fmtLine('## ')} title={t('h2')} className="size-8 flex items-center justify-center hover:bg-slate-700 rounded-lg text-[10px] font-black text-slate-400 shrink-0">H2</button>
+                <button onMouseDown={(e) => e.preventDefault()} onClick={() => fmtLine('### ')} title={t('h3')} className="size-8 flex items-center justify-center hover:bg-slate-700 rounded-lg text-[10px] font-black text-slate-400 shrink-0">H3</button>
                 <div className="h-4 w-px bg-slate-700 mx-0.5 shrink-0" />
                 <IconButton icon={AlignLeft} onClick={() => fmt('<div class="text-left">\n', '\n</div>')} title={t('leftText')} className="shrink-0 size-8" />
                 <IconButton icon={AlignCenter} onClick={() => fmt('<center>\n', '\n</center>')} title="Center" className="shrink-0 size-8" />
@@ -4273,22 +7472,13 @@ function App() {
                 <div className="h-4 w-px bg-slate-700 mx-0.5 shrink-0" />
                 <IconButton icon={Quote} onClick={() => fmtLine('> ')} title={t('quote')} className="shrink-0 size-8" />
                 <IconButton icon={LinkIcon} onClick={handleLink} title={t('link')} className="shrink-0 size-8" />
-                <IconButton icon={Minus} onClick={() => insertAtCursor('---', 'end', true)} title={t('hr')} className="shrink-0 size-8" />
-                <button onClick={() => fmt('<div class="phishy">', '</div>')} title={t('redText')} className="size-8 flex items-center justify-center hover:bg-slate-700 rounded-lg text-[10px] font-black text-red-500 shrink-0">A</button>
-                <IconButton icon={Terminal} onClick={() => fmt('`')} title={t('inlineCode')} className="shrink-0 size-8" />
+                <IconButton icon={Minus} onClick={() => insertAtCursor('\n\n---\n\n', 'end')} title={t('hr')} className="shrink-0 size-8" />
+                <button onMouseDown={(e) => e.preventDefault()} onClick={() => fmt('<div class="phishy">', '</div>')} title={t('redText')} className="size-8 flex items-center justify-center hover:bg-slate-700 rounded-lg text-[10px] font-black text-red-500 shrink-0">A</button>
+                <IconButton icon={Terminal} onClick={() => fmt('`')} title={t('inlineCode')} className="shrink-0 size-8" active={activeFormats.code} />
                 <IconButton icon={Code} onClick={() => fmt('```\n', '\n```')} title={t('codeBlock')} className="shrink-0 size-8" />
-                <IconButton icon={Indent} onClick={() => {
-                  if (!editorRef.current) return;
-                  const start = editorRef.current.selectionStart;
-                  const end = editorRef.current.selectionEnd;
-                  const selectedText = content.substring(start, end);
-                  const lines = selectedText.split('\n');
-                  const newText = lines.map(line => '    ' + line).join('\n');
-                  const newContent = content.substring(0, start) + newText + content.substring(end);
-                  setContent(newContent);
-                }} title={t('indent')} className="shrink-0 size-8" />
+                <IconButton icon={Indent} onClick={handleIndent} title={t('indent')} className="shrink-0 size-8" />
                 <IconButton icon={LayoutGrid} onClick={(e) => TOOLS_MAP['Table']?.action(e)} title={t('table')} className="shrink-0 size-8" />
-                <IconButton icon={SplitSquareHorizontal} onClick={() => insertAtCursor('\n\n| Head |\n| --- |\n', 'end', true)} title="1 Col" className="shrink-0 size-8" />
+                <IconButton icon={SplitSquareHorizontal} onClick={() => insertAtCursor('| Head |\n| --- |\n', 'end')} title="1 Col" className="shrink-0 size-8" />
                 <IconButton icon={TableIcon} onClick={importTable} title={t('importTable')} className="shrink-0 size-8" />
                 <div className="h-4 w-px bg-slate-700 mx-0.5 shrink-0" />
                 <IconButton icon={AtSign} onClick={() => setActiveModal('mentions')} title={t('mentions')} className="shrink-0 size-8" />
@@ -4323,9 +7513,7 @@ function App() {
             <AnimatePresence>
               {showNotificationList && (
                 <motion.div 
-                  initial={{ opacity: 0, y: 10, scale: 0.95 }}
-                  animate={{ opacity: 1, y: 0, scale: 1 }}
-                  exit={{ opacity: 0, y: 10, scale: 0.95 }}
+                  {...getMotionConfig()}
                   className="fixed top-14 left-2 right-2 sm:absolute sm:top-full sm:left-auto sm:right-0 sm:origin-top-right sm:mt-2 sm:w-80 max-w-sm mx-auto bg-slate-900 border border-slate-800 rounded-2xl shadow-2xl z-[100] overflow-hidden"
                 >
                   <div className="p-4 border-b border-slate-800 flex items-center justify-between bg-slate-950/50">
@@ -4433,6 +7621,7 @@ function App() {
 
           <div className="relative shrink-0 z-50 mobile-tools-container">
              <button 
+                onMouseDown={(e) => e.preventDefault()}
                 onClick={(e) => {
                   e.stopPropagation();
                   setShowMobileTools1(!showMobileTools1);
@@ -4459,8 +7648,8 @@ function App() {
                          const reader = new FileReader();
                          reader.onload = (ev) => {
                             const val = ev.target?.result as string;
-                            if (content) {
-                               setContent(content + '\n\n' + val);
+                            if (useEditorStore.getState().content) {
+                               setContent(useEditorStore.getState().content + '\n\n' + val);
                             } else {
                                setContent(val);
                             }
@@ -4476,6 +7665,7 @@ function App() {
 
           <div className="relative shrink-0 z-40 mobile-tools-container">
              <button 
+                onMouseDown={(e) => e.preventDefault()}
                 onClick={(e) => {
                   e.stopPropagation();
                   setShowMobileTools2(!showMobileTools2);
@@ -4494,12 +7684,14 @@ function App() {
                   icon={FilePlus} 
                   onClick={async () => {
                     setShowMobileTools2(false);
-                    if (content.trim() !== '') {
+                    if (useEditorStore.getState().content.trim() !== '') {
                       const saveFirst = await confirmDialog(t('saveDraftBeforeNew') || "Save draft before starting new?");
                       if (saveFirst) saveDraft();
                       else if (!await confirmDialog(t('confirmNewPost'))) return;
                     }
                     setPubTitle(''); setContent(''); setPubTags(''); setCurrentDraftId(null);
+                    localStorage.removeItem('steem_autosave_temp_visual_html');
+                    if (wysiwygRef.current) wysiwygRef.current.innerHTML = '<p><br></p>';
                   }} 
                   title={t('newPost')} 
                   className="shrink-0 size-10 flex mx-auto" 
@@ -4523,24 +7715,17 @@ function App() {
 
           {activeView === 'editor' && (
             <div className="flex items-center gap-1 bg-slate-800/30 p-1 rounded-xl border border-slate-700/30 shrink-0">
+               {isPwaInstallable && !isPwaInstalled && (
+                 <IconButton 
+                   icon={Download} 
+                   onClick={handleInstallPwa} 
+                   title={t('installApp')} 
+                   className="shrink-0 size-8 flex text-cyan-400 bg-cyan-950/20 border border-cyan-800/30 animate-pulse" 
+                 />
+               )}
                <IconButton icon={ShieldUserIcon} onClick={() => setActiveModal('keys')} title={t('keys')} className="shrink-0 size-8 flex" />
+               <IconButton icon={Settings} onClick={() => { setSettingsTab('general'); setActiveModal('settings'); }} title={t('settings')} className="shrink-0 size-8 flex" />
                <IconButton icon={Rocket} onClick={() => setActiveModal('publish')} title={t('publish')} className="shrink-0 size-8 bg-cyan-600 text-white hover:bg-cyan-500 shadow-lg shadow-cyan-900/40" />
-            </div>
-          )}
-
-          {(typeof window !== 'undefined' && ('__TAURI__' in window || 'Neutralino' in window)) && (
-            <div className="hidden lg:flex shrink-0 border-l border-slate-800 pl-2 ml-1">
-               <IconButton 
-                 icon={() => <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M18.36 6.64a9 9 0 1 1-12.73 0"></path><line x1="12" y1="2" x2="12" y2="12"></line></svg>} 
-                 onClick={async () => {
-                   if (await confirmDialog(lang === 'uk' ? 'Вийти з додатку?' : 'Exit App?')) {
-                     const ns = await import('./services/nativeService');
-                     ns.NativeService.quitApp();
-                   }
-                 }} 
-                 title={lang === 'uk' ? 'Вийти' : 'Quit'} 
-                 className="shrink-0 size-8 text-rose-400 hover:bg-rose-500/10 hover:text-rose-300"
-               />
             </div>
           )}
         </div>
@@ -4567,15 +7752,30 @@ function App() {
             <AnimatePresence>
           {isSidebarOpen && (
             <motion.aside 
-              initial={{ x: -300, opacity: 0 }}
-              animate={{ x: 0, opacity: 1 }}
-              exit={{ x: -300, opacity: 0 }}
-              className="w-72 border-r border-slate-800 bg-slate-900 flex flex-col z-30 absolute lg:relative h-full pb-16 lg:pb-0 shadow-2xl lg:shadow-none"
+              {...getSidebarMotionConfig()}
+              className={cn(
+                "border-r border-slate-800 bg-slate-900 flex flex-col z-30 absolute lg:relative h-full pb-16 lg:pb-0 shadow-2xl lg:shadow-none transition-all duration-300 overflow-visible",
+                isGalleryCollapsed ? "w-16" : "w-[clamp(20rem,25vw,30rem)]"
+              )}
             >
               <div className="flex flex-col flex-1 overflow-hidden custom-scrollbar">
-                <section className="flex flex-col flex-1 min-h-0 overflow-hidden px-4 py-2">
-                  <div className="flex items-center gap-2 mb-3 border-b border-slate-800 pb-2 shrink-0 overflow-x-auto no-scrollbar">
+                <section className={cn("flex flex-col flex-1 min-h-0 overflow-hidden py-2", isGalleryCollapsed ? "px-1" : "px-4")}>
+                  <div className={cn("flex items-center mb-3 shrink-0", isGalleryCollapsed ? "justify-center" : "justify-between")}>
+                    {!isGalleryCollapsed && <span className="text-[10px] font-bold uppercase tracking-widest text-slate-500">{t('gallery')}</span>}
                     <button 
+                      onClick={() => setIsGalleryCollapsed(!isGalleryCollapsed)}
+                      className="p-1.5 rounded-lg bg-slate-800/50 hover:bg-slate-800 text-slate-400 hover:text-white transition-colors"
+                      title={isGalleryCollapsed ? (lang === 'uk' ? 'Розгорнути галерею' : 'Expand Gallery') : (lang === 'uk' ? 'Згорнути галерею' : 'Collapse Gallery')}
+                    >
+                      {isGalleryCollapsed ? <PanelLeftOpen size={16} /> : <PanelLeftClose size={16} />}
+                    </button>
+                  </div>
+
+                  {!isGalleryCollapsed && (
+                    <>
+                      <div className="flex items-center gap-2 mb-3 border-b border-slate-800 pb-2 shrink-0 overflow-x-auto no-scrollbar">
+                    <button 
+                      onMouseDown={(e) => e.preventDefault()}
                       onClick={() => toggleGalleryMode('local')}
                       className={cn(
                         "text-[10px] font-bold uppercase tracking-widest transition-colors shrink-0",
@@ -4592,6 +7792,7 @@ function App() {
                     ].map(srv => (
                       <button 
                         key={srv.id}
+                        onMouseDown={(e) => e.preventDefault()}
                         onClick={() => toggleGalleryMode(srv.id as any)}
                         className={cn(
                           "text-[10px] font-bold uppercase tracking-widest transition-colors flex items-center gap-1 shrink-0",
@@ -4605,12 +7806,14 @@ function App() {
                     <div className="flex-1" />
                     <div className="flex items-center gap-1 shrink-0">
                       <button 
+                        onMouseDown={(e) => e.preventDefault()}
                         onClick={() => setGalleryView('grid')} 
                         className={cn("p-1 rounded", galleryView === 'grid' ? "text-cyan-400 bg-cyan-400/10" : "text-slate-600")}
                       >
                         <LayoutGrid size={14} />
                       </button>
                       <button 
+                        onMouseDown={(e) => e.preventDefault()}
                         onClick={() => setGalleryView('list')} 
                         className={cn("p-1 rounded", galleryView === 'list' ? "text-cyan-400 bg-cyan-400/10" : "text-slate-600")}
                       >
@@ -4653,7 +7856,7 @@ function App() {
                                 <div className="flex flex-wrap items-center justify-between gap-1.5">
                                   <button 
                                     onClick={() => {
-                                      triggerFileSelection();
+                                      fileInputRef.current?.click();
                                       if (window.innerWidth < 1024) setIsWidgetVisible(false);
                                     }}
                                     disabled={isUploading}
@@ -4686,77 +7889,19 @@ function App() {
                                 
                                 <div className="grid grid-cols-2 sm:grid-cols-3 gap-1.5">
                                   {vaultAccounts.length > 0 && (
-                                    <div className="col-span-2 sm:col-span-3 relative">
-                                      <button
-                                        type="button"
-                                        onClick={(e) => {
-                                          e.stopPropagation();
-                                          setIsImageAccountDropdownOpen(!isImageAccountDropdownOpen);
-                                        }}
-                                        className="w-full flex items-center justify-between gap-1.5 p-1.5 bg-slate-800/60 hover:bg-slate-800 rounded border border-slate-700/50 text-[10px] text-cyan-400 font-bold transition-all cursor-pointer select-none"
+                                    <div className="col-span-2 sm:col-span-3 flex items-center gap-2 p-1 bg-slate-800/50 rounded border border-slate-700/50">
+                                      <select 
+                                        value={imageUploadAccount || ''}
+                                        onChange={(e) => setImageUploadAccount(e.target.value)}
+                                        className="flex-1 bg-transparent text-[10px] text-cyan-400 font-bold outline-none cursor-pointer truncate"
                                       >
-                                        <span className="truncate">
-                                          {imageUploadAccount ? `@${imageUploadAccount}` : '@keychain / default'}
-                                        </span>
-                                        <ChevronDown size={12} className={cn("text-slate-400 transition-transform shrink-0", isImageAccountDropdownOpen ? "rotate-180" : "")} />
-                                      </button>
-                                      
-                                      {isImageAccountDropdownOpen && (
-                                        <>
-                                          <div 
-                                            className="fixed inset-0 z-40 bg-transparent" 
-                                            onClick={(e) => {
-                                              e.stopPropagation();
-                                              setIsImageAccountDropdownOpen(false);
-                                            }}
-                                          />
-                                          <div className="absolute right-0 left-0 mt-1 bg-slate-900 border border-slate-700 rounded shadow-xl overflow-hidden z-50 text-[10px] max-h-32 overflow-y-auto">
-                                            <button
-                                              type="button"
-                                              onClick={(e) => {
-                                                e.stopPropagation();
-                                                setImageUploadAccount('');
-                                                setIsImageAccountDropdownOpen(false);
-                                              }}
-                                              className={cn(
-                                                "w-full text-left px-2 py-1.5 text-slate-300 font-medium hover:bg-slate-800 hover:text-cyan-400 transition-colors flex items-center justify-between border-b border-slate-800/60 cursor-pointer",
-                                                !imageUploadAccount ? "text-cyan-400 bg-cyan-950/20" : ""
-                                              )}
-                                            >
-                                              <span>@keychain / default</span>
-                                              {!imageUploadAccount && <Check size={10} className="text-cyan-400" />}
-                                            </button>
-                                            
-                                            {vaultAccounts.map(acc => {
-                                              const isSelected = imageUploadAccount === acc;
-                                              const isLocked = SecurityService.isLocked();
-                                              return (
-                                                <button
-                                                  key={acc}
-                                                  type="button"
-                                                  onClick={(e) => {
-                                                    e.stopPropagation();
-                                                    setImageUploadAccount(acc);
-                                                    setIsImageAccountDropdownOpen(false);
-                                                  }}
-                                                  className={cn(
-                                                    "w-full text-left px-2 py-1.5 text-slate-300 font-medium hover:bg-slate-800 hover:text-cyan-400 transition-colors flex items-center justify-between cursor-pointer",
-                                                    isSelected ? "text-cyan-400 bg-cyan-950/20" : ""
-                                                  )}
-                                                >
-                                                  <span className="truncate">@{acc}</span>
-                                                  <div className="flex items-center gap-1.5 shrink-0 ml-2">
-                                                    <span className="text-[9px] text-slate-500 font-normal">
-                                                      {isLocked ? '🔒' : '✓'}
-                                                    </span>
-                                                    {isSelected && <Check size={10} className="text-cyan-400" />}
-                                                  </div>
-                                                </button>
-                                              );
-                                            })}
-                                          </div>
-                                        </>
-                                      )}
+                                        <option value="" className="bg-slate-900 text-slate-300">@keychain / default</option>
+                                        {vaultAccounts.map(acc => (
+                                          <option key={acc} value={acc} className="bg-slate-900 text-slate-300">
+                                            @{acc} {!SecurityService.isLocked() ? '✓' : '🔒'}
+                                          </option>
+                                        ))}
+                                      </select>
                                     </div>
                                   )}
                                 </div>
@@ -4933,10 +8078,12 @@ function App() {
                       </div>
                     )}
                   </div>
+                  </>
+                  )}
 
                   <div className={cn(
-                    "overflow-y-auto custom-scrollbar flex-1 min-h-0 -mx-1 px-1",
-                    galleryView === 'grid' ? "grid grid-cols-[repeat(auto-fill,minmax(110px,1fr))] auto-rows-min gap-3 content-start" : "flex flex-col gap-2"
+                    "overflow-y-auto custom-scrollbar flex-1 min-h-0 px-1 mt-1",
+                    !isGalleryCollapsed && galleryView === 'grid' ? "grid grid-cols-[repeat(auto-fill,minmax(110px,1fr))] auto-rows-min gap-3 content-start" : "flex flex-col gap-2"
                   )}>
                     {galleryMode === 'local' ? (
                       filteredLocalImages.map((img: ImageItem, idx: number) => (
@@ -4959,6 +8106,7 @@ function App() {
                             onMoveLeft={idx > 0 ? (i) => moveImageLocal(i, -1) : undefined}
                             onMoveRight={idx < filteredLocalImages.length - 1 ? (i) => moveImageLocal(i, 1) : undefined}
                             t={t}
+                            isCollapsed={isGalleryCollapsed}
                           />
                         ))
                     ) : (
@@ -4975,10 +8123,11 @@ function App() {
                               if (window.innerWidth < 1024) setIsWidgetVisible(false);
                             }}
                             t={t}
+                            isCollapsed={isGalleryCollapsed}
                           />
                         ))
                       ) : (
-                        <div className="flex flex-col items-center justify-center h-40 text-slate-600 gap-2">
+                        <div className={cn("flex flex-col items-center justify-center h-40 text-slate-600 gap-2", isGalleryCollapsed && "hidden")}>
                           <Search size={24} />
                           <p className="text-[10px] text-center">
                             {t('pexelsSearch')}
@@ -4988,7 +8137,7 @@ function App() {
                     )}
                   </div>
                   
-                  {galleryMode !== 'local' && pexelsResults.length > 0 && !isSearchingPexels && (
+                  {galleryMode !== 'local' && pexelsResults.length > 0 && !isSearchingPexels && !isGalleryCollapsed && (
                     <div className="mt-2 flex justify-center">
                       <button 
                         onClick={() => handleExternalSearch(gallerySearch, pexelsPage + 1)}
@@ -4999,6 +8148,7 @@ function App() {
                     </div>
                   )}
 
+                  {!isGalleryCollapsed && (
                   <div className="mt-2 shrink-0 border-t border-slate-800 pt-2">
                     <div className="flex items-center justify-between mb-1">
                       <span className="text-[9px] font-bold text-slate-500 uppercase tracking-widest">{t('links')}</span>
@@ -5018,6 +8168,7 @@ function App() {
                       onChange={e => parseImages(e.target.value)}
                     />
                   </div>
+                  )}
                 </section>
               </div>
             </motion.aside>
@@ -5032,53 +8183,573 @@ function App() {
               ref={editorPaneRef}
               className={cn(
                 "flex-1 flex flex-col min-w-0 border-r border-slate-800 transition-all relative",
-                activeMobileTab !== 'editor' && "hidden lg:flex"
+                activeMobileTab !== 'editor' && "hidden lg:flex",
+                isEditorFullScreen && "bg-slate-950 p-0 fixed inset-0 z-[100]"
               )}
             >
-              <div className="lg:hidden flex items-center justify-between px-4 py-2 bg-slate-900/80 border-b border-slate-800 text-[10px] font-medium text-slate-500 uppercase tracking-widest shrink-0">
-                <div className="flex gap-4">
-                  <span>{t('wordsLabel')}: {stats.words}</span>
-                  <span className="text-cyan-400">{t('cleanWordsLabel')}: {cleanStats.words}</span>
-                  <span>{t('charsLabel')}: {stats.chars}</span>
+<MobileStatsBar visualStyle={visualStyle} isDarkMode={isDarkMode} t={t} />
+
+              {/* Editor Mode Toggler Tabs */}
+              <div className={cn(
+                "flex items-center justify-between px-4 py-2 border-b shrink-0 select-none relative transition-colors",
+                visualStyle === 'neon' ? "bg-slate-950 border-slate-800/80" : (isDarkMode ? "bg-slate-900 border-slate-800" : "bg-slate-50 border-slate-200")
+              )}>
+                <div className="flex items-center gap-2">
+                  <div className={cn(
+                    "flex p-0.5 rounded-lg border shrink-0 shadow-inner transition-colors",
+                    visualStyle === 'neon' ? "bg-slate-950 border-slate-800" : (isDarkMode ? "bg-slate-950 border-slate-800" : "bg-slate-100 border-slate-300")
+                  )}>
+                    <button 
+                      onMouseDown={(e) => e.preventDefault()}
+                      onClick={() => handleSetEditorMode('visual')}
+                      className={cn(
+                        "px-3 py-1 text-[10px] sm:text-xs font-bold rounded transition-colors flex items-center gap-1.5",
+                        editorMode === 'visual' 
+                          ? "bg-cyan-600 text-white shadow-sm" 
+                          : (isDarkMode || visualStyle === 'neon' ? "text-slate-500 hover:text-slate-300" : "text-slate-600 hover:text-slate-900")
+                      )}
+                    >
+                      <Eye size={12} />
+                      <span className={cn(
+                        isLivePreviewEnabled ? "hidden xl:inline" : "hidden sm:inline"
+                      )}>
+                        {lang === 'uk' ? 'Візуальний' : lang === 'es' ? 'Editor Visual' : lang === 'ko' ? '비주얼 에디터' : 'Visual Editor'}
+                      </span>
+                    </button>
+                    <button 
+                      onMouseDown={(e) => e.preventDefault()}
+                      onClick={() => handleSetEditorMode('markdown')}
+                      className={cn(
+                        "px-3 py-1 text-[10px] sm:text-xs font-bold rounded transition-colors flex items-center gap-1.5",
+                        editorMode === 'markdown' 
+                          ? "bg-cyan-600 text-white shadow-sm" 
+                          : (isDarkMode || visualStyle === 'neon' ? "text-slate-500 hover:text-slate-300" : "text-slate-600 hover:text-slate-900")
+                      )}
+                    >
+                      <Terminal size={12} />
+                      <span className={cn(
+                        isLivePreviewEnabled ? "hidden xl:inline" : "hidden sm:inline"
+                      )}>
+                        {lang === 'uk' ? 'Markdown-код' : lang === 'es' ? 'Código Markdown' : lang === 'ko' ? '마크다운 코드' : 'Markdown Code'}
+                      </span>
+                    </button>
+                    <button
+                      onMouseDown={(e) => e.preventDefault()}
+                      onClick={toggleEditorFullScreen}
+                      className={cn(
+                        "px-2 py-1 ml-1 rounded transition-colors flex items-center",
+                        isDarkMode || visualStyle === 'neon' ? "text-slate-500 hover:text-cyan-400 hover:bg-slate-800" : "text-slate-500 hover:text-cyan-600 hover:bg-slate-200"
+                      )}
+                      title={isEditorFullScreen ? "Exit Fullscreen" : "Fullscreen"}
+                    >
+                      {isEditorFullScreen ? <Minimize2 size={12} /> : <Maximize2 size={12} />}
+                    </button>
+                  </div>
+
+                  {/* Real-time sync toggle (RefreshCw) */}
+                  <button
+                    onMouseDown={(e) => e.preventDefault()}
+                    onClick={() => {
+                      const next = !onDemandSyncEnabled;
+                      setOnDemandSyncEnabled(next);
+                      localStorage.setItem('steem_on_demand_sync', String(next));
+                      notify(
+                        next 
+                           ? (lang === 'uk' ? "Увімкнено оптимізовану фонову синхронізацію (без затримок)" : "Optimized background sync enabled (lag-free)") 
+                           : (lang === 'uk' ? "Увімкнено безперервну синхронізацію в реальному часі" : "Continuous real-time sync enabled"), 
+                        "success"
+                      );
+                    }}
+                    className={cn(
+                      "p-1.5 rounded-lg border transition-all flex items-center gap-1.5 text-[10px] sm:text-xs font-bold",
+                      !onDemandSyncEnabled 
+                        ? (isDarkMode || visualStyle === 'neon' ? "bg-cyan-950/40 border-cyan-800/60 text-cyan-400 hover:bg-cyan-900/40" : "bg-cyan-50 border-cyan-200 text-cyan-700 hover:bg-cyan-100/50") 
+                        : (isDarkMode || visualStyle === 'neon' ? "bg-slate-950/40 border-slate-800/60 text-slate-400 hover:text-slate-200 hover:bg-slate-900/40" : "bg-slate-100/50 border-slate-200 text-slate-600 hover:text-slate-900 hover:bg-slate-200/50")
+                    )}
+                    title={lang === 'uk' ? (!onDemandSyncEnabled ? "Безперервна синхронізація (увімкнено)" : "Увімкнути безперервну синхронізацію") : (!onDemandSyncEnabled ? "Continuous real-time sync (enabled)" : "Enable continuous real-time sync")}
+                  >
+                    <RefreshCw size={12} className={cn(!onDemandSyncEnabled ? "text-cyan-400" : "text-slate-500")} />
+                    <span className={cn(
+                      isLivePreviewEnabled ? "hidden xl:inline" : "hidden xs:inline"
+                    )}>
+                      {lang === 'uk' ? 'Реал-тайм' : 'Real-time'}
+                    </span>
+                    {!onDemandSyncEnabled && (
+                      <span className="flex h-1.5 w-1.5 relative">
+                        <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-cyan-400"></span>
+                      </span>
+                    )}
+                  </button>
+
+                  {/* Live Preview Toggle */}
+                  <button
+                    onMouseDown={(e) => e.preventDefault()}
+                    onClick={toggleLivePreview}
+                    className={cn(
+                      "hidden lg:flex p-1.5 rounded-lg border transition-all items-center gap-1.5 text-[10px] sm:text-xs font-bold",
+                      isLivePreviewEnabled 
+                        ? (isDarkMode || visualStyle === 'neon' ? "bg-cyan-950/40 border-cyan-800/60 text-cyan-400 hover:bg-cyan-900/40" : "bg-cyan-50 border-cyan-200 text-cyan-700 hover:bg-cyan-100/50") 
+                        : (isDarkMode || visualStyle === 'neon' ? "bg-slate-950/40 border-slate-800/60 text-slate-400 hover:text-slate-200 hover:bg-slate-900/40" : "bg-slate-100/50 border-slate-200 text-slate-600 hover:text-slate-900 hover:bg-slate-200/50")
+                    )}
+                    title={lang === 'uk' ? "Увімкнути/вимкнути прев'ю перегляду" : "Enable/Disable Live Preview"}
+                  >
+                    {isLivePreviewEnabled ? <Eye size={12} className={cn(isDarkMode || visualStyle === 'neon' ? "text-cyan-400" : "text-cyan-600")} /> : <EyeOff size={12} className="text-slate-500" />}
+                    <span className={cn(
+                      isLivePreviewEnabled ? "hidden xl:inline" : "hidden xs:inline"
+                    )}>
+                      {lang === 'uk' ? 'Прев\'ю' : 'Preview'}
+                    </span>
+                  </button>
+
+                  {/* Beautification Toggle */}
+                  <button
+                    onMouseDown={(e) => e.preventDefault()}
+                    onClick={() => {
+                      const next = !beautifyEnabled;
+                      setBeautifyEnabled(next);
+                      localStorage.setItem('steem_beautify', String(next));
+                      notify(
+                        next
+                          ? (lang === 'uk' ? "Б'ютіфікацію увімкнено (покращене оформлення)" : "Beautification enabled (enhanced styling)")
+                          : (lang === 'uk' ? "Б'ютіфікацію вимкнено" : "Beautification disabled"),
+                        "success"
+                      );
+                    }}
+                    className={cn(
+                      "p-1.5 rounded-lg border transition-all flex items-center gap-1.5 text-[10px] sm:text-xs font-bold",
+                      beautifyEnabled 
+                        ? (isDarkMode || visualStyle === 'neon' ? "bg-cyan-950/40 border-cyan-800/60 text-cyan-400 hover:bg-cyan-900/40" : "bg-cyan-50 border-cyan-200 text-cyan-700 hover:bg-cyan-100/50") 
+                        : (isDarkMode || visualStyle === 'neon' ? "bg-slate-950/40 border-slate-800/60 text-slate-400 hover:text-slate-200 hover:bg-slate-900/40" : "bg-slate-100/50 border-slate-200 text-slate-600 hover:text-slate-900 hover:bg-slate-200/50")
+                    )}
+                    title={lang === 'uk' ? (beautifyEnabled ? "Б'ютіфікація (увімкнено)" : "Увімкнути б'ютіфікацію") : (beautifyEnabled ? "Beautification (enabled)" : "Enable beautification")}
+                  >
+                    <Sparkles size={12} className={cn(beautifyEnabled ? "text-cyan-400" : "text-slate-500")} />
+                    <span className={cn(
+                      isLivePreviewEnabled ? "hidden xl:inline" : "hidden xs:inline"
+                    )}>
+                      {lang === 'uk' ? "Б'ютіфікація" : "Beautify"}
+                    </span>
+                    {beautifyEnabled && (
+                      <span className="flex h-1.5 w-1.5 relative">
+                        <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-cyan-400"></span>
+                      </span>
+                    )}
+                  </button>
+
+                  {/* Visual Spacing and Icon Size Popover */}
+                  <div className="relative">
+                    <button
+                      onMouseDown={(e) => e.preventDefault()}
+                      onClick={() => setIsSpacingMenuOpen(!isSpacingMenuOpen)}
+                      className={cn(
+                        "p-1.5 rounded-lg border transition-all flex items-center gap-1.5 text-[10px] sm:text-xs font-bold relative",
+                        isSpacingMenuOpen
+                          ? "bg-cyan-600 text-white border-cyan-500 shadow-none"
+                          : (isDarkMode || visualStyle === 'neon' ? "bg-slate-950/40 border-slate-800/60 text-slate-400 hover:text-slate-200 hover:bg-slate-900/40" : "bg-slate-100/50 border-slate-200 text-slate-600 hover:text-slate-900 hover:bg-slate-200/50")
+                      )}
+                      title={lang === 'uk' ? "Налаштування відступів, б'ютіфікації та іконок" : "Spacing, Beautification & Size Settings"}
+                    >
+                      <MoveVertical size={12} />
+                      <span className={cn(
+                        isLivePreviewEnabled ? "hidden xl:inline" : "hidden xs:inline"
+                      )}>
+                        {lang === 'uk' ? 'Відступи' : 'Spacing'}
+                      </span>
+                    </button>
+
+                    <AnimatePresence>
+                      {isSpacingMenuOpen && (
+                        <>
+                          {/* Overlay click-away handler */}
+                          <div 
+                            className="fixed inset-0 z-40 cursor-default" 
+                            onClick={() => setIsSpacingMenuOpen(false)} 
+                          />
+                          <motion.div
+                            initial={{ opacity: 0, y: 10, scale: 0.95 }}
+                            animate={{ opacity: 1, y: 0, scale: 1 }}
+                            exit={{ opacity: 0, y: 10, scale: 0.95 }}
+                            transition={{ duration: 0.15 }}
+                            className={cn(
+                              "absolute right-0 mt-2 w-64 rounded-xl border p-4 shadow-xl z-50 flex flex-col gap-4 select-none",
+                              isDarkMode || visualStyle === 'neon' ? "bg-slate-900 border-slate-800 text-slate-100" : "bg-white border-slate-200 text-slate-900"
+                            )}
+                          >
+                            <div className={cn(
+                              "flex items-center justify-between border-b pb-2",
+                              isDarkMode || visualStyle === 'neon' ? "border-slate-800" : "border-slate-100"
+                            )}>
+                              <span className="text-[10px] font-extrabold uppercase tracking-widest text-slate-500">
+                                {lang === 'uk' ? 'Опції розмітки' : 'Layout Options'}
+                              </span>
+                              <button 
+                                onClick={() => setIsSpacingMenuOpen(false)}
+                                className="text-slate-500 hover:text-red-400 transition-colors p-0.5"
+                              >
+                                <X size={12} />
+                              </button>
+                            </div>
+
+                            {/* Beautification Toggle inside Spacing popover */}
+                            <div className={cn(
+                              "flex items-center justify-between border-b pb-3",
+                              isDarkMode || visualStyle === 'neon' ? "border-slate-800/60" : "border-slate-100"
+                            )}>
+                              <div className="flex items-center gap-2">
+                                <Sparkles size={14} className="text-cyan-400" />
+                                <div>
+                                  <span className="text-[10px] font-bold text-slate-300 uppercase tracking-wider block">
+                                    {lang === 'uk' ? "Б'ютіфікація" : "Beautification"}
+                                  </span>
+                                  <span className="text-[9px] text-slate-500 font-medium block">
+                                    {lang === 'uk' ? "Покращене оформлення" : "Enhanced styling"}
+                                  </span>
+                                </div>
+                              </div>
+                              <button 
+                                onClick={() => {
+                                  const next = !beautifyEnabled;
+                                  setBeautifyEnabled(next);
+                                  localStorage.setItem('steem_beautify', String(next));
+                                }}
+                                className={cn(
+                                  "w-9 h-5 rounded-full transition-all duration-300 relative border shrink-0",
+                                  beautifyEnabled 
+                                    ? "bg-cyan-600 border-cyan-500" 
+                                    : (isDarkMode || visualStyle === 'neon' ? "bg-slate-800 border-slate-700" : "bg-slate-200 border-slate-300")
+                                )}
+                              >
+                                <div className={cn(
+                                  "absolute top-0.5 w-3.5 h-3.5 rounded-full bg-white shadow transition-all duration-300",
+                                  beautifyEnabled ? "left-[18px]" : "left-0.5"
+                                )} />
+                              </button>
+                            </div>
+
+                            {/* Spacing preset & slider */}
+                            <div className="space-y-2">
+                              <div className="flex justify-between items-center">
+                                <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">
+                                  {lang === 'uk' ? 'Відступи абзаців' : 'Paragraph Spacing'}
+                                </span>
+                                <span className="text-[10px] font-mono font-bold text-cyan-400 bg-cyan-950/40 border border-cyan-800/30 px-1.5 py-0.5 rounded">
+                                  {wysiwygSpacing}px
+                                </span>
+                              </div>
+                              <div className={cn(
+                                "grid grid-cols-4 gap-1 p-0.5 rounded-lg border",
+                                isDarkMode || visualStyle === 'neon' ? "bg-slate-950/40 border-slate-800/60" : "bg-slate-50 border-slate-200"
+                              )}>
+                                {[
+                                  { id: 6, label: lang === 'uk' ? 'Комп' : 'Comp' },
+                                  { id: 14, label: lang === 'uk' ? 'Збал' : 'Bal' },
+                                  { id: 20, label: lang === 'uk' ? 'Стан' : 'Norm' },
+                                  { id: 28, label: lang === 'uk' ? 'Прос' : 'Spac' }
+                                ].map(p => (
+                                  <button
+                                    key={p.id}
+                                    onClick={() => {
+                                      setWysiwygSpacing(p.id);
+                                      localStorage.setItem('steem_wysiwyg_spacing', String(p.id));
+                                    }}
+                                    className={cn(
+                                      "py-1 px-0.5 rounded text-[9px] font-bold transition-all text-center truncate",
+                                      wysiwygSpacing === p.id
+                                        ? "bg-cyan-600 text-white shadow-sm"
+                                        : "text-slate-500 hover:text-slate-300 hover:bg-slate-800/20"
+                                    )}
+                                  >
+                                    {p.label}
+                                  </button>
+                                ))}
+                              </div>
+                              <div className="flex items-center gap-2 pt-1">
+                                <span className="text-[9px] text-slate-500 font-mono">0px</span>
+                                <input
+                                  type="range"
+                                  min="0"
+                                  max="40"
+                                  value={wysiwygSpacing}
+                                  onChange={(e) => {
+                                    const val = parseInt(e.target.value, 10);
+                                    setWysiwygSpacing(val);
+                                    localStorage.setItem('steem_wysiwyg_spacing', String(val));
+                                  }}
+                                  className="flex-1 accent-cyan-500 bg-slate-800/60 h-1 rounded-lg appearance-none cursor-pointer"
+                                />
+                                <span className="text-[9px] text-slate-500 font-mono">40px</span>
+                              </div>
+                            </div>
+
+                            {/* Toolbar icon size preset & slider */}
+                            <div className={cn(
+                              "space-y-2 border-t pt-3",
+                              isDarkMode || visualStyle === 'neon' ? "border-slate-800/60" : "border-slate-100"
+                            )}>
+                              <div className="flex justify-between items-center">
+                                <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">
+                                  {lang === 'uk' ? 'Розмір іконок' : 'Toolbar Icon Size'}
+                                </span>
+                                <span className="text-[10px] font-mono font-bold text-cyan-400 bg-cyan-950/40 border border-cyan-800/30 px-1.5 py-0.5 rounded">
+                                  {toolbarIconSize}px
+                                </span>
+                              </div>
+                              <div className="flex items-center gap-2">
+                                <span className="text-[9px] text-slate-500 font-mono">12px</span>
+                                <input
+                                  type="range"
+                                  min="12"
+                                  max="32"
+                                  value={toolbarIconSize}
+                                  onChange={(e) => {
+                                    const val = parseInt(e.target.value, 10);
+                                    setToolbarIconSize(val);
+                                    localStorage.setItem('steem_toolbar_icon_size', String(val));
+                                  }}
+                                  className="flex-1 accent-cyan-500 bg-slate-800/60 h-1 rounded-lg appearance-none cursor-pointer"
+                                />
+                                <span className="text-[9px] text-slate-500 font-mono">32px</span>
+                              </div>
+                            </div>
+                          </motion.div>
+                        </>
+                      )}
+                    </AnimatePresence>
+                  </div>
                 </div>
+
+
               </div>
-              <textarea
-                id="main-editor"
-                ref={editorRef}
-                value={content}
-                onSelect={saveCursorPosition}
-                onKeyUp={saveCursorPosition}
-                onClick={saveCursorPosition}
-                onChange={e => {
-                  setContent(e.target.value);
-                  saveCursorPosition();
-                  if (widgetPos === 'floating' && isWidgetVisible && !isWidgetMenuOpen) {
-                    setIsWidgetVisible(false);
-                  }
-                }}
-                onScroll={handleEditorScroll}
-                onFocus={() => setIsEditorFocused(true)}
-                onBlur={() => {
-                  saveCursorPosition();
-                  setTimeout(() => setIsEditorFocused(false), 200);
-                }}
-                onKeyDown={(e) => {
-                  if (widgetPos === 'floating' && !e.ctrlKey && !e.metaKey && e.key !== 'Shift') {
-                    if (isWidgetVisible && !isWidgetMenuOpen) {
+
+              {editorMode === 'markdown' ? (
+                <CodeEditor
+                  id="main-editor"
+                  ref={editorRef}
+                  onDemandSyncEnabled={onDemandSyncEnabled}
+                  onChange={() => {
+                    if (widgetPos === 'floating' && isWidgetVisible && !isWidgetMenuOpen) {
                       setIsWidgetVisible(false);
                     }
-                  }
-                }}
-                onMouseUp={(e) => {
-                  showWidget(e.clientX, e.clientY);
-                }}
-                className={cn(
-                  "flex-1 w-full bg-transparent p-6 text-slate-300 text-base outline-none resize-none custom-scrollbar transition-all duration-700 editor-font",
-                  widgetPos === 'bottom' ? "mb-20 lg:mb-16 pb-12" : "pb-16 lg:pb-12",
-                  beautifyEnabled && "p-10 max-w-4xl mx-auto selection:bg-[rgb(var(--accent-color)/0.3)]"
-                )}
-                placeholder={`${t('placeholder')}\n\n\n\n\nОМ АХ ХУМ СО ХА\n♡`}
-              />
+                  }}
+                  onScroll={handleEditorScroll}
+                  onFocus={() => setIsEditorFocused(true)}
+                  onBlur={() => {
+                    saveCursorPosition();
+                    setTimeout(() => setIsEditorFocused(false), 200);
+                  }}
+                  onKeyDown={handleEditorKeyDown}
+                  onMouseUp={(e) => {
+                    showWidget(e.clientX, e.clientY);
+                  }}
+                  className={cn(
+                    "flex-1 w-full bg-transparent text-slate-300 text-base outline-none resize-none custom-scrollbar transition-all duration-700 editor-font",
+                    beautifyEnabled ? "px-4 lg:px-8 pt-4 lg:pt-6 max-w-[clamp(40rem,60vw,80rem)] mx-auto selection:bg-[rgb(var(--accent-color)/0.3)]" : "px-3 pt-3 lg:px-6 lg:pt-6",
+                    "pb-4 mb-[85px] lg:mb-[85px]"
+                  )}
+                  placeholder={`${t('placeholder')}\n\n\n\n\nОМ АХ ХУМ СО ХА\n♡`}
+                />
+              ) : (
+                <div
+                  ref={wysiwygRef}
+                  contentEditable
+                  suppressContentEditableWarning
+                  onKeyDown={handleWysiwygKeyDown}
+                  onPaste={async (e) => {
+                    const text = e.clipboardData.getData('text/plain');
+                    if (text) {
+                      const trimmedText = text.trim();
+                      if (isImageAndProxyUrl(trimmedText)) {
+                        e.preventDefault();
+                        const imgHtml = `<img src="${trimmedText}" alt="image">`;
+                        insertHtmlAtCursor(imgHtml);
+                        updateContentFromWysiwyg();
+                        return;
+                      }
+
+                      const hasMarkdownImage = /!\[([^\]]*)\]\(([^)]+)\)/.test(text);
+                      const hasMarkdownLink = /\[([^\]]*)\]\(([^)]+)\)/.test(text);
+                      const hasBareImageUrl = /(?:https?:\/\/)[^\s<>"')]+\.(?:png|jpg|jpeg|gif|webp|svg|bmp|tiff)(?:\?.*)?/i.test(text);
+
+                      const hasMarkdownSyntax = /(?:^|\n)(#{1,6}\s|\*\s|-\s|>\s|\d+\.\s|```)/.test(text) || /\*\*([^*]+)\*\*|__([^_]+)__|_([^\s_][^_]*[^\s_])_|\*([^\s*][^*]*[^\s*])\*|`([^`]+)`/.test(text);
+                      const hasHtmlSyntax = /<(?:div|span|p|br|hr|h[1-6]|b|strong|i|em|u|strike|s|sub|sup|a|img|table|thead|tbody|tr|td|th|ul|ol|li|code|pre|center|blockquote)[^>]*>/i.test(text);
+                      if (hasMarkdownImage || hasMarkdownLink || hasBareImageUrl || hasMarkdownSyntax || hasHtmlSyntax) {
+                        e.preventDefault();
+                        const processed = convertBareImageUrlsToMarkdown(text);
+                        const m = getMarked();
+                        if (m) {
+                          const parsedHtml = await m.parse(processed);
+                          insertHtmlAtCursor(parsedHtml);
+                          updateContentFromWysiwyg();
+                        }
+                      }
+                    }
+                  }}
+                  onInput={(e) => {
+                    if (isSyncingRef.current) return;
+                    const target = e.target as HTMLDivElement;
+                    // O(1) Optimization: Check if active under cursor instead of full DOM traversal queryAll
+                    const sel = window.getSelection();
+                    if (sel && sel.rangeCount > 0) {
+                      const anchorNode = sel.anchorNode;
+                      if (anchorNode) {
+                        const parentEl = anchorNode.nodeType === Node.ELEMENT_NODE ? (anchorNode as Element) : anchorNode.parentElement;
+                        if (parentEl) {
+                          const spacerEl = parentEl.closest('.table-spacer[data-empty="true"]');
+                          if (spacerEl && spacerEl.textContent && spacerEl.textContent.trim() !== '') {
+                            spacerEl.removeAttribute('data-empty');
+                            spacerEl.removeAttribute('data-placeholder');
+                            spacerEl.classList.remove('table-spacer');
+                            spacerEl.classList.remove('top-spacer');
+                            spacerEl.classList.remove('bottom-spacer');
+                          }
+                        }
+                      }
+                    }
+
+                    // Ensure top and bottom spacers are always present when needed
+                    const firstEl = target.firstElementChild;
+                    if (firstEl && ['TABLE', 'PRE', 'BLOCKQUOTE', 'UL', 'OL', 'H1', 'H2', 'H3', 'H4', 'H5', 'H6', 'CENTER'].includes(firstEl.tagName)) {
+                      const hasTopSpacer = firstEl.classList.contains('top-spacer');
+                      if (!hasTopSpacer) {
+                        const pBefore = document.createElement('p');
+                        pBefore.className = 'table-spacer top-spacer';
+                        pBefore.setAttribute('data-empty', 'true');
+                        pBefore.setAttribute('data-placeholder', lang === 'uk' ? '↵ Початок допису...' : lang === 'es' ? '↵ Inicio de la publicación...' : lang === 'ko' ? '↵ 게시물 시작...' : '↵ Top of post...');
+                        pBefore.innerHTML = '<br>';
+                        target.insertBefore(pBefore, firstEl);
+                      }
+                    }
+
+                    const lastEl = target.lastElementChild;
+                    const hasBottomSpacer = lastEl && lastEl.tagName === 'P' && lastEl.classList.contains('bottom-spacer');
+                    if (!hasBottomSpacer) {
+                      const pAfter = document.createElement('p');
+                      pAfter.className = 'table-spacer bottom-spacer';
+                      pAfter.setAttribute('data-empty', 'true');
+                      pAfter.setAttribute('data-placeholder', lang === 'uk' ? '↵ Кінець допису...' : lang === 'es' ? '↵ Fin de la publicación...' : lang === 'ko' ? '↵ 게시물 끝...' : '↵ End of post...');
+                      pAfter.innerHTML = '<br>';
+                      target.appendChild(pAfter);
+                    }
+
+                    const html = target.innerHTML;
+                    const syncDelay = onDemandSyncEnabled ? 4000 : 150;
+                    const backupDelay = onDemandSyncEnabled ? 2000 : 800;
+
+                    // Debounce local storage backup of raw HTML so typing remains 100% native and fluid
+                    if (wysiwygLocalBackupTimeoutRef.current) {
+                      clearTimeout(wysiwygLocalBackupTimeoutRef.current);
+                    }
+                    wysiwygLocalBackupTimeoutRef.current = setTimeout(() => {
+                      localStorage.setItem('steem_autosave_temp_visual_html', html);
+                    }, backupDelay) as any;
+                    
+                    // Delay HTML-to-Markdown conversion so typing stays 100% native and smooth.
+                    // This ensures zero unnecessary CPU-heavy conversions during active typing.
+                    if (wysiwygSyncTimeoutRef.current) {
+                      clearTimeout(wysiwygSyncTimeoutRef.current);
+                    }
+                    wysiwygSyncTimeoutRef.current = setTimeout(() => {
+                      const md = htmlToMarkdown(html);
+                      if (md !== useEditorStore.getState().content) {
+                        lastSyncContentRef.current = md;
+                        setContent(md);
+                        saveVisualSelection();
+                      }
+                    }, syncDelay) as any;
+                  }}
+                  onFocus={() => {
+                    setIsEditorFocused(true);
+                    saveVisualSelection();
+                  }}
+                  onBlur={() => {
+                    setIsEditorFocused(false);
+                    // Sync visual editor raw HTML immediately on blur for full safety
+                    if (onDemandSyncEnabled && wysiwygRef.current) {
+                      localStorage.setItem('steem_autosave_temp_visual_html', wysiwygRef.current.innerHTML);
+                    }
+                  }}
+                  onScroll={() => {
+                    if (wysiwygRef.current) {
+                      localStorage.setItem('steem_editor_scroll', String(wysiwygRef.current.scrollTop));
+                    }
+                  }}
+                  onMouseUp={(e) => {
+                    showWidget(e.clientX, e.clientY);
+                    saveVisualSelection();
+                  }}
+                  onKeyUp={() => {
+                    saveVisualSelection();
+                  }}
+                  onClick={(e) => {
+                    const target = e.target as HTMLElement;
+                    if (target === wysiwygRef.current) {
+                      const lastChild = target.lastElementChild;
+                      if (lastChild && ['TABLE', 'BLOCKQUOTE', 'CENTER', 'DIV', 'IMG'].includes(lastChild.tagName)) {
+                        const sel = window.getSelection();
+                        const range = document.createRange();
+                        range.setStartAfter(lastChild);
+                        range.collapse(true);
+                        sel?.removeAllRanges();
+                        sel?.addRange(range);
+                      }
+                    }
+                  }}
+                  className={cn(
+                    "flex-1 w-full bg-transparent text-slate-300 text-base outline-none overflow-y-auto custom-scrollbar transition-colors duration-700 editor-font prose prose-invert prose-cyan max-w-none wysiwyg-editor whitespace-pre-wrap",
+                    beautifyEnabled ? "px-4 lg:px-8 pt-4 lg:pt-6 max-w-4xl mx-auto selection:bg-[rgb(var(--accent-color)/0.3)]" : "px-4 pt-4 lg:px-6 lg:pt-6",
+                    "pb-4 mb-[85px] lg:mb-[85px]"
+                  )}
+                  style={{ minHeight: '200px' }}
+                />
+              )}
+
+              {/* Table Action Menu */}
+              {activeTable && tableRect && editorMode === 'visual' && (
+                <div 
+                  className={cn("fixed z-[160] flex flex-col gap-1.5 p-1.5 rounded-xl",
+                    isTableMenuExpanded || isTableMenuPinned ? "bg-slate-900 border border-slate-700/50 shadow-none" : "bg-transparent shadow-none"
+                  )}
+                  style={{
+                    top: tableRect.top + 10,
+                    left: Math.max(8, tableRect.left - 48),
+                  }}
+                  onMouseEnter={() => !isTableMenuPinned && setIsTableMenuExpanded(true)}
+                  onMouseLeave={() => !isTableMenuPinned && setIsTableMenuExpanded(false)}
+                >
+                  {isTableMenuExpanded || isTableMenuPinned ? (
+                    <>
+                      <button 
+                        onClick={() => {
+                          const newPinned = !isTableMenuPinned;
+                          setIsTableMenuPinned(newPinned);
+                          localStorage.setItem('steem_table_menu_pinned', newPinned.toString());
+                        }} 
+                        className={cn("p-2 rounded-lg transition-colors flex items-center justify-center", isTableMenuPinned ? "text-cyan-400 bg-cyan-900/40" : "text-slate-400 hover:text-white hover:bg-slate-800")}
+                        title="Pin Menu"
+                      >
+                        <Settings size={16} />
+                      </button>
+                      <div className="h-px w-full bg-slate-800" />
+                      <button onClick={deleteActiveTableRow} className="p-2 text-slate-400 hover:text-white hover:bg-red-500/80 rounded-lg transition-colors flex items-center justify-center" title="Delete Row">
+                        <Trash2 size={16} />
+                      </button>
+                      <button onClick={deleteActiveTableCol} className="p-2 text-slate-400 hover:text-white hover:bg-red-500/80 rounded-lg transition-colors flex items-center justify-center" title="Delete Column">
+                        <Trash2 size={16} className="rotate-90" />
+                      </button>
+                      <button onClick={deleteActiveTable} className="p-2 text-red-400 hover:text-white hover:bg-red-600 rounded-lg transition-colors flex items-center justify-center" title="Delete Table">
+                        <Trash2 size={18} />
+                      </button>
+                    </>
+                  ) : (
+                    <button 
+                      className="p-2 text-slate-400 bg-slate-900 border border-slate-700/50 hover:text-white hover:bg-slate-800 rounded-lg transition-colors shadow-none flex items-center justify-center" 
+                      title="Table Settings"
+                    >
+                      <Settings size={18} className="opacity-70" />
+                    </button>
+                  )}
+                </div>
+              )}
 
               {/* Tamed Widget - Now with arrow navigation and smart positioning */}
               {isWidgetVisible && !activeModal && (window.innerWidth >= 1024 || !isSidebarOpen) && (
@@ -5086,7 +8757,9 @@ function App() {
                     key="steem-widget"
                     ref={widgetRef}
                     style={(() => {
-                      const style: React.CSSProperties = { opacity: widgetOpacity };
+                      const style: React.CSSProperties = { 
+                        opacity: 1.0 
+                      };
                       
                       if (widgetPos === 'floating' && window.innerWidth >= 1024 && floatingPos && editorPaneRef.current) {
                         const rect = editorPaneRef.current.getBoundingClientRect();
@@ -5105,12 +8778,10 @@ function App() {
                       return style;
                     })()}
                     className={cn(
-                      "z-[500] p-1 flex items-center gap-1 backdrop-blur-xl",
-                      cn(
-                        widgetNoBorder 
-                          ? "bg-slate-900/40 backdrop-blur-3xl shadow-none border-none border-transparent py-0 px-0" 
-                          : "bg-slate-900 border border-white/10 rounded-3xl shadow-2xl p-1"
-                      ),
+                      "z-[150] p-1 flex items-center gap-1",
+                      widgetNoBorder 
+                        ? "shadow-none border-none border-transparent py-0 px-0 bg-slate-900"
+                        : "bg-slate-900 border border-white/10 rounded-3xl p-1 shadow-none",
                       widgetPos === 'floating' ? (
                         "fixed lg:absolute " + (window.innerWidth < 1024 ? "bottom-[4.5rem] left-4 right-4 rounded-3xl" : "")
                       ) : (
@@ -5121,13 +8792,24 @@ function App() {
                     <button 
                       onMouseDown={(e) => e.preventDefault()}
                       onClick={() => scrollRef.current?.scrollBy({ left: -100, behavior: 'smooth' })}
-                      className="hidden lg:flex w-8 h-12 items-center justify-center text-slate-500 hover:text-cyan-400 transition-colors"
+                      className="hidden lg:flex h-[var(--toolbar-btn-size,3rem)] px-1.5 items-center justify-center text-slate-500 hover:text-cyan-400 transition-colors"
                     >
-                      <ChevronLeft size={20} />
+                      <ChevronLeft size={20} className="w-[var(--toolbar-icon-size,1.25rem)] h-[var(--toolbar-icon-size,1.25rem)]" />
                     </button>
 
                     <div 
                       ref={scrollRef}
+                      onWheel={(e) => {
+                        if (scrollRef.current) {
+                          if (e.deltaX !== 0) {
+                            // Let native horizontal scrolling work
+                            return;
+                          }
+                          // Translate vertical scrolling to horizontal
+                          e.preventDefault();
+                          scrollRef.current.scrollBy({ left: e.deltaY > 0 ? 50 : -50 });
+                        }
+                      }}
                       className="flex items-center flex-nowrap justify-start gap-1.5 overflow-x-auto custom-scrollbar scroll-smooth no-scrollbar px-1 py-0 w-full"
                       style={{ 
                         scrollbarWidth: 'none',
@@ -5138,14 +8820,27 @@ function App() {
                       {enabledTools.map((key) => {
                         const tool = TOOLS_MAP[key];
                         if (!tool) return null;
+                        const isToolActive = 
+                          key === 'B' ? activeFormats.bold :
+                          key === 'I' ? activeFormats.italic :
+                          key === 'S' ? activeFormats.strikethrough :
+                          key === 'sub' ? activeFormats.sub :
+                          key === 'sup' ? activeFormats.sup :
+                          key === 'Inline' ? activeFormats.code :
+                          key === 'Color' ? activeFormats.phishy :
+                          false;
                         return (
                           <button 
                             key={key}
                             onMouseDown={(e) => e.preventDefault()}
                             onClick={tool.action} 
                             className={cn(
-                              "w-12 h-12 lg:w-12 lg:h-12 flex-shrink-0 flex items-center justify-center hover:bg-cyan-600 hover:text-white rounded-xl transition-all font-bold text-base lg:text-lg",
-                              !widgetNoBorder ? "bg-slate-900/90 border border-slate-600/50 shadow-sm" : "bg-transparent text-slate-400 hover:bg-white/10"
+                              "toolbar-btn flex-shrink-0 flex items-center justify-center hover:bg-cyan-600 hover:text-white rounded-xl transition-colors font-bold",
+                              isToolActive 
+                                ? "bg-cyan-950 text-cyan-400 border border-cyan-500/50 shadow-none"
+                                : !widgetNoBorder 
+                                  ? "bg-slate-800 border border-slate-600/50 text-slate-300 shadow-none"
+                                  : "bg-transparent text-slate-400 hover:bg-white/10"
                             )}
                           >
                             {tool.label}
@@ -5157,12 +8852,12 @@ function App() {
                     <button 
                       onMouseDown={(e) => e.preventDefault()}
                       onClick={() => scrollRef.current?.scrollBy({ left: 100, behavior: 'smooth' })}
-                      className="hidden lg:flex w-7 h-12 items-center justify-center text-slate-500 hover:text-cyan-400 transition-colors"
+                      className="hidden lg:flex h-[var(--toolbar-btn-size,3rem)] px-1.5 items-center justify-center text-slate-500 hover:text-cyan-400 transition-colors"
                     >
-                      <ChevronRight size={20} />
+                      <ChevronRight size={20} className="w-[var(--toolbar-icon-size,1.25rem)] h-[var(--toolbar-icon-size,1.25rem)]" />
                     </button>
 
-                    <div className="hidden lg:block w-px h-10 bg-slate-700/50 mx-1 flex-shrink-0" />
+                    <div className="hidden lg:block w-px h-[calc(var(--toolbar-btn-size,3rem)-8px)] bg-slate-700/50 mx-1 flex-shrink-0" />
                     
                     <div className="relative">
                       <button 
@@ -5176,9 +8871,9 @@ function App() {
                           setIsWidgetMenuOpen(!isWidgetMenuOpen);
                         }} 
                         className={cn(
-                          "w-12 h-12 lg:w-12 lg:h-12 flex-shrink-0 flex items-center justify-center rounded-xl transition-all",
+                          "toolbar-btn flex-shrink-0 flex items-center justify-center rounded-xl transition-all",
                           isWidgetMenuOpen ? "bg-cyan-600 text-white" : 
-                          !widgetNoBorder ? "bg-slate-700/50 hover:bg-cyan-600 hover:text-white border border-slate-600/50" : "bg-transparent text-slate-400 hover:bg-white/10"
+                          !widgetNoBorder ? "bg-slate-700 hover:bg-cyan-600 hover:text-white border border-slate-600/50" : "bg-transparent text-slate-400 hover:bg-white/10"
                         )}
                       >
                         <Settings size={20} />
@@ -5193,7 +8888,7 @@ function App() {
                             exit={{ opacity: 0, scale: 0.95 }}
                             transition={{ duration: 0.1, ease: "easeOut" }}
                             className={cn(
-                              "absolute right-0 w-72 bg-slate-900/90 backdrop-blur-2xl border border-white/5 rounded-3xl shadow-2xl overflow-hidden z-[400] flex flex-col",
+                              "absolute right-0 w-72 border border-white/5 rounded-3xl overflow-hidden z-[160] flex flex-col bg-slate-900 shadow-none",
                               menuDirection === 'down' ? "top-full mt-3" : "bottom-full mb-3"
                             )}
                             style={{ 
@@ -5369,7 +9064,7 @@ function App() {
                       onClick={() => setIsWidgetVisible(false)} 
                       className={cn(
                         "w-10 h-10 flex-shrink-0 flex items-center justify-center rounded-xl transition-all lg:hidden",
-                        !widgetNoBorder ? "bg-slate-700/50 hover:bg-red-600 hover:text-white border border-slate-600/50" : "bg-transparent text-slate-400 hover:bg-red-600/20 hover:text-red-400"
+                        !widgetNoBorder ? (performanceMode ? "bg-slate-700 hover:bg-red-600 hover:text-white border border-slate-600/50" : "bg-slate-700/50 hover:bg-red-600 hover:text-white border border-slate-600/50") : "bg-transparent text-slate-400 hover:bg-red-600/20 hover:text-red-400"
                       )}
                     >
                       <X size={20} />
@@ -5382,18 +9077,30 @@ function App() {
             <div 
               ref={previewRef}
               className={cn(
-                "flex-1 flex flex-col min-w-0 bg-slate-900/30 transition-all relative",
-                activeMobileTab !== 'preview' && "hidden lg:flex",
+                "flex-1 flex flex-col min-w-0 bg-slate-900 relative",
+                activeMobileTab === 'preview' ? "flex" : "hidden",
+                isLivePreviewEnabled ? "lg:flex" : "lg:hidden",
                 isFullScreen && "bg-slate-950 p-4 lg:p-12 overflow-y-auto fixed inset-0 z-[100]"
               )}
             >
               <div className="absolute top-4 right-4 z-10 flex gap-2">
-                <div className="flex p-1 bg-slate-800/50 backdrop-blur-md rounded-xl border border-slate-700/50 gap-1 shrink-0">
+                <div className="flex p-1 bg-slate-800 rounded-xl border border-slate-700 gap-1 shrink-0">
+                  <button
+                    onClick={toggleLivePreview}
+                    className={cn(
+                      "p-1.5 rounded-lg transition-colors",
+                      isLivePreviewEnabled ? "bg-cyan-600 text-white shadow-none" : "bg-red-950 text-red-400 border border-red-500/30"
+                    )}
+                    title={lang === 'uk' ? "Увімкнути/вимкнути прев'ю перегляду" : "Enable/Disable Live Preview"}
+                  >
+                    {isLivePreviewEnabled ? <Eye size={20} /> : <EyeOff size={20} />}
+                  </button>
+                  <div className="w-px h-4 bg-slate-700 mx-0.5 my-auto" />
                   <button
                     onClick={() => setSyncScrollEnabled(!syncScrollEnabled)}
                     className={cn(
-                      "p-1.5 rounded-lg transition-all",
-                      syncScrollEnabled ? "bg-cyan-600 text-white shadow-lg" : "text-slate-500 hover:text-slate-300"
+                      "p-1.5 rounded-lg transition-colors",
+                      syncScrollEnabled ? "bg-cyan-600 text-white shadow-none" : "text-slate-500 hover:text-slate-300"
                     )}
                     title={t('syncScroll')}
                   >
@@ -5424,17 +9131,7 @@ function App() {
           {/* Mobile Tabs - Merged into Bottom Nav below */}
 
           {/* Footer Status Bar - Hidden on mobile to save space for tabs */}
-          <footer className="hidden lg:flex h-8 border-t border-slate-800 bg-slate-900 items-center px-4 justify-between text-[10px] font-medium text-slate-500 uppercase tracking-widest">
-            <div className="flex gap-4">
-              <span>{t('wordsLabel')}: {stats.words}</span>
-              <span className="text-cyan-400">{t('cleanWordsLabel')}: {cleanStats.words}</span>
-              <span>{t('charsLabel')}: {stats.chars}</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
-              <span>{t('autosaveActive')}</span>
-            </div>
-          </footer>
+<DesktopStatsFooter t={t} />
         </main>
       </div>
   </div>
@@ -5445,14 +9142,14 @@ function App() {
           <div key="modal-unlock-pin" className="fixed inset-0 z-[300] flex items-center justify-center p-4">
             <motion.div 
               initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-              className="absolute inset-0 bg-slate-950/80 backdrop-blur-sm"
+              className="absolute inset-0 bg-slate-950/90"
               onClick={() => setActiveModal(null)}
             />
             <motion.div 
               initial={{ scale: 0.95, opacity: 0, y: 10 }} 
               animate={{ scale: 1, opacity: 1, y: 0 }} 
               exit={{ scale: 0.95, opacity: 0, y: 10 }}
-              className="relative w-full max-w-[240px] bg-slate-900 border border-slate-700/50 rounded-2xl shadow-2xl p-5 text-center overflow-hidden"
+              className="relative w-full max-w-[240px] bg-slate-900 border border-slate-700/50 rounded-2xl shadow-none p-5 text-center overflow-hidden"
             >
               <div className="absolute top-0 left-0 right-0 h-1 bg-cyan-600" />
               
@@ -5522,14 +9219,14 @@ function App() {
           <div key="modal-keys" className="fixed inset-0 z-[200] flex items-center justify-center p-4">
             <motion.div 
               initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-              className="absolute inset-0 bg-slate-950/80 backdrop-blur-sm"
+              className="absolute inset-0 bg-slate-950/90"
               onClick={() => setActiveModal(null)}
             />
             <motion.div 
               initial={{ scale: 0.9, opacity: 0, y: 20 }}
               animate={{ scale: 1, opacity: 1, y: 0 }}
               exit={{ scale: 0.9, opacity: 0, y: 20 }}
-              className="relative w-full max-w-lg bg-slate-900 border border-slate-800 rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]"
+              className="relative w-full max-w-lg bg-slate-900 border border-slate-800 rounded-2xl shadow-none overflow-hidden flex flex-col max-h-[90vh]"
             >
               <div className="p-6 border-b border-slate-800 flex justify-between items-center bg-slate-800/30 shrink-0">
                 <h2 className="text-xl font-bold flex items-center gap-2">
@@ -5906,14 +9603,14 @@ function App() {
           <div key="modal-publish" className="fixed inset-0 z-[200] flex items-center justify-center p-4">
             <motion.div 
               initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-              className="absolute inset-0 bg-slate-950/80 backdrop-blur-sm"
+              className="absolute inset-0 bg-slate-950/90"
               onClick={() => setActiveModal(null)}
             />
             <motion.div 
               initial={{ scale: 0.9, opacity: 0, y: 20 }}
               animate={{ scale: 1, opacity: 1, y: 0 }}
               exit={{ scale: 0.9, opacity: 0, y: 20 }}
-              className="relative w-full sm:max-w-lg bg-slate-900 border border-slate-800 rounded-2xl shadow-2xl overflow-hidden"
+              className="relative w-full sm:max-w-lg bg-slate-900 border border-slate-800 rounded-2xl shadow-none overflow-hidden"
             >
               <div className="p-4 sm:p-6 border-b border-slate-800 flex justify-between items-center bg-slate-800/30">
                 <h2 className="text-lg sm:text-xl font-bold flex items-center gap-2">
@@ -6010,11 +9707,11 @@ function App() {
                                   setSelectedVaultUser(e.target.value);
                                   setUsername(e.target.value);
                                 }}
-                                className="w-full bg-slate-900 border border-slate-700 rounded-lg p-2 text-sm text-slate-200 outline-none cursor-pointer"
+                                className="w-full bg-slate-900 border border-slate-700 rounded-lg p-2 text-sm text-slate-200 outline-none"
                               >
-                                <option value="" className="bg-slate-900 text-slate-350">{t('selectAccount')}</option>
+                                <option value="">{t('selectAccount')}</option>
                                 {vaultAccounts.map(acc => (
-                                  <option key={acc} value={acc} className="bg-slate-900 text-slate-300">@{acc}</option>
+                                  <option key={acc} value={acc}>@{acc}</option>
                                 ))}
                               </select>
                               <div className="p-3 bg-green-500/10 border border-green-500/20 rounded-lg text-[11px] text-green-400 flex items-start gap-2">
@@ -6265,11 +9962,11 @@ function App() {
                             )}
 
                             {/* Mentions in text Picker */}
-                            {extractMentions(content).filter(m => !mentions.includes(m)).length > 0 && (
+                            {extractMentions(contentForPublish).filter(m => !mentions.includes(m)).length > 0 && (
                               <div className="px-1">
                                 <span className="text-[8px] text-slate-600 uppercase font-bold mb-1 block opacity-60">{t('fromMentions')}:</span>
                                 <div className="flex flex-wrap gap-1">
-                                  {extractMentions(content).filter(m => !mentions.includes(m)).map(m => (
+                                  {extractMentions(contentForPublish).filter(m => !mentions.includes(m)).map(m => (
                                     <button
                                       key={m}
                                       onClick={() => {
@@ -6337,12 +10034,12 @@ function App() {
                    <div className="flex items-center gap-2">
                       <AtSign size={16} className={cn(
                         "transition-colors",
-                        (content.includes('✍️') || content.includes('center') || content.toLowerCase().includes('signature')) ? "text-green-500" : "text-slate-600"
+                        (contentForPublish.includes('✍️') || contentForPublish.includes('center') || contentForPublish.toLowerCase().includes('signature')) ? "text-green-500" : "text-slate-600"
                       )} />
                       <span className="text-[10px] text-slate-500 uppercase font-bold tracking-wider">{t('signaturePolicy')}</span>
                    </div>
                    <div className="flex items-center gap-2">
-                      { (content.includes('✍️') || content.includes('center') || content.toLowerCase().includes('signature')) ? (
+                      { (contentForPublish.includes('✍️') || contentForPublish.includes('center') || contentForPublish.toLowerCase().includes('signature')) ? (
                         <CheckCircle size={16} className="text-green-500" />
                       ) : (
                         <div className="flex items-center gap-1">
@@ -6393,14 +10090,14 @@ function App() {
             <div key="modal-templates" className="fixed inset-0 z-[300] flex items-center justify-center p-4">
               <motion.div 
                 initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-                className="absolute inset-0 bg-slate-950/80 backdrop-blur-sm"
+                className="absolute inset-0 bg-slate-950/90"
                 onClick={() => setActiveModal(null)}
               />
               <motion.div 
                 initial={{ opacity: 0, scale: 0.9 }}
                 animate={{ opacity: 1, scale: 1 }}
                 exit={{ opacity: 0, scale: 0.9 }}
-                className="relative bg-slate-900 border border-slate-800 rounded-3xl shadow-2xl w-full max-w-lg overflow-hidden flex flex-col max-h-[80vh]"
+                className="relative bg-slate-900 border border-slate-800 rounded-3xl shadow-none w-full max-w-lg overflow-hidden flex flex-col max-h-[80vh]"
               >
                 <div className="p-6 border-b border-slate-800 flex items-center justify-between">
                   <div className="flex items-center gap-3">
@@ -6426,7 +10123,7 @@ function App() {
                           const newT: Template = {
                             id: Date.now().toString(),
                             name,
-                            content,
+                            content: useEditorStore.getState().content,
                             tags: pubTags,
                             title: pubTitle
                           };
@@ -6496,14 +10193,14 @@ function App() {
           <div key="modal-tag-presets" className="fixed inset-0 z-[200] flex items-center justify-center p-4">
             <motion.div 
               initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-              className="absolute inset-0 bg-slate-950/80 backdrop-blur-sm"
+              className="absolute inset-0 bg-slate-950/90"
               onClick={() => setActiveModal('publish')}
             />
             <motion.div 
               initial={{ scale: 0.9, opacity: 0, y: 20 }}
               animate={{ scale: 1, opacity: 1, y: 0 }}
               exit={{ scale: 0.9, opacity: 0, y: 20 }}
-              className="relative w-full sm:max-w-2xl bg-slate-900 border border-slate-800 rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh] sm:max-h-[80vh]"
+              className="relative w-full sm:max-w-2xl bg-slate-900 border border-slate-800 rounded-2xl shadow-none overflow-hidden flex flex-col max-h-[90vh] sm:max-h-[80vh]"
             >
               <div className="p-4 sm:p-6 border-b border-slate-800 flex justify-between items-center bg-slate-800/30 shrink-0">
                 <h2 className="text-lg sm:text-xl font-bold flex items-center gap-2">
@@ -6613,14 +10310,14 @@ function App() {
           <div key="modal-split" className="fixed inset-0 z-[200] flex items-center justify-center p-4">
             <motion.div 
               initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-              className="absolute inset-0 bg-slate-950/80 backdrop-blur-sm"
+              className="absolute inset-0 bg-slate-950/90"
               onClick={() => setActiveModal(null)}
             />
             <motion.div 
               initial={{ scale: 0.9, opacity: 0, y: 20 }}
               animate={{ scale: 1, opacity: 1, y: 0 }}
               exit={{ scale: 0.9, opacity: 0, y: 20 }}
-              className="relative w-full sm:max-w-md bg-slate-900 border border-slate-800 rounded-2xl shadow-2xl overflow-hidden"
+              className="relative w-full sm:max-w-md bg-slate-900 border border-slate-800 rounded-2xl shadow-none overflow-hidden"
             >
               <div className="p-4 sm:p-6 border-b border-slate-800 flex justify-between items-center bg-slate-800/30">
                 <h2 className="text-lg sm:text-xl font-bold flex items-center gap-2">
@@ -6643,7 +10340,7 @@ function App() {
                     />
                   </div>
                   <div className="text-xl sm:text-2xl font-bold text-white flex items-baseline gap-2">
-                    {Math.ceil(content.split(/\s+/).filter(w => w.length > 0).length / (splitWords || 300))}
+                    {Math.ceil(stats.words / (splitWords || 300))}
                     <span className="text-xs text-slate-500 font-medium">{t('parts')}</span>
                   </div>
                 </div>
@@ -6670,14 +10367,14 @@ function App() {
           <div key="modal-drafts" className="fixed inset-0 z-[200] flex items-center justify-center p-4">
             <motion.div 
               initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-              className="absolute inset-0 bg-slate-950/80 backdrop-blur-sm"
+              className="absolute inset-0 bg-slate-950/90"
               onClick={() => setActiveModal(null)}
             />
             <motion.div 
               initial={{ scale: 0.9, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
               exit={{ scale: 0.9, opacity: 0 }}
-              className="relative w-full sm:max-w-md bg-slate-900 border border-slate-800 rounded-2xl shadow-2xl overflow-hidden"
+              className="relative w-full sm:max-w-md bg-slate-900 border border-slate-800 rounded-2xl shadow-none overflow-hidden"
             >
               <div className="p-4 sm:p-6 border-b border-slate-800 flex justify-between items-center bg-slate-800/30">
                 <div className="flex flex-col">
@@ -6739,6 +10436,7 @@ function App() {
                         if (await confirmDialog(t('loadDraftConfirm'))) {
                           setContent(draft.body);
                           setCurrentDraftId(draft.id);
+                          localStorage.removeItem('steem_autosave_temp_visual_html');
                           setActiveModal(null);
                         }
                       }}
@@ -6807,14 +10505,14 @@ function App() {
           <div key="modal-mentions" className="fixed inset-0 z-[200] flex items-center justify-center p-4">
             <motion.div 
               initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-              className="absolute inset-0 bg-slate-950/80 backdrop-blur-sm"
+              className="absolute inset-0 bg-slate-950/90"
               onClick={() => setActiveModal(null)}
             />
             <motion.div 
               initial={{ scale: 0.9, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
               exit={{ scale: 0.9, opacity: 0 }}
-              className="relative w-full sm:max-w-md bg-slate-900 border border-slate-800 rounded-2xl shadow-2xl overflow-hidden"
+              className="relative w-full sm:max-w-md bg-slate-900 border border-slate-800 rounded-2xl shadow-none overflow-hidden"
             >
               <div className="p-4 sm:p-6 border-b border-slate-800 flex justify-between items-center bg-slate-800/30">
                 <h2 className="text-lg sm:text-xl font-bold flex items-center gap-2">
@@ -6874,14 +10572,14 @@ function App() {
                   initial={{ opacity: 0 }} 
                   animate={{ opacity: 1 }} 
                   exit={{ opacity: 0 }}
-                  className="absolute inset-0 bg-slate-950/60 backdrop-blur-md"
+                  className="absolute inset-0 bg-slate-950/90"
                   onClick={() => setIsSMenuOpen(false)}
                 />
                 <motion.div 
                   initial={{ scale: 0.9, opacity: 0, y: 20 }} 
                   animate={{ scale: 1, opacity: 1, y: 0 }} 
                   exit={{ scale: 0.9, opacity: 0, y: 20 }}
-                  className="relative bg-slate-900 border border-white/5 rounded-[2rem] shadow-2xl max-w-sm w-full overflow-hidden flex flex-col max-h-[90vh]"
+                  className="relative bg-slate-900 border border-white/5 rounded-[2rem] shadow-none max-w-sm w-full overflow-hidden flex flex-col max-h-[90vh]"
                 >
                   <div className="p-6 sm:p-8 overflow-y-auto custom-scrollbar">
                     <div className="absolute top-0 right-0 p-4 z-10">
@@ -6891,7 +10589,7 @@ function App() {
                     </div>
 
                     <div className="flex items-center gap-4 mb-6">
-                      <div className="w-12 h-12 bg-gradient-to-br from-cyan-500 to-blue-600 rounded-2xl flex items-center justify-center text-white text-2xl font-black shadow-2xl shadow-cyan-500/20">
+                      <div className="w-12 h-12 bg-gradient-to-br from-cyan-500 to-blue-600 rounded-2xl flex items-center justify-center text-white text-2xl font-black shadow-none">
                         <span className={cn("logo-s", visualStyle === 'neon' && "neon-icon-glow")}>S</span>
                       </div>
                       <div>
@@ -7010,15 +10708,33 @@ function App() {
                           <Zap size={18} className={visualStyle === 'neon' ? "text-purple-400" : "text-slate-500"} /> Neon
                         </button>
                       </div>
-                      <div className="pt-2">
+                      <div className="pt-2 flex flex-col gap-2">
+                        <button 
+                          onClick={() => {
+                            setIsSMenuOpen(false);
+                            setSettingsTab('general');
+                            setActiveModal('settings');
+                          }}
+                          className="w-full py-4 bg-cyan-600 hover:bg-cyan-500 rounded-3xl text-sm font-black text-white flex items-center justify-center gap-3 transition-all shadow-xl shadow-cyan-600/20 text-center"
+                        >
+                          <Settings size={18} /> {lang === 'uk' ? 'Розширені налаштування' : 'Advanced Settings'}
+                        </button>
+                        <a 
+                          href="/"
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="w-full py-4 bg-gradient-to-r from-emerald-600 to-teal-500 hover:from-emerald-500 hover:to-teal-400 rounded-3xl text-sm font-black text-white flex items-center justify-center gap-3 transition-all shadow-xl shadow-emerald-600/20 text-center"
+                        >
+                          <Maximize2 size={18} /> {lang === 'uk' ? 'Повний екран та Тестування' : 'Full Preview & Testing'}
+                        </a>
                         <button 
                           onClick={() => {
                             setIsSMenuOpen(false);
                             setActiveModal('about');
                           }}
-                          className="w-full py-4 bg-cyan-600 hover:bg-cyan-500 rounded-3xl text-sm font-black text-white flex items-center justify-center gap-3 transition-all shadow-xl shadow-cyan-600/20"
+                          className="w-full py-4 bg-slate-800 hover:bg-slate-700 border border-slate-700/50 rounded-3xl text-sm font-black text-slate-300 flex items-center justify-center gap-3 transition-all"
                         >
-                          <Info size={18} /> About App
+                          <Info size={18} /> {lang === 'uk' ? 'Про додаток' : 'About App'}
                         </button>
                       </div>
                     </div>
@@ -7033,14 +10749,14 @@ function App() {
             <div key="modal-about" className="fixed inset-0 z-[300] flex items-center justify-center p-4">
               <motion.div 
                 initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-                className="absolute inset-0 bg-slate-950/80 backdrop-blur-sm"
+                className="absolute inset-0 bg-slate-950/90"
                 onClick={() => setActiveModal(null)}
               />
               <motion.div 
                 initial={{ scale: 0.9, opacity: 0, y: 20 }} 
                 animate={{ scale: 1, opacity: 1, y: 0 }} 
                 exit={{ scale: 0.9, opacity: 0, y: 20 }}
-                className="relative bg-slate-900 border border-slate-800 rounded-3xl shadow-2xl p-8 max-w-2xl w-full max-h-[90vh] overflow-y-auto custom-scrollbar"
+                className="relative bg-slate-900 border border-slate-800 rounded-3xl shadow-none p-8 max-w-2xl w-full max-h-[90vh] overflow-y-auto custom-scrollbar"
               >
                 <button 
                   onClick={() => setActiveModal(null)}
@@ -7050,8 +10766,8 @@ function App() {
                 </button>
 
                 <div className="text-center mb-8">
-                  <div className="w-20 h-20 bg-cyan-500 rounded-2xl flex items-center justify-center text-white text-4xl font-bold mx-auto mb-6 shadow-2xl shadow-cyan-500/20">S</div>
-                  <h2 className="text-3xl font-bold mb-2 tracking-tight">SteemEditor <span className="text-cyan-400">Pro</span></h2>
+                  <div className="w-20 h-20 bg-cyan-500 rounded-2xl flex items-center justify-center text-white text-4xl font-bold mx-auto mb-6 shadow-none">U</div>
+                  <h2 className="text-3xl font-bold mb-2 tracking-tight">Ultra Steem <span className="text-cyan-400">Editor</span></h2>
                   <p className="text-slate-400 text-sm max-w-sm mx-auto leading-relaxed mb-4">{t('aboutDesc')}</p>
                   <div className="inline-flex items-center gap-2 px-3 py-1 bg-cyan-500/10 border border-cyan-500/20 rounded-full text-[10px] font-bold text-cyan-400 uppercase tracking-widest">
                     <Shield size={14} /> Web Crypto AES-GCM Secured
@@ -7082,7 +10798,7 @@ function App() {
                     <div className="pt-4 space-y-3">
                       <div className="flex justify-between text-xs items-center">
                         <span className="text-slate-500">{t('version')}</span>
-                        <span className="bg-cyan-500/10 text-cyan-400 px-2 py-1 rounded-md font-mono font-bold">3.2.2-stable</span>
+                        <span className="bg-cyan-500/10 text-cyan-400 px-2 py-1 rounded-md font-mono font-bold">4.3.8</span>
                       </div>
                       <div className="flex justify-between text-xs items-center">
                         <span className="text-slate-500">{t('license')}</span>
@@ -7109,31 +10825,47 @@ function App() {
                   {/* Tech Stack Section */}
                   <div className="space-y-6">
                     <div>
-                      <h3 className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-4 flex items-center gap-2">
+                      <h3 className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-3 flex items-center gap-2">
                          <Terminal size={18} /> {t('packagesUsed')}
                       </h3>
-                      <div className="flex flex-wrap gap-1.5 overflow-y-auto max-h-[120px] p-1">
-                        {['dsteem', 'react', 'motion', 'marked', 'dompurify', 'lucide-react', 'buffer', 'jszip', 'idb-keyval'].map(pkg => (
-                          <span key={pkg} className="bg-slate-800 border border-slate-700 px-2 py-1 rounded-md text-[10px] text-slate-300 font-mono">
-                            {pkg}
-                          </span>
+                      <div className="mt-2 space-y-2 max-h-48 overflow-y-auto custom-scrollbar pr-1">
+                        {[
+                          { n: 'react', v: '19.0', d: 'Ядро інтерфейсу, реактивність та керування станом компонентів.' },
+                          { n: 'dsteem', v: '0.11', d: 'Повноцінна клієнтська інтеграція з блокчейном Steem (транзакції, підписи, апвоути).' },
+                          { n: 'motion', v: '12.0', d: 'Професійні та плавні анімації інтерфейсу для відмінного UX.' },
+                          { n: 'marked', v: '18.0', d: 'Швидкісний і безпечний парсер Markdown розмітки в чистий HTML.' },
+                          { n: 'dompurify', v: '3.4', d: 'Надійне очищення HTML від XSS-загроз при читанні стрічки дописів.' },
+                          { n: 'lucide-react', v: '0.47', d: 'Набір сучасних та лаконічних векторних іконок для UI.' },
+                          { n: 'buffer', v: '6.0', d: 'Поліфіл буфера для криптографічних підписів у браузерному оточенні.' },
+                          { n: 'jszip', v: '3.10', d: 'Створення та архівація чернеток у Markdown ZIP-пакети для бекапу.' },
+                          { n: 'idb-keyval', v: '6.2', d: 'Надшвидке сховище автозбереження чернеток в IndexedDB браузера.' },
+                          { n: 'idiomorph', v: '0.3', d: 'Інтелектуальне зіставлення (morphing) DOM для безшовної синхронізації без втрати фокусу й курсору.' },
+                          { n: 'zustand', v: '5.0', d: 'Легковажне керування глобальним станом застосунку.' }
+                        ].map(pkg => (
+                          <div key={pkg.n} className="p-2 bg-slate-950/60 border border-slate-800/80 rounded-xl flex flex-col gap-0.5">
+                            <div className="flex justify-between items-center">
+                              <span className="text-[10px] font-black text-cyan-400 font-mono leading-none">{pkg.n}</span>
+                              <span className="text-[8px] text-slate-500 font-mono font-bold">v.{pkg.v}</span>
+                            </div>
+                            <p className="text-[9px] text-slate-400 leading-normal">{pkg.d}</p>
+                          </div>
                         ))}
                       </div>
                     </div>
 
                     <div>
-                      <h3 className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-4 flex items-center gap-2">
+                      <h3 className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-3 flex items-center gap-2">
                          <Globe size={18} /> {t('externalLibs')}
                       </h3>
-                      <div className="space-y-2">
+                      <div className="space-y-1.5">
                         {[
-                          { name: 'Lucide', desc: 'Іконки' },
-                          { name: 'Motion', desc: 'Анімації' },
-                          { name: 'Tailwind', desc: 'Стилі' },
-                          { name: 'DSteem', desc: 'Блокчейн PHP' },
-                          { name: 'Marked', desc: 'Парсер MD' }
+                          { name: 'Lucide Icons', desc: 'Сучасні векторні піктограми високої чіткості' },
+                          { name: 'Motion Physics', desc: 'Фізично-базована модель декларативних анімацій' },
+                          { name: 'Tailwind CSS v4', desc: 'Утилітарний CSS-фреймворк для стилізації інтерфейсу' },
+                          { name: 'DSteem Ledger API', desc: 'Низькорівневе з\'єднання з децентралізованою мережею Steem' },
+                          { name: 'Marked Compiler', desc: 'Надшвидкий синтаксичний компілятор розмітки тексту' }
                         ].map(lib => (
-                          <div key={lib.name} className="flex justify-between items-center text-[10px]">
+                          <div key={lib.name} className="flex justify-between items-center text-[10px] bg-slate-950/20 p-1 px-2 border border-slate-800/40 rounded-lg">
                             <span className="text-slate-300 font-bold">{lib.name}</span>
                             <span className="text-slate-500 font-medium italic">{lib.desc}</span>
                           </div>
@@ -7141,7 +10873,7 @@ function App() {
                       </div>
                     </div>
 
-                    <div className="pt-4">
+                    <div className="pt-2">
                       <button 
                         onClick={() => window.open('https://github.com/ultrapositivecode/steem-editor-pro-react', '_blank')}
                         className="w-full py-3 bg-slate-800 hover:bg-slate-700 text-white rounded-2xl font-bold transition-all flex items-center justify-center gap-2 border border-slate-700/50 group"
@@ -7199,14 +10931,14 @@ function App() {
           <div key="modal-tag-groups" className="fixed inset-0 z-[200] flex items-center justify-center p-4">
             <motion.div 
               initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-              className="absolute inset-0 bg-slate-950/80 backdrop-blur-sm"
+              className="absolute inset-0 bg-slate-950/90"
               onClick={() => setActiveModal('publish')}
             />
             <motion.div 
               initial={{ scale: 0.9, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
               exit={{ scale: 0.9, opacity: 0 }}
-              className="relative w-full sm:max-w-md bg-slate-900 border border-slate-800 rounded-2xl shadow-2xl overflow-hidden"
+              className="relative w-full sm:max-w-md bg-slate-900 border border-slate-800 rounded-2xl shadow-none overflow-hidden"
             >
               <div className="p-4 sm:p-6 border-b border-slate-800 flex justify-between items-center bg-slate-800/30">
                 <h2 className="text-lg sm:text-xl font-bold flex items-center gap-2">
@@ -7293,14 +11025,14 @@ function App() {
           <div key="modal-queue" className="fixed inset-0 z-[200] flex items-center justify-center p-4">
             <motion.div 
               initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-              className="absolute inset-0 bg-slate-950/80 backdrop-blur-sm"
+              className="absolute inset-0 bg-slate-950/90"
               onClick={() => setActiveModal(null)}
             />
             <motion.div 
               initial={{ scale: 0.9, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
               exit={{ scale: 0.9, opacity: 0 }}
-              className="relative w-full max-w-lg bg-slate-900 border border-slate-800 rounded-2xl shadow-2xl overflow-hidden"
+              className="relative w-full max-w-lg bg-slate-900 border border-slate-800 rounded-2xl shadow-none overflow-hidden"
             >
               <div className="p-6 border-b border-slate-800 flex justify-between items-center bg-slate-800/30">
                 <h2 className="text-xl font-bold flex items-center gap-2">
@@ -7377,14 +11109,14 @@ function App() {
         <div key="modal-table" className="fixed inset-0 z-[200] flex items-center justify-center p-4">
           <motion.div 
             initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-            className="absolute inset-0 bg-slate-950/80 backdrop-blur-sm"
+            className="absolute inset-0 bg-slate-950/90"
             onClick={() => setActiveModal(null)}
           />
           <motion.div 
             initial={{ scale: 0.9, opacity: 0, y: 20 }}
             animate={{ scale: 1, opacity: 1, y: 0 }}
             exit={{ scale: 0.9, opacity: 0, y: 20 }}
-            className="relative w-full max-w-lg bg-slate-900 border border-slate-800 rounded-2xl shadow-2xl overflow-hidden flex flex-col"
+            className="relative w-full max-w-lg bg-slate-900 border border-slate-800 rounded-2xl shadow-none overflow-hidden flex flex-col"
           >
               <div className="p-6 border-b border-slate-800 flex justify-between items-center bg-slate-800/30">
                 <h2 className="text-xl font-bold flex items-center gap-2">
@@ -7454,14 +11186,14 @@ function App() {
         <div key="modal-settings" className="fixed inset-0 z-[200] flex items-center justify-center p-4">
           <motion.div 
             initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-            className="absolute inset-0 bg-slate-950/80 backdrop-blur-sm"
+            className="absolute inset-0 bg-slate-950/90"
             onClick={() => setActiveModal(null)}
           />
           <motion.div 
             initial={{ scale: 0.9, opacity: 0 }}
             animate={{ scale: 1, opacity: 1 }}
             exit={{ scale: 0.9, opacity: 0 }}
-            className="relative w-full max-w-lg bg-[var(--bg-sidebar)] border-[var(--border-color)] rounded-2xl shadow-2xl overflow-hidden container-theme"
+            className="relative w-full max-w-lg bg-[var(--bg-sidebar)] border-[var(--border-color)] rounded-2xl shadow-none overflow-hidden container-theme"
           >
             <div className="p-6 border-b border-[var(--border-color)] flex justify-between items-center bg-slate-800/10">
               <h2 className="text-xl font-bold flex items-center gap-2 text-[var(--text-main)]">
@@ -7470,7 +11202,7 @@ function App() {
               <button onClick={() => setActiveModal(null)} className="text-slate-500 hover:text-white"><X /></button>
             </div>
               <div className="flex border-b border-[var(--border-color)] bg-slate-800/10 overflow-x-auto no-scrollbar shrink-0">
-                {(['general', 'gallery', 'vault', 'keys', 'about'] as const).map(tab => (
+                {(['general', 'gallery', 'vault', 'keys', 'about', 'pwa'] as const).map(tab => (
                   <button
                     key={tab}
                     onClick={() => setSettingsTab(tab)}
@@ -7601,7 +11333,9 @@ function App() {
                     {/* Editor Options */}
                     <div className="space-y-4 pt-4 border-t border-slate-800">
                       <div className="flex items-center justify-between">
-                        <span className="text-xs font-bold text-slate-200">{"Синхронне пролистування"}</span>
+                        <span className="text-xs font-bold text-slate-200">
+                          {lang === 'uk' ? "Синхронне пролистування" : "Synchronous scrolling"}
+                        </span>
                         <button 
                           onClick={() => {
                             const next = !syncScrollEnabled;
@@ -7618,6 +11352,113 @@ function App() {
                             syncScrollEnabled ? "left-5" : "left-1"
                           )} />
                         </button>
+                      </div>
+
+                      {/* Custom Toolbar Icon Size Control */}
+                      <div className="space-y-2 pt-2 border-t border-slate-800/40">
+                        <div className="flex justify-between items-center">
+                          <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
+                            {lang === 'uk' ? "Розмір піктограм панелі" : "Toolbar Icon Size"}
+                          </label>
+                          <span className="text-xs font-mono font-bold text-cyan-400 bg-cyan-950/40 border border-cyan-800/30 px-2 py-0.5 rounded">
+                            {toolbarIconSize} px
+                          </span>
+                        </div>
+                        
+                        <div className="grid grid-cols-3 gap-1.5 bg-slate-900/60 p-1 rounded-xl border border-slate-800/60">
+                          {[
+                            { id: 14, label: lang === 'uk' ? "Дрібні" : "Small" },
+                            { id: 20, label: lang === 'uk' ? "Стандарт" : "Normal" },
+                            { id: 26, label: lang === 'uk' ? "Великі" : "Large" }
+                          ].map(preset => (
+                            <button
+                              key={preset.id}
+                              onClick={() => {
+                                setToolbarIconSize(preset.id);
+                                localStorage.setItem('steem_toolbar_icon_size', String(preset.id));
+                              }}
+                              className={cn(
+                                "py-1.5 px-2 rounded-lg text-[10px] font-semibold uppercase transition-all text-center",
+                                toolbarIconSize === preset.id 
+                                  ? "bg-cyan-600 text-white shadow" 
+                                  : "text-slate-500 hover:text-slate-300 hover:bg-slate-800/30"
+                              )}
+                            >
+                              {preset.label}
+                            </button>
+                          ))}
+                        </div>
+
+                        <div className="flex items-center gap-3 pt-1">
+                          <span className="text-[10px] text-slate-500 font-mono">12px</span>
+                          <input
+                            type="range"
+                            min="12"
+                            max="32"
+                            value={toolbarIconSize}
+                            onChange={(e) => {
+                              const val = parseInt(e.target.value, 10);
+                              setToolbarIconSize(val);
+                              localStorage.setItem('steem_toolbar_icon_size', String(val));
+                            }}
+                            className="flex-1 accent-cyan-500 bg-slate-800 h-1.5 rounded-lg appearance-none cursor-pointer"
+                          />
+                          <span className="text-[10px] text-slate-500 font-mono">32px</span>
+                        </div>
+                      </div>
+
+                      {/* Custom Visual Editor Spacing Control */}
+                      <div className="space-y-2 pt-2 border-t border-slate-800/40">
+                        <div className="flex justify-between items-center">
+                          <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
+                            {lang === 'uk' ? "Відступи у візуальному режимі" : "Visual Editor Spacing"}
+                          </label>
+                          <span className="text-xs font-mono font-bold text-cyan-400 bg-cyan-950/40 border border-cyan-800/30 px-2 py-0.5 rounded">
+                            {wysiwygSpacing} px
+                          </span>
+                        </div>
+                        
+                        <div className="grid grid-cols-4 gap-1.5 bg-slate-900/60 p-1 rounded-xl border border-slate-800/60">
+                          {[
+                            { id: 6, label: lang === 'uk' ? "Компакт" : "Compact" },
+                            { id: 14, label: lang === 'uk' ? "Збаланс" : "Balanced" },
+                            { id: 20, label: lang === 'uk' ? "Стандарт" : "Normal" },
+                            { id: 28, label: lang === 'uk' ? "Просторі" : "Spacious" }
+                          ].map(preset => (
+                            <button
+                              key={preset.id}
+                              onClick={() => {
+                                setWysiwygSpacing(preset.id);
+                                localStorage.setItem('steem_wysiwyg_spacing', String(preset.id));
+                              }}
+                              className={cn(
+                                "py-1.5 px-1 rounded-lg text-[10px] font-semibold uppercase transition-all text-center truncate",
+                                wysiwygSpacing === preset.id 
+                                  ? "bg-cyan-600 text-white shadow" 
+                                  : "text-slate-500 hover:text-slate-300 hover:bg-slate-800/30"
+                              )}
+                            >
+                              {preset.label}
+                            </button>
+                          ))}
+                        </div>
+
+                        <div className="flex items-center gap-3 pt-1">
+                          <span className="text-[10px] text-slate-500 font-mono">0px</span>
+                          <input
+                            type="range"
+                            min="0"
+                            max="40"
+                            value={wysiwygSpacing}
+                            onChange={(e) => {
+                              const val = parseInt(e.target.value, 10);
+                              setWysiwygSpacing(val);
+                              localStorage.setItem('steem_wysiwyg_spacing', String(val));
+                            }}
+                            className="flex-1 accent-cyan-500 bg-slate-800 h-1.5 rounded-lg appearance-none cursor-pointer"
+                          />
+                          <span className="text-[10px] text-slate-500 font-mono">40px</span>
+                        </div>
                       </div>
                     </div>
                   </section>
@@ -7749,91 +11590,6 @@ function App() {
                         ))}
                       </div>
                     </div>
-
-                    <div className="pt-4 border-t border-slate-800 space-y-4">
-                       <h4 className="text-sm font-bold text-red-400 flex items-center gap-2">
-                         <Trash2 size={16} /> Очищення даних застосунку
-                       </h4>
-                       <div className="space-y-2 p-3 bg-red-900/10 border border-red-900/20 rounded-xl">
-                          <label className="flex items-start gap-3 cursor-pointer group">
-                             <input type="checkbox" checked={cacheClearOptions.cache} onChange={e => setCacheClearOptions(p => ({...p, cache: e.target.checked}))} className="mt-1 bg-slate-900 border-slate-700 rounded text-red-500 focus:ring-red-500" />
-                             <div className="flex flex-col">
-                               <span className="text-sm font-medium text-slate-300 group-hover:text-amber-100 transition-colors">Кеш зображень рідера та галереї</span>
-                               <span className="text-xs text-slate-500">Тимчасові дані, завантажені для перегляду</span>
-                             </div>
-                          </label>
-                          <label className="flex items-start gap-3 cursor-pointer group">
-                             <input type="checkbox" checked={cacheClearOptions.drafts} onChange={e => setCacheClearOptions(p => ({...p, drafts: e.target.checked}))} className="mt-1 bg-slate-900 border-slate-700 rounded text-red-500 focus:ring-red-500" />
-                             <div className="flex flex-col">
-                               <span className="text-sm font-medium text-slate-300 group-hover:text-amber-100 transition-colors">Чернетки та шаблони</span>
-                               <span className="text-xs text-slate-500">Всі збережені статті (steem_drafts, steem_templates)</span>
-                             </div>
-                          </label>
-                          <label className="flex items-start gap-3 cursor-pointer group">
-                             <input type="checkbox" checked={cacheClearOptions.settings} onChange={e => setCacheClearOptions(p => ({...p, settings: e.target.checked}))} className="mt-1 bg-slate-900 border-slate-700 rounded text-red-500 focus:ring-red-500" />
-                             <div className="flex flex-col">
-                               <span className="text-sm font-medium text-slate-300 group-hover:text-amber-100 transition-colors">Системні налаштування</span>
-                               <span className="text-xs text-slate-500">Тема, форматування, розмітка тощо</span>
-                             </div>
-                          </label>
-                          <label className="flex items-start gap-3 cursor-pointer group">
-                             <input type="checkbox" checked={cacheClearOptions.vault} onChange={e => setCacheClearOptions(p => ({...p, vault: e.target.checked}))} className="mt-1 bg-slate-900 border-slate-700 rounded text-red-500 focus:ring-red-500" />
-                             <div className="flex flex-col">
-                               <span className="text-sm font-medium text-red-400 group-hover:text-red-300 transition-colors">Сховище акаунтів (Vault)</span>
-                               <span className="text-xs text-red-500/70">Видалить усі додані акаунти та пароль. Тільки для екстрених випадків.</span>
-                             </div>
-                          </label>
-                       </div>
-
-                       <button 
-                         onClick={async () => {
-                           if (!cacheClearOptions.cache && !cacheClearOptions.drafts && !cacheClearOptions.settings && !cacheClearOptions.vault) {
-                             notify("Жодної опції не вибрано", "error");
-                             return;
-                           }
-                           if (await confirmDialog("Ви впевнені, що бажаєте видалити вибрані дані? Цю дію неможливо скасувати.")) {
-                              const keysToKeep = [];
-                              // Logic for clearing specific items
-                              if (!cacheClearOptions.vault) {
-                                  keysToKeep.push('steem_vault_accounts', 'steem_vault_encrypted', 'steem_username');
-                              }
-                              if (!cacheClearOptions.drafts) {
-                                  keysToKeep.push('steem_drafts', 'steem_templates', 'steem_queue', 'steem_editor_cursor', 'steem_tag_groups', 'steem_mentions');
-                              }
-                              if (!cacheClearOptions.settings) {
-                                  keysToKeep.push('steem_dark_mode', 'steem_visual_style', 'steem_sync_scroll', 'widget_no_border', 'steem_lang', 'steem_notif_enabled', 'steem_auto_insert_mentions');
-                              }
-                              
-                              if (cacheClearOptions.cache && cacheClearOptions.drafts && cacheClearOptions.settings && cacheClearOptions.vault) {
-                                  localStorage.clear();
-                              } else {
-                                  const temp = {};
-                                  for (const key of keysToKeep) {
-                                      const val = localStorage.getItem(key);
-                                      if (val !== null) temp[key] = val;
-                                  }
-                                  
-                                  if (cacheClearOptions.cache) {
-                                      localStorage.removeItem('steem_uploaded_images_v2');
-                                      localStorage.removeItem('steem_history_cache'); // hypothetically
-                                      // also remove any dynamically prefixed keys if they existed, but standard keys cover it
-                                  }
-                                  
-                                  localStorage.clear();
-                                  for (const [k, v] of Object.entries(temp)) {
-                                      localStorage.setItem(k, v as string);
-                                  }
-                              }
-                              notify("Очищення успішно завершено.");
-                              setTimeout(() => window.location.reload(), 1000);
-                           }
-                         }}
-                         className="w-full py-3 bg-red-900/20 border border-red-500/30 text-red-500 hover:text-white hover:bg-red-600 rounded-xl font-bold transition-all shadow-lg flex items-center justify-center gap-2"
-                       >
-                         <Trash2 size={18} /> Видалити вибрані дані
-                       </button>
-                    </div>
-
                   </section>
                 )}
 
@@ -7903,16 +11659,12 @@ function App() {
                        <div className="w-16 h-16 bg-cyan-500/10 rounded-2xl mx-auto flex items-center justify-center text-cyan-400 font-black text-2xl shadow-xl shadow-cyan-500/10">S</div>
                        <div>
                          <h3 className="text-xl font-black tracking-tight">SteemEditor <span className="text-cyan-400">Pro</span></h3>
-                         <p className="text-[10px] text-slate-500 uppercase font-black tracking-[0.2em] pt-1">Version 1.0.0 "Platinum"</p>
+                         <p className="text-[10px] text-slate-500 uppercase font-black tracking-[0.2em] pt-1">Version 3.9.9 "Quantum"</p>
                        </div>
-                       
-                       <div className="pt-4 space-y-2">
-                         <div className="py-2 px-4 bg-slate-950 border border-slate-800 rounded-xl flex justify-between items-center group hover:border-cyan-500/50 transition-all">
-                            <span className="text-xs text-slate-400 font-bold uppercase tracking-tight">Author</span>
-                            <span className="text-xs text-cyan-400 font-black tracking-widest">UA_DEVS</span>
-                         </div>
-                       </div>
-                       <label className="text-[10px] font-black text-slate-500 uppercase tracking-[0.2em] px-1">Changelog & Updates</label>
+                       <label className="text-[10px] font-black text-slate-500 uppercase tracking-[0.2em] px-1 pt-4 block border-t border-slate-800">Changelog & Updates</label>
+                        <div className="mt-2 p-3 bg-slate-950 border border-cyan-500/20 rounded-xl text-left">
+                          <p className="text-xs text-slate-300 font-medium">New in v3.9.9: Gallery Minimization & Expanded Editor Layout</p>
+                        </div>
                        
                        <div className="space-y-2 max-h-60 overflow-y-auto custom-scrollbar bg-slate-900 border border-slate-800 rounded-xl p-3">
                          {APP_CHANGELOG.map((log, index) => (
@@ -7924,7 +11676,7 @@ function App() {
                              <ul className={cn("text-xs list-inside list-disc pl-1 leading-snug", index === 0 ? "text-slate-300 space-y-1.5" : "text-slate-400 space-y-1")}>
                                {log.changes.map((change, i) => (
                                  <li key={i}>{change}</li>
-                               ))}
+                                ))}
                              </ul>
                            </div>
                          ))}
@@ -7949,24 +11701,53 @@ function App() {
                        </div>
                     </div>
 
-                    <div className="space-y-3 pt-2">
-                       <label className="text-[10px] font-black text-slate-500 uppercase tracking-[0.2em] px-1">Package Audit</label>
-                       <div className="grid grid-cols-2 gap-2">
-                          {[
-                            { n: 'React', v: '19.0' },
-                            { n: 'Lucide', v: '0.47' },
-                            { n: 'Motion', v: '12.0' },
-                            { n: 'JSZip', v: '3.10' },
-                            { n: 'DSteem', v: '0.11' },
-                            { n: 'Vite', v: '6.0' }
-                          ].map(pkg => (
-                            <div key={pkg.n} className="p-3 bg-slate-900 border border-slate-800 rounded-xl flex flex-col gap-1">
-                               <span className="text-[11px] font-black text-slate-300 uppercase leading-none">{pkg.n}</span>
-                               <span className="text-[9px] text-cyan-500/80 font-mono tracking-tighter">v.{pkg.v} (STABLE)</span>
-                            </div>
-                          ))}
+                    <div className="space-y-4 pt-2 text-left">
+                       <div>
+                          <label className="text-[10px] font-black text-slate-500 uppercase tracking-[0.2em] px-1">Пакетний Аудит (NPM Packages)</label>
+                          <div className="mt-2 space-y-2 max-h-64 overflow-y-auto custom-scrollbar pr-1">
+                             {[
+                               { n: 'react', v: '19.0', d: 'Ядро інтерфейсу, реактивність та керування станом компонентів.' },
+                               { n: 'dsteem', v: '0.11', d: 'Повноцінна клієнтська інтеграція з блокчейном Steem (транзакції, підписи, апвоути).' },
+                               { n: 'motion', v: '12.0', d: 'Професійні та плавні анімації інтерфейсу для відмінного UX.' },
+                               { n: 'marked', v: '18.0', d: 'Швидкісний і безпечний парсер Markdown розмітки в чистий HTML.' },
+                               { n: 'dompurify', v: '3.4', d: 'Надійне очищення HTML від XSS-загроз при читанні стрічки дописів.' },
+                               { n: 'lucide-react', v: '0.47', d: 'Набір сучасних та лаконічних векторних іконок для UI.' },
+                               { n: 'buffer', v: '6.0', d: 'Поліфіл буфера для криптографічних підписів у браузерному оточенні.' },
+                               { n: 'jszip', v: '3.10', d: 'Створення та архівація чернеток у Markdown ZIP-пакети для бекапу.' },
+                               { n: 'idb-keyval', v: '6.2', d: 'Надшвидке сховище автозбереження чернеток в IndexedDB браузера.' },
+                               { n: 'idiomorph', v: '0.3', d: 'Інтелектуальне зіставлення (morphing) DOM для безшовної синхронізації без втрати фокусу й курсору.' },
+                               { n: 'zustand', v: '5.0', d: 'Легковажне керування глобальним станом застосунку.' }
+                             ].map(pkg => (
+                               <div key={pkg.n} className="p-2.5 bg-slate-900 border border-slate-800/80 rounded-xl flex flex-col gap-1 hover:border-slate-700/50 transition-all">
+                                  <div className="flex justify-between items-center">
+                                     <span className="text-[11px] font-black text-cyan-400 font-mono leading-none">{pkg.n}</span>
+                                     <span className="text-[9px] text-slate-500 font-mono font-bold">v.{pkg.v} (STABLE)</span>
+                                  </div>
+                                  <p className="text-[10px] text-slate-400 leading-normal">{pkg.d}</p>
+                               </div>
+                             ))}
+                          </div>
                        </div>
-                       <p className="text-[9px] text-slate-600 italic px-2 text-center pt-2">All assets & dependencies verified as part of the Secure Desktop Suite.</p>
+
+                       <div className="pt-2">
+                          <label className="text-[10px] font-black text-slate-500 uppercase tracking-[0.2em] px-1">Зовнішні Бібліотеки (CDN / Core)</label>
+                          <div className="mt-2 grid grid-cols-1 sm:grid-cols-2 gap-2">
+                             {[
+                               { n: 'Lucide Icons', d: 'Сучасні векторні піктограми високої чіткості.' },
+                               { n: 'Motion Physics', d: 'Фізично-базована модель декларативних анімацій.' },
+                               { n: 'Tailwind CSS v4', d: 'Утилітарний CSS-фреймворк для стилізації інтерфейсу.' },
+                               { n: 'DSteem Ledger API', d: 'Низькорівневе з\'єднання з децентралізованою мережею Steem.' },
+                               { n: 'Marked Compiler', d: 'Надшвидкий синтаксичний компілятор розмітки тексту.' }
+                             ].map(lib => (
+                               <div key={lib.n} className="p-2.5 bg-slate-950/40 border border-slate-800/60 rounded-xl flex flex-col gap-1">
+                                  <span className="text-[11px] font-black text-slate-300 uppercase leading-none">{lib.n}</span>
+                                  <p className="text-[10px] text-slate-500 leading-snug">{lib.d}</p>
+                                </div>
+                             ))}
+                          </div>
+                       </div>
+
+                       <p className="text-[9px] text-slate-600 italic px-2 text-center pt-2">Усі активи та залежності верифіковані в межах безпечного релізу Steem Editor Pro.</p>
                     </div>
 
                     <section className="space-y-4 border-t border-slate-800 pt-6">
@@ -8007,6 +11788,45 @@ function App() {
                     </section>
                   </section>
                 )}
+
+                {settingsTab === 'pwa' && (
+                  <section className="space-y-6">
+                    <div className="p-6 bg-slate-900 border border-slate-800 rounded-2xl text-center space-y-4">
+                      <div className="w-16 h-16 bg-gradient-to-br from-cyan-500 to-blue-600 rounded-2xl mx-auto flex items-center justify-center text-white font-black text-2xl shadow-xl shadow-cyan-500/20">S</div>
+                      <div>
+                        <h3 className="text-xl font-black tracking-tight">{lang === 'uk' ? 'Підтримка PWA' : 'PWA Support'}</h3>
+                        <p className="text-[10px] text-slate-500 uppercase font-black tracking-[0.2em] pt-1">{t('pwaPlatformSupport')}</p>
+                      </div>
+
+                      <p className="text-xs text-slate-400 leading-relaxed text-left bg-slate-950 p-4 rounded-xl border border-slate-800/60">
+                        {t('pwaInstallDesc')}
+                      </p>
+
+                      <div className="pt-2">
+                        {isPwaInstalled ? (
+                          <div className="py-3 px-4 bg-green-500/10 border border-green-500/30 rounded-xl text-green-400 font-bold text-xs flex items-center justify-center gap-2">
+                            <CheckCircle size={16} />
+                            {t('pwaAlreadyInstalled')}
+                          </div>
+                        ) : (
+                          <button
+                            onClick={handleInstallPwa}
+                            disabled={!isPwaInstallable}
+                            className={cn(
+                              "w-full py-3 px-4 rounded-xl font-black text-xs uppercase tracking-wider transition-all flex items-center justify-center gap-2 shadow-lg",
+                              isPwaInstallable
+                                ? "bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-white shadow-cyan-500/20 active:scale-95"
+                                : "bg-slate-800 text-slate-500 cursor-not-allowed border border-slate-700/50"
+                            )}
+                          >
+                            <Download size={16} />
+                            {t('installApp')}
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  </section>
+                )}
               </div>
           </motion.div>
         </div>
@@ -8022,10 +11842,10 @@ function App() {
               className="fixed bottom-20 left-4 right-4 lg:left-auto lg:right-8 lg:top-8 lg:bottom-auto lg:w-80 z-[100]"
             >
               <div className={cn(
-                "p-4 rounded-2xl shadow-2xl border backdrop-blur-xl flex items-center gap-3",
-                pubLog.type === 'success' ? "bg-green-500/20 border-green-500/30 text-green-400" :
-                pubLog.type === 'error' ? "bg-red-500/20 border-red-500/30 text-red-400" :
-                "bg-slate-800/90 border-cyan-500/30 text-cyan-400"
+                "p-4 rounded-2xl shadow-none border flex items-center gap-3 bg-slate-900",
+                pubLog.type === 'success' ? "border-green-500/30 text-green-400" :
+                pubLog.type === 'error' ? "border-red-500/30 text-red-400" :
+                "border-cyan-500/30 text-cyan-400"
               )}>
                 {pubLog.type === 'loading' && <div className="w-4 h-4 border-2 border-cyan-500/30 border-t-cyan-500 rounded-full animate-spin shrink-0" />}
                 <p className="text-sm font-medium">{pubLog.msg}</p>
@@ -8038,7 +11858,10 @@ function App() {
       </AnimatePresence>
 
       {/* Mobile Bottom Navigation */}
-        <nav className="lg:hidden fixed bottom-0 left-0 right-0 h-16 bg-slate-900 border-t border-slate-800 grid grid-cols-5 items-center px-1 z-[70] shadow-[0_-4px_20px_rgba(0,0,0,0.5)]">
+        <nav 
+          className="lg:hidden fixed bottom-0 left-0 right-0 h-16 bg-slate-900 border-t border-slate-800 grid grid-cols-5 items-center px-1 z-[70] shadow-[0_-4px_20px_rgba(0,0,0,0.5)] transition-all duration-150"
+          style={{ bottom: keyboardOffset > 0 ? `${keyboardOffset}px` : 0 }}
+        >
           <button 
             onClick={() => setActiveMobileTab('editor')}
             className={cn("flex flex-col items-center justify-center gap-1 h-full transition-all", activeMobileTab === 'editor' ? "text-cyan-400 bg-cyan-400/5 shadow-[inset_0_2px_0_theme(colors.cyan.400)] neon-tab-glow" : "text-slate-500 hover:text-slate-300 opacity-80 hover:opacity-100")}
@@ -8058,7 +11881,7 @@ function App() {
             <button 
               onClick={() => {
                 if (!pubTitle) {
-                  const firstLine = content.split('\n')[0].replace(/[#*`]/g, '').trim().substring(0, 100);
+                  const firstLine = useEditorStore.getState().content.split('\n')[0].replace(/[#*`]/g, '').trim().substring(0, 100);
                   setPubTitle(firstLine);
                 }
                 setActiveModal('publish');
@@ -8080,15 +11903,48 @@ function App() {
             <span className="text-[9px] font-bold uppercase tracking-tighter">{t('gallery')}</span>
           </button>
           <button 
-            onClick={() => setActiveModal('keys')}
-            className={cn("flex flex-col items-center justify-center gap-1 h-full transition-all", activeModal === 'keys' ? "text-cyan-400 bg-cyan-400/5 shadow-[inset_0_2px_0_theme(colors.cyan.400)] neon-tab-glow" : "text-slate-500 hover:text-slate-300 opacity-80 hover:opacity-100")}
+            onClick={() => {
+              setSettingsTab('general');
+              setActiveModal('settings');
+            }}
+            className={cn("flex flex-col items-center justify-center gap-1 h-full transition-all", activeModal === 'settings' ? "text-cyan-400 bg-cyan-400/5 shadow-[inset_0_2px_0_theme(colors.cyan.400)] neon-tab-glow" : "text-slate-500 hover:text-slate-300 opacity-80 hover:opacity-100")}
           >
-            <ShieldUserIcon size={18} className={cn(visualStyle === 'neon' && "neon-icon-glow")} />
-            <span className="text-[9px] font-bold uppercase tracking-tighter">{t('keys_mobile')}</span>
+            <Settings size={18} className={cn(visualStyle === 'neon' && "neon-icon-glow")} />
+            <span className="text-[9px] font-bold uppercase tracking-tighter">{t('settings')}</span>
           </button>
         </nav>
 
         <style dangerouslySetInnerHTML={{ __html: `
+        .toolbar-btn {
+          width: var(--toolbar-btn-size, 3rem) !important;
+          height: var(--toolbar-btn-size, 3rem) !important;
+          font-size: var(--toolbar-btn-font-size, 1rem) !important;
+        }
+        .toolbar-btn svg {
+          width: var(--toolbar-icon-size, 1.25rem) !important;
+          height: var(--toolbar-icon-size, 1.25rem) !important;
+        }
+        
+        .wysiwyg-editor p,
+        .wysiwyg-editor ul,
+        .wysiwyg-editor ol,
+        .wysiwyg-editor h1,
+        .wysiwyg-editor h2,
+        .wysiwyg-editor h3,
+        .wysiwyg-editor h4,
+        .wysiwyg-editor h5,
+        .wysiwyg-editor h6,
+        .wysiwyg-editor blockquote,
+        .wysiwyg-editor pre {
+          margin-top: var(--wysiwyg-spacing, 18px) !important;
+          margin-bottom: var(--wysiwyg-spacing, 18px) !important;
+        }
+        .wysiwyg-editor table,
+        .wysiwyg-editor img {
+          margin-top: var(--wysiwyg-spacing, 18px) !important;
+          margin-bottom: var(--wysiwyg-spacing, 18px) !important;
+        }
+
         .custom-scrollbar::-webkit-scrollbar {
           width: 6px;
         }
@@ -8106,6 +11962,42 @@ function App() {
         .prose img {
           border-radius: 0.75rem;
           margin: 1.5rem 0;
+        }
+        .wysiwyg-editor table {
+          border-collapse: collapse;
+          width: 100%;
+          margin: 1.5rem 0;
+          border: 1px dashed rgba(255, 255, 255, 0.15);
+        }
+        .wysiwyg-editor th, .wysiwyg-editor td {
+          border: 1px solid rgba(255, 255, 255, 0.2);
+          padding: 10px 12px !important;
+          min-width: 90px;
+          height: 42px !important; /* height on table-cells serves as minimum height */
+          position: relative;
+        }
+        .wysiwyg-editor th {
+          background-color: rgba(255, 255, 255, 0.07);
+          font-weight: 700;
+          text-align: left;
+          color: #22d3ee !important; /* cyan-400 */
+        }
+        /* Empty cells helper */
+        .wysiwyg-editor th:empty::before, .wysiwyg-editor td:empty::before {
+          useEditorStore.getState().content: "✎...";
+          color: rgba(6, 182, 212, 0.45);
+          font-size: 0.75rem;
+          position: absolute;
+          left: 12px;
+          top: 50%;
+          transform: translateY(-50%);
+          pointer-events: none;
+          font-style: italic;
+        }
+        .wysiwyg-editor th:focus, .wysiwyg-editor td:focus {
+          outline: 2px solid #06b6d4 !important;
+          outline-offset: -2px;
+          background-color: rgba(6, 182, 212, 0.08) !important;
         }
         .pull-left {
           float: left;
@@ -8126,7 +12018,7 @@ function App() {
           text-align: justify;
         }
         .clearfix::after {
-          content: "";
+          useEditorStore.getState().content: "";
           clear: both;
           display: table;
         }
@@ -8150,14 +12042,14 @@ function App() {
       {/* Account Prompt Overlay */}
       <AnimatePresence>
         {showAccountPrompt && (
-          <div className="fixed inset-0 z-[10000] flex items-center justify-center p-4 bg-black/80 backdrop-blur-md">
+          <div className="fixed inset-0 z-[10000] flex items-center justify-center p-4 bg-black/90">
             <motion.div 
               initial={{ scale: 0.9, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
               exit={{ scale: 0.9, opacity: 0 }}
-              className="bg-slate-900 border border-slate-800 rounded-3xl shadow-2xl max-w-sm w-full p-6 sm:p-8 text-center max-h-[90vh] overflow-y-auto custom-scrollbar"
+              className="bg-slate-900 border border-slate-800 rounded-3xl shadow-none max-w-sm w-full p-6 sm:p-8 text-center max-h-[90vh] overflow-y-auto custom-scrollbar"
             >
-              <div className="w-16 h-16 sm:w-20 sm:h-20 bg-gradient-to-tr from-cyan-500 to-blue-600 rounded-2xl flex items-center justify-center mx-auto mb-6 shadow-xl shadow-cyan-500/20">
+              <div className="w-16 h-16 sm:w-20 sm:h-20 bg-gradient-to-tr from-cyan-500 to-blue-600 rounded-2xl flex items-center justify-center mx-auto mb-6 shadow-none">
                 <AtSign size={32} className="text-white sm:size-[40px]" />
               </div>
               <h1 className="text-xl sm:text-2xl font-bold text-white mb-2">{t('welcomeTitle')}</h1>
@@ -8263,6 +12155,7 @@ function App() {
               exit={{ opacity: 0, scale: 0.95 }}
               transition={{ duration: 0.1, ease: 'easeOut' }}
               onClick={(e) => e.stopPropagation()}
+              onMouseDown={(e) => e.preventDefault()}
               className="absolute bg-slate-900 border border-slate-700 shadow-2xl p-4 rounded-3xl"
               style={{
                 left: tableSelectorPos.x,
@@ -8275,10 +12168,20 @@ function App() {
               </div>
               
               <div className="flex flex-col gap-2 mb-4 border-b border-slate-800 pb-3">
+                <div className="flex justify-center gap-2 mb-2">
+                  <button 
+                    onClick={(e) => { e.preventDefault(); setTableImportFormat('markdown'); }}
+                    className={cn("px-3 py-1 rounded text-xs font-bold transition-all", tableImportFormat === 'markdown' ? "bg-cyan-600 text-white" : "bg-slate-800 text-slate-400 hover:text-slate-200")}
+                  >Markdown</button>
+                  <button 
+                    onClick={(e) => { e.preventDefault(); setTableImportFormat('html'); }}
+                    className={cn("px-3 py-1 rounded text-xs font-bold transition-all", tableImportFormat === 'html' ? "bg-cyan-600 text-white" : "bg-slate-800 text-slate-400 hover:text-slate-200")}
+                  >HTML</button>
+                </div>
                 <div className="grid grid-cols-2 gap-2">
                   <button 
                     onClick={() => {
-                      insertAtCursor('\n\n| Head |\n| --- |\n');
+                      insertAtCursor(tableImportFormat === 'markdown' ? '| Head |\n| --- |\n' : '<table data-format="html" style="width:100%">\n  <tr>\n    <th>Head</th>\n  </tr>\n</table>\n');
                       setShowTableSelector(false);
                     }}
                     className="p-1.5 bg-purple-500/10 hover:bg-purple-500/20 text-purple-400 text-[10px] rounded border border-purple-500/30 flex items-center justify-center transition-colors font-medium"
@@ -8287,7 +12190,7 @@ function App() {
                   </button>
                   <button 
                     onClick={() => {
-                      insertAtCursor('\n\n| Head | Head |\n| --- | --- |\n');
+                      insertAtCursor(tableImportFormat === 'markdown' ? '| Head | Head |\n| --- | --- |\n' : '<table data-format="html" style="width:100%">\n  <tr>\n    <th>Head</th>\n    <th>Head</th>\n  </tr>\n</table>\n');
                       setShowTableSelector(false);
                     }}
                     className="p-1.5 bg-purple-500/10 hover:bg-purple-500/20 text-purple-400 text-[10px] rounded border border-purple-500/30 flex items-center justify-center transition-colors font-medium"
@@ -8296,7 +12199,7 @@ function App() {
                   </button>
                   <button 
                     onClick={() => {
-                      insertAtCursor('\n\n| Head | Head |\n| --- | --- |\n| Cell | Cell |\n| Cell | Cell |\n');
+                      insertAtCursor(tableImportFormat === 'markdown' ? '| Head | Head |\n| --- | --- |\n| Cell | Cell |\n| Cell | Cell |\n' : '<table data-format="html" style="width:100%">\n  <tr>\n    <th>Head</th>\n    <th>Head</th>\n  </tr>\n  <tr>\n    <td>Cell</td>\n    <td>Cell</td>\n  </tr>\n  <tr>\n    <td>Cell</td>\n    <td>Cell</td>\n  </tr>\n</table>\n');
                       setShowTableSelector(false);
                     }}
                     className="p-1.5 bg-cyan-500/10 hover:bg-cyan-500/20 text-cyan-400 text-[10px] rounded border border-cyan-500/30 flex items-center justify-center transition-colors font-medium"
@@ -8305,7 +12208,7 @@ function App() {
                   </button>
                   <button 
                     onClick={() => {
-                      insertAtCursor('\n\n| Head | Head | Head |\n| --- | --- | --- |\n| Cell | Cell | Cell |\n| Cell | Cell | Cell |\n| Cell | Cell | Cell |\n');
+                      insertAtCursor(tableImportFormat === 'markdown' ? '| Head | Head | Head |\n| --- | --- | --- |\n| Cell | Cell | Cell |\n| Cell | Cell | Cell |\n| Cell | Cell | Cell |\n' : '<table data-format="html" style="width:100%">\n  <tr>\n    <th>Head</th>\n    <th>Head</th>\n    <th>Head</th>\n  </tr>\n  <tr>\n    <td>Cell</td>\n    <td>Cell</td>\n    <td>Cell</td>\n  </tr>\n  <tr>\n    <td>Cell</td>\n    <td>Cell</td>\n    <td>Cell</td>\n  </tr>\n  <tr>\n    <td>Cell</td>\n    <td>Cell</td>\n    <td>Cell</td>\n  </tr>\n</table>\n');
                       setShowTableSelector(false);
                     }}
                     className="p-1.5 bg-cyan-500/10 hover:bg-cyan-500/20 text-cyan-400 text-[10px] rounded border border-cyan-500/30 flex items-center justify-center transition-colors font-medium"
@@ -8328,7 +12231,7 @@ function App() {
                           onClick={() => {
                             const r = rowIndex; // 0 for header-only
                             const c = colIndex + 1;
-                            let table = '\n\n| ' + Array.from({ length: c }).map(() => 'Head').join(' | ') + ' |\n';
+                            let table = '| ' + Array.from({ length: c }).map(() => 'Head').join(' | ') + ' |\n';
                             table += '| ' + Array.from({ length: c }).map(() => '---').join(' | ') + ' |\n';
                             for (let i = 0; i < r; i++) {
                               table += '| ' + Array.from({ length: c }).map(() => 'Cell').join(' | ') + ' |\n';
@@ -8378,7 +12281,7 @@ function App() {
                   onClick={() => {
                     const r = parseInt((document.getElementById('customTableRowInput') as HTMLInputElement)?.value || '3', 10);
                     const c = parseInt((document.getElementById('customTableColInput') as HTMLInputElement)?.value || '3', 10);
-                    let table = '\n\n| ' + Array.from({ length: c }).map(() => 'Head').join(' | ') + ' |\n';
+                    let table = '| ' + Array.from({ length: c }).map(() => 'Head').join(' | ') + ' |\n';
                     table += '| ' + Array.from({ length: c }).map(() => '---').join(' | ') + ' |\n';
                     for (let i = 0; i < r; i++) {
                       table += '| ' + Array.from({ length: c }).map(() => 'Cell').join(' | ') + ' |\n';
@@ -8398,12 +12301,12 @@ function App() {
       {/* SystemDialog */}
       <AnimatePresence>
         {systemDialog && (
-          <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+          <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-black/90">
             <motion.div 
               initial={{ scale: 0.95, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
               exit={{ scale: 0.95, opacity: 0 }}
-              className="bg-white dark:bg-slate-900 rounded-2xl shadow-2xl w-full sm:max-w-md border border-slate-200 dark:border-slate-700 mx-auto max-h-[90vh] overflow-y-auto custom-scrollbar"
+              className="bg-white dark:bg-slate-900 rounded-2xl shadow-none w-full sm:max-w-md border border-slate-200 dark:border-slate-700 mx-auto max-h-[90vh] overflow-y-auto custom-scrollbar"
             >
               <div className="p-4 sm:p-6 text-center sm:text-left">
                 <h3 className="text-lg sm:text-xl font-bold text-slate-900 dark:text-white mb-1">{systemDialog.title}</h3>
