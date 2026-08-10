@@ -1,9 +1,9 @@
 [package]
 name = "ultra-steem-editor"
-version = "4.3.8"
+version = "4.4.4"
 description = "Tauri Desktop Builder App"
 authors = ["Desktop Developer"]
-edition = "2026"
+edition = "2024"
 
 [lib]
 name = "tauri_app"
