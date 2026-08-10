@@ -1,5 +1,4 @@
 import { Buffer } from 'buffer';
-import 'regenerator-runtime/runtime';
 
 // Polyfills MUST run before any other imports that might depend on them
 if (typeof (window as any).global === 'undefined') {

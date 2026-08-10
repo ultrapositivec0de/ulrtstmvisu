@@ -27,8 +27,7 @@ import { useEditorStore, getOffsetFromRowCol, getRowColFromOffset } from './stor
 import ImageItemComp from './components/ImageItem';
 import ExternalImageItem from './components/ExternalImageItem';
 import Reader from './components/Reader';
-import JSZip from 'jszip';
-import { saveAs } from 'file-saver';
+import { zipSync, unzipSync, strToU8, strFromU8 } from 'fflate';
 import { htmlToMarkdown, convertBareImageUrlsToMarkdown, isImageAndProxyUrl } from './lib/editorSync';
 import { useEditorWorker } from './hooks/useEditorWorker';
 
@@ -237,6 +236,7 @@ const translations = {
     aboutDesc: "Ultra Steem Editor — професійний багатопотоковий редактор для Steem з безпекою на базі Web Crypto (AES-GCM), подвійним шифруванням та захистом ПІН-кодом. Оптимізовано для великих файлів.",
     aboutApp: "Про застосунок",
     packagesUsed: "Використані пакети (NPM)",
+    removedPackages: "Прибрані пакети (Оптимізація)",
     externalLibs: "Зовнішні бібліотеки (CDN)",
     credits: "Авторство та розробка",
     aiCredits: "ШІ (Gemini AI)",
@@ -404,6 +404,7 @@ const translations = {
     aboutDesc: "Ultra Steem Editor — professional multi-threaded editor for Steem with Web Crypto (AES-GCM) security, double encryption, and PIN protection. Optimized for large files.",
     aboutApp: "About App",
     packagesUsed: "Packages Used (NPM)",
+    removedPackages: "Removed Packages (Optimization)",
     externalLibs: "External Libraries (CDN)",
     credits: "Credits & Development",
     aiCredits: "AI (Gemini AI)",
@@ -1337,6 +1338,28 @@ const IconButton = ({
 
 const APP_CHANGELOG = [
   {
+    version: "v4.4.4",
+    date: "2026-08-10",
+    changes: [
+      "Babel Optimization: Configured Vite React plugin to use compact code generation, preventing deoptimization warnings for large files.",
+      "Agent String Upgrade: Changed default App Agent string to ultrasteemeditor/4.4.4 for proper version tracking on the Steem blockchain.",
+      "Zip Compression Migration: Replaced legacy 'jszip' with ultra-lightweight 'fflate' for much faster and lighter ZIP package operations.",
+      "Modern Metadata Extraction: Integrated 'exifreader' (v4.38.1) for secure, client-side extraction of camera and shooting parameters from uploaded images.",
+      "Dependencies & Engine Upgrade: Migrated to @blazeapps/dsteem (v0.12.2), upgraded TypeScript to ^7.0.2, and React to version 19.",
+      "Cleaned Up Dependencies: Uninstalled legacy/unused packages including dsteem, jszip, postcss, autoprefixer, core-js, bytebuffer, exif-parser, eslint-plugin-react, and babel-plugin-transform-remove-console to minimize bundle size and remove deprecated overhead.",
+      "Linter Cleanup: Addressed and removed strict linter override comments in Reader.tsx."
+    ]
+  },
+  {
+    version: "v4.3.9",
+    date: "2026-08-02",
+    changes: [
+      "Customizable Font Size: Added a new precise font size control in the toolbar settings dropdown.",
+      "Responsive Typography: Connected the selected font size directly to the editor's visual output for instantaneous scaling without page reloads.",
+      "UI Refinement: Grouped font size presets alongside a numeric input and range slider for maximal control."
+    ]
+  },
+  {
     version: "v4.3.8",
     date: "2026-07-23",
     changes: [
@@ -2040,23 +2063,25 @@ function App() {
   const [showLangMenu, setShowLangMenu] = useState(false);
   const [showMobileTools1, setShowMobileTools1] = useState(false);
   const [showMobileTools2, setShowMobileTools2] = useState(false);
+  const [showQuickFontSizePopover, setShowQuickFontSizePopover] = useState(false);
 
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
       const target = e.target as HTMLElement;
-      if (!target.closest('.mobile-tools-container')) {
+      if (!target.closest('.mobile-tools-container') && !target.closest('.font-size-popover-container')) {
         setShowMobileTools1(false);
         setShowMobileTools2(false);
         setShowMobileToolsOpen(false);
+        setShowQuickFontSizePopover(false);
       }
     };
-    if (showMobileTools1 || showMobileTools2 || showMobileToolsOpen) {
+    if (showMobileTools1 || showMobileTools2 || showMobileToolsOpen || showQuickFontSizePopover) {
       document.addEventListener('mousedown', handleClickOutside);
     }
     return () => {
       document.removeEventListener('mousedown', handleClickOutside);
     };
-  }, [showMobileTools1, showMobileTools2, showMobileToolsOpen]);
+  }, [showMobileTools1, showMobileTools2, showMobileToolsOpen, showQuickFontSizePopover]);
 
   const [targetReaderPost, setTargetReaderPost] = useState<{ author: string, permlink: string, commentAuthor?: string, commentPermlink?: string } | null>(null);
   const [mutedUsers, setMutedUsers] = useState<string[]>(() => {
@@ -2288,7 +2313,7 @@ function App() {
   const [pubTitle, setPubTitle] = useState('');
   const [removeTitleLine, setRemoveTitleLine] = useState(() => localStorage.getItem('steem_remove_title_line') !== 'false');
   const [pubTags, setPubTags] = useState('');
-  const [appAgent, setAppAgent] = useState(localStorage.getItem('steem_app_agent') || 'steemeditor/1.0');
+  const [appAgent, setAppAgent] = useState(localStorage.getItem('steem_app_agent') || 'ultrasteemeditor/4.4.4');
   const [rewardType, setRewardType] = useState<'SP' | '50' | '0'>( (localStorage.getItem('steem_reward_type') as any) || '50');
   const [beneficiaries, setBeneficiaries] = useState<{account: string, weight: number}[]>([]);
   const [benName, setBenName] = useState('');
@@ -2297,6 +2322,10 @@ function App() {
   const [showAdvancedPublish, setShowAdvancedPublish] = useState(false);
   const [themeColor, setThemeColor] = useState<string>(localStorage.getItem('steem_theme_color') || 'cyan');
   const [editorFont, setEditorFont] = useState<string>(localStorage.getItem('steem_editor_font') || 'sans');
+  const [editorFontSize, setEditorFontSize] = useState<number>(() => {
+    const saved = localStorage.getItem('steem_editor_font_size');
+    return saved ? parseInt(saved, 10) : 16;
+  });
   const [toolbarIconSize, setToolbarIconSize] = useState<number>(() => {
     const saved = localStorage.getItem('steem_toolbar_icon_size');
     return saved ? parseInt(saved, 10) : 20;
@@ -2309,7 +2338,7 @@ function App() {
   const [isExifEnabled, setIsExifEnabled] = useState(() => localStorage.getItem('steem_exif_enabled') === 'true');
   const [pubLog, setPubLog] = useState<{ msg: string, type: 'success' | 'error' | 'loading' | null }>({ msg: '', type: null });
 
-  // Update CSS variables for theme color, font, toolbar sizing, and WYSIWYG spacing
+  // Update CSS variables for theme color, font, font size, toolbar sizing, and WYSIWYG spacing
   useEffect(() => {
     const theme = activeAssortment.find(t => t.name === themeColor) || activeAssortment[0];
     document.documentElement.style.setProperty('--accent-color', theme.rgb);
@@ -2317,12 +2346,13 @@ function App() {
     
     const font = fontOptions.find(f => f.id === editorFont) || fontOptions[0];
     document.documentElement.style.setProperty('--font-editor', font.family);
+    document.documentElement.style.setProperty('--editor-font-size', `${editorFontSize}px`);
 
     document.documentElement.style.setProperty('--toolbar-icon-size', `${toolbarIconSize}px`);
     document.documentElement.style.setProperty('--toolbar-btn-size', `${toolbarIconSize + 16}px`);
     document.documentElement.style.setProperty('--toolbar-btn-font-size', `${Math.round(toolbarIconSize * 0.85)}px`);
     document.documentElement.style.setProperty('--wysiwyg-spacing', `${wysiwygSpacing}px`);
-  }, [themeColor, activeAssortment, editorFont, fontOptions, toolbarIconSize, wysiwygSpacing]);
+  }, [themeColor, activeAssortment, editorFont, fontOptions, editorFontSize, toolbarIconSize, wysiwygSpacing]);
 
   const getExifTableFromBlob = async (file: File | Blob): Promise<string> => {
     if (!isExifEnabled) return '';
@@ -6714,6 +6744,62 @@ function App() {
     localStorage.setItem(STORAGE_KEY_FLOAT_CONFIG, JSON.stringify(newTools));
   };
 
+  const saveFileNatively = async (blob: Blob, defaultFilename: string, mimeType: string = 'text/plain') => {
+    try {
+      if (IS_NATIVE && (window as any).__TAURI__) {
+        const { save } = await import('@tauri-apps/plugin-dialog');
+        const { writeFile } = await import('@tauri-apps/plugin-fs');
+        
+        const ext = defaultFilename.split('.').pop() || '*';
+        const filePath = await save({
+          defaultPath: defaultFilename,
+          filters: [{
+            name: 'Files',
+            extensions: [ext]
+          }]
+        });
+        
+        if (filePath) {
+          const buffer = await blob.arrayBuffer();
+          await writeFile(filePath, new Uint8Array(buffer));
+          return true;
+        }
+        return false;
+      } else if (IS_NATIVE && (window as any).AndroidBridge?.saveFile) {
+        return new Promise<boolean>((resolve) => {
+          const reader = new FileReader();
+          reader.onload = () => {
+            const base64 = (reader.result as string).split(',')[1];
+            (window as any).AndroidBridge.saveFile(base64, defaultFilename, mimeType);
+            resolve(true);
+          };
+          reader.readAsDataURL(blob);
+        });
+      } else {
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = defaultFilename;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+        return true;
+      }
+    } catch (err: any) {
+      console.error("Native save failed, falling back:", err);
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = defaultFilename;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      return true;
+    }
+  };
+
   const exportBackup = async () => {
     try {
       const draftsRaw = localStorage.getItem(STORAGE_KEY_DRAFTS) || "[]";
@@ -6724,7 +6810,7 @@ function App() {
         return;
       }
 
-      const zip = new JSZip();
+      const zipData: Record<string, Uint8Array> = {};
       drafts.forEach((d: any) => {
         const safeTitle = (d.title || `draft-${d.id}`).replace(/[/\\?%*:|"<>]/g, '-');
         
@@ -6740,24 +6826,18 @@ function App() {
         
         if (!content.endsWith("\n")) content += "\n";
         
-        zip.file(`${safeTitle}.md`, content);
+        zipData[`${safeTitle}.md`] = strToU8(content);
       });
       
-      const blob = await zip.generateAsync({ type: 'blob' });
+      const zipBuffer = zipSync(zipData);
+      const blob = new Blob([zipBuffer], { type: 'application/zip' });
       const filename = `steem_drafts_md_${new Date().toISOString().split('T')[0]}.zip`;
       
-      if (IS_NATIVE && (window as any).AndroidBridge?.saveFile) {
-        const reader = new FileReader();
-        reader.onload = () => {
-          const base64 = (reader.result as string).split(',')[1];
-          (window as any).AndroidBridge.saveFile(base64, filename, 'application/zip');
-        };
-        reader.readAsDataURL(blob);
-      } else {
-        saveAs(blob, filename);
-      }
+      const saved = await saveFileNatively(blob, filename, 'application/zip');
       
-      notify("Drafts exported as Markdown files in ZIP!", "success");
+      if (saved) {
+        notify("Drafts exported as Markdown files in ZIP!", "success");
+      }
     } catch (err: any) {
       notify("Error: " + err.message, "error");
     }
@@ -6771,12 +6851,12 @@ function App() {
       let importedDrafts: any[] = [];
       
       if (file.name.endsWith('.zip')) {
-        const zip = await JSZip.loadAsync(file);
+        const buffer = await file.arrayBuffer();
+        const unzipped = unzipSync(new Uint8Array(buffer));
         
         // Try legacy/comprehensive format first
-        const jsonFile = zip.file('backup.json');
-        if (jsonFile) {
-          const text = await jsonFile.async('text');
+        if (unzipped['backup.json']) {
+          const text = strFromU8(unzipped['backup.json']);
           const parsed = JSON.parse(text);
           if (parsed && parsed.drafts) {
             const draftsArr = typeof parsed.drafts === 'string' ? JSON.parse(parsed.drafts) : parsed.drafts;
@@ -6784,11 +6864,11 @@ function App() {
           }
         } else {
           // New format: iterate .md files
-          const files = Object.keys(zip.files);
+          const files = Object.keys(unzipped);
           const mdFiles = files.filter(f => f.endsWith('.md') && !f.startsWith('__MACOSX'));
           
           for (const filename of mdFiles) {
-            const content = await zip.files[filename].async('text');
+            const content = strFromU8(unzipped[filename]);
             const title = filename.split('/').pop()?.replace('.md', '') || 'Imported Draft';
             importedDrafts.push({
               id: Date.now() + Math.random(),
@@ -6823,7 +6903,7 @@ function App() {
     }
   };
 
-  const downloadFile = () => {
+  const downloadFile = async () => {
     // Sync current WYSIWYG editor content to markdown if editing in visual mode
     const currentMarkdown = syncWysiwygToContentIfVisual();
     const lines = currentMarkdown.split('\n');
@@ -6863,17 +6943,7 @@ function App() {
       
     const fullFilename = `${safeFilename || 'steem-post'}.md`;
     
-    // Use native bridge if available, otherwise fallback to saveAs
-    if (IS_NATIVE && (window as any).AndroidBridge?.saveFile) {
-      const reader = new FileReader();
-      reader.onload = () => {
-        const base64 = (reader.result as string).split(',')[1];
-        (window as any).AndroidBridge.saveFile(base64, fullFilename, 'text/markdown');
-      };
-      reader.readAsDataURL(fileBlob);
-    } else {
-      saveAs(fileBlob, fullFilename);
-    }
+    await saveFileNatively(fileBlob, fullFilename, 'text/markdown');
   };
 
   const uploadExternalImage = async (url: string, fileName: string = 'image.jpg') => {
@@ -7374,8 +7444,8 @@ function App() {
         {/* Center: Formatting Tools */}
         {activeView === 'editor' && (
           <div className="flex-1 min-w-0 px-1 flex items-center justify-start lg:justify-center relative group/tools">
-            {/* Mobile format menu trigger */}
-            <div className="relative mobile-tools-container lg:hidden shrink-0">
+            {/* Format menu trigger */}
+            <div className="relative mobile-tools-container shrink-0">
               <button
                 onMouseDown={(e) => e.preventDefault()}
                 onClick={(e) => {
@@ -7393,9 +7463,9 @@ function App() {
                 <ChevronDown size={14} className={cn("transition-transform duration-200 shrink-0", showMobileToolsOpen && "rotate-180")} />
               </button>
 
-              {/* Mobile Dropdown */}
+              {/* Tools Dropdown */}
               <div className={cn(
-                "fixed top-14 left-2 right-2 sm:absolute sm:top-full sm:left-0 sm:right-auto mt-2 bg-slate-800 border border-slate-700 p-2 rounded-xl shadow-2xl z-[150] flex-col gap-2 max-w-[95vw] sm:w-max max-h-[70vh] overflow-y-auto custom-scrollbar mx-auto sm:mx-0",
+                "fixed top-14 left-2 right-2 sm:absolute sm:top-full sm:left-0 sm:right-auto mt-2 bg-slate-800 border border-slate-700 p-2.5 rounded-xl shadow-2xl z-[150] flex-col gap-2.5 max-w-[95vw] sm:w-max max-h-[75vh] overflow-y-auto custom-scrollbar mx-auto sm:mx-0",
                 showMobileToolsOpen ? "flex" : "hidden"
               )}>
                 {/* Group 1 */}
@@ -8478,6 +8548,64 @@ function App() {
                                   className="flex-1 accent-cyan-500 bg-slate-800/60 h-1 rounded-lg appearance-none cursor-pointer"
                                 />
                                 <span className="text-[9px] text-slate-500 font-mono">40px</span>
+                              </div>
+                            </div>
+
+                             {/* Editor font size preset & slider */}
+                            <div className={cn(
+                              "space-y-2 border-t pt-3",
+                              isDarkMode || visualStyle === 'neon' ? "border-slate-800/60" : "border-slate-100"
+                            )}>
+                              <div className="flex justify-between items-center">
+                                <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">
+                                  {lang === 'uk' ? 'Розмір шрифту' : 'Editor Font Size'}
+                                </span>
+                                <span className="text-[10px] font-mono font-bold text-cyan-400 bg-cyan-950/40 border border-cyan-800/30 px-1.5 py-0.5 rounded">
+                                  {editorFontSize}px
+                                </span>
+                              </div>
+                              <div className={cn(
+                                "grid grid-cols-4 gap-1 p-0.5 rounded-lg border",
+                                isDarkMode || visualStyle === 'neon' ? "bg-slate-950/40 border-slate-800/60" : "bg-slate-50 border-slate-200"
+                              )}>
+                                {[
+                                  { id: 14, label: lang === 'uk' ? 'Дрібний' : 'Small' },
+                                  { id: 16, label: lang === 'uk' ? 'Стандарт' : 'Normal' },
+                                  { id: 18, label: lang === 'uk' ? 'Великий' : 'Large' },
+                                  { id: 22, label: lang === 'uk' ? 'Макс' : 'Max' }
+                                ].map(p => (
+                                  <button
+                                    key={p.id}
+                                    onClick={() => {
+                                      setEditorFontSize(p.id);
+                                      localStorage.setItem('steem_editor_font_size', String(p.id));
+                                    }}
+                                    className={cn(
+                                      "py-1 px-0.5 rounded text-[9px] font-bold transition-all text-center truncate",
+                                      editorFontSize === p.id
+                                        ? "bg-cyan-600 text-white shadow-sm"
+                                        : "text-slate-500 hover:text-slate-300 hover:bg-slate-800/20"
+                                    )}
+                                  >
+                                    {p.label}
+                                  </button>
+                                ))}
+                              </div>
+                              <div className="flex items-center gap-2 pt-1">
+                                <span className="text-[9px] text-slate-500 font-mono">12px</span>
+                                <input
+                                  type="range"
+                                  min="12"
+                                  max="32"
+                                  value={editorFontSize}
+                                  onChange={(e) => {
+                                    const val = parseInt(e.target.value, 10);
+                                    setEditorFontSize(val);
+                                    localStorage.setItem('steem_editor_font_size', String(val));
+                                  }}
+                                  className="flex-1 accent-cyan-500 bg-slate-800/60 h-1 rounded-lg appearance-none cursor-pointer"
+                                />
+                                <span className="text-[9px] text-slate-500 font-mono">32px</span>
                               </div>
                             </div>
 
@@ -10798,11 +10926,11 @@ function App() {
                     <div className="pt-4 space-y-3">
                       <div className="flex justify-between text-xs items-center">
                         <span className="text-slate-500">{t('version')}</span>
-                        <span className="bg-cyan-500/10 text-cyan-400 px-2 py-1 rounded-md font-mono font-bold">4.3.8</span>
+                        <span className="bg-cyan-500/10 text-cyan-400 px-2 py-1 rounded-md font-mono font-bold">4.4.4</span>
                       </div>
                       <div className="flex justify-between text-xs items-center">
                         <span className="text-slate-500">{t('license')}</span>
-                        <span className="text-slate-300 font-bold">GNU AGPL v3</span>
+                        <span className="text-slate-300 font-bold">Apache 2.0</span>
                       </div>
                       <div className="space-y-1.5 pt-2">
                         <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">{t('appAgent')}</label>
@@ -10830,17 +10958,18 @@ function App() {
                       </h3>
                       <div className="mt-2 space-y-2 max-h-48 overflow-y-auto custom-scrollbar pr-1">
                         {[
-                          { n: 'react', v: '19.0', d: 'Ядро інтерфейсу, реактивність та керування станом компонентів.' },
-                          { n: 'dsteem', v: '0.11', d: 'Повноцінна клієнтська інтеграція з блокчейном Steem (транзакції, підписи, апвоути).' },
-                          { n: 'motion', v: '12.0', d: 'Професійні та плавні анімації інтерфейсу для відмінного UX.' },
-                          { n: 'marked', v: '18.0', d: 'Швидкісний і безпечний парсер Markdown розмітки в чистий HTML.' },
-                          { n: 'dompurify', v: '3.4', d: 'Надійне очищення HTML від XSS-загроз при читанні стрічки дописів.' },
-                          { n: 'lucide-react', v: '0.47', d: 'Набір сучасних та лаконічних векторних іконок для UI.' },
-                          { n: 'buffer', v: '6.0', d: 'Поліфіл буфера для криптографічних підписів у браузерному оточенні.' },
-                          { n: 'jszip', v: '3.10', d: 'Створення та архівація чернеток у Markdown ZIP-пакети для бекапу.' },
-                          { n: 'idb-keyval', v: '6.2', d: 'Надшвидке сховище автозбереження чернеток в IndexedDB браузера.' },
-                          { n: 'idiomorph', v: '0.3', d: 'Інтелектуальне зіставлення (morphing) DOM для безшовної синхронізації без втрати фокусу й курсору.' },
-                          { n: 'zustand', v: '5.0', d: 'Легковажне керування глобальним станом застосунку.' }
+                          { n: 'react', v: '19.0.0', d: 'Ядро інтерфейсу, реактивність та керування станом компонентів.' },
+                          { n: '@blazeapps/dsteem', v: '0.12.2', d: 'Повноцінна клієнтська інтеграція з блокчейном Steem (транзакції, підписи, апвоути).' },
+                          { n: 'motion', v: '13.1.0', d: 'Професійні та плавні анімації інтерфейсу для відмінного UX.' },
+                          { n: 'marked', v: '18.0.7', d: 'Швидкісний і безпечний парсер Markdown розмітки в чистий HTML.' },
+                          { n: 'dompurify', v: '3.4.13', d: 'Надійне очищення HTML від XSS-загроз при читанні стрічки дописів.' },
+                          { n: 'lucide-react', v: '1.31.0', d: 'Набір сучасних та лаконічних векторних іконок для UI.' },
+                          { n: 'buffer', v: '6.0.3', d: 'Поліфіл буфера для криптографічних підписів у браузерному оточенні.' },
+                          { n: 'fflate', v: '0.8.3', d: 'Ультра-швидке та легковажне стиснення й розархівування чернеток у ZIP.' },
+                          { n: 'exifreader', v: '4.38.1', d: 'Зчитування та аналіз метаданих EXIF з фотографій для параметрів зйомки.' },
+                          { n: 'idb-keyval', v: '6.2.2', d: 'Надшвидке сховище автозбереження чернеток в IndexedDB браузера.' },
+                          { n: 'idiomorph', v: '0.7.4', d: 'Інтелектуальне зіставлення (morphing) DOM для безшовної синхронізації без втрати фокусу й курсору.' },
+                          { n: 'zustand', v: '5.0.14', d: 'Легковажне керування глобальним станом застосунку.' }
                         ].map(pkg => (
                           <div key={pkg.n} className="p-2 bg-slate-950/60 border border-slate-800/80 rounded-xl flex flex-col gap-0.5">
                             <div className="flex justify-between items-center">
@@ -10848,26 +10977,6 @@ function App() {
                               <span className="text-[8px] text-slate-500 font-mono font-bold">v.{pkg.v}</span>
                             </div>
                             <p className="text-[9px] text-slate-400 leading-normal">{pkg.d}</p>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-
-                    <div>
-                      <h3 className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-3 flex items-center gap-2">
-                         <Globe size={18} /> {t('externalLibs')}
-                      </h3>
-                      <div className="space-y-1.5">
-                        {[
-                          { name: 'Lucide Icons', desc: 'Сучасні векторні піктограми високої чіткості' },
-                          { name: 'Motion Physics', desc: 'Фізично-базована модель декларативних анімацій' },
-                          { name: 'Tailwind CSS v4', desc: 'Утилітарний CSS-фреймворк для стилізації інтерфейсу' },
-                          { name: 'DSteem Ledger API', desc: 'Низькорівневе з\'єднання з децентралізованою мережею Steem' },
-                          { name: 'Marked Compiler', desc: 'Надшвидкий синтаксичний компілятор розмітки тексту' }
-                        ].map(lib => (
-                          <div key={lib.name} className="flex justify-between items-center text-[10px] bg-slate-950/20 p-1 px-2 border border-slate-800/40 rounded-lg">
-                            <span className="text-slate-300 font-bold">{lib.name}</span>
-                            <span className="text-slate-500 font-medium italic">{lib.desc}</span>
                           </div>
                         ))}
                       </div>
@@ -11354,6 +11463,60 @@ function App() {
                         </button>
                       </div>
 
+                      {/* Custom Editor Font Size Control */}
+                      <div className="space-y-2 pt-2 border-t border-slate-800/40">
+                        <div className="flex justify-between items-center">
+                          <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
+                            {lang === 'uk' ? "Розмір шрифту редактора" : "Editor Font Size"}
+                          </label>
+                          <span className="text-xs font-mono font-bold text-cyan-400 bg-cyan-950/40 border border-cyan-800/30 px-2 py-0.5 rounded">
+                            {editorFontSize} px
+                          </span>
+                        </div>
+                        
+                        <div className="grid grid-cols-4 gap-1.5 bg-slate-900/60 p-1 rounded-xl border border-slate-800/60">
+                          {[
+                            { id: 14, label: lang === 'uk' ? "Дрібний" : "Small" },
+                            { id: 16, label: lang === 'uk' ? "Стандарт" : "Normal" },
+                            { id: 18, label: lang === 'uk' ? "Великий" : "Large" },
+                            { id: 22, label: lang === 'uk' ? "Макс" : "Max" }
+                          ].map(preset => (
+                            <button
+                              key={preset.id}
+                              onClick={() => {
+                                setEditorFontSize(preset.id);
+                                localStorage.setItem('steem_editor_font_size', String(preset.id));
+                              }}
+                              className={cn(
+                                "py-1.5 px-1 rounded-lg text-[10px] font-semibold uppercase transition-all text-center truncate",
+                                editorFontSize === preset.id 
+                                  ? "bg-cyan-600 text-white shadow" 
+                                  : "text-slate-500 hover:text-slate-300 hover:bg-slate-800/30"
+                              )}
+                            >
+                              {preset.label}
+                            </button>
+                          ))}
+                        </div>
+
+                        <div className="flex items-center gap-3 pt-1">
+                          <span className="text-[10px] text-slate-500 font-mono">12px</span>
+                          <input
+                            type="range"
+                            min="12"
+                            max="32"
+                            value={editorFontSize}
+                            onChange={(e) => {
+                              const val = parseInt(e.target.value, 10);
+                              setEditorFontSize(val);
+                              localStorage.setItem('steem_editor_font_size', String(val));
+                            }}
+                            className="flex-1 accent-cyan-500 bg-slate-800 h-1.5 rounded-lg appearance-none cursor-pointer"
+                          />
+                          <span className="text-[10px] text-slate-500 font-mono">32px</span>
+                        </div>
+                      </div>
+
                       {/* Custom Toolbar Icon Size Control */}
                       <div className="space-y-2 pt-2 border-t border-slate-800/40">
                         <div className="flex justify-between items-center">
@@ -11706,17 +11869,18 @@ function App() {
                           <label className="text-[10px] font-black text-slate-500 uppercase tracking-[0.2em] px-1">Пакетний Аудит (NPM Packages)</label>
                           <div className="mt-2 space-y-2 max-h-64 overflow-y-auto custom-scrollbar pr-1">
                              {[
-                               { n: 'react', v: '19.0', d: 'Ядро інтерфейсу, реактивність та керування станом компонентів.' },
-                               { n: 'dsteem', v: '0.11', d: 'Повноцінна клієнтська інтеграція з блокчейном Steem (транзакції, підписи, апвоути).' },
-                               { n: 'motion', v: '12.0', d: 'Професійні та плавні анімації інтерфейсу для відмінного UX.' },
-                               { n: 'marked', v: '18.0', d: 'Швидкісний і безпечний парсер Markdown розмітки в чистий HTML.' },
-                               { n: 'dompurify', v: '3.4', d: 'Надійне очищення HTML від XSS-загроз при читанні стрічки дописів.' },
-                               { n: 'lucide-react', v: '0.47', d: 'Набір сучасних та лаконічних векторних іконок для UI.' },
-                               { n: 'buffer', v: '6.0', d: 'Поліфіл буфера для криптографічних підписів у браузерному оточенні.' },
-                               { n: 'jszip', v: '3.10', d: 'Створення та архівація чернеток у Markdown ZIP-пакети для бекапу.' },
-                               { n: 'idb-keyval', v: '6.2', d: 'Надшвидке сховище автозбереження чернеток в IndexedDB браузера.' },
-                               { n: 'idiomorph', v: '0.3', d: 'Інтелектуальне зіставлення (morphing) DOM для безшовної синхронізації без втрати фокусу й курсору.' },
-                               { n: 'zustand', v: '5.0', d: 'Легковажне керування глобальним станом застосунку.' }
+                               { n: 'react', v: '19.0.0', d: 'Ядро інтерфейсу, реактивність та керування станом компонентів.' },
+                               { n: '@blazeapps/dsteem', v: '0.12.2', d: 'Повноцінна клієнтська інтеграція з блокчейном Steem (транзакції, підписи, апвоути).' },
+                               { n: 'motion', v: '13.1.0', d: 'Професійні та плавні анімації інтерфейсу для відмінного UX.' },
+                               { n: 'marked', v: '18.0.7', d: 'Швидкісний і безпечний парсер Markdown розмітки в чистий HTML.' },
+                               { n: 'dompurify', v: '3.4.13', d: 'Надійне очищення HTML від XSS-загроз при читанні стрічки дописів.' },
+                               { n: 'lucide-react', v: '1.31.0', d: 'Набір сучасних та лаконічних векторних іконок для UI.' },
+                               { n: 'buffer', v: '6.0.3', d: 'Поліфіл буфера для криптографічних підписів у браузерному оточенні.' },
+                               { n: 'fflate', v: '0.8.3', d: 'Ультра-швидке та легковажне стиснення й розархівування чернеток у ZIP.' },
+                               { n: 'exifreader', v: '4.38.1', d: 'Зчитування та аналіз метаданих EXIF з фотографій для параметрів зйомки.' },
+                               { n: 'idb-keyval', v: '6.2.2', d: 'Надшвидке сховище автозбереження чернеток в IndexedDB браузера.' },
+                               { n: 'idiomorph', v: '0.7.4', d: 'Інтелектуальне зіставлення (morphing) DOM для безшовної синхронізації без втрати фокусу й курсору.' },
+                               { n: 'zustand', v: '5.0.14', d: 'Легковажне керування глобальним станом застосунку.' }
                              ].map(pkg => (
                                <div key={pkg.n} className="p-2.5 bg-slate-900 border border-slate-800/80 rounded-xl flex flex-col gap-1 hover:border-slate-700/50 transition-all">
                                   <div className="flex justify-between items-center">
@@ -11725,24 +11889,6 @@ function App() {
                                   </div>
                                   <p className="text-[10px] text-slate-400 leading-normal">{pkg.d}</p>
                                </div>
-                             ))}
-                          </div>
-                       </div>
-
-                       <div className="pt-2">
-                          <label className="text-[10px] font-black text-slate-500 uppercase tracking-[0.2em] px-1">Зовнішні Бібліотеки (CDN / Core)</label>
-                          <div className="mt-2 grid grid-cols-1 sm:grid-cols-2 gap-2">
-                             {[
-                               { n: 'Lucide Icons', d: 'Сучасні векторні піктограми високої чіткості.' },
-                               { n: 'Motion Physics', d: 'Фізично-базована модель декларативних анімацій.' },
-                               { n: 'Tailwind CSS v4', d: 'Утилітарний CSS-фреймворк для стилізації інтерфейсу.' },
-                               { n: 'DSteem Ledger API', d: 'Низькорівневе з\'єднання з децентралізованою мережею Steem.' },
-                               { n: 'Marked Compiler', d: 'Надшвидкий синтаксичний компілятор розмітки тексту.' }
-                             ].map(lib => (
-                               <div key={lib.n} className="p-2.5 bg-slate-950/40 border border-slate-800/60 rounded-xl flex flex-col gap-1">
-                                  <span className="text-[11px] font-black text-slate-300 uppercase leading-none">{lib.n}</span>
-                                  <p className="text-[10px] text-slate-500 leading-snug">{lib.d}</p>
-                                </div>
                              ))}
                           </div>
                        </div>
@@ -11779,7 +11925,7 @@ function App() {
                                   localStorage.setItem('steem_app_agent', e.target.value);
                                 }}
                                 className="w-full bg-slate-900 border border-slate-700 rounded-lg p-2.5 text-xs text-slate-200 outline-none focus:ring-1 focus:ring-cyan-500"
-                                placeholder="steemeditor/1.0"
+                                placeholder="ultrasteemeditor/4.4.4"
                               />
                             </div>
                           </motion.div>

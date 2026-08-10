@@ -1,4 +1,4 @@
-import * as dsteem from 'dsteem';
+import * as dsteem from '@blazeapps/dsteem';
 import { Buffer } from 'buffer';
 import { get, set, del } from 'idb-keyval';
 
@@ -12,7 +12,7 @@ const PEXELS_KEY = '_px_meta_v1'; // legacy
 const APP_SECRET = "steem-editor-pro-v1-static-salt-2024";
 
 const getDSteem = () => {
-  return (dsteem as any).default || dsteem;
+  return dsteem;
 };
 
 interface WrappedMasterKey {

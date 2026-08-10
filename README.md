@@ -24,7 +24,7 @@
 
 ## 🛠 Технології
 
-- **Frontend**: React 18, Vite, Tailwind CSS.
+- **Frontend**: React 19, Vite, Tailwind CSS.
 - **Анімації**: Framer Motion.
 - **Іконки**: Lucide React.
 - **Шифрування**: AES-GCM (Web Crypto).
@@ -57,7 +57,7 @@
 
 ## 📄 Ліцензія
 
-Цей проект розповсюджується під ліцензією MIT.
+Цей проект розповсюджується під ліцензією Apache 2.0. Детальніше дивіться у файлі [LICENSE](./LICENSE).
 
 ---
-© 2024 SteemEditor Pro. Розроблено для спільноти Steem.
+© 2026 SteemEditor Pro. Розроблено для спільноти Steem.

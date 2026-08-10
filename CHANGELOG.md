@@ -1,4 +1,31 @@
 # Changelog
+## [2026-08-10] - Version 4.4.4
+### Added
+- **Babel Optimization**: Configured Vite React plugin with `babel: { compact: true }` to resolve code generator deoptimization warnings for large files.
+- **Agent string**: Changed default App Agent string to `ultrasteemeditor/4.4.4` for proper version tracking on the Steem blockchain.
+- **Zip Compression Engine**: Added `fflate` (v0.8.3) for high-performance, ultra-lightweight ZIP archive operations.
+- **Modern Metadata Extraction**: Added `exifreader` (v4.38.1) for secure, client-side extraction of camera parameters from uploaded images.
+- **Steem Library Upgrade**: Added `@blazeapps/dsteem` (v0.12.2), migrating from the deprecated `dsteem` package for active maintenance and better performance.
+
+### Changed
+- **TypeScript Upgrade**: Upgraded TypeScript to version ^7.0.2.
+- **React Upgrade**: Updated React and React-DOM to version 19.0.0.
+
+### Removed
+- **Unused Zip Library**: Removed `jszip` in favor of `fflate`.
+- **Legacy CSS Tools**: Uninstalled `postcss` and `autoprefixer` (no longer strictly needed for Tailwind v4 integration via Vite).
+- **Unused Polyfills**: Removed `core-js` dependency to prevent Babel from unintentionally injecting or importing unnecessary polyfills.
+- **Unused Dev & Utility Packages**: Uninstalled `babel-plugin-transform-remove-console` and `eslint-plugin-react`.
+- **Deprecated Helper Libraries**: Uninstalled legacy/unused helper libraries like `bytebuffer`, old `exif` / `exif-parser` packages, and the deprecated `dsteem` library, reducing overhead in favor of lightweight and modern solutions like `exifreader`.
+
+### Fixed
+- **Linter Warnings**: Addressed and removed strict linter override comments (`@typescript-eslint/no-use-before-define`, `react-hooks/set-state-in-effect`) in `Reader.tsx`.
+
+## [2026-08-02] - Version 4.3.9
+### Added
+- **Customizable Font Size**: Added a new precise font size control in the toolbar settings dropdown.
+- **Responsive Typography**: Connected the selected font size directly to the editor's visual output for instantaneous scaling without page reloads.
+- **UI Refinement**: Grouped font size presets alongside a numeric input and range slider for maximal control.
 
 ## [2026-07-23] - Version 4.3.8
 ### Added

@@ -1,9 +1,6 @@
 name: "Tauri Multiplatform Build & Release"
 
 on:
-  push:
-    tags:
-      - 'v*' # Triggers on semantic version tags, for example: v1.0.0
   workflow_dispatch: # Allows manual trigger from GitHub Actions tab
 
 # Grant necessary permissions for creating GitHub Releases
@@ -19,7 +16,7 @@ jobs:
         include:
           - platform: "windows-latest" # Builds Windows EXE and MSI installer
             args: ""
-          - platform: "ubuntu-26.04" # Builds Linux Debian (.deb) and AppImage packages Using modern Ubuntu environment
+          - platform: "ubuntu-latest" # Builds Linux Debian (.deb) and AppImage packages Using modern Ubuntu environment
             args: ""
 
     runs-on: ${{ matrix.platform }}
@@ -54,7 +51,8 @@ jobs:
             libxdo-dev \
             libssl-dev \
             libayatana-appindicator3-dev \
-            librsvg2-dev
+            librsvg2-dev \
+            rpm
 
       - name: "Install Frontend Dependencies"
         run: npm install --legacy-peer-deps
@@ -93,7 +91,7 @@ jobs:
   publish-android:
     name: "Build & Release (Android)"
     needs: publish-tauri
-    runs-on: ubuntu-26.04
+    runs-on: ubuntu-latest
     steps:
       - name: "Checkout code repository"
         uses: actions/checkout@v4

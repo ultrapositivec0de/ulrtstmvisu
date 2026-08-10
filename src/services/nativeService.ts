@@ -217,8 +217,14 @@ export const NativeService = {
     }
     
     // Web and Neutralino fallback
-    const { saveAs } = await import('file-saver');
-    saveAs(blob, filename);
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
     return true;
   },
 

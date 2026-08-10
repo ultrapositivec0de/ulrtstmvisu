@@ -18,8 +18,11 @@
   --font-editor: "Inter", sans-serif;
 }
 
-.editor-font, .markdown-body {
+.editor-font,
+.markdown-body,
+.wysiwyg-editor {
   font-family: var(--font-editor) !important;
+  font-size: var(--editor-font-size, 16px) !important;
 }
 
 /* AIS_FOCUS_MODE_CSS_START */
@@ -284,7 +287,7 @@ body {
 }
 
 .markdown-body h1, .wysiwyg-editor h1 {
-  font-size: 1.5rem !important;
+  font-size: 1.8em !important;
   font-weight: 700 !important;
   margin-top: 1.5rem !important;
   margin-bottom: 0.75rem !important;
@@ -292,13 +295,13 @@ body {
   padding-bottom: 0.5rem !important;
 }
 .markdown-body h2, .wysiwyg-editor h2 {
-  font-size: 1.25rem !important;
+  font-size: 1.5em !important;
   font-weight: 700 !important;
   margin-top: 1.25rem !important;
   margin-bottom: 0.5rem !important;
 }
 .markdown-body h3, .wysiwyg-editor h3 {
-  font-size: 1.125rem !important;
+  font-size: 1.3em !important;
   font-weight: 700 !important;
   margin-top: 1rem !important;
   margin-bottom: 0.5rem !important;

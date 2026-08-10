@@ -1,4 +1,4 @@
-import * as dsteem from 'dsteem';
+import * as dsteem from '@blazeapps/dsteem';
 
 export const STEEM_NODES = [
   'https://api.steemit.com',
@@ -53,7 +53,7 @@ export const probeNodes = async (force = false) => {
 export const getClient = () => {
   const node = getActiveNode();
   try {
-    const ClientClass = (dsteem as any).Client || (dsteem as any).default?.Client;
+    const ClientClass = (dsteem as any).Client;
     if (ClientClass) {
       return new ClientClass(node, { timeout: 10000 });
     }

@@ -1,10 +1,10 @@
 name: NeutralinoJS Build
 
 on:
-  push:
-    branches:
-      - main
-  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: write
 
 jobs:
   build:
@@ -17,7 +17,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 24
 
       - name: Install dependencies
         run: npm install
@@ -30,8 +30,20 @@ jobs:
       - name: Build Neutralino App
         run: npm run build:neu
 
-      - name: Upload Artifacts
-        uses: actions/upload-artifact@v4
+      - name: Get package version
+        id: package-version
+        shell: bash
+        run: |
+          VERSION=$(node -p "require('./package.json').version")
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+
+      - name: Upload Neutralino Binaries to GitHub Release
+        uses: softprops/action-gh-release@v2
         with:
-          name: SteemEditorPro-Neutralino
-          path: neutralino-build/dist/
+          tag_name: "v${{ steps.package-version.outputs.version }}"
+          name: "Release v${{ steps.package-version.outputs.version }}"
+          draft: true
+          files: |
+            neutralino-build/dist/*
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

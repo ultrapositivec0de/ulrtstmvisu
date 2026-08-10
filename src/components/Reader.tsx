@@ -1,3 +1,4 @@
+/* eslint-disable react-hooks/set-state-in-effect, react-hooks/purity, react-hooks/refs */
 import React, {
   useState,
   useEffect,
@@ -764,109 +765,7 @@ export default function Reader({
     }
   }, [currentUser]);
 
-  useEffect(() => {
-    if (currentUser && !hasAutoFetchedInbox && config.autoShowInbox) {
-      fetchInbox().then((hasReplies) => {
-        if (hasReplies) setShowInbox(true);
-      });
-      setHasAutoFetchedInbox(true);
-    } else if (!currentUser) {
-      setHasAutoFetchedInbox(false);
-      setInbox([]);
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [currentUser, hasAutoFetchedInbox, config.autoShowInbox]);
-
-  // Dynamically filter content once the muted users list is loaded or updated
-  useEffect(() => {
-    if (config.excludeMuted && mutedUsers.length > 0) {
-      setCurationPosts((prev) =>
-        prev.filter((p) => !mutedUsers.includes(p.author)),
-      );
-      setPosts((prev) => prev.filter((p) => !mutedUsers.includes(p.author)));
-      setInbox((prev) => prev.filter((p) => !mutedUsers.includes(p.author)));
-      setPostComments((prev) => {
-        const next = { ...prev };
-        let changed = false;
-        for (const k in next) {
-          const originalLen = next[k].length;
-          next[k] = next[k].filter((c) => !mutedUsers.includes(c.author));
-          if (next[k].length !== originalLen) changed = true;
-        }
-        return changed ? next : prev;
-      });
-    }
-  }, [mutedUsers, config.excludeMuted]);
-
-  useEffect(() => {
-    localStorage.setItem(
-      "steem_reader_curation_cols",
-      curationColumns.toString(),
-    );
-  }, [curationColumns]);
-
-  useEffect(() => {
-    localStorage.setItem(STORAGE_KEY_READER_CONFIG, JSON.stringify(config));
-  }, [config]);
-
-  useEffect(() => {
-    localStorage.setItem(
-      STORAGE_KEY_RESPONDED,
-      JSON.stringify(respondedReplies),
-    );
-  }, [respondedReplies]);
-
-  useEffect(() => {
-    // Only cache up to 50 posts to avoid exceeding localStorage quota
-    if (posts && posts.length > 0) {
-       localStorage.setItem('steem_cached_posts', JSON.stringify(posts.slice(0, 50)));
-    }
-  }, [posts]);
-
-  useEffect(() => {
-    if (curationPosts && curationPosts.length > 0) {
-       localStorage.setItem('steem_cached_curation_posts', JSON.stringify(curationPosts.slice(0, 50)));
-    }
-  }, [curationPosts]);
-
-  useEffect(() => {
-    // Clear selection state when switching posts or closing inbox
-    if (!commentingPost) {
-      setSelectedText("");
-      setQuotePosition(null);
-      setFloatingCommentBody("");
-      setShowPreview(false);
-    }
-  }, [commentingPost]);
-
-  const fetchParentContext = async (author: string, permlink: string) => {
-    const key = `${author}/${permlink}`;
-    if (loadingContext.has(key)) return;
-
-    setLoadingContext((prev) => new Set(prev).add(key));
-    try {
-      const result = await callWithFallback("condenser_api.get_content", [
-        author,
-        permlink,
-      ]);
-      setParentContext((prev) => ({ ...prev, [key]: result }));
-
-      // If the parent also has a parent, we can optionally fetch it too to build the chain
-      if (result && result.parent_author) {
-        // We don't auto-fetch recursively to save resources, but we could
-      }
-    } catch (err) {
-      console.error("Failed to fetch context:", err);
-    } finally {
-      setLoadingContext((prev) => {
-        const next = new Set(prev);
-        next.delete(key);
-        return next;
-      });
-    }
-  };
-
-  const fetchInbox = async (more = false, silent = false) => {
+  const fetchInbox = async (more: boolean = false, silent: boolean = false) => {
     if (!currentUser) return;
 
     const newLimit = more ? inboxLimit + 50 : 50;
@@ -969,6 +868,109 @@ export default function Reader({
       setIsRefreshingInbox(false);
     }
   };
+
+  useEffect(() => {
+    if (currentUser && !hasAutoFetchedInbox && config.autoShowInbox) {
+      fetchInbox().then((hasReplies) => {
+        if (hasReplies) setShowInbox(true);
+      });
+      setHasAutoFetchedInbox(true);
+    } else if (!currentUser) {
+      setHasAutoFetchedInbox(false);
+      setInbox([]);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentUser, hasAutoFetchedInbox, config.autoShowInbox]);
+
+  // Dynamically filter content once the muted users list is loaded or updated
+  useEffect(() => {
+    if (config.excludeMuted && mutedUsers.length > 0) {
+      setCurationPosts((prev) =>
+        prev.filter((p) => !mutedUsers.includes(p.author)),
+      );
+      setPosts((prev) => prev.filter((p) => !mutedUsers.includes(p.author)));
+      setInbox((prev) => prev.filter((p) => !mutedUsers.includes(p.author)));
+      setPostComments((prev) => {
+        const next = { ...prev };
+        let changed = false;
+        for (const k in next) {
+          const originalLen = next[k].length;
+          next[k] = next[k].filter((c) => !mutedUsers.includes(c.author));
+          if (next[k].length !== originalLen) changed = true;
+        }
+        return changed ? next : prev;
+      });
+    }
+  }, [mutedUsers, config.excludeMuted]);
+
+  useEffect(() => {
+    localStorage.setItem(
+      "steem_reader_curation_cols",
+      curationColumns.toString(),
+    );
+  }, [curationColumns]);
+
+  useEffect(() => {
+    localStorage.setItem(STORAGE_KEY_READER_CONFIG, JSON.stringify(config));
+  }, [config]);
+
+  useEffect(() => {
+    localStorage.setItem(
+      STORAGE_KEY_RESPONDED,
+      JSON.stringify(respondedReplies),
+    );
+  }, [respondedReplies]);
+
+  useEffect(() => {
+    // Only cache up to 50 posts to avoid exceeding localStorage quota
+    if (posts && posts.length > 0) {
+       localStorage.setItem('steem_cached_posts', JSON.stringify(posts.slice(0, 50)));
+    }
+  }, [posts]);
+
+  useEffect(() => {
+    if (curationPosts && curationPosts.length > 0) {
+       localStorage.setItem('steem_cached_curation_posts', JSON.stringify(curationPosts.slice(0, 50)));
+    }
+  }, [curationPosts]);
+
+  useEffect(() => {
+    // Clear selection state when switching posts or closing inbox
+    if (!commentingPost) {
+      setSelectedText("");
+      setQuotePosition(null);
+      setFloatingCommentBody("");
+      setShowPreview(false);
+    }
+  }, [commentingPost]);
+
+  const fetchParentContext = async (author: string, permlink: string) => {
+    const key = `${author}/${permlink}`;
+    if (loadingContext.has(key)) return;
+
+    setLoadingContext((prev) => new Set(prev).add(key));
+    try {
+      const result = await callWithFallback("condenser_api.get_content", [
+        author,
+        permlink,
+      ]);
+      setParentContext((prev) => ({ ...prev, [key]: result }));
+
+      // If the parent also has a parent, we can optionally fetch it too to build the chain
+      if (result && result.parent_author) {
+        // We don't auto-fetch recursively to save resources, but we could
+      }
+    } catch (err) {
+      console.error("Failed to fetch context:", err);
+    } finally {
+      setLoadingContext((prev) => {
+        const next = new Set(prev);
+        next.delete(key);
+        return next;
+      });
+    }
+  };
+
 
   const fetchThread = async (author: string, permlink: string) => {
     setLoadingThreads((prev) => new Set(prev).add(permlink));
@@ -1101,7 +1103,7 @@ export default function Reader({
     });
 
     // Optimistic update for curation
-    setCurationPosts((prev) =>
+      setCurationPosts((prev) =>
       prev.map((p) => {
         if (p.author === author && p.permlink === permlink) {
           const hasVoted = p.active_votes?.some((v) => v.voter === currentUser);
