@@ -7445,7 +7445,7 @@ function App() {
         {activeView === 'editor' && (
           <div className="flex-1 min-w-0 px-1 flex items-center justify-start lg:justify-center relative group/tools">
             {/* Format menu trigger */}
-            <div className="relative mobile-tools-container shrink-0">
+            <div className="relative mobile-tools-container shrink-0 lg:hidden">
               <button
                 onMouseDown={(e) => e.preventDefault()}
                 onClick={(e) => {

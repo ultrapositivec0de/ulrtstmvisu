@@ -768,7 +768,7 @@ export default function Reader({
   const fetchInbox = async (more: boolean = false, silent: boolean = false) => {
     if (!currentUser) return;
 
-    const newLimit = more ? inboxLimit + 50 : 50;
+    const newLimit = Math.min(more ? inboxLimit + 50 : 50, 100);
     if (more) setInboxLimit(newLimit);
 
     if (silent) setIsRefreshingInbox(true);
