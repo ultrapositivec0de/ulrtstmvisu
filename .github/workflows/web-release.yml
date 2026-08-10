@@ -1,0 +1,54 @@
+name: "Build & Release Web (Static Page)"
+
+on:
+  workflow_dispatch: # Allows manual trigger from GitHub Actions tab
+
+# Grant permissions for creating/updating GitHub Releases
+permissions:
+  contents: write
+
+jobs:
+  build-web:
+    name: "Build & Release Static Web ZIP"
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: "Checkout code repository"
+        uses: actions/checkout@v4
+
+      - name: "Set up Node.js LTS"
+        uses: actions/setup-node@v4
+        with:
+          node-version: lts/*
+          cache: "npm"
+
+      - name: "Install Frontend Dependencies"
+        run: npm install --legacy-peer-deps
+
+      - name: "Build Static Frontend Assets"
+        run: npm run build
+
+      - name: "Get package version"
+        id: package-version
+        shell: bash
+        run: |
+          VERSION=$(node -p "require('./package.json').version")
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+
+      - name: "Compress built assets into ZIP"
+        run: |
+          VERSION="${{ steps.package-version.outputs.version }}"
+          cd dist
+          zip -r ../ultra-steem-editor-web-v${VERSION}.zip .
+
+      - name: "Upload Static Web ZIP to GitHub Draft Release"
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: "v${{ steps.package-version.outputs.version }}"
+          name: "Release v${{ steps.package-version.outputs.version }}"
+          draft: true
+          prerelease: false
+          files: |
+            ultra-steem-editor-web-v${{ steps.package-version.outputs.version }}.zip
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

@@ -8,9 +8,11 @@ fn greet(name: &str) -> String {
 pub fn run() {
     // Вимикаємо ВСЕ апаратне прискорення для WebKit на Linux
     // Це запобігає білим екранам і зависанню системи (dumped core)
-    std::env::set_var("WEBKIT_DISABLE_COMPOSITING_MODE", "1");
-    std::env::set_var("WEBKIT_DISABLE_DMABUF_RENDERER", "1");
-    std::env::set_var("GDK_BACKEND", "x11"); // Іноді Wayland викликає падіння
+    unsafe {
+        std::env::set_var("WEBKIT_DISABLE_COMPOSITING_MODE", "1");
+        std::env::set_var("WEBKIT_DISABLE_DMABUF_RENDERER", "1");
+        std::env::set_var("GDK_BACKEND", "x11"); // Іноді Wayland викликає падіння
+    }
     
     tauri::Builder::default()
         .plugin(tauri_plugin_fs::init())
