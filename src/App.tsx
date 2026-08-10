@@ -7143,6 +7143,9 @@ function App() {
                 setSourceInput(prev => url + "\n" + prev);
                 successCount++;
                 uploaded = true;
+                if (i === 0) {
+                  insertImage(url, file.name, 'plain');
+                }
               }
             } catch (err) {
               if (attempt >= 3) throw err;
@@ -7172,6 +7175,9 @@ function App() {
             ]);
             setSourceInput(prev => url + "\n" + prev);
             successCount++;
+            if (i === 0) {
+              insertImage(url, file.name, 'plain');
+            }
           }
         }
       } catch (err: any) {
