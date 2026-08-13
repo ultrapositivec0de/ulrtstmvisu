@@ -1,4 +1,5 @@
 import { useEffect, useRef } from 'react';
+import { useEditorStore } from '../store';
 
 export interface EditorStats {
   words: number;
@@ -64,18 +65,16 @@ export function useEditorWorker(
       }, 100);
     };
 
-    const unsubscribe = import('../store').then(({ useEditorStore }) => {
-       calculate(useEditorStore.getState().content); // initial
-       return useEditorStore.subscribe((state, prevState) => {
-          if (state.content !== prevState.content) {
-             calculate(state.content);
-          }
-       });
+    calculate(useEditorStore.getState().content); // initial
+    const unsubscribe = useEditorStore.subscribe((state, prevState) => {
+      if (state.content !== prevState.content) {
+         calculate(state.content);
+      }
     });
 
     return () => {
       if (timer) clearTimeout(timer);
-      unsubscribe.then(unsub => unsub());
+      unsubscribe();
     };
   }, []);
 }

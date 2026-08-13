@@ -10,7 +10,7 @@ permissions:
 jobs:
   build-web:
     name: "Build & Release Static Web ZIP"
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
 
     steps:
       - name: "Checkout code repository"

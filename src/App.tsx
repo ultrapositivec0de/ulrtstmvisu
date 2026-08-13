@@ -1982,10 +1982,7 @@ function App() {
         return;
       }
       try {
-        const currentContent = import('./store').then(({ useEditorStore }) => {
-          return useEditorStore.getState().content;
-        });
-        const mdContent = await currentContent;
+        const mdContent = useEditorStore.getState().content;
         const processed = processContentForSteem(mdContent);
         let finalHtml = (await m.parse(processed)) as string;
         
@@ -2023,25 +2020,24 @@ function App() {
     }
 
     let timer: any;
-    const unsubscribe = import('./store').then(({ useEditorStore }) => {
-      // Trigger update immediately if needed, or wait for next changes
-      if (!isLivePreviewEnabled) updatePreview(); 
-      else {
+    
+    // Trigger update immediately if needed, or wait for next changes
+    if (!isLivePreviewEnabled) updatePreview(); 
+    else {
+      timer = setTimeout(updatePreview, 300);
+    }
+    const unsubscribe = useEditorStore.subscribe((state, prevState) => {
+      if (state.content !== prevState.content) {
+        // Skip expensive markdown preview parsing/morphing in background while user types in visual editor
+        if (editorMode === 'visual') return;
+        if (timer) clearTimeout(timer);
         timer = setTimeout(updatePreview, 300);
       }
-      return useEditorStore.subscribe((state, prevState) => {
-        if (state.content !== prevState.content) {
-          // Skip expensive markdown preview parsing/morphing in background while user types in visual editor
-          if (editorMode === 'visual') return;
-          if (timer) clearTimeout(timer);
-          timer = setTimeout(updatePreview, 300);
-        }
-      });
     });
 
     return () => {
       if (timer) clearTimeout(timer);
-      unsubscribe.then(unsub => unsub());
+      unsubscribe();
     };
   }, [t, syncScrollEnabled, isLivePreviewEnabled, lang, editorMode]);
   const [templates, setTemplates] = useState<Template[]>([]);
@@ -3419,6 +3415,7 @@ function App() {
   }, []);
 
   // Visual Viewport API for mobile virtual keyboard height detection
+  const [viewportHeight, setViewportHeight] = useState(() => typeof window !== 'undefined' ? window.innerHeight : 0);
   const [keyboardOffset, setKeyboardOffset] = useState(0);
 
   useEffect(() => {
@@ -3429,6 +3426,7 @@ function App() {
       if (!vv) return;
       const layoutHeight = window.innerHeight;
       const visualHeight = vv.height;
+      setViewportHeight(visualHeight);
       const diff = layoutHeight - visualHeight - vv.offsetTop;
       if (diff > 80) {
         setKeyboardOffset(diff);
@@ -3437,6 +3435,7 @@ function App() {
       }
     };
 
+    handleVisualViewportChange();
     window.visualViewport.addEventListener('resize', handleVisualViewportChange);
     window.visualViewport.addEventListener('scroll', handleVisualViewportChange);
 
@@ -3501,7 +3500,7 @@ function App() {
 
     try {
       const ta = editorRef.current;
-      const textVal = useEditorStore.getState().content || localStorage.getItem('steem_autosave_temp') || ta.value || '';
+      const textVal = useEditorStore.getState().content;
       
       // Ensure the textarea has the correct value
       if (ta.value !== textVal) {
@@ -3841,83 +3840,6 @@ function App() {
   }, [activeView, activeMobileTab, editorMode, saveCursorPosition, restoreVisualSelection, saveVisualSelection, restoreMarkdownCursorAndScroll]);
 
   useEffect(() => {
-    // DEBOUNCED PERSISTENCE: Fast 350ms save to storage so state and cursor match without blocking UI thread during typing
-    let timer: any;
-    const unsubscribe = import('./store').then(({ useEditorStore }) => {
-      return useEditorStore.subscribe((state, prevState) => {
-        if (state.content !== prevState.content) {
-          if (timer) clearTimeout(timer);
-          timer = setTimeout(() => {
-            saveLargeStorage(STORAGE_KEY_AUTOSAVE, state.content);
-            if (cursorPositionRef.current) {
-              try {
-                localStorage.setItem('steem_editor_cursor', JSON.stringify(cursorPositionRef.current));
-              } catch (err) {
-                console.debug(err);
-              }
-            }
-            if (editorMode === 'markdown') {
-              try {
-                localStorage.setItem('steem_visual_html_is_stale', 'true');
-              } catch (err) {
-                console.debug(err);
-              }
-            }
-          }, 350);
-        }
-      });
-    });
-
-    return () => {
-      if (timer) clearTimeout(timer);
-      unsubscribe.then(unsub => unsub());
-    };
-  }, [editorMode, saveLargeStorage]);
-
-  // Synchronous flush on page reload / unload
-  useEffect(() => {
-    const handleBeforeUnload = () => {
-      try {
-        if (editorMode === 'markdown' && editorRef.current) {
-          const val = editorRef.current.value;
-          useEditorStore.setState({ content: val });
-          saveLargeStorage(STORAGE_KEY_AUTOSAVE, val);
-          saveCursorPosition();
-        } else if (editorMode === 'visual' && wysiwygRef.current) {
-          const html = wysiwygRef.current.innerHTML;
-          try {
-            localStorage.setItem('steem_autosave_temp_visual_html', html);
-          } catch (err) {
-            console.debug(err);
-          }
-          const md = htmlToMarkdown(html);
-          useEditorStore.setState({ content: md });
-          saveLargeStorage(STORAGE_KEY_AUTOSAVE, md);
-          saveVisualSelection();
-          syncCursorVisualToMarkdown();
-          if (cursorPositionRef.current) {
-            try {
-              localStorage.setItem('steem_editor_cursor', JSON.stringify(cursorPositionRef.current));
-            } catch (err) {
-              console.debug(err);
-            }
-          }
-        } else {
-          saveLargeStorage(STORAGE_KEY_AUTOSAVE, useEditorStore.getState().content);
-          saveCursorPosition();
-        }
-      } catch (err) {
-        console.warn('Error flushing autosave state before unload:', err);
-      }
-    };
-
-    window.addEventListener('beforeunload', handleBeforeUnload);
-    return () => {
-      window.removeEventListener('beforeunload', handleBeforeUnload);
-    };
-  }, [editorMode, saveCursorPosition, saveVisualSelection, syncCursorVisualToMarkdown, saveLargeStorage]);
-
-  useEffect(() => {
     if (isImagesLoaded.current) {
       localStorage.setItem(STORAGE_KEY_IMAGES, JSON.stringify(images));
       localStorage.setItem('steem_editor_source_links', sourceInput);
@@ -4053,34 +3975,32 @@ function App() {
   useEffect(() => {
     // DEBOUNCED PERSISTENCE: Fast 350ms save to storage so state and cursor match without blocking UI thread during typing
     let timer: any;
-    const unsubscribe = import('./store').then(({ useEditorStore }) => {
-      return useEditorStore.subscribe((state, prevState) => {
-        if (state.content !== prevState.content) {
-          if (timer) clearTimeout(timer);
-          timer = setTimeout(() => {
-            saveLargeStorage(STORAGE_KEY_AUTOSAVE, state.content);
-            if (cursorPositionRef.current) {
-              try {
-                localStorage.setItem('steem_editor_cursor', JSON.stringify(cursorPositionRef.current));
-              } catch (err) {
-                console.debug(err);
-              }
+    const unsubscribe = useEditorStore.subscribe((state, prevState) => {
+      if (state.content !== prevState.content) {
+        if (timer) clearTimeout(timer);
+        timer = setTimeout(() => {
+          saveLargeStorage(STORAGE_KEY_AUTOSAVE, state.content);
+          if (cursorPositionRef.current) {
+            try {
+              localStorage.setItem('steem_editor_cursor', JSON.stringify(cursorPositionRef.current));
+            } catch (err) {
+              console.debug(err);
             }
-            if (editorMode === 'markdown') {
-              try {
-                localStorage.setItem('steem_visual_html_is_stale', 'true');
-              } catch (err) {
-                console.debug(err);
-              }
+          }
+          if (editorMode === 'markdown') {
+            try {
+              localStorage.setItem('steem_visual_html_is_stale', 'true');
+            } catch (err) {
+              console.debug(err);
             }
-          }, 350);
-        }
-      });
+          }
+        }, 350);
+      }
     });
 
     return () => {
       if (timer) clearTimeout(timer);
-      unsubscribe.then(unsub => unsub());
+      unsubscribe();
     };
   }, [editorMode, saveLargeStorage]);
 
@@ -7341,10 +7261,10 @@ function App() {
 
   return (
     <div className={cn(
-      "flex flex-col h-screen font-sans overflow-hidden transition-colors duration-500 selection:bg-[rgb(var(--accent-color)/0.3)]",
+      "flex flex-col w-full relative font-sans overflow-hidden transition-colors duration-500 selection:bg-[rgb(var(--accent-color)/0.3)]",
       visualStyle === 'neon' ? "theme-neon bg-slate-950 text-cyan-400" : (isDarkMode ? "bg-slate-950 text-slate-100" : "theme-light bg-white text-slate-900 border-slate-200"),
       performanceMode && "perf-mode"
-    )}>
+    )} style={{ height: viewportHeight > 0 ? `${viewportHeight}px` : "100dvh" }}>
       {/* Dynamic Theme Styles */}
       <style dangerouslySetInnerHTML={{ __html: `
         :root {
@@ -7724,12 +7644,37 @@ function App() {
                          const reader = new FileReader();
                          reader.onload = (ev) => {
                             const val = ev.target?.result as string;
-                            if (useEditorStore.getState().content) {
-                               setContent(useEditorStore.getState().content + '\n\n' + val);
+                            const currentContent = useEditorStore.getState().content;
+                            const newContent = currentContent ? currentContent + '\n\n' + val : val;
+                            
+                            useEditorStore.setState({ content: newContent });
+                            
+                            if (editorMode === 'markdown' && editorRef.current) {
+                               editorRef.current.value = newContent;
+                               editorRef.current.dispatchEvent(new Event('input', { bubbles: true }));
+                            } else if (editorMode === 'visual') {
+                               setContent(newContent);
+                               if (wysiwygRef.current) {
+                                  isSyncingRef.current = true;
+                                  const getMarkedFn = getMarked;
+                                  const m = getMarkedFn();
+                                  if (m) {
+                                     m.parse(newContent).then(parsed => {
+                                        if (wysiwygRef.current) {
+                                          wysiwygRef.current.innerHTML = parsed;
+                                        }
+                                        isSyncingRef.current = false;
+                                     });
+                                  } else {
+                                     isSyncingRef.current = false;
+                                  }
+                               }
                             } else {
-                               setContent(val);
+                               setContent(newContent);
                             }
+                            
                             setShowMobileTools1(false);
+                            e.target.value = '';
                          };
                          reader.readAsText(f);
                       }
@@ -8689,33 +8634,52 @@ function App() {
                   suppressContentEditableWarning
                   onKeyDown={handleWysiwygKeyDown}
                   onPaste={async (e) => {
-                    const text = e.clipboardData.getData('text/plain');
-                    if (text) {
-                      const trimmedText = text.trim();
+                    e.preventDefault();
+                    
+                    const htmlData = e.clipboardData.getData('text/html');
+                    const textData = e.clipboardData.getData('text/plain');
+                    
+                    if (!textData && !htmlData) return;
+                    
+                    if (textData) {
+                      const trimmedText = textData.trim();
                       if (isImageAndProxyUrl(trimmedText)) {
-                        e.preventDefault();
                         const imgHtml = `<img src="${trimmedText}" alt="image">`;
-                        insertHtmlAtCursor(imgHtml);
+                        if (!document.execCommand('insertHTML', false, imgHtml)) {
+                          insertHtmlAtCursor(imgHtml);
+                        }
                         updateContentFromWysiwyg();
                         return;
                       }
+                    }
 
-                      const hasMarkdownImage = /!\[([^\]]*)\]\(([^)]+)\)/.test(text);
-                      const hasMarkdownLink = /\[([^\]]*)\]\(([^)]+)\)/.test(text);
-                      const hasBareImageUrl = /(?:https?:\/\/)[^\s<>"')]+\.(?:png|jpg|jpeg|gif|webp|svg|bmp|tiff)(?:\?.*)?/i.test(text);
+                    const m = getMarked();
+                    if (!m) return;
 
-                      const hasMarkdownSyntax = /(?:^|\n)(#{1,6}\s|\*\s|-\s|>\s|\d+\.\s|```)/.test(text) || /\*\*([^*]+)\*\*|__([^_]+)__|_([^\s_][^_]*[^\s_])_|\*([^\s*][^*]*[^\s*])\*|`([^`]+)`/.test(text);
-                      const hasHtmlSyntax = /<(?:div|span|p|br|hr|h[1-6]|b|strong|i|em|u|strike|s|sub|sup|a|img|table|thead|tbody|tr|td|th|ul|ol|li|code|pre|center|blockquote)[^>]*>/i.test(text);
-                      if (hasMarkdownImage || hasMarkdownLink || hasBareImageUrl || hasMarkdownSyntax || hasHtmlSyntax) {
-                        e.preventDefault();
-                        const processed = convertBareImageUrlsToMarkdown(text);
-                        const m = getMarked();
-                        if (m) {
-                          const parsedHtml = await m.parse(processed);
-                          insertHtmlAtCursor(parsedHtml);
-                          updateContentFromWysiwyg();
-                        }
+                    let finalHtml = '';
+                    
+                    if (htmlData) {
+                      // Convert rich HTML to Markdown to strip out all inline styles, classes, colors, etc.
+                      const md = htmlToMarkdown(htmlData);
+                      finalHtml = await m.parse(md);
+                    } else if (textData) {
+                      // If only plain text exists, allow markdown parser to format it
+                      const processed = convertBareImageUrlsToMarkdown(textData);
+                      finalHtml = await m.parse(processed);
+                    }
+                    
+                    if (finalHtml) {
+                      // If the parsed HTML is just a single unwrapped paragraph, strip the <p> to insert cleanly inline
+                      finalHtml = finalHtml.trim();
+                      if (finalHtml.startsWith('<p>') && finalHtml.endsWith('</p>') && (finalHtml.match(/<p>/g) || []).length === 1) {
+                        finalHtml = finalHtml.substring(3, finalHtml.length - 4);
                       }
+                      
+                      // Using execCommand ensures native browser block splitting and insertion handling
+                      if (!document.execCommand('insertHTML', false, finalHtml)) {
+                        insertHtmlAtCursor(finalHtml as string);
+                      }
+                      updateContentFromWysiwyg();
                     }
                   }}
                   onInput={(e) => {
@@ -8917,7 +8881,7 @@ function App() {
                         ? "shadow-none border-none border-transparent py-0 px-0 bg-slate-900"
                         : "bg-slate-900 border border-white/10 rounded-3xl p-1 shadow-none",
                       widgetPos === 'floating' ? (
-                        "fixed lg:absolute " + (window.innerWidth < 1024 ? "bottom-[4.5rem] left-4 right-4 rounded-3xl" : "")
+                        "absolute " + (window.innerWidth < 1024 ? "bottom-[4.5rem] left-4 right-4 rounded-3xl" : "")
                       ) : (
                         "absolute bottom-4 left-4 right-4 rounded-3xl mx-auto max-w-2xl"
                       )
@@ -12011,8 +11975,8 @@ function App() {
 
       {/* Mobile Bottom Navigation */}
         <nav 
-          className="lg:hidden fixed bottom-0 left-0 right-0 h-16 bg-slate-900 border-t border-slate-800 grid grid-cols-5 items-center px-1 z-[70] shadow-[0_-4px_20px_rgba(0,0,0,0.5)] transition-all duration-150"
-          style={{ bottom: keyboardOffset > 0 ? `${keyboardOffset}px` : 0 }}
+          className="lg:hidden absolute bottom-0 left-0 right-0 h-16 bg-slate-900 border-t border-slate-800 grid grid-cols-5 items-center px-1 z-[70] shadow-[0_-4px_20px_rgba(0,0,0,0.5)] transition-all duration-150"
+          
         >
           <button 
             onClick={() => setActiveMobileTab('editor')}

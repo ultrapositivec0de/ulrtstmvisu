@@ -1,0 +1,428 @@
+1745-    document.addEventListener('fullscreenchange', handleFsChange);
+1746-    return () => document.removeEventListener('fullscreenchange', handleFsChange);
+1747-  }, []);
+1748-
+1749-  const [isEditorFocused, setIsEditorFocused] = useState(false);
+1750:  const [editorMode, setEditorMode] = useState<'visual' | 'markdown'>(() => {
+1751-    return (localStorage.getItem('steem_editor_mode') as 'visual' | 'markdown') || 'visual';
+1752-  });
+1753-  const [activeFormats, setActiveFormats] = useState({
+1754-    bold: false,
+1755-    italic: false,
+--
+2027-      timer = setTimeout(updatePreview, 300);
+2028-    }
+2029-    const unsubscribe = useEditorStore.subscribe((state, prevState) => {
+2030-      if (state.content !== prevState.content) {
+2031-        // Skip expensive markdown preview parsing/morphing in background while user types in visual editor
+2032:        if (editorMode === 'visual') return;
+2033-        if (timer) clearTimeout(timer);
+2034-        timer = setTimeout(updatePreview, 300);
+2035-      }
+2036-    });
+2037-
+2038-    return () => {
+2039-      if (timer) clearTimeout(timer);
+2040-      unsubscribe();
+2041-    };
+2042:  }, [t, syncScrollEnabled, isLivePreviewEnabled, lang, editorMode]);
+2043-  const [templates, setTemplates] = useState<Template[]>([]);
+2044-  const [mentions, setMentions] = useState<string[]>([]);
+2045-  const [newMention, setNewMention] = useState('');
+2046-  
+2047-  // Auth & Publish
+--
+2570-  const wysiwygLocalBackupTimeoutRef = useRef<number | null>(null);
+2571-  const isInitialLoadRef = useRef(true);
+2572-
+2573-  const toggleLivePreview = useCallback(() => {
+2574-    const nextVal = !isLivePreviewEnabled;
+2575:    if (editorMode === 'markdown' && editorRef.current) {
+2576-      const val = editorRef.current.value;
+2577-      const start = editorRef.current.selectionStart;
+2578-      const end = editorRef.current.selectionEnd;
+2579-      const pos = getRowColFromOffset(val, start);
+2580-      useEditorStore.setState({
+--
+2583-        selectionStart: start,
+2584-        selectionEnd: end
+2585-      });
+2586-    }
+2587-    setIsLivePreviewEnabled(nextVal);
+2588:  }, [isLivePreviewEnabled, editorMode]);
+2589-
+2590-  useEffect(() => {
+2591-    return () => {
+2592-      if (wysiwygSyncTimeoutRef.current) {
+2593-        clearTimeout(wysiwygSyncTimeoutRef.current);
+--
+2866-      setContent(md);
+2867-    }
+2868-  }, [onDemandSyncEnabled, saveVisualSelection, setContent]);
+2869-
+2870-  const syncWysiwygToContentIfVisual = useCallback(() => {
+2871:    if (editorMode === 'visual' && wysiwygRef.current) {
+2872-      const md = htmlToMarkdown(wysiwygRef.current.innerHTML);
+2873-      if (md !== useEditorStore.getState().content) {
+2874-        lastSyncContentRef.current = md;
+2875-        setContent(md);
+2876-        return md;
+2877-      }
+2878-    }
+2879-    return useEditorStore.getState().content;
+2880:  }, [editorMode, setContent]);
+2881-
+2882-  // Helper function to insert HTML at visual editor's selection/cursor point
+2883-  const insertHtmlAtCursor = useCallback((html: string) => {
+2884-    if (!wysiwygRef.current) return;
+2885-
+--
+3306-    }
+3307-  }, [lang, scrollCaretIntoView]);
+3308-
+3309-  // Bidirectional sync: sync content to visual editor unless visual editor currently has focus
+3310-  useEffect(() => {
+3311:    if (editorMode === 'visual' && wysiwygRef.current && !isEditorFocused && !wysiwygRef.current.contains(document.activeElement) && useEditorStore.getState().content !== lastSyncContentRef.current) {
+3312-      if (isInitialLoadRef.current) {
+3313-        isInitialLoadRef.current = false;
+3314-        if (onDemandSyncEnabled) {
+3315-          const isStale = localStorage.getItem('steem_visual_html_is_stale') === 'true';
+3316-          const cachedHtml = localStorage.getItem('steem_autosave_temp_visual_html');
+--
+3394-          }
+3395-        }
+3396-      };
+3397-      renderHtml();
+3398-    }
+3399:  }, [ editorMode, isEditorFocused, syncCursorMarkdownToVisual, lang, onDemandSyncEnabled]);
+3400-
+3401-  // Load cursor position on start
+3402-  useEffect(() => {
+3403-     try {
+3404-        const savedCursor = localStorage.getItem('steem_editor_cursor');
+--
+3462-        const text = editorRef.current.value;
+3463-        const rowColPos = getRowColFromOffset(text, start);
+3464-        useEditorStore.getState().setCursor(rowColPos);
+3465-        useEditorStore.getState().setSelection(start, end);
+3466-
+3467:        if (editorMode === 'markdown') {
+3468-          const caretPos = start;
+3469-
+3470-          const lineStart = text.lastIndexOf('\n', caretPos - 1) + 1;
+3471-          const lineEnd = text.indexOf('\n', caretPos);
+3472-          const actualLineEnd = lineEnd === -1 ? text.length : lineEnd;
+--
+3483-            sup: isInsideTagInLine(currentLine, caretInLine, '<sup>', '</sup>'),
+3484-            phishy: isInsideTagInLine(currentLine, caretInLine, '<div class="phishy">', '</div>')
+3485-          });
+3486-        }
+3487-     }
+3488:  }, [editorMode]);
+3489-
+3490-  const restoreMarkdownCursorAndScroll = useCallback((retryCount = 0) => {
+3491-    if (!editorRef.current) {
+3492-      if (retryCount < 10) {
+3493-        setTimeout(() => restoreMarkdownCursorAndScroll(retryCount + 1), 30);
+--
+3689-        console.warn('Failed to parse saved cursor in restoration effect', e);
+3690-      }
+3691-      return null;
+3692-    };
+3693-
+3694:    if (editorMode === 'markdown') {
+3695-      hasRestoredInitialCursorRef.current = true;
+3696-      restoreMarkdownCursorAndScroll();
+3697:    } else if (editorMode === 'visual' && wysiwygRef.current) {
+3698-      hasRestoredInitialCursorRef.current = true;
+3699-      const timer = setTimeout(async () => {
+3700-        const pos = getPos();
+3701-        if (pos) {
+3702-          useEditorStore.getState().setSelection(pos.start, pos.end);
+--
+3716-          }
+3717-        }
+3718-      }, 250);
+3719-      return () => clearTimeout(timer);
+3720-    }
+3721:  }, [editorMode, syncCursorMarkdownToVisual, restoreMarkdownCursorAndScroll]);
+3722-
+3723-  const handleSetEditorMode = useCallback((mode: 'visual' | 'markdown') => {
+3724:    if (editorMode === mode) return;
+3725-
+3726-    localStorage.setItem('steem_editor_mode', mode);
+3727-
+3728-    if (mode === 'visual') {
+3729-      if (editorRef.current) {
+--
+3765-
+3766-      setTimeout(() => {
+3767-        restoreMarkdownCursorAndScroll();
+3768-      }, 50);
+3769-    }
+3770:  }, [editorMode, saveCursorPosition, syncCursorMarkdownToVisual, syncCursorVisualToMarkdown, saveVisualSelection, setContent, restoreMarkdownCursorAndScroll]);
+3771-
+3772-  // Save cursor position when unmounting or switching view
+3773-  useEffect(() => {
+3774-    return () => saveCursorPosition();
+3775-  }, [saveCursorPosition]);
+3776-
+3777-  useEffect(() => {
+3778-    if (activeView === 'editor' && activeMobileTab === 'editor') {
+3779-       setTimeout(() => {
+3780:          if (editorMode === 'visual') {
+3781-             restoreVisualSelection();
+3782-          } else {
+3783-             restoreMarkdownCursorAndScroll();
+3784-             return;
+3785-          }
+--
+3832-    } else {
+3833-       saveVisualSelection();
+3834-       saveCursorPosition();
+3835-       isSyncingRef.current = false;
+3836-    }
+3837:  }, [activeView, activeMobileTab, editorMode, saveCursorPosition, restoreVisualSelection, saveVisualSelection, restoreMarkdownCursorAndScroll]);
+3838-
+3839-  useEffect(() => {
+3840-    if (isImagesLoaded.current) {
+3841-      localStorage.setItem(STORAGE_KEY_IMAGES, JSON.stringify(images));
+3842-      localStorage.setItem('steem_editor_source_links', sourceInput);
+--
+3913-    };
+3914-  }, [updateTableRect, activeTable]);
+3915-
+3916-  useEffect(() => {
+3917-    const handleSelectionChange = () => {
+3918:      if (editorMode === 'visual' && wysiwygRef.current) {
+3919-        const sel = window.getSelection();
+3920-        if (sel && sel.rangeCount > 0) {
+3921-          try {
+3922-            const range = sel.getRangeAt(0);
+3923-            if (wysiwygRef.current.contains(range.commonAncestorContainer)) {
+--
+3965-
+3966-    document.addEventListener('selectionchange', handleSelectionChange);
+3967-    return () => {
+3968-      document.removeEventListener('selectionchange', handleSelectionChange);
+3969-    };
+3970:  }, [editorMode]);
+3971-
+3972-  useEffect(() => {
+3973-    // DEBOUNCED PERSISTENCE: Fast 350ms save to storage so state and cursor match without blocking UI thread during typing
+3974-    let timer: any;
+3975-    const unsubscribe = useEditorStore.subscribe((state, prevState) => {
+--
+3982-              localStorage.setItem('steem_editor_cursor', JSON.stringify(cursorPositionRef.current));
+3983-            } catch (err) {
+3984-              console.debug(err);
+3985-            }
+3986-          }
+3987:          if (editorMode === 'markdown') {
+3988-            try {
+3989-              localStorage.setItem('steem_visual_html_is_stale', 'true');
+3990-            } catch (err) {
+3991-              console.debug(err);
+3992-            }
+--
+3997-
+3998-    return () => {
+3999-      if (timer) clearTimeout(timer);
+4000-      unsubscribe();
+4001-    };
+4002:  }, [editorMode, saveLargeStorage]);
+4003-
+4004-  // Synchronous flush on page reload / unload
+4005-  useEffect(() => {
+4006-    const handleBeforeUnload = () => {
+4007-      try {
+4008:        if (editorMode === 'markdown' && editorRef.current) {
+4009-          const val = editorRef.current.value;
+4010-          useEditorStore.setState({ content: val });
+4011-          saveLargeStorage(STORAGE_KEY_AUTOSAVE, val);
+4012-          saveCursorPosition();
+4013:        } else if (editorMode === 'visual' && wysiwygRef.current) {
+4014-          const html = wysiwygRef.current.innerHTML;
+4015-          try {
+4016-            localStorage.setItem('steem_autosave_temp_visual_html', html);
+4017-          } catch (err) {
+4018-            console.debug(err);
+--
+4040-
+4041-    window.addEventListener('beforeunload', handleBeforeUnload);
+4042-    return () => {
+4043-      window.removeEventListener('beforeunload', handleBeforeUnload);
+4044-    };
+4045:  }, [editorMode, saveCursorPosition, saveVisualSelection, syncCursorVisualToMarkdown, saveLargeStorage]);
+4046-
+4047-  const handleEditorScroll = useCallback(() => {
+4048-    if (editorRef.current) {
+4049-      localStorage.setItem('steem_editor_scroll', String(editorRef.current.scrollTop));
+4050-    }
+--
+4087-    return { s: start, e: end, text: content.substring(start, end) };
+4088-  }, []);
+4089-
+4090-  const insertAtCursor = useCallback((text: string, selectionMode: 'end' | 'select' = 'end') => {
+4091-    const content = useEditorStore.getState().content;
+4092:    if (editorMode === 'visual') {
+4093-      const runParse = async () => {
+4094-        const m = getMarked();
+4095-        if (m) {
+4096-          const html = await m.parse(text);
+4097-          insertHtmlAtCursor(html);
+--
+4122-        editorRef.current.focus({ preventScroll: true }); editorRef.current.setSelectionRange(start + finalText.length, start + finalText.length);
+4123-      }
+4124-      editorRef.current.scrollTop = scrollTop;
+4125-      editorRef.current.scrollLeft = scrollLeft;
+4126-    }, 0);
+4127:  }, [ editorMode, insertHtmlAtCursor, setContent]);
+4128-
+4129-  useEffect(() => {
+4130-    // Timer removed as per user request to hide only on typing
+4131-  }, [isEditorFocused, isWidgetVisible]);
+4132-
+--
+4504-      }
+4505-    }
+4506-  }, [activeFormats, saveCursorPosition, setContent]);
+4507-
+4508-  const fmt = useCallback((prefix: string, suffix: string = prefix) => {
+4509:    if (editorMode === 'visual') {
+4510-      let formatKey: 'bold' | 'italic' | 'strikethrough' | 'sub' | 'sup' | 'code' | 'phishy' | null = null;
+4511-      if (prefix === '**') formatKey = 'bold';
+4512-      else if (prefix === '*') formatKey = 'italic';
+4513-      else if (prefix === '~~') formatKey = 'strikethrough';
+4514-      else if (prefix === '<sub>') formatKey = 'sub';
+--
+4737-      setTimeout(() => {
+4738-        if (!editorRef.current) return;
+4739-        editorRef.current.focus({ preventScroll: true }); editorRef.current.setSelectionRange(range.s, range.s + newText.length);
+4740-      }, 0);
+4741-    }
+4742:  }, [ getSelectionOrWord, editorMode, insertHtmlAtCursor, getVisualSelectionHtml, restoreVisualSelection, handleMarkdownFormat, updateContentFromWysiwyg, activeFormats, setContent]);
+4743-
+4744-  const deleteActiveTableRow = useCallback(() => {
+4745-    if (activeTableRow && wysiwygRef.current && wysiwygRef.current.contains(activeTableRow)) {
+4746-      const table = activeTableRow.closest('table');
+4747-      activeTableRow.remove();
+--
+4789-    }
+4790-  }, [activeTable, updateContentFromWysiwyg]);
+4791-
+4792-  const fmtLine = useCallback((prefix: string) => {
+4793-    const content = useEditorStore.getState().content;
+4794:    if (editorMode === 'visual') {
+4795-      restoreVisualSelection(true);
+4796-      if (prefix === '# ') {
+4797-        document.execCommand('formatBlock', false, '<h1>');
+4798-      } else if (prefix === '## ') {
+4799-        document.execCommand('formatBlock', false, '<h2>');
+--
+4837-      setTimeout(() => {
+4838-        if (!editorRef.current) return;
+4839-        editorRef.current.focus({ preventScroll: true }); editorRef.current.setSelectionRange(start, start + newText.length);
+4840-      }, 0);
+4841-    }
+4842:  }, [ editorMode, insertHtmlAtCursor, getVisualSelectionHtml, restoreVisualSelection, updateContentFromWysiwyg, setContent]);
+4843-
+4844-  const handleLink = useCallback(async () => {
+4845-    const content = useEditorStore.getState().content;
+4846:    if (editorMode === 'visual') {
+4847-      restoreVisualSelection(true);
+4848-      const selectionHtml = getVisualSelectionHtml() || '';
+4849-      const isUrl = /^(https?:\/\/|www\.)\S+$/i.test(selectionHtml.trim());
+4850-      
+4851-      if (isUrl) {
+--
+4877-      }
+4878-    } else {
+4879-      const url = await promptDialog(t('urlPrompt'), "https://");
+4880-      if (url) fmt('[', `](${url})`);
+4881-    }
+4882:  }, [ t, getSelectionOrWord, fmt, promptDialog, editorMode, restoreVisualSelection, getVisualSelectionHtml, insertHtmlAtCursor, updateContentFromWysiwyg, setContent]);
+4883-
+4884-  const handleIndent = useCallback(() => {
+4885-    const content = useEditorStore.getState().content;
+4886:    if (editorMode === 'visual') {
+4887-      restoreVisualSelection(false);
+4888-      const sel = window.getSelection();
+4889-      let insideList = false;
+4890-      if (sel && sel.rangeCount > 0) {
+4891-        let node: Node | null = sel.getRangeAt(0).startContainer;
+--
+4907-    const selectedText = content.substring(start, end);
+4908-    const lines = selectedText.split('\n');
+4909-    const newText = lines.map(line => '    ' + line).join('\n');
+4910-    const newContent = content.substring(0, start) + newText + content.substring(end);
+4911-    setContent(newContent);
+4912:  }, [ editorMode, restoreVisualSelection, updateContentFromWysiwyg, insertHtmlAtCursor, setContent]);
+4913-
+4914-  const handleWysiwygKeyDown = useCallback((e: React.KeyboardEvent<HTMLDivElement>) => {
+4915-    const isMod = e.ctrlKey || e.metaKey;
+4916-    
+4917-    if (widgetPos === 'floating' && !isMod && e.key !== 'Shift') {
+--
+7644-                            const currentContent = useEditorStore.getState().content;
+7645-                            const newContent = currentContent ? currentContent + '\n\n' + val : val;
+7646-                            
+7647-                            useEditorStore.setState({ content: newContent });
+7648-                            
+7649:                            if (editorMode === 'markdown' && editorRef.current) {
+7650-                               editorRef.current.value = newContent;
+7651-                               editorRef.current.dispatchEvent(new Event('input', { bubbles: true }));
+7652:                            } else if (editorMode === 'visual') {
+7653-                               setContent(newContent);
+7654-                               if (wysiwygRef.current) {
+7655-                                  isSyncingRef.current = true;
+7656-                                  const getMarkedFn = getMarked;
+7657-                                  const m = getMarkedFn();
+--
+8220-                    <button 
+8221-                      onMouseDown={(e) => e.preventDefault()}
+8222-                      onClick={() => handleSetEditorMode('visual')}
+8223-                      className={cn(
+8224-                        "px-3 py-1 text-[10px] sm:text-xs font-bold rounded transition-colors flex items-center gap-1.5",
+8225:                        editorMode === 'visual' 
+8226-                          ? "bg-cyan-600 text-white shadow-sm" 
+8227-                          : (isDarkMode || visualStyle === 'neon' ? "text-slate-500 hover:text-slate-300" : "text-slate-600 hover:text-slate-900")
+8228-                      )}
+8229-                    >
+8230-                      <Eye size={12} />
+--
+8237-                    <button 
+8238-                      onMouseDown={(e) => e.preventDefault()}
+8239-                      onClick={() => handleSetEditorMode('markdown')}
+8240-                      className={cn(
+8241-                        "px-3 py-1 text-[10px] sm:text-xs font-bold rounded transition-colors flex items-center gap-1.5",
+8242:                        editorMode === 'markdown' 
+8243-                          ? "bg-cyan-600 text-white shadow-sm" 
+8244-                          : (isDarkMode || visualStyle === 'neon' ? "text-slate-500 hover:text-slate-300" : "text-slate-600 hover:text-slate-900")
+8245-                      )}
+8246-                    >
+8247-                      <Terminal size={12} />
+--
+8595-                </div>
+8596-
+8597-
+8598-              </div>
+8599-
+8600:              {editorMode === 'markdown' ? (
+8601-                <CodeEditor
+8602-                  id="main-editor"
+8603-                  ref={editorRef}
+8604-                  onDemandSyncEnabled={onDemandSyncEnabled}
+8605-                  onChange={() => {
+--
+8797-                  style={{ minHeight: '200px' }}
+8798-                />
+8799-              )}
+8800-
+8801-              {/* Table Action Menu */}
+8802:              {activeTable && tableRect && editorMode === 'visual' && (
+8803-                <div 
+8804-                  className={cn("fixed z-[160] flex flex-col gap-1.5 p-1.5 rounded-xl",
+8805-                    isTableMenuExpanded || isTableMenuPinned ? "bg-slate-900 border border-slate-700/50 shadow-none" : "bg-transparent shadow-none"
+8806-                  )}
+8807-                  style={{
