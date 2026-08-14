@@ -63,12 +63,12 @@ export function htmlToMarkdown(html: string): string {
     });
 
     switch (tag) {
-      case 'h1': return `\n# ${inner.trim()}\n`;
-      case 'h2': return `\n## ${inner.trim()}\n`;
-      case 'h3': return `\n### ${inner.trim()}\n`;
-      case 'h4': return `\n#### ${inner.trim()}\n`;
-      case 'h5': return `\n##### ${inner.trim()}\n`;
-      case 'h6': return `\n###### ${inner.trim()}\n`;
+      case 'h1': return inner.trim() ? `\n# ${inner.trim()}\n` : '';
+      case 'h2': return inner.trim() ? `\n## ${inner.trim()}\n` : '';
+      case 'h3': return inner.trim() ? `\n### ${inner.trim()}\n` : '';
+      case 'h4': return inner.trim() ? `\n#### ${inner.trim()}\n` : '';
+      case 'h5': return inner.trim() ? `\n##### ${inner.trim()}\n` : '';
+      case 'h6': return inner.trim() ? `\n###### ${inner.trim()}\n` : '';
       case 'strong':
       case 'b': return applyInlineFormat(inner, '**', '**');
       case 'em':
@@ -235,6 +235,13 @@ export function htmlToMarkdown(html: string): string {
           return `<div class="text-blue">${inner}</div>`;
         } else if (className.includes('text-green')) {
           return `<div class="text-green">${inner}</div>`;
+        }
+
+        if (className.includes('table-spacer') || el.hasAttribute('data-placeholder') || el.hasAttribute('data-empty')) {
+           const cleanedText = inner.replace(/↵\s*(Початок|Кінець|Новий|Top|End|New|Inicio|Fin|Nuevo|게시물|새)\s*(допису|publicación|post|параграф|рядок|párrafo|paragraph|문단|시작|끝)?.*/gi, '').trim();
+           if (cleanedText === '' || el.getAttribute('data-empty') === 'true') {
+             return '';
+           }
         }
 
         if (inner.trim() === '') {

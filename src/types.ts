@@ -13,6 +13,7 @@ export interface Template {
   content: string;
   title?: string;
   tags?: string;
+  type?: 'post' | 'snippet';
 }
 
 export interface ImageItem {

@@ -14,6 +14,7 @@ import {
   ThumbsUp,
   MessageSquare,
   Edit,
+  Edit3,
   Search,
   Bold,
   Italic,
@@ -712,6 +713,7 @@ export default function Reader({
   const [parentContext, setParentContext] = useState<Record<string, SteemPost>>(
     {},
   );
+  const [expandedInboxThreads, setExpandedInboxThreads] = useState<Set<string>>(new Set());
   const [loadingContext, setLoadingContext] = useState<Set<string>>(new Set());
   const [isRefreshingInbox, setIsRefreshingInbox] = useState(false);
   const [hasAutoFetchedInbox, setHasAutoFetchedInbox] = useState(false);
@@ -749,7 +751,7 @@ export default function Reader({
               const next = { ...prev };
               let changed = false;
               for (const comment of results) {
-                if (comment.parent_permlink && !next[comment.parent_permlink]) {
+                if (comment.author === currentUser && comment.parent_permlink && !next[comment.parent_permlink]) {
                   next[comment.parent_permlink] = comment.body;
                   changed = true;
                 }
@@ -839,7 +841,7 @@ export default function Reader({
       setRespondedReplies((prev) => {
         const next = { ...prev };
         myComments.forEach((c) => {
-          if (c.parent_permlink) {
+          if (c.author === currentUser && c.parent_permlink) {
             next[c.parent_permlink] = c.body;
           }
         });
@@ -970,6 +972,25 @@ export default function Reader({
       });
     }
   };
+
+  // Auto-fetch parent context for visible inbox threads
+  useEffect(() => {
+    if (showInbox && inbox.length > 0) {
+      const keysToFetch = inbox
+        .filter((r) => !hiddenReplies.has(r.permlink))
+        .map((r) => `${r.parent_author}/${r.parent_permlink}`)
+        .filter((value, index, self) => self.indexOf(value) === index) // unique keys
+        .slice(0, 15); // limit to first 15 threads to avoid overloading
+      
+      keysToFetch.forEach((key) => {
+        const [p_author, p_permlink] = key.split('/');
+        if (p_author && p_permlink && !parentContext[key] && !loadingContext.has(key)) {
+          fetchParentContext(p_author, p_permlink);
+        }
+      });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [showInbox, inbox, hiddenReplies, parentContext, loadingContext]);
 
 
   const fetchThread = async (author: string, permlink: string) => {
@@ -1165,14 +1186,59 @@ export default function Reader({
     body: string,
     editPermlink?: string,
   ) => {
-    // We add to local cache immediately (optimistic) but we should probably wait for success
-    // to be "real", but user wants instant feedback.
     try {
       if (!currentUser) {
         alert("Please specify your username in settings first!");
         return;
       }
+
+      const tempPermlink = editPermlink || `re-${parentAuthor.replace(/\./g, '')}-${Date.now()}`;
+      const optimisticComment: SteemPost = {
+        author: currentUser,
+        permlink: tempPermlink,
+        category: "",
+        title: "",
+        body: body,
+        json_metadata: JSON.stringify({ tags: [], app: "steem-editor", format: "markdown" }),
+        created: new Date().toISOString().replace('Z', ''),
+        active_votes: [],
+        children: 0,
+        parent_author: parentAuthor,
+        parent_permlink: parentPermlink
+      };
+
+      // Optimistically append the comment to postComments state immediately
+      setPostComments((prev) => {
+        const list = prev[parentPermlink] || [];
+        if (list.some((c) => c.permlink === tempPermlink)) return prev;
+        return {
+          ...prev,
+          [parentPermlink]: [...list, optimisticComment]
+        };
+      });
+
+      // Optimistically increment the children count of the parent post
+      setPosts((prev) =>
+        prev.map((p) => {
+          if (p.permlink === parentPermlink) {
+            return { ...p, children: p.children + 1 };
+          }
+          return p;
+        })
+      );
+      setCurationPosts((prev) =>
+        prev.map((p) => {
+          if (p.permlink === parentPermlink) {
+            return { ...p, children: p.children + 1 };
+          }
+          return p;
+        })
+      );
+
+      // Submit comment to the blockchain
       await onComment(parentAuthor, parentPermlink, body, editPermlink);
+
+      // Set responded status instantly for quick feedback
       setRespondedReplies((prev) => ({
         ...prev,
         [parentPermlink]: body,
@@ -1181,11 +1247,17 @@ export default function Reader({
       // Hide from inbox if we just responded to a message there
       setHiddenReplies((prev) => new Set(prev).add(parentPermlink));
 
-      // After success, we could fetch comments for this post if it's currently expanded
-      fetchComments(parentAuthor, parentPermlink);
+      // Fetch the verified comments list after a short delay to let the blockchain process it
+      setTimeout(() => {
+        fetchComments(parentAuthor, parentPermlink);
+      }, 4000);
 
-      // If we are in the inbox, mark as responded or refresh silent
-      if (showInbox) fetchInbox(true);
+      // Silently refresh the inbox in the background after a short delay
+      if (showInbox) {
+        setTimeout(() => {
+          fetchInbox(false, true);
+        }, 3000);
+      }
     } catch (err) {
       console.error("Comment failed:", err);
     }
@@ -1935,452 +2007,536 @@ export default function Reader({
                   </button>
                 </div>
               ) : (
-                inbox
-                  .filter((r) => !hiddenReplies.has(r.permlink))
-                  .map((reply) => {
-                    const myReply = respondedReplies[reply.permlink];
-                    const isExpanded = expandedReplies.has(reply.permlink);
-                    const isLong = reply.body.length > 300;
-                    const displayBody =
-                      isLong && !isExpanded
-                        ? reply.body.substring(0, 300) + "..."
-                        : reply.body;
+                (() => {
+                  const groupedMap: Record<string, SteemPost[]> = {};
+                  inbox
+                    .filter((r) => !hiddenReplies.has(r.permlink))
+                    .forEach((reply) => {
+                      const key = `${reply.parent_author}/${reply.parent_permlink}`;
+                      if (!groupedMap[key]) {
+                        groupedMap[key] = [];
+                      }
+                      groupedMap[key].push(reply);
+                    });
+
+                  const sortedThreadKeys = Object.keys(groupedMap).sort((keyA, keyB) => {
+                    const latestA = Math.max(...groupedMap[keyA].map(r => new Date(r.created).getTime()));
+                    const latestB = Math.max(...groupedMap[keyB].map(r => new Date(r.created).getTime()));
+                    return latestB - latestA;
+                  });
+
+                  return sortedThreadKeys.map((threadKey) => {
+                    const threadReplies = groupedMap[threadKey];
+                    const sortedReplies = [...threadReplies].sort(
+                      (a, b) => new Date(a.created).getTime() - new Date(b.created).getTime()
+                    );
+                    
+                    const firstReply = sortedReplies[0];
+                    const isThreadExpanded = expandedInboxThreads.has(threadKey);
+                    
+                    const visibleReplies = isThreadExpanded 
+                      ? sortedReplies 
+                      : [sortedReplies[sortedReplies.length - 1]];
+                    const hiddenCount = sortedReplies.length - visibleReplies.length;
 
                     return (
                       <div
-                        key={`${reply.author}/${reply.permlink}`}
-                        id={`inbox-item-${reply.permlink}`}
-                        className="p-4 bg-slate-950/50 border border-slate-800 rounded-xl space-y-3 relative group transition-colors duration-500"
+                        key={threadKey}
+                        className="p-4 bg-slate-950/40 border border-slate-800/80 rounded-2xl space-y-4 relative group/thread hover:border-slate-700/50 transition-colors"
                       >
-                        <button
-                          onClick={() =>
-                            setHiddenReplies((prev) =>
-                              new Set(prev).add(reply.permlink),
-                            )
-                          }
-                          className="absolute top-2 right-2 p-1 text-slate-500 hover:text-red-400 opacity-0 group-hover:opacity-100 transition-opacity"
-                          title="Mark as read / Hide"
-                        >
-                          <X size={18} />
-                        </button>
-
-                        <div className="flex items-center justify-between pr-4">
-                          <div className="flex items-center gap-2">
-                            <span className="text-xs font-bold text-cyan-400">
-                              @{reply.author}
+                        {/* Thread Context Header */}
+                        <div className="border-b border-slate-800/60 pb-3">
+                          <div className="flex items-center justify-between mb-2">
+                            <span className="text-[10px] uppercase tracking-wider font-bold text-slate-500 flex items-center gap-1.5">
+                              <GitBranch size={12} className="text-cyan-500/80 rotate-180" />
+                              Діалог у гілці @{firstReply.parent_author}
                             </span>
-                            {new Date(reply.created + "Z").getTime() >
-                              Date.now() - 24 * 60 * 60 * 1000 && (
-                              <span className="text-[8px] bg-red-500/20 text-red-500 px-1.5 py-0.5 rounded-full font-bold uppercase animate-pulse">
-                                New
-                              </span>
-                            )}
-                            {myReply && (
-                              <span className="flex items-center gap-0.5 text-[8px] bg-green-500/20 text-green-400 px-1.5 py-0.5 rounded-full font-bold uppercase tracking-wider">
-                                <UserCheck size={8} /> Replied
-                              </span>
-                            )}
-                          </div>
-                          <span className="text-[10px] text-slate-500">
-                            {new Date(reply.created + "Z").toLocaleString()}
-                          </span>
-                        </div>
-
-                        <div className="space-y-2">
-                          <div
-                            className="text-xs markdown-body opacity-90"
-                            dangerouslySetInnerHTML={{
-                              __html: renderContent(
-                                displayBody,
-                                reply.permlink,
-                              ),
-                            }}
-                          />
-                          {config.loadImages === false &&
-                            !revealedImages.has(reply.permlink) && (
-                              <button
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  setRevealedImages((prev) =>
-                                    new Set(prev).add(reply.permlink),
-                                  );
-                                }}
-                                className="flex items-center gap-2 px-2 py-1 bg-slate-900 hover:bg-slate-800 rounded text-[10px] text-cyan-400 font-bold transition-all border border-cyan-500/10"
-                              >
-                                <ImageIcon size={16} /> Показати фото
-                              </button>
-                            )}
-                          {isLong && (
+                            
                             <button
-                              onClick={() =>
-                                setExpandedReplies((prev) => {
+                              onClick={() => {
+                                setHiddenReplies((prev) => {
                                   const next = new Set(prev);
-                                  if (next.has(reply.permlink))
-                                    next.delete(reply.permlink);
-                                  else next.add(reply.permlink);
+                                  threadReplies.forEach((r) => next.add(r.permlink));
                                   return next;
-                                })
-                              }
-                              className="text-[10px] text-cyan-500 hover:text-cyan-400 font-bold uppercase tracking-tighter"
+                                });
+                              }}
+                              className="text-[10px] text-slate-500 hover:text-red-400 opacity-0 group-hover/thread:opacity-100 transition-opacity flex items-center gap-1"
+                              title="Mark thread as read"
                             >
-                              {isExpanded ? "Show Less" : "Show More..."}
+                              <X size={14} /> Сховати гілку
                             </button>
-                          )}
-                        </div>
+                          </div>
 
-                        {reply.children > 0 && !threads[reply.permlink] && (
-                          <button
-                            onClick={() =>
-                              fetchThread(reply.author, reply.permlink)
-                            }
-                            disabled={loadingThreads.has(reply.permlink)}
-                            className="w-full py-1.5 bg-slate-900 border border-slate-800 rounded text-[10px] text-slate-400 hover:text-cyan-400 flex items-center justify-center gap-2 transition-colors disabled:opacity-50"
-                          >
-                            {loadingThreads.has(reply.permlink) ? (
-                              <RefreshCw size={14} className="animate-spin" />
-                            ) : (
-                              <GitBranch size={14} />
-                            )}
-                            Show full thread ({reply.children} replies)
-                          </button>
-                        )}
-
-                        {threads[reply.permlink] && (
-                          <div className="space-y-2 pl-2 border-l border-slate-700 mt-2 relative">
-                            <button
-                              onClick={() =>
-                                setThreads((prev) => {
-                                  const next = { ...prev };
-                                  delete next[reply.permlink];
-                                  return next;
-                                })
-                              }
-                              className="absolute -right-1 -top-2 p-1 bg-slate-900 border border-slate-800 rounded-full text-slate-500 hover:text-red-400 shadow-lg"
-                              title="Collapse Thread"
-                            >
-                              <ChevronUp size={16} />
-                            </button>
-                            {threads[reply.permlink].map((t) => (
-                              <div
-                                key={`${t.author}/${t.permlink}`}
-                                className={cn(
-                                  "p-2 rounded text-[10px] space-y-1 group",
-                                  t.author === currentUser
-                                    ? "bg-cyan-500/5 border border-cyan-500/10"
-                                    : "bg-slate-900/50",
-                                )}
-                              >
-                                <div className="flex justify-between items-center opacity-60">
-                                  <div className="flex items-center gap-2">
-                                    <span
-                                      className={cn(
-                                        "font-bold",
-                                        t.author === currentUser
-                                          ? "text-cyan-400"
-                                          : "text-slate-400",
-                                      )}
-                                    >
-                                      @{t.author}
-                                    </span>
-                                    {t.author === currentUser ? (
-                                      <button
-                                        onClick={() =>
-                                          setEditingReply({
-                                            permlink: t.permlink,
-                                            body: t.body,
-                                          })
-                                        }
-                                        className="hidden group-hover:block text-[8px] text-yellow-500/70 hover:text-yellow-400 uppercase font-bold"
-                                      >
-                                        Edit
-                                      </button>
-                                    ) : (
-                                      <>
-                                        <div className="hidden group-hover:flex items-center gap-2">
-                                          <button
-                                            onClick={() =>
-                                              handleLocalVote(
-                                                t.author,
-                                                t.permlink,
-                                                voteWeight,
-                                              )
-                                            }
-                                            className="text-[8px] text-cyan-500/70 hover:text-cyan-400 font-bold uppercase"
-                                          >
-                                            Vote
-                                          </button>
-                                          <button
-                                            onClick={() => {
-                                              setReplyingTo(t);
-                                              setFloatingCommentBody(
-                                                `> ${t.body.substring(0, 100)}${t.body.length > 100 ? "..." : ""}\n\n`,
-                                              );
-                                            }}
-                                            className="text-[8px] text-green-500/70 hover:text-green-400 font-bold uppercase"
-                                          >
-                                            Reply
-                                          </button>
-                                        </div>
-                                      </>
-                                    )}
-                                  </div>
-                                  <span>
-                                    {new Date(
-                                      t.created + "Z",
-                                    ).toLocaleTimeString([], {
-                                      hour: "2-digit",
-                                      minute: "2-digit",
-                                    })}
-                                  </span>
-                                </div>
-                                {editingReply?.permlink === t.permlink ? (
-                                  <div className="space-y-2 mt-1">
-                                    <ReplyBox
-                                      value={editingReply.body}
-                                      onChange={(txt) =>
-                                        setEditingReply((prev) =>
-                                          prev ? { ...prev, body: txt } : null,
-                                        )
-                                      }
-                                      placeholder="Edit comment..."
-                                      onUploadImage={onUploadImage}
-                                      onCancel={() => setEditingReply(null)}
-                                      onSend={async (body) => {
-                                        await handleLocalComment(
-                                          t.parent_author,
-                                          t.parent_permlink,
-                                          body,
-                                          editingReply.permlink,
-                                        );
-                                        setEditingReply(null);
-                                        fetchThread(
-                                          reply.author,
-                                          reply.permlink,
-                                        ); // Refresh thread
-                                      }}
-                                    />
-                                  </div>
-                                ) : (
-                                  <>
-                                    <div
-                                      className="markdown-body text-[10px]"
-                                      dangerouslySetInnerHTML={{
-                                        __html: renderContent(
-                                          t.body,
-                                          t.permlink,
-                                        ),
-                                      }}
-                                    />
-                                    {config.loadImages === false &&
-                                      !revealedImages.has(t.permlink) && (
+                          {(() => {
+                            const chains = [];
+                            let currentParentKey = threadKey;
+                            let currentParent = parentContext[currentParentKey];
+                            let depth = 0;
+                            
+                            while (currentParent && depth < 4) {
+                              const p = currentParent;
+                              const nextKey = `${p.parent_author}/${p.parent_permlink}`;
+                              
+                              chains.unshift(
+                                <div
+                                  key={`${p.author}/${p.permlink}`}
+                                  className="p-3 mb-2 bg-slate-900/60 rounded-xl border border-slate-800/50 text-[11px] text-slate-350 italic"
+                                >
+                                  <div className="flex justify-between items-center mb-1 text-[10px]">
+                                    <span className="font-bold text-cyan-400">@{p.author}:</span>
+                                    <div className="flex items-center gap-2">
+                                      <span className="text-slate-500">
+                                        {new Date(p.created + "Z").toLocaleString()}
+                                      </span>
+                                      {p.parent_author && p.parent_author !== "" && (
                                         <button
-                                          onClick={(e) => {
-                                            e.stopPropagation();
-                                            setRevealedImages((prev) =>
-                                              new Set(prev).add(t.permlink),
-                                            );
+                                          onClick={() => {
+                                            fetchParentContext(p.parent_author, p.parent_permlink);
                                           }}
-                                          className="flex items-center gap-1.5 mt-1 text-[9px] text-cyan-400 hover:text-cyan-300 font-bold"
+                                          className="text-cyan-500 hover:text-cyan-400 underline font-semibold cursor-pointer"
                                         >
-                                          <ImageIcon size={14} /> Показати фото
+                                          Контекст вгору ↑
                                         </button>
                                       )}
-                                  </>
-                                )}
-                              </div>
-                            ))}
-                          </div>
-                        )}
+                                    </div>
+                                  </div>
+                                  <div className="line-clamp-3 text-slate-400 font-sans">
+                                    {p.body.replace(/[#*`>_-]/g, '').substring(0, 160)}
+                                    {p.body.length > 160 ? "..." : ""}
+                                  </div>
+                                </div>
+                              );
+                              
+                              if (!p.parent_author || p.parent_author === '') break;
+                              currentParentKey = nextKey;
+                              currentParent = parentContext[currentParentKey];
+                              depth++;
+                            }
 
-                        {myReply && !threads[reply.permlink] && (
-                          <div className="bg-slate-900 border-l-2 border-green-500/50 p-2 rounded-r-lg space-y-1">
-                            <div className="flex items-center justify-between">
-                              <span className="text-[9px] font-bold text-green-400/60 uppercase">
-                                Ваша відповідь:
-                              </span>
-                              <button
-                                onClick={() =>
-                                  setShowMyReplies((prev) => {
-                                    const next = new Set(prev);
-                                    if (next.has(reply.permlink))
-                                      next.delete(reply.permlink);
-                                    else next.add(reply.permlink);
-                                    return next;
-                                  })
-                                }
-                                className="text-[9px] text-slate-500 hover:text-slate-300 underline"
-                              >
-                                {showMyReplies.has(reply.permlink)
-                                  ? "Сховати"
-                                  : "Показати"}
-                              </button>
-                            </div>
-                            {showMyReplies.has(reply.permlink) && (
-                              <div className="text-[11px] text-slate-400 italic font-sans animate-in fade-in slide-in-from-top-1">
-                                {myReply}
-                              </div>
-                            )}
-                          </div>
-                        )}
-
-                        {/* Recursive Parent Context Chain */}
-                        {(() => {
-                          const chains = [];
-                          let currentParentKey = `${reply.parent_author}/${reply.parent_permlink}`;
-                          let depth = 0;
-                          while (parentContext[currentParentKey] && depth < 5) {
-                            const p = parentContext[currentParentKey];
-                            chains.unshift(
-                              <div
-                                key={`${p.author}/${p.permlink}`}
-                                className="p-2 mb-1 bg-slate-900/80 rounded border-l-2 border-slate-700/50 text-[10px] text-slate-400 italic"
-                              >
-                                <div className="flex justify-between mb-1">
-                                  <span className="font-bold text-slate-500">
-                                    @{p.author}
-                                  </span>
+                            if (chains.length === 0) {
+                              return (
+                                <div className="flex items-center justify-between text-[11px] text-slate-500 p-2 bg-slate-900/30 rounded-xl">
+                                  <span>Попередній контекст завантажується...</span>
                                   <button
-                                    onClick={() =>
-                                      fetchParentContext(
-                                        p.parent_author,
-                                        p.parent_permlink,
-                                      )
-                                    }
-                                    className="text-[9px] text-cyan-700 hover:text-cyan-500 underline"
+                                    onClick={() => {
+                                      const [pa, pp] = threadKey.split('/');
+                                      fetchParentContext(pa, pp);
+                                    }}
+                                    className="text-[10px] text-cyan-500 hover:underline"
                                   >
-                                    Context Up
+                                    Оновити контекст
                                   </button>
                                 </div>
-                                <div className="line-clamp-3">
-                                  {p.body.substring(0, 150)}
-                                  {p.body.length > 150 ? "..." : ""}
-                                </div>
-                              </div>,
-                            );
-                            currentParentKey = `${p.parent_author}/${p.parent_permlink}`;
-                            depth++;
-                          }
-                          return chains;
-                        })()}
-
-                        <div className="flex items-center gap-3 pt-2">
-                          <button
-                            onClick={() =>
-                              handleLocalVote(
-                                reply.author,
-                                reply.permlink,
-                                voteWeight,
-                              )
-                            }
-                            className={cn(
-                              "flex items-center gap-1 text-[10px] transition-colors px-2 py-1 rounded hover:bg-slate-800",
-                              reply.active_votes.some(
-                                (v) => v.voter === currentUser,
-                              )
-                                ? "text-cyan-400 font-bold"
-                                : "text-slate-400 hover:text-cyan-400",
-                            )}
-                          >
-                            <ThumbsUp
-                              size={16}
-                              className={cn(
-                                reply.active_votes.some(
-                                  (v) => v.voter === currentUser,
-                                ) && "fill-cyan-400/20",
-                              )}
-                            />
-                            {reply.active_votes.some(
-                              (v) => v.voter === currentUser,
-                            )
-                              ? "Voted"
-                              : "Upvote"}
-                          </button>
-                          <button
-                            onClick={() => {
-                              const isAlreadyReplying =
-                                replyingTo?.permlink === reply.permlink;
-                              setReplyingTo(isAlreadyReplying ? null : reply);
-                              if (!isAlreadyReplying) {
-                                setFloatingCommentBody(
-                                  `> ${reply.body.substring(0, 150)}${reply.body.length > 150 ? "..." : ""}\n\n`,
-                                );
-                              }
-                            }}
-                            className={cn(
-                              "flex items-center gap-1 text-[10px] transition-colors px-2 py-1 rounded hover:bg-slate-800",
-                              replyingTo?.permlink === reply.permlink
-                                ? "text-green-400 font-bold bg-green-500/10"
-                                : "text-slate-400 hover:text-green-400",
-                            )}
-                          >
-                            <QuoteIcon size={16} />
-                            Quote & Reply
-                          </button>
-                          <button
-                            onClick={() => {
-                              setReplyingTo(
-                                replyingTo?.permlink === reply.permlink
-                                  ? null
-                                  : reply,
                               );
-                              if (
-                                !replyingTo ||
-                                replyingTo.permlink !== reply.permlink
-                              ) {
-                                setFloatingCommentBody("");
-                              }
-                            }}
-                            className={cn(
-                              "flex items-center gap-1 text-[10px] transition-colors px-2 py-1 rounded hover:bg-slate-800",
-                              replyingTo?.permlink === reply.permlink
-                                ? "text-green-400 font-bold bg-green-500/10"
-                                : "text-slate-400 hover:text-green-400",
-                            )}
-                          >
-                            <MessageSquare size={16} />
-                            Reply
-                          </button>
-                          <button
-                            onClick={() =>
-                              fetchParentContext(
-                                reply.parent_author,
-                                reply.parent_permlink,
-                              )
                             }
-                            className="text-[10px] text-cyan-500 hover:underline ml-auto"
-                            disabled={loadingContext.has(
-                              `${reply.parent_author}/${reply.parent_permlink}`,
-                            )}
-                          >
-                            {loadingContext.has(
-                              `${reply.parent_author}/${reply.parent_permlink}`,
-                            )
-                              ? "..."
-                              : "Context"}
-                          </button>
+
+                            return (
+                              <div className="space-y-1.5 border-l-2 border-slate-800/85 pl-3">
+                                {chains}
+                              </div>
+                            );
+                          })()}
                         </div>
 
-                        {replyingTo?.permlink === reply.permlink && (
-                          <ReplyBox
-                            id={`inbox-reply-textarea-${reply.permlink}`}
-                            draftKey={`inbox-reply-${reply.permlink}`}
-                            value={floatingCommentBody}
-                            onChange={setFloatingCommentBody}
-                            onUploadImage={onUploadImage}
-                            onSend={async (body) => {
-                              await handleLocalComment(
-                                reply.author,
-                                reply.permlink,
-                                body,
-                              );
-                              setReplyingTo(null);
+                        {/* Collapsed comments indicator */}
+                        {hiddenCount > 0 && (
+                          <button
+                            onClick={() => {
+                              setExpandedInboxThreads((prev) => {
+                                const next = new Set(prev);
+                                next.add(threadKey);
+                                return next;
+                              });
                             }}
-                            onCancel={() => setReplyingTo(null)}
-                          />
+                            className="w-full py-2 bg-slate-900 hover:bg-slate-850 border border-slate-800/80 rounded-xl text-[11px] text-cyan-400 hover:text-cyan-300 flex items-center justify-center gap-1.5 transition-colors"
+                          >
+                            <ChevronDown size={14} />
+                            Показати ще {hiddenCount} {hiddenCount === 1 ? 'коментар' : hiddenCount < 5 ? 'коментарі' : 'коментарів'} у цій гілці
+                          </button>
                         )}
+
+                        {/* Expanded state collapse button */}
+                        {isThreadExpanded && sortedReplies.length > 1 && (
+                          <button
+                            onClick={() => {
+                              setExpandedInboxThreads((prev) => {
+                                const next = new Set(prev);
+                                next.delete(threadKey);
+                                return next;
+                              });
+                            }}
+                            className="w-full py-1 bg-slate-900 hover:bg-slate-850 border border-slate-800/80 rounded-xl text-[11px] text-slate-400 hover:text-slate-300 flex items-center justify-center gap-1.5 transition-colors"
+                          >
+                            <ChevronUp size={14} />
+                            Згорнути гілку діалогу
+                          </button>
+                        )}
+
+                        {/* List of visible replies */}
+                        <div className="space-y-3">
+                          {visibleReplies.map((reply) => {
+                            const myReply = respondedReplies[reply.permlink];
+                            const isReplyExpanded = expandedReplies.has(reply.permlink);
+                            const isLong = reply.body.length > 300;
+                            const displayBody =
+                              isLong && !isReplyExpanded
+                                ? reply.body.substring(0, 300) + "..."
+                                : reply.body;
+
+                            return (
+                              <div
+                                key={reply.permlink}
+                                id={`inbox-item-${reply.permlink}`}
+                                className="p-3 bg-slate-950/40 border border-slate-800/40 rounded-xl space-y-2 relative group/item"
+                              >
+                                <button
+                                  onClick={() =>
+                                    setHiddenReplies((prev) =>
+                                      new Set(prev).add(reply.permlink),
+                                    )
+                                  }
+                                  className="absolute top-2 right-2 p-1 text-slate-500 hover:text-red-400 opacity-0 group-hover/item:opacity-100 transition-opacity"
+                                  title="Hide this comment"
+                                >
+                                  <X size={14} />
+                                </button>
+
+                                <div className="flex items-center justify-between pr-4">
+                                  <div className="flex items-center gap-2">
+                                    <span className="text-xs font-bold text-cyan-400">
+                                      @{reply.author}
+                                    </span>
+                                    {new Date(reply.created + "Z").getTime() >
+                                      Date.now() - 24 * 60 * 60 * 1000 && (
+                                      <span className="text-[8px] bg-red-500/20 text-red-500 px-1.5 py-0.5 rounded-full font-bold uppercase animate-pulse">
+                                        New
+                                      </span>
+                                    )}
+                                    {myReply && (
+                                      <span className="flex items-center gap-0.5 text-[8px] bg-green-500/20 text-green-400 px-1.5 py-0.5 rounded-full font-bold uppercase tracking-wider">
+                                        <UserCheck size={8} /> Replied
+                                      </span>
+                                    )}
+                                  </div>
+                                  <span className="text-[10px] text-slate-500">
+                                    {new Date(reply.created + "Z").toLocaleString()}
+                                  </span>
+                                </div>
+
+                                <div className="space-y-2">
+                                  <div
+                                    className="text-xs markdown-body opacity-90"
+                                    dangerouslySetInnerHTML={{
+                                      __html: renderContent(
+                                        displayBody,
+                                        reply.permlink,
+                                      ),
+                                    }}
+                                  />
+                                  {config.loadImages === false &&
+                                    !revealedImages.has(reply.permlink) && (
+                                      <button
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          setRevealedImages((prev) =>
+                                            new Set(prev).add(reply.permlink),
+                                          );
+                                        }}
+                                        className="flex items-center gap-2 px-2 py-1 bg-slate-900 hover:bg-slate-800 rounded text-[10px] text-cyan-400 font-bold transition-all border border-cyan-500/10"
+                                      >
+                                        <ImageIcon size={16} /> Показати фото
+                                      </button>
+                                    )}
+                                  {isLong && (
+                                    <button
+                                      onClick={() =>
+                                        setExpandedReplies((prev) => {
+                                          const next = new Set(prev);
+                                          if (next.has(reply.permlink))
+                                            next.delete(reply.permlink);
+                                          else next.add(reply.permlink);
+                                          return next;
+                                        })
+                                      }
+                                      className="text-[10px] text-cyan-500 hover:text-cyan-400 font-bold uppercase tracking-tighter"
+                                    >
+                                      {isReplyExpanded ? "Show Less" : "Show More..."}
+                                    </button>
+                                  )}
+                                </div>
+
+                                {reply.children > 0 && !threads[reply.permlink] && (
+                                  <button
+                                    onClick={() =>
+                                      fetchThread(reply.author, reply.permlink)
+                                    }
+                                    disabled={loadingThreads.has(reply.permlink)}
+                                    className="w-full py-1 bg-slate-900 border border-slate-800/60 rounded text-[10px] text-slate-400 hover:text-cyan-400 flex items-center justify-center gap-1.5 transition-colors disabled:opacity-50"
+                                  >
+                                    {loadingThreads.has(reply.permlink) ? (
+                                      <RefreshCw size={12} className="animate-spin" />
+                                    ) : (
+                                      <GitBranch size={12} />
+                                    )}
+                                    Show full thread ({reply.children} replies)
+                                  </button>
+                                )}
+
+                                {threads[reply.permlink] && (
+                                  <div className="space-y-2 pl-2 border-l border-slate-700 mt-2 relative">
+                                    <button
+                                      onClick={() =>
+                                        setThreads((prev) => {
+                                          const next = { ...prev };
+                                          delete next[reply.permlink];
+                                          return next;
+                                        })
+                                      }
+                                      className="absolute -right-1 -top-2 p-1 bg-slate-900 border border-slate-800 rounded-full text-slate-500 hover:text-red-400 shadow-lg"
+                                      title="Collapse Thread"
+                                    >
+                                      <ChevronUp size={14} />
+                                    </button>
+                                    {threads[reply.permlink].map((t) => (
+                                      <div
+                                        key={`${t.author}/${t.permlink}`}
+                                        className={cn(
+                                          "p-2 rounded text-[10px] space-y-1 group",
+                                          t.author === currentUser
+                                            ? "bg-cyan-500/5 border border-cyan-500/10"
+                                            : "bg-slate-900/50",
+                                        )}
+                                      >
+                                        <div className="flex justify-between items-center opacity-60">
+                                          <div className="flex items-center gap-2">
+                                            <span
+                                              className={cn(
+                                                "font-bold",
+                                                t.author === currentUser
+                                                  ? "text-cyan-400"
+                                                  : "text-slate-400",
+                                              )}
+                                            >
+                                              @{t.author}
+                                            </span>
+                                            {t.author === currentUser ? (
+                                              <button
+                                                onClick={() =>
+                                                  setEditingReply({
+                                                    permlink: t.permlink,
+                                                    body: t.body,
+                                                  })
+                                                }
+                                                className="hidden group-hover:block text-[8px] text-yellow-500/70 hover:text-yellow-400 uppercase font-bold"
+                                              >
+                                                Edit
+                                              </button>
+                                            ) : (
+                                              <div className="hidden group-hover:flex items-center gap-2">
+                                                <button
+                                                  onClick={() =>
+                                                    handleLocalVote(
+                                                      t.author,
+                                                      t.permlink,
+                                                      voteWeight,
+                                                    )
+                                                  }
+                                                  className="text-[8px] text-cyan-500/70 hover:text-cyan-400 font-bold uppercase"
+                                                >
+                                                  Vote
+                                                </button>
+                                                <button
+                                                  onClick={() => {
+                                                    setReplyingTo(t);
+                                                    setFloatingCommentBody(
+                                                      `> ${t.body.substring(0, 100)}${t.body.length > 100 ? "..." : ""}\n\n`,
+                                                    );
+                                                  }}
+                                                  className="text-[8px] text-green-500/70 hover:text-green-400 font-bold uppercase"
+                                                >
+                                                  Reply
+                                                </button>
+                                              </div>
+                                            )}
+                                          </div>
+                                          <span>
+                                            {new Date(t.created + "Z").toLocaleTimeString([], {
+                                              hour: "2-digit",
+                                              minute: "2-digit",
+                                            })}
+                                          </span>
+                                        </div>
+                                        {editingReply?.permlink === t.permlink ? (
+                                          <div className="space-y-2 mt-1">
+                                            <ReplyBox
+                                              value={editingReply.body}
+                                              onChange={(txt) =>
+                                                setEditingReply((prev) =>
+                                                  prev ? { ...prev, body: txt } : null,
+                                                )
+                                              }
+                                              placeholder="Edit comment..."
+                                              onUploadImage={onUploadImage}
+                                              onCancel={() => setEditingReply(null)}
+                                              onSend={async (body) => {
+                                                await handleLocalComment(
+                                                  t.parent_author,
+                                                  t.parent_permlink,
+                                                  body,
+                                                  editingReply.permlink,
+                                                );
+                                                setEditingReply(null);
+                                                fetchThread(reply.author, reply.permlink);
+                                              }}
+                                            />
+                                          </div>
+                                        ) : (
+                                          <>
+                                            <div
+                                              className="markdown-body text-[10px]"
+                                              dangerouslySetInnerHTML={{
+                                                __html: renderContent(t.body, t.permlink),
+                                              }}
+                                            />
+                                            {config.loadImages === false &&
+                                              !revealedImages.has(t.permlink) && (
+                                                <button
+                                                  onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    setRevealedImages((prev) =>
+                                                      new Set(prev).add(t.permlink),
+                                                    );
+                                                  }}
+                                                  className="flex items-center gap-1.5 mt-1 text-[9px] text-cyan-400 hover:text-cyan-300 font-bold"
+                                                >
+                                                  <ImageIcon size={14} /> Показати фото
+                                                </button>
+                                              )}
+                                          </>
+                                        )}
+                                      </div>
+                                    ))}
+                                  </div>
+                                )}
+
+                                {myReply && !threads[reply.permlink] && (
+                                  <div className="bg-slate-900 border-l-2 border-green-500/50 p-2 rounded-r-lg space-y-1">
+                                    <div className="flex items-center justify-between">
+                                      <span className="text-[9px] font-bold text-green-400/60 uppercase">
+                                        Ваша відповідь:
+                                      </span>
+                                      <button
+                                        onClick={() =>
+                                          setShowMyReplies((prev) => {
+                                            const next = new Set(prev);
+                                            if (next.has(reply.permlink))
+                                              next.delete(reply.permlink);
+                                            else next.add(reply.permlink);
+                                            return next;
+                                          })
+                                        }
+                                        className="text-[9px] text-slate-500 hover:text-slate-300 underline"
+                                      >
+                                        {showMyReplies.has(reply.permlink) ? "Сховати" : "Показати"}
+                                      </button>
+                                    </div>
+                                    {showMyReplies.has(reply.permlink) && (
+                                      <div className="text-[11px] text-slate-400 italic font-sans">
+                                        {myReply}
+                                      </div>
+                                    )}
+                                  </div>
+                                )}
+
+                                <div className="flex items-center gap-3 pt-2">
+                                  <button
+                                    onClick={() =>
+                                      handleLocalVote(reply.author, reply.permlink, voteWeight)
+                                    }
+                                    className={cn(
+                                      "flex items-center gap-1 text-[10px] transition-colors px-2 py-1 rounded hover:bg-slate-800",
+                                      reply.active_votes.some((v) => v.voter === currentUser)
+                                        ? "text-cyan-400 font-bold"
+                                        : "text-slate-400 hover:text-cyan-400",
+                                    )}
+                                  >
+                                    <ThumbsUp
+                                      size={14}
+                                      className={cn(
+                                        reply.active_votes.some((v) => v.voter === currentUser) &&
+                                          "fill-cyan-400/20",
+                                      )}
+                                    />
+                                    {reply.active_votes.some((v) => v.voter === currentUser)
+                                      ? "Voted"
+                                      : "Upvote"}
+                                  </button>
+                                  <button
+                                    onClick={() => {
+                                      const isAlreadyReplying = replyingTo?.permlink === reply.permlink;
+                                      setReplyingTo(isAlreadyReplying ? null : reply);
+                                      if (!isAlreadyReplying) {
+                                        setFloatingCommentBody(
+                                          `> ${reply.body.substring(0, 150)}${reply.body.length > 150 ? "..." : ""}\n\n`,
+                                        );
+                                      }
+                                    }}
+                                    className={cn(
+                                      "flex items-center gap-1 text-[10px] transition-colors px-2 py-1 rounded hover:bg-slate-800",
+                                      replyingTo?.permlink === reply.permlink
+                                        ? "text-green-400 font-bold bg-green-500/10"
+                                        : "text-slate-400 hover:text-green-400",
+                                    )}
+                                  >
+                                    <QuoteIcon size={14} />
+                                    Quote & Reply
+                                  </button>
+                                  <button
+                                    onClick={() => {
+                                      setReplyingTo(replyingTo?.permlink === reply.permlink ? null : reply);
+                                      if (!replyingTo || replyingTo.permlink !== reply.permlink) {
+                                        setFloatingCommentBody("");
+                                      }
+                                    }}
+                                    className={cn(
+                                      "flex items-center gap-1 text-[10px] transition-colors px-2 py-1 rounded hover:bg-slate-800",
+                                      replyingTo?.permlink === reply.permlink
+                                        ? "text-green-400 font-bold bg-green-500/10"
+                                        : "text-slate-400 hover:text-green-400",
+                                    )}
+                                  >
+                                    <MessageSquare size={14} />
+                                    Reply
+                                  </button>
+                                </div>
+
+                                {replyingTo?.permlink === reply.permlink && (
+                                  <ReplyBox
+                                    id={`inbox-reply-textarea-${reply.permlink}`}
+                                    draftKey={`inbox-reply-${reply.permlink}`}
+                                    value={floatingCommentBody}
+                                    onChange={setFloatingCommentBody}
+                                    onUploadImage={onUploadImage}
+                                    placeholder={`Reply to @${reply.author}`}
+                                    onSend={async (body) => {
+                                      await handleLocalComment(reply.author, reply.permlink, body);
+                                      setReplyingTo(null);
+                                      setFloatingCommentBody("");
+                                    }}
+                                    onCancel={() => {
+                                      setReplyingTo(null);
+                                      setFloatingCommentBody("");
+                                    }}
+                                  />
+                                )}
+                              </div>
+                            );
+                          })}
+                        </div>
                       </div>
                     );
-                  })
+                  });
+                })()
               )}
               {inbox.length >= inboxLimit && (
                 <div className="p-4 pt-0">
@@ -2581,10 +2737,20 @@ export default function Reader({
                                   {(voteWeight / 100).toFixed(0)}%
                                 </span>
                               </button>
-                              <div className="flex items-center gap-1 text-slate-500 px-2 py-1 bg-slate-950/30 rounded-lg hidden sm:flex">
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  if (!expandedPosts.has(post.permlink)) {
+                                    togglePost(post);
+                                  }
+                                  fetchComments(post.author, post.permlink);
+                                }}
+                                className="flex items-center gap-1 text-slate-400 hover:text-cyan-400 px-2 py-1 bg-slate-950/30 hover:bg-slate-900 rounded-lg hidden sm:flex transition-all border border-slate-800/40 hover:border-cyan-500/20"
+                                title="Завантажити коментарі"
+                              >
                                 <MessageSquare size={16} />
-                                <span className="text-[10px] sm:text-xs">{post.children}</span>
-                              </div>
+                                <span className="text-[10px] sm:text-xs font-semibold">{post.children}</span>
+                              </button>
                             </div>
                           )}
                           <div
@@ -2701,6 +2867,28 @@ export default function Reader({
                                 </span>
                               </button>
 
+                               <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  fetchComments(post.author, post.permlink);
+                                }}
+                                className={cn(
+                                  "flex items-center gap-1.5 px-3 py-1.5 hover:bg-slate-800 rounded-lg transition-all border border-transparent text-slate-400 hover:text-cyan-400",
+                                  loadingComments.has(post.permlink) && "animate-pulse text-cyan-400"
+                                )}
+                                title="Завантажити коментарі"
+                              >
+                                <MessageSquare
+                                  size={18}
+                                  className={cn(
+                                    postComments[post.permlink] && "fill-cyan-400/10 text-cyan-400"
+                                  )}
+                                />
+                                <span className="text-sm font-bold">
+                                  {post.children}
+                                </span>
+                              </button>
+
                               <button
                                 onClick={() => {
                                   if (
@@ -2720,23 +2908,10 @@ export default function Reader({
                                     ? "text-green-400 bg-green-500/10 border-green-500/20"
                                     : "text-slate-400 hover:text-green-400",
                                 )}
+                                title="Написати коментар"
                               >
-                                <MessageSquare
-                                  size={18}
-                                  className={cn(
-                                    respondedReplies[post.permlink] &&
-                                      "fill-green-400/20",
-                                  )}
-                                />
-                                <span
-                                  className={cn(
-                                    "text-sm",
-                                    respondedReplies[post.permlink] &&
-                                      "font-bold",
-                                  )}
-                                >
-                                  {post.children}
-                                </span>
+                                <Edit3 size={18} />
+                                <span className="text-sm font-medium">Коментувати</span>
                                 {respondedReplies[post.permlink] && (
                                   <span className="hidden sm:inline-block ml-1 px-1.5 py-0.5 bg-green-500/20 text-[8px] font-bold uppercase rounded text-green-400 tracking-tighter">
                                     Ви відповіли
@@ -4525,13 +4700,13 @@ function CommentItem({
     setLocalComment(comment);
   }, [comment]);
 
-  const fetchReplies = async () => {
-    if (comment.children === 0) return;
+  const fetchReplies = async (force: boolean = false) => {
+    if (!force && localComment.children === 0) return;
     setLoadingReplies(true);
     try {
       const result: SteemPost[] = await callWithFallback(
         "condenser_api.get_content_replies",
-        [comment.author, comment.permlink],
+        [localComment.author, localComment.permlink],
       );
       const configStr = localStorage.getItem("steem_reader_config_v1");
       const config = configStr
@@ -4711,7 +4886,7 @@ function CommentItem({
         </button>
         {localComment.children > 0 && replies.length === 0 && (
           <button
-            onClick={fetchReplies}
+            onClick={() => fetchReplies()}
             className="text-cyan-500 hover:underline flex items-center gap-1"
           >
             {loadingReplies ? (
@@ -4731,14 +4906,39 @@ function CommentItem({
             onChange={setReplyBody}
             placeholder={`Reply to @${localComment.author}`}
             onSend={async (body) => {
-              await onComment(localComment.author, localComment.permlink, body);
-              setReplyBody("");
-              setShowReply(false);
+              const activeUser = currentUser || "you";
+              const tempPermlink = `re-${localComment.author.replace(/\./g, '')}-${Date.now()}`;
+              const optimisticReply: SteemPost = {
+                author: activeUser,
+                permlink: tempPermlink,
+                category: localComment.category || "",
+                title: "",
+                body: body,
+                json_metadata: JSON.stringify({ tags: [], app: "steem-editor", format: "markdown" }),
+                created: new Date().toISOString().replace('Z', ''),
+                active_votes: [],
+                children: 0,
+                parent_author: localComment.author,
+                parent_permlink: localComment.permlink
+              };
+
+              // Optimistically append the reply to replies state immediately
+              setReplies((prev) => [...prev, optimisticReply]);
+
               setLocalComment((prev) => ({
                 ...prev,
                 children: prev.children + 1,
               }));
-              fetchReplies(); // auto fetch
+
+              // Submit the reply
+              await onComment(localComment.author, localComment.permlink, body);
+              setReplyBody("");
+              setShowReply(false);
+
+              // Background refresh after a short delay so the blockchain registers it
+              setTimeout(() => {
+                fetchReplies(true);
+              }, 4000);
             }}
             onCancel={() => setShowReply(false)}
           />

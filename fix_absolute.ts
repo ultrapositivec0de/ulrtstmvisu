@@ -9,7 +9,7 @@ updatedCode = updatedCode.replace(
   /"lg:hidden fixed bottom-0 left-0 right-0 h-16 bg-slate-900 border-t border-slate-800 grid grid-cols-5 items-center px-1 z-\[70\] shadow-\[0_-4px_20px_rgba\(0,0,0,0\.5\)\] transition-all duration-150"/,
   `"lg:hidden absolute bottom-0 left-0 right-0 h-16 bg-slate-900 border-t border-slate-800 grid grid-cols-5 items-center px-1 z-[70] shadow-[0_-4px_20px_rgba(0,0,0,0.5)] transition-all duration-150"`
 ).replace(
-  /style=\{\{ bottom: keyboardOffset > 0 \? \`\$\{keyboardOffset\}px\` : 0 \}\}/,
+  /style=\{\{ bottom: keyboardOffset > 0 \? `\$\{keyboardOffset\}px` : 0 \}\}/,
   `` // remove this style as it is now absolute to the resized root
 );
 

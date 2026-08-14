@@ -9,7 +9,7 @@ import {
   Trash2, X, ChevronLeft, ChevronRight, ChevronUp, ChevronDown,
   Eye, EyeOff, Edit3, Plus, ShieldCheck, Key,
   Search, List as ListIcon, Lock, LayoutGrid, Maximize2, Minimize2, Calendar, Tags, Shield, Bell, ArrowRight, Clock,
-  Code, Terminal, Indent, Layers, CheckCircle, Check, AlignLeft, AlignRight, Rows, Columns, PanelLeft, PanelRight, PanelLeftClose, PanelLeftOpen, Moon, Sun, FilePlus, Zap, MoveVertical, Info, Globe, FileUp, FileDown, Copy, SplitSquareHorizontal, Type, Download, Sparkles
+  Code, Terminal, Indent, Layers, CheckCircle, PlusCircle, Check, AlignLeft, AlignRight, Rows, Columns, PanelLeft, PanelRight, PanelLeftClose, PanelLeftOpen, Moon, Sun, FilePlus, Zap, MoveVertical, Info, Globe, FileUp, FileDown, Copy, SplitSquareHorizontal, Type, Download, Sparkles
 } from 'lucide-react';
 import { motion, AnimatePresence, Reorder } from 'motion/react';
 import { marked } from 'marked';
@@ -63,7 +63,7 @@ const COMMUNITIES = [
 const COMMON_TAGS = ['life', 'betterlife', 'thediarygame', 'club5050', 'club75', 'club100', 'art', 'photography', 'travel', 'food', 'nature', 'blog', 'creative', 'dev', 'steem', 'lifestyle', 'news', 'steemit', 'sharing', 'review', 'tutorial'];
 
 // Detect native environment (Tauri / Android Wrapper)
-const IS_NATIVE = typeof window !== 'undefined' && (!!(window as any).__TAURI__ || !!(window as any).AndroidBridge || navigator.userAgent.includes('SteemEditorNative'));
+// const IS_NATIVE = typeof window !== 'undefined' && (!!(window as any).__TAURI__ || !!(window as any).AndroidBridge || navigator.userAgent.includes('SteemEditorNative'));
 
 // --- Translations ---
 const translations = {
@@ -1338,6 +1338,18 @@ const IconButton = ({
 
 const APP_CHANGELOG = [
   {
+    version: "v4.5.8",
+    date: "2026-08-14",
+    changes: [
+      "Store Import Optimization: Refactored and optimized state store imports across modules to eliminate inefficient dependencies and ensure clean module coupling.",
+      "Template Refinements: Upgraded and streamlined built-in post templates for enhanced markdown structure and readability.",
+      "Immersive Fullscreen Actions: Enhanced full-screen rendering, ensuring all dropdowns, modal dialogs, and widget action menus display correctly and remain fully accessible without clipping.",
+      "Neon Theme Text Highlighting: Added custom neon text colorization support in visual mode, paired with a dedicated toolbar toggle to enable or disable it on demand.",
+      "Precise Caret & Spacer Management: Refined visual editor cursor placement and block spacer generation (around tables, blockquotes, centers, and iframes) to prevent unexpected jumps and ensure smooth, natural typing.",
+      "Babel & Build Stability: Configured Vite React plugin with compact optimizations for high-performance builds across large source files."
+    ]
+  },
+  {
     version: "v4.4.4",
     date: "2026-08-10",
     changes: [
@@ -1543,68 +1555,367 @@ const getChangelogText = () => "SteemEditor Pro Updates:\n\n" + APP_CHANGELOG.ma
   `${log.version} (${log.date})\n` + log.changes.map(c => `- ${c}`).join('\n')
 ).join('\n\n');
 
-const isInsideTagInLine = (line: string, caretPosInLine: number, openTag: string, closeTag: string = openTag) => {
-  const openLen = openTag.length;
-  const closeLen = closeTag.length;
-  
-  if (openTag === closeTag) {
-    const tagLen = openLen;
-    const indices: number[] = [];
-    let idx = line.indexOf(openTag);
+interface FormatRange {
+  formatKey: 'bold' | 'italic' | 'code' | 'strikethrough' | 'sub' | 'sup' | 'phishy';
+  openTag: string;
+  closeTag: string;
+  openIdx: number;
+  closeIdx: number;
+  contentStart: number;
+  contentEnd: number;
+}
 
-    while (idx !== -1) {
-      const isEscaped = idx > 0 && line[idx - 1] === '\\';
-      const isSpuriousStar = openTag === '*' && (
-        (idx > 0 && line[idx - 1] === '*') || 
-        (idx + 1 < line.length && line[idx + 1] === '*')
-      );
+function getAllFormatRangesInLine(line: string): FormatRange[] {
+  const ranges: FormatRange[] = [];
+  if (!line) return ranges;
 
-      if (!isEscaped && !isSpuriousStar) {
-        indices.push(idx);
-      }
-      idx = line.indexOf(openTag, idx + tagLen);
-    }
+  // 1. Paired HTML-like tags: <sub>, <sup>, <div class="phishy">, <span class="phishy">
+  const htmlPairs: Array<{ formatKey: 'sub' | 'sup' | 'phishy'; openTag: string; closeTag: string }> = [
+    { formatKey: 'sub', openTag: '<sub>', closeTag: '</sub>' },
+    { formatKey: 'sup', openTag: '<sup>', closeTag: '</sup>' },
+    { formatKey: 'phishy', openTag: '<div class="phishy">', closeTag: '</div>' },
+    { formatKey: 'phishy', openTag: '<span class="phishy">', closeTag: '</span>' },
+  ];
 
-    for (let i = 0; i < indices.length; i += 2) {
-      if (i + 1 < indices.length) {
-        const start = indices[i] + tagLen;
-        const end = indices[i + 1];
-        if (caretPosInLine >= start && caretPosInLine <= end) {
-          return true;
-        }
+  for (const { formatKey, openTag, closeTag } of htmlPairs) {
+    const oLen = openTag.length;
+    const cLen = closeTag.length;
+    let s = 0;
+    while (s < line.length) {
+      const oIdx = line.indexOf(openTag, s);
+      if (oIdx === -1) break;
+      if (oIdx > 0 && line[oIdx - 1] === '\\') {
+        s = oIdx + oLen;
+        continue;
       }
-    }
-  } else {
-    const openIndices: number[] = [];
-    let oIdx = line.indexOf(openTag);
-    while (oIdx !== -1) {
-      if (!(oIdx > 0 && line[oIdx - 1] === '\\')) {
-        openIndices.push(oIdx);
+      const cIdx = line.indexOf(closeTag, oIdx + oLen);
+      if (cIdx === -1) break;
+      if (cIdx > 0 && line[cIdx - 1] === '\\') {
+        s = cIdx + cLen;
+        continue;
       }
-      oIdx = line.indexOf(openTag, oIdx + openLen);
-    }
-
-    const closeIndices: number[] = [];
-    let cIdx = line.indexOf(closeTag);
-    while (cIdx !== -1) {
-      if (!(cIdx > 0 && line[cIdx - 1] === '\\')) {
-        closeIndices.push(cIdx);
-      }
-      cIdx = line.indexOf(closeTag, cIdx + closeLen);
-    }
-
-    for (let i = 0; i < openIndices.length; i++) {
-      const oPos = openIndices[i];
-      const cPos = closeIndices.find(c => c > oPos);
-      if (cPos !== undefined) {
-        if (caretPosInLine >= oPos + openLen && caretPosInLine <= cPos) {
-          return true;
-        }
-      }
+      ranges.push({
+        formatKey,
+        openTag,
+        closeTag,
+        openIdx: oIdx,
+        closeIdx: cIdx,
+        contentStart: oIdx + oLen,
+        contentEnd: cIdx,
+      });
+      s = cIdx + cLen;
     }
   }
-  return false;
-};
+
+  // 2. Inline code: `...`
+  const codeIdxs: number[] = [];
+  let cSearch = 0;
+  while (cSearch < line.length) {
+    const idx = line.indexOf('`', cSearch);
+    if (idx === -1) break;
+    if (idx === 0 || line[idx - 1] !== '\\') {
+      codeIdxs.push(idx);
+    }
+    cSearch = idx + 1;
+  }
+  for (let i = 0; i < codeIdxs.length; i += 2) {
+    if (i + 1 < codeIdxs.length) {
+      ranges.push({
+        formatKey: 'code',
+        openTag: '`',
+        closeTag: '`',
+        openIdx: codeIdxs[i],
+        closeIdx: codeIdxs[i + 1],
+        contentStart: codeIdxs[i] + 1,
+        contentEnd: codeIdxs[i + 1],
+      });
+    }
+  }
+
+  // 3. Strikethrough: ~~...~~
+  const strikeIdxs: number[] = [];
+  let sSearch = 0;
+  while (sSearch < line.length) {
+    const idx = line.indexOf('~~', sSearch);
+    if (idx === -1) break;
+    if (idx === 0 || line[idx - 1] !== '\\') {
+      strikeIdxs.push(idx);
+    }
+    sSearch = idx + 2;
+  }
+  for (let i = 0; i < strikeIdxs.length; i += 2) {
+    if (i + 1 < strikeIdxs.length) {
+      ranges.push({
+        formatKey: 'strikethrough',
+        openTag: '~~',
+        closeTag: '~~',
+        openIdx: strikeIdxs[i],
+        closeIdx: strikeIdxs[i + 1],
+        contentStart: strikeIdxs[i] + 2,
+        contentEnd: strikeIdxs[i + 1],
+      });
+    }
+  }
+
+  // 4. Asterisks: single (*), double (**), triple (***), and empty tags (**, ****, ******)
+  const starRuns: Array<{ start: number; end: number; len: number }> = [];
+  let i = 0;
+  while (i < line.length) {
+    if (line[i] === '*') {
+      if (i > 0 && line[i - 1] === '\\') {
+        i++;
+        continue;
+      }
+      const rStart = i;
+      while (i < line.length && line[i] === '*') {
+        i++;
+      }
+      starRuns.push({ start: rStart, end: i, len: i - rStart });
+    } else {
+      i++;
+    }
+  }
+
+  for (const r of starRuns) {
+    if (r.len === 6) {
+      ranges.push({
+        formatKey: 'bold',
+        openTag: '***',
+        closeTag: '***',
+        openIdx: r.start,
+        closeIdx: r.start + 3,
+        contentStart: r.start + 3,
+        contentEnd: r.start + 3,
+      });
+      ranges.push({
+        formatKey: 'italic',
+        openTag: '***',
+        closeTag: '***',
+        openIdx: r.start,
+        closeIdx: r.start + 3,
+        contentStart: r.start + 3,
+        contentEnd: r.start + 3,
+      });
+    } else if (r.len === 4) {
+      ranges.push({
+        formatKey: 'bold',
+        openTag: '**',
+        closeTag: '**',
+        openIdx: r.start,
+        closeIdx: r.start + 2,
+        contentStart: r.start + 2,
+        contentEnd: r.start + 2,
+      });
+    } else if (r.len === 2) {
+      ranges.push({
+        formatKey: 'italic',
+        openTag: '*',
+        closeTag: '*',
+        openIdx: r.start,
+        closeIdx: r.start + 1,
+        contentStart: r.start + 1,
+        contentEnd: r.start + 1,
+      });
+    }
+  }
+
+  const tripleStars = starRuns.filter(r => r.len === 3);
+  for (let k = 0; k < tripleStars.length; k += 2) {
+    if (k + 1 < tripleStars.length) {
+      ranges.push({
+        formatKey: 'bold',
+        openTag: '***',
+        closeTag: '***',
+        openIdx: tripleStars[k].start,
+        closeIdx: tripleStars[k + 1].start,
+        contentStart: tripleStars[k].start + 3,
+        contentEnd: tripleStars[k + 1].start,
+      });
+      ranges.push({
+        formatKey: 'italic',
+        openTag: '***',
+        closeTag: '***',
+        openIdx: tripleStars[k].start,
+        closeIdx: tripleStars[k + 1].start,
+        contentStart: tripleStars[k].start + 3,
+        contentEnd: tripleStars[k + 1].start,
+      });
+    }
+  }
+
+  const doubleStars = starRuns.filter(r => r.len === 2);
+  for (let k = 0; k < doubleStars.length; k += 2) {
+    if (k + 1 < doubleStars.length) {
+      ranges.push({
+        formatKey: 'bold',
+        openTag: '**',
+        closeTag: '**',
+        openIdx: doubleStars[k].start,
+        closeIdx: doubleStars[k + 1].start,
+        contentStart: doubleStars[k].start + 2,
+        contentEnd: doubleStars[k + 1].start,
+      });
+    }
+  }
+
+  const singleStars = starRuns.filter(r => r.len === 1);
+  for (let k = 0; k < singleStars.length; k += 2) {
+    if (k + 1 < singleStars.length) {
+      ranges.push({
+        formatKey: 'italic',
+        openTag: '*',
+        closeTag: '*',
+        openIdx: singleStars[k].start,
+        closeIdx: singleStars[k + 1].start,
+        contentStart: singleStars[k].start + 1,
+        contentEnd: singleStars[k + 1].start,
+      });
+    }
+  }
+
+  // 5. Underscores: _..._ (italic), __...__ (bold), ___...___ (bold & italic)
+  const underRuns: Array<{ start: number; end: number; len: number }> = [];
+  let j = 0;
+  while (j < line.length) {
+    if (line[j] === '_') {
+      if (j > 0 && line[j - 1] === '\\') {
+        j++;
+        continue;
+      }
+      const rStart = j;
+      while (j < line.length && line[j] === '_') {
+        j++;
+      }
+      underRuns.push({ start: rStart, end: j, len: j - rStart });
+    } else {
+      j++;
+    }
+  }
+
+  for (const r of underRuns) {
+    if (r.len === 6) {
+      ranges.push({
+        formatKey: 'bold',
+        openTag: '___',
+        closeTag: '___',
+        openIdx: r.start,
+        closeIdx: r.start + 3,
+        contentStart: r.start + 3,
+        contentEnd: r.start + 3,
+      });
+      ranges.push({
+        formatKey: 'italic',
+        openTag: '___',
+        closeTag: '___',
+        openIdx: r.start,
+        closeIdx: r.start + 3,
+        contentStart: r.start + 3,
+        contentEnd: r.start + 3,
+      });
+    } else if (r.len === 4) {
+      ranges.push({
+        formatKey: 'bold',
+        openTag: '__',
+        closeTag: '__',
+        openIdx: r.start,
+        closeIdx: r.start + 2,
+        contentStart: r.start + 2,
+        contentEnd: r.start + 2,
+      });
+    } else if (r.len === 2) {
+      ranges.push({
+        formatKey: 'italic',
+        openTag: '_',
+        closeTag: '_',
+        openIdx: r.start,
+        closeIdx: r.start + 1,
+        contentStart: r.start + 1,
+        contentEnd: r.start + 1,
+      });
+    }
+  }
+
+  const tripleUnders = underRuns.filter(r => r.len === 3);
+  for (let k = 0; k < tripleUnders.length; k += 2) {
+    if (k + 1 < tripleUnders.length) {
+      ranges.push({
+        formatKey: 'bold',
+        openTag: '___',
+        closeTag: '___',
+        openIdx: tripleUnders[k].start,
+        closeIdx: tripleUnders[k + 1].start,
+        contentStart: tripleUnders[k].start + 3,
+        contentEnd: tripleUnders[k + 1].start,
+      });
+      ranges.push({
+        formatKey: 'italic',
+        openTag: '___',
+        closeTag: '___',
+        openIdx: tripleUnders[k].start,
+        closeIdx: tripleUnders[k + 1].start,
+        contentStart: tripleUnders[k].start + 3,
+        contentEnd: tripleUnders[k + 1].start,
+      });
+    }
+  }
+
+  const doubleUnders = underRuns.filter(r => r.len === 2);
+  for (let k = 0; k < doubleUnders.length; k += 2) {
+    if (k + 1 < doubleUnders.length) {
+      ranges.push({
+        formatKey: 'bold',
+        openTag: '__',
+        closeTag: '__',
+        openIdx: doubleUnders[k].start,
+        closeIdx: doubleUnders[k + 1].start,
+        contentStart: doubleUnders[k].start + 2,
+        contentEnd: doubleUnders[k + 1].start,
+      });
+    }
+  }
+
+  const singleUnders = underRuns.filter(r => r.len === 1);
+  for (let k = 0; k < singleUnders.length; k += 2) {
+    if (k + 1 < singleUnders.length) {
+      ranges.push({
+        formatKey: 'italic',
+        openTag: '_',
+        closeTag: '_',
+        openIdx: singleUnders[k].start,
+        closeIdx: singleUnders[k + 1].start,
+        contentStart: singleUnders[k].start + 1,
+        contentEnd: singleUnders[k + 1].start,
+      });
+    }
+  }
+
+  return ranges;
+}
+
+function isInsideTagInLine(line: string, caretPosInLine: number, openTag: string, selEndInLine: number = caretPosInLine): boolean {
+  let key: FormatRange['formatKey'] = 'bold';
+  if (openTag === '*' || openTag === 'italic' || openTag === '_') key = 'italic';
+  else if (openTag === '**' || openTag === 'bold' || openTag === '__') key = 'bold';
+  else if (openTag === '`' || openTag === 'code') key = 'code';
+  else if (openTag === '~~' || openTag === 'strikethrough') key = 'strikethrough';
+  else if (openTag === '<sub>' || openTag === 'sub') key = 'sub';
+  else if (openTag === '<sup>' || openTag === 'sup') key = 'sup';
+  else if (openTag === '<div class="phishy">' || openTag === 'phishy') key = 'phishy';
+
+  const ranges = getAllFormatRangesInLine(line).filter(r => r.formatKey === key);
+  if (caretPosInLine === selEndInLine) {
+    return ranges.some(r => caretPosInLine >= r.contentStart && caretPosInLine <= r.contentEnd);
+  }
+  return ranges.some(r => caretPosInLine >= r.contentStart && selEndInLine <= r.contentEnd);
+}
+
+function getActiveFormatRangeInLine(line: string, caretInLine: number): FormatRange | null {
+  const ranges = getAllFormatRangesInLine(line);
+  const matching = ranges.filter(r => caretInLine >= r.contentStart && caretInLine <= r.contentEnd);
+  if (matching.length === 0) return null;
+  matching.sort((a, b) => (a.contentEnd - a.contentStart) - (b.contentEnd - b.contentStart));
+  return matching[0];
+}
 
 // Helper functions for path-based DOM node tracking
 function getNodePath(root: Node, target: Node): number[] | null {
@@ -1655,7 +1966,7 @@ function DesktopStatsFooter({ t }: any) {
         <ReadingTimeBadge splitWords={300} t={t} />
       </div>
       <div className="flex items-center gap-2">
-        <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
+        <div className="w-2 h-2 rounded-full bg-emerald-500" />
         <span>{t('autosaveActive')}</span>
       </div>
     </footer>
@@ -1712,39 +2023,102 @@ function App() {
   const previewRef = useRef<HTMLDivElement>(null);
 
   const toggleFullScreen = () => {
-    if (!previewRef.current) return;
-    if (!document.fullscreenElement) {
-      previewRef.current.requestFullscreen().catch(err => {
-        console.error(`Error attempting to enable full-screen mode: ${err.message}`);
-      });
-    } else {
-      document.exitFullscreen();
-    }
+    setIsFullScreen(prev => {
+      const next = !prev;
+      if (next) {
+        if (!document.fullscreenElement && document.documentElement.requestFullscreen) {
+          document.documentElement.requestFullscreen().catch(() => {});
+        }
+      } else {
+        if (document.fullscreenElement && document.exitFullscreen) {
+          document.exitFullscreen().catch(() => {});
+        }
+      }
+      return next;
+    });
   };
 
   const toggleEditorFullScreen = () => {
-    if (!editorPaneRef.current) return;
-    if (!document.fullscreenElement) {
-      editorPaneRef.current.requestFullscreen().catch(err => {
-        console.error(`Error attempting to enable full-screen mode: ${err.message}`);
-      });
-    } else {
-      document.exitFullscreen();
-    }
+    setIsEditorFullScreen(prev => {
+      const next = !prev;
+      if (next) {
+        if (!document.fullscreenElement && document.documentElement.requestFullscreen) {
+          document.documentElement.requestFullscreen().catch(() => {});
+        }
+      } else {
+        if (document.fullscreenElement && document.exitFullscreen) {
+          document.exitFullscreen().catch(() => {});
+        }
+      }
+      return next;
+    });
   };
+
+  useEffect(() => {
+    const handleFullscreenChange = () => {
+      const isNativeFs = !!(
+        document.fullscreenElement ||
+        (document as any).webkitFullscreenElement ||
+        (document as any).mozFullScreenElement ||
+        (document as any).msFullscreenElement
+      );
+      if (!isNativeFs) {
+        setIsFullScreen(false);
+        setIsEditorFullScreen(false);
+      }
+    };
+
+    document.addEventListener('fullscreenchange', handleFullscreenChange);
+    document.addEventListener('webkitfullscreenchange', handleFullscreenChange);
+    document.addEventListener('mozfullscreenchange', handleFullscreenChange);
+    document.addEventListener('MSFullscreenChange', handleFullscreenChange);
+
+    return () => {
+      document.removeEventListener('fullscreenchange', handleFullscreenChange);
+      document.removeEventListener('webkitfullscreenchange', handleFullscreenChange);
+      document.removeEventListener('mozfullscreenchange', handleFullscreenChange);
+      document.removeEventListener('MSFullscreenChange', handleFullscreenChange);
+    };
+  }, []);
 
   useEffect(() => {
     probeNodes();
   }, []);
 
   useEffect(() => {
-    const handleFsChange = () => {
-      setIsFullScreen(document.fullscreenElement === previewRef.current);
-      setIsEditorFullScreen(document.fullscreenElement === editorPaneRef.current);
+    const handleGlobalKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        if (showTableSelector) {
+          setShowTableSelector(false);
+          return;
+        }
+        if (isWidgetMenuOpen) {
+          setIsWidgetMenuOpen(false);
+          return;
+        }
+        if (activeModal) {
+          setActiveModal(null);
+          return;
+        }
+        if (isEditorFullScreen) {
+          setIsEditorFullScreen(false);
+          if (document.fullscreenElement && document.exitFullscreen) {
+            document.exitFullscreen().catch(() => {});
+          }
+          return;
+        }
+        if (isFullScreen) {
+          setIsFullScreen(false);
+          if (document.fullscreenElement && document.exitFullscreen) {
+            document.exitFullscreen().catch(() => {});
+          }
+          return;
+        }
+      }
     };
-    document.addEventListener('fullscreenchange', handleFsChange);
-    return () => document.removeEventListener('fullscreenchange', handleFsChange);
-  }, []);
+    window.addEventListener('keydown', handleGlobalKeyDown);
+    return () => window.removeEventListener('keydown', handleGlobalKeyDown);
+  }, [showTableSelector, isWidgetMenuOpen, activeModal, isEditorFullScreen, isFullScreen]);
 
   const [isEditorFocused, setIsEditorFocused] = useState(false);
   const [editorMode, setEditorMode] = useState<'visual' | 'markdown'>(() => {
@@ -1896,9 +2270,14 @@ function App() {
 
   const [isDarkMode, setIsDarkMode] = useState(() => localStorage.getItem('steem_dark_mode') !== 'false');
   const [visualStyle, setVisualStyle] = useState<'standard' | 'neon'>(() => (localStorage.getItem('steem_visual_style') as 'standard' | 'neon') || 'standard');
+  const [neonTextColored, setNeonTextColored] = useState(() => localStorage.getItem('steem_neon_text_colored') !== 'false');
   const [syncScrollEnabled, setSyncScrollEnabled] = useState(() => localStorage.getItem('steem_sync_scroll') !== 'false');
   const [isGalleryCollapsed, setIsGalleryCollapsed] = useState(() => localStorage.getItem('steem_gallery_collapsed') === 'true');
   const [isLivePreviewEnabled, setIsLivePreviewEnabled] = useState(() => localStorage.getItem('steem_live_preview_enabled') === 'true');
+
+  useEffect(() => {
+    localStorage.setItem('steem_neon_text_colored', String(neonTextColored));
+  }, [neonTextColored]);
 
   useEffect(() => {
     localStorage.setItem('steem_gallery_collapsed', String(isGalleryCollapsed));
@@ -2040,7 +2419,11 @@ function App() {
       unsubscribe();
     };
   }, [t, syncScrollEnabled, isLivePreviewEnabled, lang, editorMode]);
-  const [templates, setTemplates] = useState<Template[]>([]);
+   const [templates, setTemplates] = useState<Template[]>([]);
+  const [isAddingTemplate, setIsAddingTemplate] = useState(false);
+  const [newTemplateName, setNewTemplateName] = useState('');
+  const [newTemplateType, setNewTemplateType] = useState<'post' | 'snippet'>('snippet');
+  const [templateFilter, setTemplateFilter] = useState<'all' | 'post' | 'snippet'>('all');
   const [mentions, setMentions] = useState<string[]>([]);
   const [newMention, setNewMention] = useState('');
   
@@ -2309,7 +2692,7 @@ function App() {
   const [pubTitle, setPubTitle] = useState('');
   const [removeTitleLine, setRemoveTitleLine] = useState(() => localStorage.getItem('steem_remove_title_line') !== 'false');
   const [pubTags, setPubTags] = useState('');
-  const [appAgent, setAppAgent] = useState(localStorage.getItem('steem_app_agent') || 'ultrasteemeditor/4.4.4');
+  const [appAgent, setAppAgent] = useState(localStorage.getItem('steem_app_agent') || 'ultrasteemeditor/4.5.8');
   const [rewardType, setRewardType] = useState<'SP' | '50' | '0'>( (localStorage.getItem('steem_reward_type') as any) || '50');
   const [beneficiaries, setBeneficiaries] = useState<{account: string, weight: number}[]>([]);
   const [benName, setBenName] = useState('');
@@ -2631,6 +3014,7 @@ function App() {
   const savedVisualRangeRef = useRef<Range | null>(null);
 
   const saveVisualSelection = useCallback(() => {
+    if (editorMode !== 'visual') return;
     const sel = window.getSelection();
     if (sel && sel.rangeCount > 0 && wysiwygRef.current) {
       try {
@@ -2647,7 +3031,6 @@ function App() {
           let isSub = false;
           let isSup = false;
           let isPhishy = false;
-          let isHeading = false;
 
           while (curr && curr !== wysiwygRef.current) {
             if (curr.nodeType === Node.ELEMENT_NODE) {
@@ -2659,35 +3042,44 @@ function App() {
               if (tag === 'strike' || tag === 'del' || tag === 's') isStrike = true;
               if (tag === 'sub') isSub = true;
               if (tag === 'sup') isSup = true;
-              if (/^h[1-6]$/.test(tag) || tag === 'th') isHeading = true;
               if (el.classList.contains('phishy')) isPhishy = true;
+
+              const fw = el.style?.fontWeight || '';
+              if (fw === 'bold' || fw === 'bolder' || parseInt(fw, 10) >= 600) isBold = true;
+              const fs = el.style?.fontStyle || '';
+              if (fs === 'italic' || fs === 'oblique') isItalic = true;
+              const td = el.style?.textDecoration || '';
+              if (td.includes('line-through')) isStrike = true;
             }
             curr = curr.parentNode;
           }
 
-          // Check browser's queryCommandState as fallback/enhancement for active caret format
+          // Check browser's queryCommandState ONLY if the activeElement is inside wysiwyg or wysiwyg is active
           let queryBold = false;
           let queryItalic = false;
           let queryStrike = false;
           let querySub = false;
           let querySup = false;
-          try {
-            queryBold = document.queryCommandState('bold');
-            queryItalic = document.queryCommandState('italic');
-            queryStrike = document.queryCommandState('strikeThrough');
-            querySub = document.queryCommandState('subscript');
-            querySup = document.queryCommandState('superscript');
-          } catch (err) {
-            console.warn('queryCommandState failed:', err);
+          const isWysiwygFocused = document.activeElement && (document.activeElement === wysiwygRef.current || wysiwygRef.current.contains(document.activeElement));
+          if (isWysiwygFocused) {
+            try {
+              queryBold = document.queryCommandState('bold');
+              queryItalic = document.queryCommandState('italic');
+              queryStrike = document.queryCommandState('strikeThrough');
+              querySub = document.queryCommandState('subscript');
+              querySup = document.queryCommandState('superscript');
+            } catch (err) {
+              console.warn('queryCommandState failed:', err);
+            }
           }
 
           const newFormats = {
-            bold: isBold || (queryBold && !isHeading),
-            italic: isItalic || queryItalic,
+            bold: isBold || (isWysiwygFocused ? queryBold : false),
+            italic: isItalic || (isWysiwygFocused ? queryItalic : false),
             code: isCode,
-            strikethrough: isStrike || queryStrike,
-            sub: isSub || querySub,
-            sup: isSup || querySup,
+            strikethrough: isStrike || (isWysiwygFocused ? queryStrike : false),
+            sub: isSub || (isWysiwygFocused ? querySub : false),
+            sup: isSup || (isWysiwygFocused ? querySup : false),
             phishy: isPhishy
           };
 
@@ -2705,12 +3097,27 @@ function App() {
             }
             return newFormats;
           });
+        } else {
+          setActiveFormats(prev => {
+            if (!prev.bold && !prev.italic && !prev.code && !prev.strikethrough && !prev.sub && !prev.sup && !prev.phishy) {
+              return prev;
+            }
+            return {
+              bold: false,
+              italic: false,
+              code: false,
+              strikethrough: false,
+              sub: false,
+              sup: false,
+              phishy: false
+            };
+          });
         }
       } catch (e) {
         console.warn('Could not save selection:', e);
       }
     }
-  }, []);
+  }, [editorMode]);
 
 
   const scrollCaretIntoView = useCallback((block: ScrollLogicalPosition = 'center') => {
@@ -3138,30 +3545,46 @@ function App() {
              if (div.parentNode) div.parentNode.replaceChild(span, div);
           });
         
+        const blockTags = ['TABLE', 'PRE', 'BLOCKQUOTE', 'UL', 'OL', 'CENTER', 'IFRAME', 'HR'];
+
+        // Clean up any orphan or non-boundary spacers
+        tempDiv.querySelectorAll('.table-spacer, [data-placeholder], [data-empty]').forEach((spacerEl) => {
+           const isTop = spacerEl === tempDiv.firstElementChild && spacerEl.classList.contains('top-spacer');
+           const isBottom = spacerEl === tempDiv.lastElementChild && spacerEl.classList.contains('bottom-spacer');
+           const text = spacerEl.textContent || '';
+           const hasContent = text.trim() !== '' || spacerEl.children.length > 1 || (spacerEl.children.length === 1 && spacerEl.firstElementChild?.tagName !== 'BR');
+           if (!isTop && !isBottom) {
+              spacerEl.removeAttribute('data-empty');
+              spacerEl.removeAttribute('data-placeholder');
+              spacerEl.classList.remove('table-spacer', 'top-spacer', 'bottom-spacer');
+           } else if (hasContent) {
+              spacerEl.removeAttribute('data-empty');
+              spacerEl.removeAttribute('data-placeholder');
+              spacerEl.classList.remove('table-spacer', 'top-spacer', 'bottom-spacer');
+           }
+        });
+
         // 1. One Top Spacer at the very top of the editor if the first element is a block element
         const firstEl = tempDiv.firstElementChild;
-        if (firstEl && ['TABLE', 'PRE', 'BLOCKQUOTE', 'UL', 'OL', 'H1', 'H2', 'H3', 'H4', 'H5', 'H6', 'CENTER'].includes(firstEl.tagName)) {
-           const pBefore = document.createElement('p');
-           pBefore.className = 'table-spacer top-spacer';
-           pBefore.setAttribute('data-empty', 'true');
-           pBefore.setAttribute('data-placeholder', lang === 'uk' ? '↵ Початок допису...' : lang === 'es' ? '↵ Inicio de la publicación...' : lang === 'ko' ? '↵ 게시물 시작...' : '↵ Top of post...');
-           pBefore.innerHTML = '<br>';
-           tempDiv.insertBefore(pBefore, firstEl);
+        if (firstEl && blockTags.includes(firstEl.tagName) && !firstEl.classList.contains('top-spacer')) {
+           if (!tempDiv.querySelector('.top-spacer')) {
+              const pBefore = document.createElement('p');
+              pBefore.className = 'table-spacer top-spacer';
+              pBefore.setAttribute('data-empty', 'true');
+              pBefore.setAttribute('data-placeholder', lang === 'uk' ? '↵ Новий параграф...' : lang === 'es' ? '↵ Nuevo párrafo...' : lang === 'ko' ? '↵ 새 문단...' : '↵ New paragraph...');
+              pBefore.innerHTML = '<br>';
+              tempDiv.insertBefore(pBefore, firstEl);
+           }
         }
         
-        // 2. One Bottom Spacer at the very bottom of the editor
+        // 2. One Bottom Spacer at the very bottom of the editor ONLY if last element is a block element
         const lastEl = tempDiv.lastElementChild;
-        if (!lastEl || lastEl.tagName !== 'P' || lastEl.getAttribute('data-empty') !== 'true' || !lastEl.classList.contains('bottom-spacer')) {
-           if (lastEl && lastEl.tagName === 'P' && (lastEl.textContent || '').trim() === '' && lastEl.querySelectorAll('img, iframe, table').length === 0) {
-              lastEl.className = 'table-spacer bottom-spacer';
-              lastEl.setAttribute('data-empty', 'true');
-              lastEl.setAttribute('data-placeholder', lang === 'uk' ? '↵ Кінець допису...' : lang === 'es' ? '↵ Fin de la publicación...' : lang === 'ko' ? '↵ 게시물 끝...' : '↵ End of post...');
-              if (!lastEl.innerHTML) lastEl.innerHTML = '<br>';
-           } else {
+        if (lastEl && blockTags.includes(lastEl.tagName) && !lastEl.classList.contains('bottom-spacer')) {
+           if (!tempDiv.querySelector('.bottom-spacer')) {
               const pAfter = document.createElement('p');
               pAfter.className = 'table-spacer bottom-spacer';
               pAfter.setAttribute('data-empty', 'true');
-              pAfter.setAttribute('data-placeholder', lang === 'uk' ? '↵ Кінець допису...' : lang === 'es' ? '↵ Fin de la publicación...' : lang === 'ko' ? '↵ 게시물 끝...' : '↵ End of post...');
+              pAfter.setAttribute('data-placeholder', lang === 'uk' ? '↵ Новий параграф...' : lang === 'es' ? '↵ Nuevo párrafo...' : lang === 'ko' ? '↵ 새 문단...' : '↵ New paragraph...');
               pAfter.innerHTML = '<br>';
               tempDiv.appendChild(pAfter);
            }
@@ -3341,30 +3764,46 @@ function App() {
              if (div.parentNode) div.parentNode.replaceChild(span, div);
           });
           
+          const blockTags = ['TABLE', 'PRE', 'BLOCKQUOTE', 'UL', 'OL', 'CENTER', 'IFRAME', 'HR'];
+
+          // Clean up any orphan or non-boundary spacers
+          tempDiv.querySelectorAll('.table-spacer, [data-placeholder], [data-empty]').forEach((spacerEl) => {
+             const isTop = spacerEl === tempDiv.firstElementChild && spacerEl.classList.contains('top-spacer');
+             const isBottom = spacerEl === tempDiv.lastElementChild && spacerEl.classList.contains('bottom-spacer');
+             const text = spacerEl.textContent || '';
+             const hasContent = text.trim() !== '' || spacerEl.children.length > 1 || (spacerEl.children.length === 1 && spacerEl.firstElementChild?.tagName !== 'BR');
+             if (!isTop && !isBottom) {
+                spacerEl.removeAttribute('data-empty');
+                spacerEl.removeAttribute('data-placeholder');
+                spacerEl.classList.remove('table-spacer', 'top-spacer', 'bottom-spacer');
+             } else if (hasContent) {
+                spacerEl.removeAttribute('data-empty');
+                spacerEl.removeAttribute('data-placeholder');
+                spacerEl.classList.remove('table-spacer', 'top-spacer', 'bottom-spacer');
+             }
+          });
+
           // 1. One Top Spacer at the very top of the editor if the first element is a block element
           const firstEl = tempDiv.firstElementChild;
-          if (firstEl && ['TABLE', 'PRE', 'BLOCKQUOTE', 'UL', 'OL', 'H1', 'H2', 'H3', 'H4', 'H5', 'H6', 'CENTER'].includes(firstEl.tagName)) {
-             const pBefore = document.createElement('p');
-             pBefore.className = 'table-spacer top-spacer';
-             pBefore.setAttribute('data-empty', 'true');
-             pBefore.setAttribute('data-placeholder', lang === 'uk' ? '↵ Початок допису...' : lang === 'es' ? '↵ Inicio de la publicación...' : lang === 'ko' ? '↵ 게시물 시작...' : '↵ Top of post...');
-             pBefore.innerHTML = '<br>';
-             tempDiv.insertBefore(pBefore, firstEl);
+          if (firstEl && blockTags.includes(firstEl.tagName) && !firstEl.classList.contains('top-spacer')) {
+             if (!tempDiv.querySelector('.top-spacer')) {
+                const pBefore = document.createElement('p');
+                pBefore.className = 'table-spacer top-spacer';
+                pBefore.setAttribute('data-empty', 'true');
+                pBefore.setAttribute('data-placeholder', lang === 'uk' ? '↵ Новий параграф...' : lang === 'es' ? '↵ Nuevo párrafo...' : lang === 'ko' ? '↵ 새 문단...' : '↵ New paragraph...');
+                pBefore.innerHTML = '<br>';
+                tempDiv.insertBefore(pBefore, firstEl);
+             }
           }
           
-          // 2. One Bottom Spacer at the very bottom of the editor
+          // 2. One Bottom Spacer at the very bottom of the editor ONLY if last element is a block element
           const lastEl = tempDiv.lastElementChild;
-          if (!lastEl || lastEl.tagName !== 'P' || lastEl.getAttribute('data-empty') !== 'true' || !lastEl.classList.contains('bottom-spacer')) {
-             if (lastEl && lastEl.tagName === 'P' && (lastEl.textContent || '').trim() === '' && lastEl.querySelectorAll('img, iframe, table').length === 0) {
-                lastEl.className = 'table-spacer bottom-spacer';
-                lastEl.setAttribute('data-empty', 'true');
-                lastEl.setAttribute('data-placeholder', lang === 'uk' ? '↵ Кінець допису...' : lang === 'es' ? '↵ Fin de la publicación...' : lang === 'ko' ? '↵ 게시물 끝...' : '↵ End of post...');
-                if (!lastEl.innerHTML) lastEl.innerHTML = '<br>';
-             } else {
+          if (lastEl && blockTags.includes(lastEl.tagName) && !lastEl.classList.contains('bottom-spacer')) {
+             if (!tempDiv.querySelector('.bottom-spacer')) {
                 const pAfter = document.createElement('p');
                 pAfter.className = 'table-spacer bottom-spacer';
                 pAfter.setAttribute('data-empty', 'true');
-                pAfter.setAttribute('data-placeholder', lang === 'uk' ? '↵ Кінець допису...' : lang === 'es' ? '↵ Fin de la publicación...' : lang === 'ko' ? '↵ 게시물 끝...' : '↵ End of post...');
+                pAfter.setAttribute('data-placeholder', lang === 'uk' ? '↵ Новий параграф...' : lang === 'es' ? '↵ Nuevo párrafo...' : lang === 'ko' ? '↵ 새 문단...' : '↵ New paragraph...');
                 pAfter.innerHTML = '<br>';
                 tempDiv.appendChild(pAfter);
              }
@@ -3416,7 +3855,8 @@ function App() {
 
   // Visual Viewport API for mobile virtual keyboard height detection
   const [viewportHeight, setViewportHeight] = useState(() => typeof window !== 'undefined' ? window.innerHeight : 0);
-  const [keyboardOffset, setKeyboardOffset] = useState(0);
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const [_keyboardOffset, setKeyboardOffset] = useState(0);
 
   useEffect(() => {
     if (typeof window === 'undefined' || !window.visualViewport) return;
@@ -3450,7 +3890,6 @@ function App() {
   const hasRestoredInitialCursorRef = useRef(false);
 
   const saveCursorPosition = useCallback(() => {
-     if (isSyncingRef.current) return;
      if (editorRef.current) {
         const start = editorRef.current.selectionStart;
         const end = editorRef.current.selectionEnd;
@@ -3459,7 +3898,11 @@ function App() {
            end
         };
         cursorPositionRef.current = pos;
-        localStorage.setItem('steem_editor_cursor', JSON.stringify(pos));
+        try {
+          localStorage.setItem('steem_editor_cursor', JSON.stringify(pos));
+        } catch (err) {
+          console.warn('Failed to save cursor position:', err);
+        }
 
         // Sync content and Zustand store (in-memory only, disk persistence is debounced)
         const text = editorRef.current.value;
@@ -3469,6 +3912,7 @@ function App() {
 
         if (editorMode === 'markdown') {
           const caretPos = start;
+          const selEnd = end;
 
           const lineStart = text.lastIndexOf('\n', caretPos - 1) + 1;
           const lineEnd = text.indexOf('\n', caretPos);
@@ -3476,15 +3920,31 @@ function App() {
 
           const currentLine = text.substring(lineStart, actualLineEnd);
           const caretInLine = caretPos - lineStart;
+          const selEndInLine = Math.min(actualLineEnd, selEnd) - lineStart;
 
-          setActiveFormats({
-            bold: isInsideTagInLine(currentLine, caretInLine, '**'),
-            italic: isInsideTagInLine(currentLine, caretInLine, '*'),
-            code: isInsideTagInLine(currentLine, caretInLine, '`'),
-            strikethrough: isInsideTagInLine(currentLine, caretInLine, '~~'),
-            sub: isInsideTagInLine(currentLine, caretInLine, '<sub>', '</sub>'),
-            sup: isInsideTagInLine(currentLine, caretInLine, '<sup>', '</sup>'),
-            phishy: isInsideTagInLine(currentLine, caretInLine, '<div class="phishy">', '</div>')
+          const newFormats = {
+            bold: isInsideTagInLine(currentLine, caretInLine, '**', selEndInLine),
+            italic: isInsideTagInLine(currentLine, caretInLine, '*', selEndInLine),
+            code: isInsideTagInLine(currentLine, caretInLine, '`', selEndInLine),
+            strikethrough: isInsideTagInLine(currentLine, caretInLine, '~~', selEndInLine),
+            sub: isInsideTagInLine(currentLine, caretInLine, '<sub>', selEndInLine),
+            sup: isInsideTagInLine(currentLine, caretInLine, '<sup>', selEndInLine),
+            phishy: isInsideTagInLine(currentLine, caretInLine, '<div class="phishy">', selEndInLine)
+          };
+
+          setActiveFormats(prev => {
+            if (
+              prev.bold === newFormats.bold &&
+              prev.italic === newFormats.italic &&
+              prev.code === newFormats.code &&
+              prev.strikethrough === newFormats.strikethrough &&
+              prev.sub === newFormats.sub &&
+              prev.sup === newFormats.sup &&
+              prev.phishy === newFormats.phishy
+            ) {
+              return prev;
+            }
+            return newFormats;
           });
         }
      }
@@ -3728,6 +4188,17 @@ function App() {
 
     localStorage.setItem('steem_editor_mode', mode);
 
+    // Immediately reset active formats to prevent phantom button highlighting during transition
+    setActiveFormats({
+      bold: false,
+      italic: false,
+      code: false,
+      strikethrough: false,
+      sub: false,
+      sup: false,
+      phishy: false
+    });
+
     if (mode === 'visual') {
       if (editorRef.current) {
         const val = editorRef.current.value;
@@ -3749,7 +4220,8 @@ function App() {
       setTimeout(async () => {
         await syncCursorMarkdownToVisual();
         if (wysiwygRef.current) {
-          wysiwygRef.current.focus();
+          wysiwygRef.current.focus({ preventScroll: true });
+          saveVisualSelection();
         }
       }, 100);
     } else {
@@ -3768,6 +4240,7 @@ function App() {
 
       setTimeout(() => {
         restoreMarkdownCursorAndScroll();
+        saveCursorPosition();
       }, 50);
     }
   }, [editorMode, saveCursorPosition, syncCursorMarkdownToVisual, syncCursorVisualToMarkdown, saveVisualSelection, setContent, restoreMarkdownCursorAndScroll]);
@@ -3918,48 +4391,52 @@ function App() {
 
   useEffect(() => {
     const handleSelectionChange = () => {
-      if (editorMode === 'visual' && wysiwygRef.current) {
-        const sel = window.getSelection();
-        if (sel && sel.rangeCount > 0) {
-          try {
-            const range = sel.getRangeAt(0);
-            if (wysiwygRef.current.contains(range.commonAncestorContainer)) {
-              savedVisualRangeRef.current = range.cloneRange();
-              
-              let node: Node | null = range.commonAncestorContainer;
-              if (node.nodeType === 3) node = node.parentNode;
-              const table = ((node as Element)?.closest?.('table') as HTMLTableElement) || null;
-              const row = ((node as Element)?.closest?.('tr') as HTMLTableRowElement) || null;
-              const cell = ((node as Element)?.closest?.('td, th') as HTMLTableCellElement) || null;
+      if (editorMode === 'visual') {
+        saveVisualSelection();
+        if (wysiwygRef.current) {
+          const sel = window.getSelection();
+          if (sel && sel.rangeCount > 0) {
+            try {
+              const range = sel.getRangeAt(0);
+              if (wysiwygRef.current.contains(range.commonAncestorContainer)) {
+                savedVisualRangeRef.current = range.cloneRange();
+                
+                let node: Node | null = range.commonAncestorContainer;
+                if (node.nodeType === 3) node = node.parentNode;
+                const table = ((node as Element)?.closest?.('table') as HTMLTableElement) || null;
+                const row = ((node as Element)?.closest?.('tr') as HTMLTableRowElement) || null;
+                const cell = ((node as Element)?.closest?.('td, th') as HTMLTableCellElement) || null;
 
-              if (activeTableRef.current !== table) {
-                activeTableRef.current = table;
-                setActiveTable(table);
+                if (activeTableRef.current !== table) {
+                  activeTableRef.current = table;
+                  setActiveTable(table);
+                }
+                if (activeTableRowRef.current !== row) {
+                  activeTableRowRef.current = row;
+                  setActiveTableRow(row);
+                }
+                if (activeTableCellRef.current !== cell) {
+                  activeTableCellRef.current = cell;
+                  setActiveTableCell(cell);
+                }
+              } else {
+                if (activeTableRef.current !== null) { activeTableRef.current = null; setActiveTable(null); }
+                if (activeTableRowRef.current !== null) { activeTableRowRef.current = null; setActiveTableRow(null); }
+                if (activeTableCellRef.current !== null) { activeTableCellRef.current = null; setActiveTableCell(null); }
               }
-              if (activeTableRowRef.current !== row) {
-                activeTableRowRef.current = row;
-                setActiveTableRow(row);
-              }
-              if (activeTableCellRef.current !== cell) {
-                activeTableCellRef.current = cell;
-                setActiveTableCell(cell);
-              }
-            } else {
+            } catch {
               if (activeTableRef.current !== null) { activeTableRef.current = null; setActiveTable(null); }
               if (activeTableRowRef.current !== null) { activeTableRowRef.current = null; setActiveTableRow(null); }
               if (activeTableCellRef.current !== null) { activeTableCellRef.current = null; setActiveTableCell(null); }
             }
-          } catch {
+          } else {
             if (activeTableRef.current !== null) { activeTableRef.current = null; setActiveTable(null); }
             if (activeTableRowRef.current !== null) { activeTableRowRef.current = null; setActiveTableRow(null); }
             if (activeTableCellRef.current !== null) { activeTableCellRef.current = null; setActiveTableCell(null); }
           }
-        } else {
-          if (activeTableRef.current !== null) { activeTableRef.current = null; setActiveTable(null); }
-          if (activeTableRowRef.current !== null) { activeTableRowRef.current = null; setActiveTableRow(null); }
-          if (activeTableCellRef.current !== null) { activeTableCellRef.current = null; setActiveTableCell(null); }
         }
-      } else {
+      } else if (editorMode === 'markdown') {
+        saveCursorPosition();
         if (activeTableRef.current !== null) { activeTableRef.current = null; setActiveTable(null); }
         if (activeTableRowRef.current !== null) { activeTableRowRef.current = null; setActiveTableRow(null); }
         if (activeTableCellRef.current !== null) { activeTableCellRef.current = null; setActiveTableCell(null); }
@@ -3970,7 +4447,7 @@ function App() {
     return () => {
       document.removeEventListener('selectionchange', handleSelectionChange);
     };
-  }, [editorMode]);
+  }, [editorMode, saveVisualSelection, saveCursorPosition]);
 
   useEffect(() => {
     // DEBOUNCED PERSISTENCE: Fast 350ms save to storage so state and cursor match without blocking UI thread during typing
@@ -4171,180 +4648,164 @@ function App() {
       const lineEnd = text.indexOf('\n', caretPos);
       const actualLineEnd = lineEnd === -1 ? text.length : lineEnd;
       const currentLine = text.slice(lineStart, actualLineEnd);
+      const caretInLine = caretPos - lineStart;
 
-      // --- Part 1: Handle Block Elements / Lists first ---
-      const quoteMatch = currentLine.match(/^(\s*>\s*)/);
-      const unorderedListMatch = currentLine.match(/^(\s*[-*+]\s+\[[ xX]\]\s+)/) || currentLine.match(/^(\s*[-*+]\s+)/);
+      // 1. Identify quote or list prefix
+      const quoteMatch = currentLine.match(/^(\s*>+\s*)/);
+      const unorderedListMatch = currentLine.match(/^(\s*[-*+]\s+(?:\[[ xX]\]\s+)?)/);
       const orderedListMatch = currentLine.match(/^(\s*)(\d+)([.)]\s+)/);
 
+      const cleanLineTrimmed = currentLine.trim();
+
+      // Check if this line is an empty list or quote item
+      const isEmptyUnorderedList = cleanLineTrimmed === '-' || cleanLineTrimmed === '*' || cleanLineTrimmed === '+' ||
+        cleanLineTrimmed === '- [ ]' || cleanLineTrimmed === '- [x]' || cleanLineTrimmed === '- [X]';
+      const isEmptyOrderedList = orderedListMatch && (cleanLineTrimmed === `${orderedListMatch[2]}.` || cleanLineTrimmed === `${orderedListMatch[2]}`);
+      const isEmptyQuote = cleanLineTrimmed === '>';
+
+      if (isEmptyUnorderedList || isEmptyOrderedList || isEmptyQuote) {
+        e.preventDefault();
+        const before = text.slice(0, lineStart);
+        const after = text.slice(actualLineEnd);
+        const newText = before + '\n' + after;
+        const newCaretPos = lineStart + 1;
+        setContent(newText);
+        setTimeout(() => {
+          if (!editorRef.current) return;
+          editorRef.current.focus({ preventScroll: true });
+          editorRef.current.setSelectionRange(newCaretPos, newCaretPos);
+          saveCursorPosition();
+        }, 0);
+        return;
+      }
+
+      let listPrefix = '';
       if (quoteMatch) {
-        const prefix = quoteMatch[1];
-        e.preventDefault();
-        if (currentLine.trim() === '>') {
-          const before = text.slice(0, lineStart);
-          const after = text.slice(actualLineEnd);
-          const newText = before + '\n' + after;
-          const newCaretPos = lineStart + 1;
-          setContent(newText);
-          setTimeout(() => {
-            if (!editorRef.current) return;
-            editorRef.current.focus({ preventScroll: true }); editorRef.current.setSelectionRange(newCaretPos, newCaretPos);
-            saveCursorPosition();
-          }, 0);
-        } else {
-          const before = text.slice(0, caretPos);
-          const after = text.slice(caretPos);
-          const newText = before + '\n' + prefix + after;
-          const newCaretPos = caretPos + 1 + prefix.length;
-          setContent(newText);
-          setTimeout(() => {
-            if (!editorRef.current) return;
-            editorRef.current.focus({ preventScroll: true }); editorRef.current.setSelectionRange(newCaretPos, newCaretPos);
-            saveCursorPosition();
-          }, 0);
-        }
-        return;
-      }
-
-      if (unorderedListMatch) {
-        const prefix = unorderedListMatch[1];
-        e.preventDefault();
-        const cleanLine = currentLine.trim();
-        if (cleanLine === '-' || cleanLine === '*' || cleanLine === '+' || cleanLine === '- [ ]' || cleanLine === '- [x]' || cleanLine === '- [X]') {
-          const before = text.slice(0, lineStart);
-          const after = text.slice(actualLineEnd);
-          const newText = before + '\n' + after;
-          const newCaretPos = lineStart + 1;
-          setContent(newText);
-          setTimeout(() => {
-            if (!editorRef.current) return;
-            editorRef.current.focus({ preventScroll: true }); editorRef.current.setSelectionRange(newCaretPos, newCaretPos);
-            saveCursorPosition();
-          }, 0);
-        } else {
-          let newPrefix = prefix;
-          if (prefix.includes('[x]')) {
-            newPrefix = prefix.replace('[x]', '[ ]');
-          } else if (prefix.includes('[X]')) {
-            newPrefix = prefix.replace('[X]', '[ ]');
-          }
-          const before = text.slice(0, caretPos);
-          const after = text.slice(caretPos);
-          const newText = before + '\n' + newPrefix + after;
-          const newCaretPos = caretPos + 1 + newPrefix.length;
-          setContent(newText);
-          setTimeout(() => {
-            if (!editorRef.current) return;
-            editorRef.current.focus({ preventScroll: true }); editorRef.current.setSelectionRange(newCaretPos, newCaretPos);
-            saveCursorPosition();
-          }, 0);
-        }
-        return;
-      }
-
-      if (orderedListMatch) {
+        listPrefix = quoteMatch[0];
+      } else if (unorderedListMatch) {
+        listPrefix = unorderedListMatch[0];
+        if (listPrefix.includes('[x]')) listPrefix = listPrefix.replace('[x]', '[ ]');
+        else if (listPrefix.includes('[X]')) listPrefix = listPrefix.replace('[X]', '[ ]');
+      } else if (orderedListMatch) {
         const indent = orderedListMatch[1];
         const num = parseInt(orderedListMatch[2], 10);
         const delimiter = orderedListMatch[3];
-        e.preventDefault();
-        
-        if (currentLine.trim() === `${num}.` || currentLine.trim() === `${num}`) {
-          const before = text.slice(0, lineStart);
-          const after = text.slice(actualLineEnd);
-          const newText = before + '\n' + after;
-          const newCaretPos = lineStart + 1;
-          setContent(newText);
-          setTimeout(() => {
-            if (!editorRef.current) return;
-            editorRef.current.focus({ preventScroll: true }); editorRef.current.setSelectionRange(newCaretPos, newCaretPos);
-            saveCursorPosition();
-          }, 0);
-        } else {
-          const nextNum = num + 1;
-          const newPrefix = indent + nextNum + delimiter;
-          const before = text.slice(0, caretPos);
-          const after = text.slice(caretPos);
-          const newText = before + '\n' + newPrefix + after;
-          const newCaretPos = caretPos + 1 + newPrefix.length;
-          setContent(newText);
-          setTimeout(() => {
-            if (!editorRef.current) return;
-            editorRef.current.focus({ preventScroll: true }); editorRef.current.setSelectionRange(newCaretPos, newCaretPos);
-            saveCursorPosition();
-          }, 0);
-        }
-        return;
+        listPrefix = indent + (num + 1) + delimiter;
       }
 
-      // --- Part 2: Handle Inline Formatting Continuation ---
-      let activeTag = null;
-      let activeCloseTag = null;
-      let activeKey: 'bold' | 'italic' | 'code' | 'strikethrough' | 'sub' | 'sup' | 'phishy' | null = null;
+      // 2. Check if caret is inside an active inline formatting tag in the current line
+      const activeRange = getActiveFormatRangeInLine(currentLine, caretInLine);
 
-      if (activeFormats.bold) { activeTag = '**'; activeCloseTag = '**'; activeKey = 'bold'; }
-      else if (activeFormats.italic) { activeTag = '*'; activeCloseTag = '*'; activeKey = 'italic'; }
-      else if (activeFormats.code) { activeTag = '`'; activeCloseTag = '`'; activeKey = 'code'; }
-      else if (activeFormats.strikethrough) { activeTag = '~~'; activeCloseTag = '~~'; activeKey = 'strikethrough'; }
-      else if (activeFormats.sub) { activeTag = '<sub>'; activeCloseTag = '</sub>'; activeKey = 'sub'; }
-      else if (activeFormats.sup) { activeTag = '<sup>'; activeCloseTag = '</sup>'; activeKey = 'sup'; }
-      else if (activeFormats.phishy) { activeTag = '<div class="phishy">'; activeCloseTag = '</div>'; activeKey = 'phishy'; }
-
-      if (activeTag && activeCloseTag && activeKey) {
+      if (activeRange) {
         e.preventDefault();
+        const { openTag, closeTag, openIdx, closeIdx, contentStart, contentEnd, formatKey } = activeRange;
+        const insideText = currentLine.slice(contentStart, contentEnd);
+        const trimmedInside = insideText.trim();
+        const leadingSpaces = insideText.slice(0, insideText.length - insideText.trimStart().length);
+        const trailingSpaces = insideText.slice(insideText.trimEnd().length);
 
-        if (currentLine === activeTag + activeCloseTag) {
-          const before = text.slice(0, lineStart);
-          const after = text.slice(actualLineEnd);
-          
-          const newText = before + '\n' + after;
-          const newCaretPos = lineStart + 1;
+        // Case A: Empty formatting tag (e.g. *|* or **|** or **   **) -> cancel formatting and start clean line
+        if (trimmedInside.length === 0) {
+          const beforeTag = currentLine.slice(0, openIdx);
+          const afterTag = currentLine.slice(closeIdx + closeTag.length);
+          const cleanedCurrentLine = beforeTag + insideText + afterTag;
+
+          const beforeDoc = text.slice(0, lineStart);
+          const afterDoc = text.slice(actualLineEnd);
+
+          const newText = beforeDoc + cleanedCurrentLine + '\n' + listPrefix + afterDoc;
+          const newCaretPos = lineStart + cleanedCurrentLine.length + 1 + listPrefix.length;
 
           setContent(newText);
-          setActiveFormats(prev => ({ ...prev, [activeKey!]: false }));
-          
+          setActiveFormats(prev => ({ ...prev, [formatKey]: false }));
           setTimeout(() => {
             if (!editorRef.current) return;
-            editorRef.current.focus({ preventScroll: true }); editorRef.current.setSelectionRange(newCaretPos, newCaretPos);
+            editorRef.current.focus({ preventScroll: true });
+            editorRef.current.setSelectionRange(newCaretPos, newCaretPos);
             saveCursorPosition();
           }, 0);
           return;
         }
 
-        const tagLen = activeTag.length;
-        const closeLen = activeCloseTag.length;
-        const openIdx = text.lastIndexOf(activeTag, caretPos - tagLen);
-        const closeIdx = text.indexOf(activeCloseTag, caretPos);
+        // Case B: Caret is at the end of formatted content (e.g. *курсор текст|*) -> close tag tightly and continue onto new line
+        if (caretInLine >= contentEnd) {
+          const beforeTag = currentLine.slice(0, openIdx);
+          const afterTag = currentLine.slice(closeIdx + closeTag.length);
 
-        let resultText = text;
-        let resultCaretPos = caretPos;
+          const beforeDoc = text.slice(0, lineStart);
+          const afterDoc = text.slice(actualLineEnd);
 
-        if (openIdx !== -1 && closeIdx !== -1 && openIdx < closeIdx) {
-          const before = text.slice(0, openIdx);
-          const inside = text.slice(openIdx + tagLen, closeIdx);
-          const after = text.slice(closeIdx + closeLen);
+          const line1 = beforeTag + leadingSpaces + openTag + trimmedInside + closeTag + trailingSpaces + afterTag;
+          const line2 = listPrefix + openTag + closeTag;
+          const newText = beforeDoc + line1 + '\n' + line2 + afterDoc;
+          const newCaretPos = lineStart + line1.length + 1 + listPrefix.length + openTag.length;
 
-          const trimmedInside = inside.trimEnd();
-          const trailingSpaces = inside.slice(trimmedInside.length);
-
-          resultText = before + activeTag + trimmedInside + activeCloseTag + trailingSpaces + after;
-          resultCaretPos = before.length + tagLen + trimmedInside.length + closeLen + trailingSpaces.length;
+          setContent(newText);
+          setTimeout(() => {
+            if (!editorRef.current) return;
+            editorRef.current.focus({ preventScroll: true });
+            editorRef.current.setSelectionRange(newCaretPos, newCaretPos);
+            saveCursorPosition();
+          }, 0);
+          return;
         }
 
-        const before = resultText.slice(0, resultCaretPos);
-        const after = resultText.slice(resultCaretPos);
-        
-        const newText = before + '\n' + activeTag + activeCloseTag + after;
-        const newCaretPos = resultCaretPos + 1 + activeTag.length;
+        // Case C: Caret is in the middle of formatted text (e.g. *перша частина| друга частина*) -> split tags cleanly and tightly
+        if (caretInLine > contentStart && caretInLine < contentEnd) {
+          const textBeforeCaretInTag = currentLine.slice(openIdx + openTag.length, caretInLine);
+          const textAfterCaretInTag = currentLine.slice(caretInLine, closeIdx);
+          const beforeTag = currentLine.slice(0, openIdx);
+          const afterTag = currentLine.slice(closeIdx + closeTag.length);
 
+          const lead1 = textBeforeCaretInTag.slice(0, textBeforeCaretInTag.length - textBeforeCaretInTag.trimStart().length);
+          const trail1 = textBeforeCaretInTag.slice(textBeforeCaretInTag.trimEnd().length);
+          const trim1 = textBeforeCaretInTag.trim();
+          const line1 = trim1 
+            ? (beforeTag + lead1 + openTag + trim1 + closeTag + trail1) 
+            : (beforeTag + textBeforeCaretInTag);
+
+          const lead2 = textAfterCaretInTag.slice(0, textAfterCaretInTag.length - textAfterCaretInTag.trimStart().length);
+          const trail2 = textAfterCaretInTag.slice(textAfterCaretInTag.trimEnd().length);
+          const trim2 = textAfterCaretInTag.trim();
+          const line2 = trim2 
+            ? (listPrefix + lead2 + openTag + trim2 + closeTag + trail2 + afterTag) 
+            : (listPrefix + openTag + closeTag + textAfterCaretInTag + afterTag);
+
+          const beforeDoc = text.slice(0, lineStart);
+          const afterDoc = text.slice(actualLineEnd);
+
+          const newText = beforeDoc + line1 + '\n' + line2 + afterDoc;
+          const newCaretPos = lineStart + line1.length + 1 + listPrefix.length + (trim2 ? (lead2.length + openTag.length) : openTag.length);
+
+          setContent(newText);
+          setTimeout(() => {
+            if (!editorRef.current) return;
+            editorRef.current.focus({ preventScroll: true });
+            editorRef.current.setSelectionRange(newCaretPos, newCaretPos);
+            saveCursorPosition();
+          }, 0);
+          return;
+        }
+      }
+
+      // 3. Handle default list/quote continuation
+      if (listPrefix) {
+        e.preventDefault();
+        const before = text.slice(0, caretPos);
+        const after = text.slice(caretPos);
+        const newText = before + '\n' + listPrefix + after;
+        const newCaretPos = caretPos + 1 + listPrefix.length;
         setContent(newText);
         setTimeout(() => {
           if (!editorRef.current) return;
-          editorRef.current.focus({ preventScroll: true }); editorRef.current.setSelectionRange(newCaretPos, newCaretPos);
+          editorRef.current.focus({ preventScroll: true });
+          editorRef.current.setSelectionRange(newCaretPos, newCaretPos);
           saveCursorPosition();
         }, 0);
+        return;
       }
     }
-  }, [widgetPos, isWidgetVisible, isWidgetMenuOpen, activeFormats, saveCursorPosition, setContent]);
+  }, [widgetPos, isWidgetVisible, isWidgetMenuOpen, saveCursorPosition, setContent]);
 
   const handleMarkdownFormat = useCallback((tag: string, closeTag: string = tag) => {
     if (!editorRef.current) return;
@@ -4368,145 +4829,145 @@ function App() {
       const before = text.slice(0, start);
       const after = text.slice(end);
 
-      const newText = before + tag + selectedText + closeTag + after;
+      const leadingSpaces = selectedText.slice(0, selectedText.length - selectedText.trimStart().length);
+      const trailingSpaces = selectedText.slice(selectedText.trimEnd().length);
+      const trimmedSelection = selectedText.trim();
+
+      if (trimmedSelection.length > 0) {
+        const newText = before + leadingSpaces + tag + trimmedSelection + closeTag + trailingSpaces + after;
+        setContent(newText);
+        
+        const newStart = start + leadingSpaces.length + tag.length;
+        const newEnd = newStart + trimmedSelection.length;
+        setTimeout(() => {
+          if (!editorRef.current) return;
+          editorRef.current.focus({ preventScroll: true });
+          editorRef.current.setSelectionRange(newStart, newEnd);
+          saveCursorPosition();
+        }, 0);
+        return;
+      }
+    }
+
+    const caretPos = start;
+    const lineStart = text.lastIndexOf('\n', caretPos - 1) + 1;
+    const lineEnd = text.indexOf('\n', caretPos);
+    const actualLineEnd = lineEnd === -1 ? text.length : lineEnd;
+    const currentLine = text.substring(lineStart, actualLineEnd);
+    const caretInLine = caretPos - lineStart;
+
+    const ranges = getAllFormatRangesInLine(currentLine);
+    const matchingRange = ranges.find(r => r.formatKey === formatKey && caretInLine >= r.openIdx && caretInLine <= r.closeIdx + r.closeTag.length);
+
+    if (matchingRange) {
+      const { openIdx, closeIdx, contentStart, contentEnd, openTag, closeTag: cTag } = matchingRange;
+      const insideText = currentLine.slice(contentStart, contentEnd);
+      const trimmedInside = insideText.trim();
+      const leadingSpaces = insideText.slice(0, insideText.length - insideText.trimStart().length);
+      const trailingSpaces = insideText.slice(insideText.trimEnd().length);
+
+      // 1. If tag is empty or only whitespace (e.g. *|* or **   **), remove it completely
+      if (trimmedInside.length === 0) {
+        const beforeTag = currentLine.slice(0, openIdx);
+        const afterTag = currentLine.slice(closeIdx + cTag.length);
+        const newLine = beforeTag + insideText + afterTag;
+        const newText = text.slice(0, lineStart) + newLine + text.slice(actualLineEnd);
+        const newCaretPos = lineStart + openIdx + leadingSpaces.length;
+
+        setContent(newText);
+        setActiveFormats(prev => ({ ...prev, [formatKey]: false }));
+        setTimeout(() => {
+          if (!editorRef.current) return;
+          editorRef.current.focus({ preventScroll: true });
+          editorRef.current.setSelectionRange(newCaretPos, newCaretPos);
+          saveCursorPosition();
+        }, 0);
+        return;
+      }
+
+      // 2. If caret is at or after the end of formatted content (e.g. **іаві| ** or ** іаві **|), exit/finish format and jump out
+      if (caretInLine >= contentEnd || caretInLine >= closeIdx) {
+        const beforeTag = currentLine.slice(0, openIdx);
+        const afterTag = currentLine.slice(closeIdx + cTag.length);
+        const normalizedTag = leadingSpaces + openTag + trimmedInside + cTag + trailingSpaces;
+        const newLine = beforeTag + normalizedTag + afterTag;
+        const newText = text.slice(0, lineStart) + newLine + text.slice(actualLineEnd);
+        const newCaretPos = lineStart + beforeTag.length + normalizedTag.length;
+
+        setContent(newText);
+        setActiveFormats(prev => ({ ...prev, [formatKey]: false }));
+        setTimeout(() => {
+          if (!editorRef.current) return;
+          editorRef.current.focus({ preventScroll: true });
+          editorRef.current.setSelectionRange(newCaretPos, newCaretPos);
+          saveCursorPosition();
+        }, 0);
+        return;
+      }
+
+      // 3. Otherwise, unwrap the format tags from the surrounding text
+      const beforeTag = currentLine.slice(0, openIdx);
+      const afterTag = currentLine.slice(closeIdx + cTag.length);
+
+      const newLine = beforeTag + insideText + afterTag;
+      const newText = text.slice(0, lineStart) + newLine + text.slice(actualLineEnd);
+      const newCaretPos = lineStart + openIdx + (caretInLine - (openIdx + openTag.length));
+
       setContent(newText);
-      
-      const newStart = start + tag.length;
-      const newEnd = end + tag.length;
+      setActiveFormats(prev => ({ ...prev, [formatKey]: false }));
       setTimeout(() => {
         if (!editorRef.current) return;
-        editorRef.current.focus({ preventScroll: true }); editorRef.current.setSelectionRange(newStart, newEnd);
+        editorRef.current.focus({ preventScroll: true });
+        editorRef.current.setSelectionRange(newCaretPos, newCaretPos);
         saveCursorPosition();
       }, 0);
       return;
     }
 
-    if (activeFormats[formatKey]) {
-      // 1. If we are right before the closeTag, we should simply JUMP OUT / ESCAPE the tag.
-      // We also trim spaces inside the tag at both edges, moving them outside the formatting.
-      if (text.substring(start, start + closeTag.length) === closeTag) {
-        const tagLen = tag.length;
-        const closeLen = closeTag.length;
-        const openIdx = text.lastIndexOf(tag, start - tagLen);
-
-        let newText = text;
-        let newCaretPos = start + closeLen;
-
-        if (openIdx !== -1 && openIdx < start) {
-          const before = text.slice(0, openIdx);
-          const inside = text.slice(openIdx + tagLen, start);
-          const after = text.slice(start + closeLen);
-
-          const trimmedInside = inside.trim();
-          const leadingSpaces = inside.slice(0, inside.length - inside.trimStart().length);
-          const trailingSpaces = inside.slice(inside.trimEnd().length);
-
-          newText = before + leadingSpaces + tag + trimmedInside + closeTag + trailingSpaces + after;
-          newCaretPos = before.length + leadingSpaces.length + tagLen + trimmedInside.length + closeLen + trailingSpaces.length;
-        }
-
-        setContent(newText);
-        setTimeout(() => {
-          if (!editorRef.current) return;
-          editorRef.current.focus({ preventScroll: true }); editorRef.current.setSelectionRange(newCaretPos, newCaretPos);
-          saveCursorPosition();
-        }, 0);
-        setActiveFormats(prev => ({ ...prev, [formatKey]: false }));
-        return;
-      }
-
-      // 2. Otherwise, we strip the format from the surrounding tags
-      const tagLen = tag.length;
-      const closeLen = closeTag.length;
-      const openIdx = text.lastIndexOf(tag, start - tagLen);
-      const closeIdx = text.indexOf(closeTag, start);
-
-      if (openIdx !== -1 && closeIdx !== -1 && openIdx < closeIdx) {
-        const before = text.slice(0, openIdx);
-        const inside = text.slice(openIdx + tagLen, closeIdx);
-        const after = text.slice(closeIdx + closeLen);
-
-        if (start < closeIdx) {
-          const newText = before + inside + after;
-          const newCaretPos = start - tagLen;
-          setContent(newText);
-          setTimeout(() => {
-            if (!editorRef.current) return;
-            editorRef.current.focus({ preventScroll: true }); editorRef.current.setSelectionRange(newCaretPos, newCaretPos);
-            saveCursorPosition();
-          }, 0);
-          return;
-        } 
-        
-        const trimmedInside = inside.trimEnd();
-        const trailingSpaces = inside.slice(trimmedInside.length);
-
-        const newText = before + tag + trimmedInside + closeTag + trailingSpaces + after;
-        const newCaretPos = before.length + tagLen + trimmedInside.length + closeLen + trailingSpaces.length;
-
-        setContent(newText);
-        setTimeout(() => {
-          if (!editorRef.current) return;
-          editorRef.current.focus({ preventScroll: true }); editorRef.current.setSelectionRange(newCaretPos, newCaretPos);
-          saveCursorPosition();
-        }, 0);
-      }
-    } else {
-      // 3. We are NOT inside the tag format. Let's look for a word adjacent to or under the cursor.
-      let wordStart = start;
-      let wordEnd = start;
-      while (wordStart > 0 && /\w|[\u0400-\u04FF]/.test(text[wordStart - 1])) {
-        wordStart--;
-      }
-      while (wordEnd < text.length && /\w|[\u0400-\u04FF]/.test(text[wordEnd])) {
-        wordEnd++;
-      }
-      const word = text.slice(wordStart, wordEnd);
-
-      if (word.length > 0 && start > wordStart && start < wordEnd) {
-        // Check if the word already has the tags around it, to strip them
-        const hasLeftTag = text.substring(wordStart - tag.length, wordStart) === tag;
-        const hasRightTag = text.substring(wordEnd, wordEnd + closeTag.length) === closeTag;
-
-        if (hasLeftTag && hasRightTag) {
-          const before = text.slice(0, wordStart - tag.length);
-          const after = text.slice(wordEnd + closeTag.length);
-          const newText = before + word + after;
-          setContent(newText);
-          const newCaretPos = wordStart - tag.length + word.length;
-          setTimeout(() => {
-            if (!editorRef.current) return;
-            editorRef.current.focus({ preventScroll: true }); editorRef.current.setSelectionRange(newCaretPos, newCaretPos);
-            saveCursorPosition();
-          }, 0);
-        } else {
-          // Wrap the word
-          const before = text.slice(0, wordStart);
-          const after = text.slice(wordEnd);
-          const newText = before + tag + word + closeTag + after;
-          setContent(newText);
-          const newCaretPos = start + tag.length;
-          setTimeout(() => {
-            if (!editorRef.current) return;
-            editorRef.current.focus({ preventScroll: true }); editorRef.current.setSelectionRange(newCaretPos, newCaretPos);
-            saveCursorPosition();
-          }, 0);
-        }
-      } else {
-        const before = text.slice(0, start);
-        const after = text.slice(start);
-        const newText = before + tag + closeTag + after;
-        const newCaretPos = start + tag.length;
-        
-        setContent(newText);
-        setTimeout(() => {
-          if (!editorRef.current) return;
-          editorRef.current.focus({ preventScroll: true }); editorRef.current.setSelectionRange(newCaretPos, newCaretPos);
-          saveCursorPosition();
-        }, 0);
-      }
+    // 4. We are NOT inside this format tag. Check if caret is inside a word to wrap it.
+    let wordStart = caretInLine;
+    let wordEnd = caretInLine;
+    while (wordStart > 0 && /\w|[\u0400-\u04FF]/.test(currentLine[wordStart - 1])) {
+      wordStart--;
     }
-  }, [activeFormats, saveCursorPosition, setContent]);
+    while (wordEnd < currentLine.length && /\w|[\u0400-\u04FF]/.test(currentLine[wordEnd])) {
+      wordEnd++;
+    }
+    const word = currentLine.slice(wordStart, wordEnd);
+
+    if (word.length > 0 && caretInLine >= wordStart && caretInLine <= wordEnd) {
+      const beforeWord = currentLine.slice(0, wordStart);
+      const afterWord = currentLine.slice(wordEnd);
+      const newLine = beforeWord + tag + word + closeTag + afterWord;
+      const newText = text.slice(0, lineStart) + newLine + text.slice(actualLineEnd);
+      const newCaretPos = lineStart + wordStart + tag.length + (caretInLine - wordStart);
+
+      setContent(newText);
+      setActiveFormats(prev => ({ ...prev, [formatKey]: true }));
+      setTimeout(() => {
+        if (!editorRef.current) return;
+        editorRef.current.focus({ preventScroll: true });
+        editorRef.current.setSelectionRange(newCaretPos, newCaretPos);
+        saveCursorPosition();
+      }, 0);
+    } else {
+      // Insert empty pair e.g. *|*
+      const beforeCaret = currentLine.slice(0, caretInLine);
+      const afterCaret = currentLine.slice(caretInLine);
+      const newLine = beforeCaret + tag + closeTag + afterCaret;
+      const newText = text.slice(0, lineStart) + newLine + text.slice(actualLineEnd);
+      const newCaretPos = lineStart + caretInLine + tag.length;
+
+      setContent(newText);
+      setActiveFormats(prev => ({ ...prev, [formatKey]: true }));
+      setTimeout(() => {
+        if (!editorRef.current) return;
+        editorRef.current.focus({ preventScroll: true });
+        editorRef.current.setSelectionRange(newCaretPos, newCaretPos);
+        saveCursorPosition();
+      }, 0);
+    }
+  }, [saveCursorPosition, setContent]);
 
   const fmt = useCallback((prefix: string, suffix: string = prefix) => {
     if (editorMode === 'visual') {
@@ -4734,12 +5195,16 @@ function App() {
         editorRef.current.focus({ preventScroll: true }); editorRef.current.setSelectionRange(range.s + prefix.length, range.s + prefix.length);
       }, 0);
     } else {
-      const newText = prefix + range.text + suffix;
+      const leadingSpaces = range.text.slice(0, range.text.length - range.text.trimStart().length);
+      const trailingSpaces = range.text.slice(range.text.trimEnd().length);
+      const trimmed = range.text.trim();
+      const newText = trimmed ? (leadingSpaces + prefix + trimmed + suffix + trailingSpaces) : (prefix + suffix);
       const newContent = useEditorStore.getState().content.substring(0, range.s) + newText + useEditorStore.getState().content.substring(range.e);
       setContent(newContent);
       setTimeout(() => {
         if (!editorRef.current) return;
-        editorRef.current.focus({ preventScroll: true }); editorRef.current.setSelectionRange(range.s, range.s + newText.length);
+        editorRef.current.focus({ preventScroll: true }); 
+        editorRef.current.setSelectionRange(range.s + leadingSpaces.length + prefix.length, range.s + leadingSpaces.length + prefix.length + trimmed.length);
       }, 0);
     }
   }, [ getSelectionOrWord, editorMode, insertHtmlAtCursor, getVisualSelectionHtml, restoreVisualSelection, handleMarkdownFormat, updateContentFromWysiwyg, activeFormats, setContent]);
@@ -5142,6 +5607,21 @@ function App() {
       }
     }
     
+    if (e.key.length === 1 && !e.ctrlKey && !e.metaKey && !e.altKey) {
+      const sel = window.getSelection();
+      if (sel && sel.rangeCount > 0 && wysiwygRef.current) {
+        const range = sel.getRangeAt(0);
+        let current: Node | null = range.startContainer;
+        if (current.nodeType === Node.TEXT_NODE) current = current.parentNode;
+        const spacer = (current as Element)?.closest?.('.table-spacer, [data-placeholder], [data-empty]');
+        if (spacer && wysiwygRef.current.contains(spacer)) {
+          spacer.removeAttribute('data-empty');
+          spacer.removeAttribute('data-placeholder');
+          spacer.classList.remove('table-spacer', 'top-spacer', 'bottom-spacer');
+        }
+      }
+    }
+
     // Check if we are inside a table cell when pressing Enter
     if (e.key === 'Enter') {
       const sel = window.getSelection();
@@ -5150,14 +5630,12 @@ function App() {
         let current: Node | null = range.startContainer;
         if (current.nodeType === Node.TEXT_NODE) current = current.parentNode;
         
-        const spacer = (current as Element)?.closest?.('.table-spacer');
+        const spacer = (current as Element)?.closest?.('.table-spacer, [data-placeholder], [data-empty]');
         if (spacer && wysiwygRef.current.contains(spacer)) {
           e.preventDefault();
           spacer.removeAttribute('data-empty');
           spacer.removeAttribute('data-placeholder');
-          spacer.classList.remove('table-spacer');
-          spacer.classList.remove('top-spacer');
-          spacer.classList.remove('bottom-spacer');
+          spacer.classList.remove('table-spacer', 'top-spacer', 'bottom-spacer');
           document.execCommand('insertParagraph');
           updateContentFromWysiwyg();
           return;
@@ -6666,26 +7144,135 @@ function App() {
 
   const saveFileNatively = async (blob: Blob, defaultFilename: string, mimeType: string = 'text/plain') => {
     try {
-      if (IS_NATIVE && (window as any).__TAURI__) {
-        const { save } = await import('@tauri-apps/plugin-dialog');
-        const { writeFile } = await import('@tauri-apps/plugin-fs');
+      // 0. UNIVERSAL NATIVE HOOKS FOR TAURI / NEUROLINO / ANDROID / LINUX WEBVIEW INTERCEPTION
+      if (typeof window !== 'undefined') {
+        const isText = mimeType.startsWith('text/') || mimeType.includes('json');
+        let textData = '';
+        let base64Data = '';
         
+        if (isText) {
+          textData = await blob.text();
+        } else {
+          const reader = new FileReader();
+          base64Data = await new Promise<string>((resolve) => {
+            reader.onloadend = () => {
+              const res = reader.result as string;
+              resolve(res.split(',')[1] || '');
+            };
+            reader.readAsDataURL(blob);
+          });
+        }
+
+        // Dispatch CustomEvent for native webview listeners (Tauri, NeuroLino, etc.)
+        const nativeSaveEvent = new CustomEvent('nativeSaveFile', {
+          detail: {
+            filename: defaultFilename,
+            mimeType,
+            text: textData,
+            base64: base64Data,
+          }
+        });
+        window.dispatchEvent(nativeSaveEvent);
+
+        // Also post message to window so webview container postMessage listeners can intercept it
+        window.postMessage({
+          type: 'nativeSaveFile',
+          filename: defaultFilename,
+          mimeType,
+          text: textData,
+          base64: base64Data,
+        }, '*');
+
+        // Check for specific NeuroLino custom bridge
+        if ((window as any).NeuroLinoBridge?.saveFile) {
+          (window as any).NeuroLinoBridge.saveFile(base64Data || btoa(textData), defaultFilename, mimeType);
+        }
+        
+        // Check for webkit message handlers (iOS / macOS native WebView)
+        if ((window as any).webkit?.messageHandlers?.saveFile?.postMessage) {
+          (window as any).webkit.messageHandlers.saveFile.postMessage({
+            filename: defaultFilename,
+            mimeType,
+            text: textData,
+            base64: base64Data
+          });
+        }
+      }
+
+      // 1. NEUTRALINO.JS (Native desktop app runner)
+      if (typeof window !== 'undefined' && (window as any).Neutralino) {
+        const neu = (window as any).Neutralino;
         const ext = defaultFilename.split('.').pop() || '*';
-        const filePath = await save({
+        const filePath = await neu.os.showSaveDialog('Save File', {
           defaultPath: defaultFilename,
           filters: [{
-            name: 'Files',
+            name: `${ext.toUpperCase()} Files`,
             extensions: [ext]
           }]
         });
-        
         if (filePath) {
-          const buffer = await blob.arrayBuffer();
-          await writeFile(filePath, new Uint8Array(buffer));
+          if (mimeType.startsWith('text/')) {
+            const text = await blob.text();
+            await neu.filesystem.writeFile(filePath, text);
+          } else {
+            const buffer = await blob.arrayBuffer();
+            await neu.filesystem.writeBinaryFile(filePath, buffer);
+          }
           return true;
         }
         return false;
-      } else if (IS_NATIVE && (window as any).AndroidBridge?.saveFile) {
+      }
+
+      // 2. TAURI (Native desktop app runner)
+      if (typeof window !== 'undefined' && (window as any).__TAURI__) {
+        try {
+          let saveFn: any = null;
+          let writeFn: any = null;
+
+          try {
+            const { save } = await import('@tauri-apps/plugin-dialog');
+            const { writeFile } = await import('@tauri-apps/plugin-fs');
+            saveFn = save;
+            writeFn = writeFile;
+          } catch {
+            try {
+              // @ts-ignore
+              const { save } = await import(String('@tauri-apps/api/dialog'));
+              // @ts-ignore
+              const { writeFile } = await import(String('@tauri-apps/api/fs'));
+              saveFn = save;
+              writeFn = writeFile;
+            } catch {
+              const tauri = (window as any).__TAURI__;
+              if (tauri.dialog?.save) saveFn = tauri.dialog.save;
+              if (tauri.fs?.writeFile) writeFn = tauri.fs.writeFile;
+            }
+          }
+
+          if (saveFn && writeFn) {
+            const ext = defaultFilename.split('.').pop() || '*';
+            const filePath = await saveFn({
+              defaultPath: defaultFilename,
+              filters: [{
+                name: 'Files',
+                extensions: [ext]
+              }]
+            });
+            
+            if (filePath) {
+              const buffer = await blob.arrayBuffer();
+              await writeFn(filePath, new Uint8Array(buffer));
+              return true;
+            }
+            return false;
+          }
+        } catch (tauriErr) {
+          console.error("Tauri native save failed, trying fallback:", tauriErr);
+        }
+      }
+
+      // 3. ANDROID NATIVE BRIDGE / Custom App Bridges
+      if (typeof window !== 'undefined' && (window as any).AndroidBridge?.saveFile) {
         return new Promise<boolean>((resolve) => {
           const reader = new FileReader();
           reader.onload = () => {
@@ -6695,19 +7282,46 @@ function App() {
           };
           reader.readAsDataURL(blob);
         });
-      } else {
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = defaultFilename;
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-        URL.revokeObjectURL(url);
-        return true;
       }
+
+      // 4. MODERN WEB FILE SYSTEM ACCESS API (showSaveFilePicker)
+      // This is extremely powerful for Android, Linux, Windows, macOS, allowing real "Save As" file dialogs
+      if (typeof window !== 'undefined' && (window as any).showSaveFilePicker) {
+        try {
+          const ext = defaultFilename.split('.').pop() || 'md';
+          const fileHandle = await (window as any).showSaveFilePicker({
+            suggestedName: defaultFilename,
+            types: [{
+              description: `${ext.toUpperCase()} Documents`,
+              accept: {
+                [mimeType]: ['.' + ext]
+              }
+            }]
+          });
+          const writable = await fileHandle.createWritable();
+          await writable.write(blob);
+          await writable.close();
+          return true;
+        } catch (pickerErr: any) {
+          if (pickerErr.name === 'AbortError') {
+            return false;
+          }
+          console.warn("showSaveFilePicker failed or cancelled, falling back to legacy download:", pickerErr);
+        }
+      }
+
+      // 5. STANDARD WEB DOWNLOAD FALLBACK (Anchor element tag)
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = defaultFilename;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      return true;
     } catch (err: any) {
-      console.error("Native save failed, falling back:", err);
+      console.error("All save operations failed, using fallback:", err);
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
@@ -7295,6 +7909,15 @@ function App() {
             box-shadow: 0 0 15px rgba(var(--accent-rgb), 0.4), 0 0 5px rgba(var(--accent-rgb), 0.2) !important;
             border: 1px solid rgba(var(--accent-rgb), 0.5) !important;
           }
+          ${neonTextColored ? `
+            .wysiwyg-editor, .wysiwyg-editor *, #main-editor {
+              color: var(--accent) !important;
+              caret-color: var(--accent) !important;
+            }
+            .wysiwyg-editor strong, .wysiwyg-editor b, #main-editor strong, #main-editor b {
+              font-weight: 700 !important;
+            }
+          ` : ''}
         ` : ''}
         .bg-cyan-600, .bg-cyan-500 { background-color: var(--accent) !important; }
         .hover\\:bg-cyan-600:hover, .hover\\:bg-cyan-500:hover { background-color: var(--accent) !important; filter: brightness(0.9); }
@@ -7398,7 +8021,7 @@ function App() {
                 <div className="flex gap-1 bg-slate-900/50 p-1 rounded-lg">
                   <IconButton icon={Bold} onClick={() => { fmt('**'); setShowMobileToolsOpen(false); }} title={t('bold')} className="shrink-0 size-8" active={activeFormats.bold} />
                   <IconButton icon={Italic} onClick={() => { fmt('*'); setShowMobileToolsOpen(false); }} title={t('italic')} className="shrink-0 size-8" active={activeFormats.italic} />
-                  <IconButton icon={Strikethrough} onClick={() => { fmt('~~'); setShowMobileToolsOpen(false); }} title={t('strike')} className="shrink-0 size-8" />
+                  <IconButton icon={Strikethrough} onClick={() => { fmt('~~'); setShowMobileToolsOpen(false); }} title={t('strike')} className="shrink-0 size-8" active={activeFormats.strikethrough} />
                 </div>
                 {/* Group 2 */}
                 <div className="flex gap-1 bg-slate-900/50 p-1 rounded-lg">
@@ -7418,7 +8041,7 @@ function App() {
                   <IconButton icon={Quote} onClick={() => { fmtLine('> '); setShowMobileToolsOpen(false); }} title={t('quote')} className="shrink-0 size-8" />
                   <IconButton icon={LinkIcon} onClick={() => { handleLink(); setShowMobileToolsOpen(false); }} title={t('link')} className="shrink-0 size-8" />
                   <IconButton icon={Minus} onClick={() => { insertAtCursor('\n\n---\n\n', 'end'); setShowMobileToolsOpen(false); }} title={t('hr')} className="shrink-0 size-8" />
-                  <button onMouseDown={(e) => e.preventDefault()} onClick={() => { fmt('<div class="phishy">', '</div>'); setShowMobileToolsOpen(false); }} title={t('redText')} className="size-8 flex items-center justify-center hover:bg-slate-700 rounded-lg text-[10px] font-black text-red-500 shrink-0">A</button>
+                  <button onMouseDown={(e) => e.preventDefault()} onClick={() => { fmt('<div class="phishy">', '</div>'); setShowMobileToolsOpen(false); }} title={t('redText')} className={cn("size-8 flex items-center justify-center hover:bg-slate-700 rounded-lg text-[10px] font-black shrink-0 transition-colors", activeFormats.phishy ? "bg-red-500/20 text-red-400 ring-1 ring-red-500/50" : "text-red-500")}>A</button>
                 </div>
                 {/* Group 5 */}
                 <div className="flex gap-1 bg-slate-900/50 p-1 rounded-lg items-center text-slate-500 text-xs font-bold uppercase tracking-widest pl-2">
@@ -7455,7 +8078,7 @@ function App() {
               <div className="tools-scroll-container mx-auto flex items-center justify-start gap-1 bg-slate-800/30 p-1 rounded-xl border border-slate-700/30 overflow-x-auto no-scrollbar scroll-smooth whitespace-nowrap w-full lg:w-auto">
                 <IconButton icon={Bold} onClick={() => fmt('**')} title={t('bold')} className="shrink-0 size-8" active={activeFormats.bold} />
                 <IconButton icon={Italic} onClick={() => fmt('*')} title={t('italic')} className="shrink-0 size-8" active={activeFormats.italic} />
-                <IconButton icon={Strikethrough} onClick={() => fmt('~~')} title={t('strike')} className="shrink-0 size-8" />
+                <IconButton icon={Strikethrough} onClick={() => fmt('~~')} title={t('strike')} className="shrink-0 size-8" active={activeFormats.strikethrough} />
                 <div className="h-4 w-px bg-slate-700 mx-0.5 shrink-0" />
                 <button onMouseDown={(e) => e.preventDefault()} onClick={() => fmtLine('# ')} title={t('h1')} className="size-8 flex items-center justify-center hover:bg-slate-700 rounded-lg text-[10px] font-black text-slate-400 shrink-0">H1</button>
                 <button onMouseDown={(e) => e.preventDefault()} onClick={() => fmtLine('## ')} title={t('h2')} className="size-8 flex items-center justify-center hover:bg-slate-700 rounded-lg text-[10px] font-black text-slate-400 shrink-0">H2</button>
@@ -7469,7 +8092,7 @@ function App() {
                 <IconButton icon={Quote} onClick={() => fmtLine('> ')} title={t('quote')} className="shrink-0 size-8" />
                 <IconButton icon={LinkIcon} onClick={handleLink} title={t('link')} className="shrink-0 size-8" />
                 <IconButton icon={Minus} onClick={() => insertAtCursor('\n\n---\n\n', 'end')} title={t('hr')} className="shrink-0 size-8" />
-                <button onMouseDown={(e) => e.preventDefault()} onClick={() => fmt('<div class="phishy">', '</div>')} title={t('redText')} className="size-8 flex items-center justify-center hover:bg-slate-700 rounded-lg text-[10px] font-black text-red-500 shrink-0">A</button>
+                <button onMouseDown={(e) => e.preventDefault()} onClick={() => fmt('<div class="phishy">', '</div>')} title={t('redText')} className={cn("size-8 flex items-center justify-center hover:bg-slate-700 rounded-lg text-[10px] font-black shrink-0 transition-colors", activeFormats.phishy ? "bg-red-500/20 text-red-400 ring-1 ring-red-500/50" : "text-red-500")}>A</button>
                 <IconButton icon={Terminal} onClick={() => fmt('`')} title={t('inlineCode')} className="shrink-0 size-8" active={activeFormats.code} />
                 <IconButton icon={Code} onClick={() => fmt('```\n', '\n```')} title={t('codeBlock')} className="shrink-0 size-8" />
                 <IconButton icon={Indent} onClick={handleIndent} title={t('indent')} className="shrink-0 size-8" />
@@ -7741,12 +8364,13 @@ function App() {
                    icon={Download} 
                    onClick={handleInstallPwa} 
                    title={t('installApp')} 
-                   className="shrink-0 size-8 flex text-cyan-400 bg-cyan-950/20 border border-cyan-800/30 animate-pulse" 
+                   className="shrink-0 size-8 flex text-cyan-400 bg-cyan-950/20 border border-cyan-800/30" 
                  />
                )}
                <IconButton icon={ShieldUserIcon} onClick={() => setActiveModal('keys')} title={t('keys')} className="shrink-0 size-8 flex" />
                <IconButton icon={Settings} onClick={() => { setSettingsTab('general'); setActiveModal('settings'); }} title={t('settings')} className="shrink-0 size-8 flex" />
-               <IconButton icon={Rocket} onClick={() => setActiveModal('publish')} title={t('publish')} className="shrink-0 size-8 bg-cyan-600 text-white hover:bg-cyan-500 shadow-lg shadow-cyan-900/40" />
+
+                <IconButton icon={Rocket} onClick={() => setActiveModal('publish')} title={t('publish')} className={cn("shrink-0 size-8 bg-cyan-600 text-white hover:bg-cyan-500 border border-cyan-500/30 transition-all", performanceMode ? "shadow-none" : "shadow-lg shadow-cyan-500/30 hover:scale-105 active:scale-95")} />
             </div>
           )}
         </div>
@@ -7978,7 +8602,7 @@ function App() {
                                     className={cn("flex justify-between items-center px-1.5 py-1 rounded border", performanceMode ? "bg-cyan-900/30 border-cyan-800 text-cyan-400" : "bg-slate-800/30 border-slate-700/30 text-slate-500")}
                                   >
                                     <span className="text-[9px] font-bold uppercase truncate">{t('performanceMode') || 'Perf'}</span>
-                                    <div className={cn("w-1.5 h-1.5 rounded-full shrink-0", performanceMode ? "bg-cyan-400" : "bg-slate-700")} />
+                                    <div className={cn("w-1.5 h-1.5 rounded-full shrink-0", performanceMode ? "bg-[rgb(var(--accent-color))]" : "bg-slate-700")} />
                                   </button>
 
                                   <button
@@ -7990,7 +8614,7 @@ function App() {
                                     className={cn("flex justify-between items-center px-1.5 py-1 rounded border", isTrafficOptimized ? "bg-cyan-900/30 border-cyan-800 text-cyan-400" : "bg-slate-800/30 border-slate-700/30 text-slate-500")}
                                   >
                                     <span className="text-[9px] font-bold uppercase truncate">{t('trafficOptimization')?.substring(0, 6) || "Optim"}</span>
-                                    <div className={cn("w-1.5 h-1.5 rounded-full shrink-0", isTrafficOptimized ? "bg-cyan-400" : "bg-slate-700")} />
+                                    <div className={cn("w-1.5 h-1.5 rounded-full shrink-0", isTrafficOptimized ? "bg-[rgb(var(--accent-color))]" : "bg-slate-700")} />
                                   </button>
 
                                   <button
@@ -8002,7 +8626,7 @@ function App() {
                                     className={cn("flex justify-between items-center px-1.5 py-1 rounded border", isExifEnabled ? "bg-cyan-900/30 border-cyan-800 text-cyan-400" : "bg-slate-800/30 border-slate-700/30 text-slate-500")}
                                   >
                                     <span className="text-[9px] font-bold uppercase truncate">{t('exifEnabled') || "EXIF"}</span>
-                                    <div className={cn("w-1.5 h-1.5 rounded-full shrink-0", isExifEnabled ? "bg-cyan-400" : "bg-slate-700")} />
+                                    <div className={cn("w-1.5 h-1.5 rounded-full shrink-0", isExifEnabled ? "bg-[rgb(var(--accent-color))]" : "bg-slate-700")} />
                                   </button>
                             </div>
 
@@ -8205,7 +8829,7 @@ function App() {
               className={cn(
                 "flex-1 flex flex-col min-w-0 border-r border-slate-800 transition-all relative",
                 activeMobileTab !== 'editor' && "hidden lg:flex",
-                isEditorFullScreen && "bg-slate-950 p-0 fixed inset-0 z-[100]"
+                isEditorFullScreen && "bg-slate-950 p-0 fixed inset-0 z-[250]"
               )}
             >
 <MobileStatsBar visualStyle={visualStyle} isDarkMode={isDarkMode} t={t} />
@@ -8258,12 +8882,19 @@ function App() {
                       onMouseDown={(e) => e.preventDefault()}
                       onClick={toggleEditorFullScreen}
                       className={cn(
-                        "px-2 py-1 ml-1 rounded transition-colors flex items-center",
-                        isDarkMode || visualStyle === 'neon' ? "text-slate-500 hover:text-cyan-400 hover:bg-slate-800" : "text-slate-500 hover:text-cyan-600 hover:bg-slate-200"
+                        "px-2 py-1 ml-1 rounded transition-colors flex items-center gap-1",
+                        isEditorFullScreen 
+                          ? "bg-cyan-600 text-white shadow-sm ring-1 ring-cyan-400" 
+                          : (isDarkMode || visualStyle === 'neon' ? "text-slate-500 hover:text-cyan-400 hover:bg-slate-800" : "text-slate-500 hover:text-cyan-600 hover:bg-slate-200")
                       )}
-                      title={isEditorFullScreen ? "Exit Fullscreen" : "Fullscreen"}
+                      title={isEditorFullScreen ? (lang === 'uk' ? "Вийти з повноекранного режиму (Esc)" : "Exit Fullscreen (Esc)") : (lang === 'uk' ? "Повноекранний режим" : "Fullscreen")}
                     >
-                      {isEditorFullScreen ? <Minimize2 size={12} /> : <Maximize2 size={12} />}
+                      {isEditorFullScreen ? <Minimize2 size={12} className="text-white" /> : <Maximize2 size={12} />}
+                      {isEditorFullScreen && (
+                        <span className="text-[10px] font-bold uppercase tracking-wider hidden xs:inline">
+                          {lang === 'uk' ? 'Вихід' : 'Exit'}
+                        </span>
+                      )}
                     </button>
                   </div>
 
@@ -8296,9 +8927,7 @@ function App() {
                       {lang === 'uk' ? 'Реал-тайм' : 'Real-time'}
                     </span>
                     {!onDemandSyncEnabled && (
-                      <span className="flex h-1.5 w-1.5 relative">
-                        <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-cyan-400"></span>
-                      </span>
+                      <span className="w-1.5 h-1.5 rounded-full bg-[rgb(var(--accent-color))] shrink-0" />
                     )}
                   </button>
 
@@ -8351,11 +8980,43 @@ function App() {
                       {lang === 'uk' ? "Б'ютіфікація" : "Beautify"}
                     </span>
                     {beautifyEnabled && (
-                      <span className="flex h-1.5 w-1.5 relative">
-                        <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-cyan-400"></span>
-                      </span>
+                      <span className="w-1.5 h-1.5 rounded-full bg-[rgb(var(--accent-color))] shrink-0" />
                     )}
                   </button>
+
+                  {/* Neon Editor Text Color Toggle */}
+                  {visualStyle === 'neon' && (
+                    <button
+                      onMouseDown={(e) => e.preventDefault()}
+                      onClick={() => {
+                        const next = !neonTextColored;
+                        setNeonTextColored(next);
+                        notify(
+                          next 
+                            ? (lang === 'uk' ? "Кольоровий текст увімкнено" : "Colored text enabled") 
+                            : (lang === 'uk' ? "Кольоровий текст вимкнено" : "Colored text disabled"), 
+                          "success"
+                        );
+                      }}
+                      className={cn(
+                        "p-1.5 rounded-lg border transition-all flex items-center gap-1.5 text-[10px] sm:text-xs font-bold",
+                        neonTextColored 
+                          ? "bg-cyan-950/40 border-cyan-800/60 text-cyan-400 hover:bg-cyan-900/40" 
+                          : "bg-slate-950/40 border-slate-800/60 text-slate-400 hover:text-slate-200 hover:bg-slate-900/40"
+                      )}
+                      title={lang === 'uk' ? (neonTextColored ? "Кольоровий текст (увімкнено)" : "Увімкнути кольоровий текст") : (neonTextColored ? "Colored Text (enabled)" : "Enable colored text")}
+                    >
+                      <Type size={12} className={cn(neonTextColored ? "text-cyan-400" : "text-slate-500")} />
+                      <span className={cn(
+                        isLivePreviewEnabled ? "hidden xl:inline" : "hidden xs:inline"
+                      )}>
+                        {lang === 'uk' ? "Колір" : "Color"}
+                      </span>
+                      {neonTextColored && (
+                        <span className="w-1.5 h-1.5 rounded-full bg-[rgb(var(--accent-color))] shrink-0" />
+                      )}
+                    </button>
+                  )}
 
                   {/* Visual Spacing and Icon Size Popover */}
                   <div className="relative">
@@ -8606,22 +9267,31 @@ function App() {
                   ref={editorRef}
                   onDemandSyncEnabled={onDemandSyncEnabled}
                   onChange={() => {
+                    saveCursorPosition();
                     if (widgetPos === 'floating' && isWidgetVisible && !isWidgetMenuOpen) {
                       setIsWidgetVisible(false);
                     }
                   }}
+                  onSelect={saveCursorPosition}
+                  onKeyUp={saveCursorPosition}
+                  onClick={saveCursorPosition}
                   onScroll={handleEditorScroll}
-                  onFocus={() => setIsEditorFocused(true)}
+                  onFocus={() => {
+                    setIsEditorFocused(true);
+                    saveCursorPosition();
+                  }}
                   onBlur={() => {
                     saveCursorPosition();
                     setTimeout(() => setIsEditorFocused(false), 200);
                   }}
                   onKeyDown={handleEditorKeyDown}
                   onMouseUp={(e) => {
+                    saveCursorPosition();
                     showWidget(e.clientX, e.clientY);
                   }}
                   className={cn(
-                    "flex-1 w-full bg-transparent text-slate-300 text-base outline-none resize-none custom-scrollbar transition-all duration-700 editor-font",
+                    "flex-1 w-full bg-transparent text-base outline-none resize-none custom-scrollbar transition-all duration-700 editor-font",
+                    (visualStyle === 'neon' && neonTextColored) ? "text-cyan-400 font-normal" : "text-slate-300",
                     beautifyEnabled ? "px-4 lg:px-8 pt-4 lg:pt-6 max-w-[clamp(40rem,60vw,80rem)] mx-auto selection:bg-[rgb(var(--accent-color)/0.3)]" : "px-3 pt-3 lg:px-6 lg:pt-6",
                     "pb-4 mb-[85px] lg:mb-[85px]"
                   )}
@@ -8640,6 +9310,21 @@ function App() {
                     const textData = e.clipboardData.getData('text/plain');
                     
                     if (!textData && !htmlData) return;
+
+                    // Convert current spacer to standard paragraph before pasting if selection is inside
+                    const sel = window.getSelection();
+                    if (sel && sel.rangeCount > 0) {
+                      const anchorNode = sel.anchorNode;
+                      if (anchorNode) {
+                        const parentEl = anchorNode.nodeType === Node.ELEMENT_NODE ? (anchorNode as Element) : anchorNode.parentElement;
+                        const spacerEl = parentEl?.closest('.table-spacer, [data-placeholder], [data-empty]');
+                        if (spacerEl) {
+                          spacerEl.removeAttribute('data-empty');
+                          spacerEl.removeAttribute('data-placeholder');
+                          spacerEl.classList.remove('table-spacer', 'top-spacer', 'bottom-spacer');
+                        }
+                      }
+                    }
                     
                     if (textData) {
                       const trimmedText = textData.trim();
@@ -8679,54 +9364,69 @@ function App() {
                       if (!document.execCommand('insertHTML', false, finalHtml)) {
                         insertHtmlAtCursor(finalHtml as string);
                       }
+
+                      // Ensure any filled spacers lose their attributes
+                      if (wysiwygRef.current) {
+                        wysiwygRef.current.querySelectorAll('.table-spacer, [data-placeholder], [data-empty]').forEach((el) => {
+                          const text = el.textContent || '';
+                          if (text.trim() !== '' || el.children.length > 1 || (el.children.length === 1 && el.firstElementChild?.tagName !== 'BR')) {
+                            el.removeAttribute('data-empty');
+                            el.removeAttribute('data-placeholder');
+                            el.classList.remove('table-spacer', 'top-spacer', 'bottom-spacer');
+                          }
+                        });
+                      }
+
                       updateContentFromWysiwyg();
                     }
                   }}
                   onInput={(e) => {
                     if (isSyncingRef.current) return;
                     const target = e.target as HTMLDivElement;
-                    // O(1) Optimization: Check if active under cursor instead of full DOM traversal queryAll
-                    const sel = window.getSelection();
-                    if (sel && sel.rangeCount > 0) {
-                      const anchorNode = sel.anchorNode;
-                      if (anchorNode) {
-                        const parentEl = anchorNode.nodeType === Node.ELEMENT_NODE ? (anchorNode as Element) : anchorNode.parentElement;
-                        if (parentEl) {
-                          const spacerEl = parentEl.closest('.table-spacer[data-empty="true"]');
-                          if (spacerEl && spacerEl.textContent && spacerEl.textContent.trim() !== '') {
-                            spacerEl.removeAttribute('data-empty');
-                            spacerEl.removeAttribute('data-placeholder');
-                            spacerEl.classList.remove('table-spacer');
-                            spacerEl.classList.remove('top-spacer');
-                            spacerEl.classList.remove('bottom-spacer');
-                          }
-                        }
-                      }
-                    }
 
-                    // Ensure top and bottom spacers are always present when needed
+                    // Clean up non-boundary or filled spacers
+                    target.querySelectorAll('.table-spacer, [data-placeholder], [data-empty]').forEach((spacerEl) => {
+                      const isTop = spacerEl === target.firstElementChild && spacerEl.classList.contains('top-spacer');
+                      const isBottom = spacerEl === target.lastElementChild && spacerEl.classList.contains('bottom-spacer');
+                      const text = spacerEl.textContent || '';
+                      const hasContent = text.trim() !== '' || spacerEl.children.length > 1 || (spacerEl.children.length === 1 && spacerEl.firstElementChild?.tagName !== 'BR');
+                      if (!isTop && !isBottom) {
+                        spacerEl.removeAttribute('data-empty');
+                        spacerEl.removeAttribute('data-placeholder');
+                        spacerEl.classList.remove('table-spacer', 'top-spacer', 'bottom-spacer');
+                      } else if (hasContent) {
+                        spacerEl.removeAttribute('data-empty');
+                        spacerEl.removeAttribute('data-placeholder');
+                        spacerEl.classList.remove('table-spacer', 'top-spacer', 'bottom-spacer');
+                      }
+                    });
+
+                    const blockTags = ['TABLE', 'PRE', 'BLOCKQUOTE', 'UL', 'OL', 'CENTER', 'IFRAME', 'HR'];
+
+                    // Ensure top spacer is added ONLY if first element is a special block element and no top-spacer exists
                     const firstEl = target.firstElementChild;
-                    if (firstEl && ['TABLE', 'PRE', 'BLOCKQUOTE', 'UL', 'OL', 'H1', 'H2', 'H3', 'H4', 'H5', 'H6', 'CENTER'].includes(firstEl.tagName)) {
-                      const hasTopSpacer = firstEl.classList.contains('top-spacer');
-                      if (!hasTopSpacer) {
+                    if (firstEl && blockTags.includes(firstEl.tagName) && !firstEl.classList.contains('top-spacer')) {
+                      if (!target.querySelector('.top-spacer')) {
                         const pBefore = document.createElement('p');
                         pBefore.className = 'table-spacer top-spacer';
                         pBefore.setAttribute('data-empty', 'true');
-                        pBefore.setAttribute('data-placeholder', lang === 'uk' ? '↵ Початок допису...' : lang === 'es' ? '↵ Inicio de la publicación...' : lang === 'ko' ? '↵ 게시물 시작...' : '↵ Top of post...');
+                        pBefore.setAttribute('data-placeholder', lang === 'uk' ? '↵ Новий параграф...' : lang === 'es' ? '↵ Nuevo párrafo...' : lang === 'ko' ? '↵ 새 문단...' : '↵ New paragraph...');
                         pBefore.innerHTML = '<br>';
                         target.insertBefore(pBefore, firstEl);
                       }
                     }
 
+                    // Ensure bottom spacer is added ONLY if last element is a block element and no bottom-spacer exists
                     const lastEl = target.lastElementChild;
-                    const hasBottomSpacer = lastEl && lastEl.tagName === 'P' && lastEl.classList.contains('bottom-spacer');
-                    if (!hasBottomSpacer) {
-                      const pAfter = document.createElement('p');
-                      pAfter.className = 'table-spacer bottom-spacer';
-                      pAfter.setAttribute('data-empty', 'true');
-                      pAfter.setAttribute('data-placeholder', lang === 'uk' ? '↵ Кінець допису...' : lang === 'es' ? '↵ Fin de la publicación...' : lang === 'ko' ? '↵ 게시물 끝...' : '↵ End of post...');
-                      pAfter.innerHTML = '<br>';
-                      target.appendChild(pAfter);
+                    if (lastEl && blockTags.includes(lastEl.tagName) && !lastEl.classList.contains('bottom-spacer')) {
+                      if (!target.querySelector('.bottom-spacer')) {
+                        const pAfter = document.createElement('p');
+                        pAfter.className = 'table-spacer bottom-spacer';
+                        pAfter.setAttribute('data-empty', 'true');
+                        pAfter.setAttribute('data-placeholder', lang === 'uk' ? '↵ Новий параграф...' : lang === 'es' ? '↵ Nuevo párrafo...' : lang === 'ko' ? '↵ 새 문단...' : '↵ New paragraph...');
+                        pAfter.innerHTML = '<br>';
+                        target.appendChild(pAfter);
+                      }
                     }
 
                     const html = target.innerHTML;
@@ -8780,20 +9480,32 @@ function App() {
                   }}
                   onClick={(e) => {
                     const target = e.target as HTMLElement;
-                    if (target === wysiwygRef.current) {
-                      const lastChild = target.lastElementChild;
-                      if (lastChild && ['TABLE', 'BLOCKQUOTE', 'CENTER', 'DIV', 'IMG'].includes(lastChild.tagName)) {
-                        const sel = window.getSelection();
-                        const range = document.createRange();
-                        range.setStartAfter(lastChild);
-                        range.collapse(true);
-                        sel?.removeAllRanges();
-                        sel?.addRange(range);
+                    const spacer = target.closest?.('.table-spacer, [data-placeholder], [data-empty]') as HTMLElement | null;
+                    if (spacer && wysiwygRef.current?.contains(spacer)) {
+                      spacer.removeAttribute('data-empty');
+                      spacer.removeAttribute('data-placeholder');
+                      spacer.classList.remove('table-spacer', 'top-spacer', 'bottom-spacer');
+                      
+                      if (!spacer.innerHTML || spacer.innerHTML.trim() === '') {
+                        spacer.innerHTML = '<br>';
                       }
+                      
+                      const sel = window.getSelection();
+                      const range = document.createRange();
+                      range.selectNodeContents(spacer);
+                      range.collapse(true);
+                      sel?.removeAllRanges();
+                      sel?.addRange(range);
+                      
+                      updateContentFromWysiwyg();
+                      return;
                     }
+
+                    saveVisualSelection();
                   }}
                   className={cn(
-                    "flex-1 w-full bg-transparent text-slate-300 text-base outline-none overflow-y-auto custom-scrollbar transition-colors duration-700 editor-font prose prose-invert prose-cyan max-w-none wysiwyg-editor whitespace-pre-wrap",
+                    "flex-1 w-full bg-transparent text-base outline-none overflow-y-auto custom-scrollbar transition-colors duration-700 editor-font prose prose-invert prose-cyan max-w-none wysiwyg-editor whitespace-pre-wrap",
+                    (visualStyle === 'neon' && neonTextColored) ? "text-cyan-400 font-normal" : "text-slate-300",
                     beautifyEnabled ? "px-4 lg:px-8 pt-4 lg:pt-6 max-w-4xl mx-auto selection:bg-[rgb(var(--accent-color)/0.3)]" : "px-4 pt-4 lg:px-6 lg:pt-6",
                     "pb-4 mb-[85px] lg:mb-[85px]"
                   )}
@@ -9178,7 +9890,7 @@ function App() {
                 "flex-1 flex flex-col min-w-0 bg-slate-900 relative",
                 activeMobileTab === 'preview' ? "flex" : "hidden",
                 isLivePreviewEnabled ? "lg:flex" : "lg:hidden",
-                isFullScreen && "bg-slate-950 p-4 lg:p-12 overflow-y-auto fixed inset-0 z-[100]"
+                isFullScreen && "bg-slate-950 p-4 lg:p-12 overflow-y-auto fixed inset-0 z-[250]"
               )}
             >
               <div className="absolute top-4 right-4 z-10 flex gap-2">
@@ -10164,11 +10876,14 @@ function App() {
                 <button 
                   onClick={handlePublish}
                   disabled={pubLog.type === 'loading'}
-                  className="w-full py-4 bg-cyan-600 hover:bg-cyan-500 disabled:opacity-50 text-white font-bold rounded-xl shadow-lg shadow-cyan-900/20 transition-all active:scale-[0.98] flex items-center justify-center gap-2"
+                  className={cn(
+                    "w-full py-4 bg-cyan-600 hover:bg-cyan-500 disabled:opacity-50 text-white font-black rounded-xl transition-all flex items-center justify-center gap-2 border border-cyan-500/20",
+                    performanceMode ? "shadow-none" : "shadow-xl shadow-cyan-500/30 active:scale-[0.98]"
+                  )}
                 >
                   {pubLog.type === 'loading' ? (
                     <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                  ) : <Rocket size={20} />}
+                  ) : <Rocket size={20} className="stroke-[2.5px]" />}
                   {t('publish')}
                 </button>
                 <button 
@@ -10189,7 +10904,10 @@ function App() {
               <motion.div 
                 initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
                 className="absolute inset-0 bg-slate-950/90"
-                onClick={() => setActiveModal(null)}
+                onClick={() => {
+                  setActiveModal(null);
+                  setIsAddingTemplate(false);
+                }}
               />
               <motion.div 
                 initial={{ opacity: 0, scale: 0.9 }}
@@ -10207,36 +10925,180 @@ function App() {
                       <p className="text-xs text-slate-500 uppercase tracking-widest">{templates.length} {t('saved') || 'збережено'}</p>
                     </div>
                   </div>
-                  <button onClick={() => setActiveModal(null)} className="p-2 hover:bg-slate-800 rounded-xl transition-colors">
+                  <button 
+                    onClick={() => {
+                      setActiveModal(null);
+                      setIsAddingTemplate(false);
+                    }} 
+                    className="p-2 hover:bg-slate-800 rounded-xl transition-colors"
+                  >
                     <X size={20} />
                   </button>
                 </div>
 
                 <div className="p-6 overflow-y-auto custom-scrollbar flex-1">
-                  <div className="flex gap-2 mb-6">
-                    <button 
-                      onClick={async () => {
-                        const name = await promptDialog(t('templateName'));
-                        if (name) {
-                          const newT: Template = {
-                            id: Date.now().toString(),
-                            name,
-                            content: useEditorStore.getState().content,
-                            tags: pubTags,
-                            title: pubTitle
-                          };
-                          const updated = [...templates, newT];
-                          setTemplates(updated);
-                          localStorage.setItem('steem_templates', JSON.stringify(updated));
-                          notify(t('templateSaved'));
-                        }
-                      }}
-                      className="flex-1 py-3 bg-cyan-600 hover:bg-cyan-500 text-white rounded-xl font-bold transition-all flex items-center justify-center gap-2 shadow-lg shadow-cyan-900/20"
-                    >
-                      <Plus size={18} />
-                      {t('saveAsTemplate')}
-                    </button>
-                  </div>
+                  {isAddingTemplate ? (
+                    <div className="space-y-4 bg-slate-850/50 p-4 rounded-2xl border border-slate-700/50 mb-6">
+                      <div className="flex items-center gap-2 mb-2">
+                        <Edit3 size={16} className="text-cyan-400" />
+                        <h3 className="font-bold text-slate-100 text-sm">Зберегти як новий шаблон</h3>
+                      </div>
+                      
+                      <div>
+                        <label className="block text-[10px] text-slate-400 font-bold uppercase tracking-wider mb-1.5">
+                          Назва шаблону
+                        </label>
+                        <input
+                          type="text"
+                          value={newTemplateName}
+                          onChange={(e) => setNewTemplateName(e.target.value)}
+                          placeholder="Наприклад: Мій підпис, Звіт, Привітання..."
+                          className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2.5 text-xs text-slate-250 focus:outline-none focus:border-cyan-500/50 placeholder:text-slate-600 font-sans"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-[10px] text-slate-400 font-bold uppercase tracking-wider mb-2">
+                          Призначення та тип шаблону
+                        </label>
+                        <div className="grid grid-cols-2 gap-3">
+                          <button
+                            type="button"
+                            onClick={() => setNewTemplateType('post')}
+                            className={`p-3 rounded-xl border text-left flex flex-col justify-between transition-all ${
+                              newTemplateType === 'post'
+                                ? 'bg-cyan-500/10 border-cyan-500/60 text-cyan-400'
+                                : 'bg-slate-950 border-slate-800 hover:border-slate-700 text-slate-500'
+                            }`}
+                          >
+                            <div className="flex items-center gap-1.5 font-bold text-xs">
+                              <FileText size={13} />
+                              <span>Шаблон допису</span>
+                            </div>
+                            <p className="text-[9px] text-slate-450 mt-1.5 leading-relaxed">
+                              Замінює весь поточний вміст, заголовок та теги допису.
+                            </p>
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={() => setNewTemplateType('snippet')}
+                            className={`p-3 rounded-xl border text-left flex flex-col justify-between transition-all ${
+                              newTemplateType === 'snippet'
+                                ? 'bg-amber-500/10 border-amber-500/60 text-amber-400'
+                                : 'bg-slate-950 border-slate-800 hover:border-slate-700 text-slate-500'
+                            }`}
+                          >
+                            <div className="flex items-center gap-1.5 font-bold text-xs">
+                              <Edit3 size={13} />
+                              <span>Вставка / Сніппет</span>
+                            </div>
+                            <p className="text-[9px] text-slate-450 mt-1.5 leading-relaxed">
+                              Вставляє заготовлений текст у поточне місце курсору.
+                            </p>
+                          </button>
+                        </div>
+                      </div>
+
+                      <div className="flex gap-2 pt-2">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setIsAddingTemplate(false);
+                            setNewTemplateName('');
+                          }}
+                          className="flex-1 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold rounded-xl text-xs transition-colors"
+                        >
+                          Скасувати
+                        </button>
+                        <button
+                          type="button"
+                          disabled={!newTemplateName.trim()}
+                          onClick={() => {
+                            if (!newTemplateName.trim()) {
+                              notify('Вкажіть назву шаблону!');
+                              return;
+                            }
+                            const newT: Template = {
+                              id: Date.now().toString(),
+                              name: newTemplateName.trim(),
+                              content: useEditorStore.getState().content,
+                              tags: pubTags,
+                              title: pubTitle,
+                              type: newTemplateType
+                            };
+                            const updated = [...templates, newT];
+                            setTemplates(updated);
+                            localStorage.setItem(STORAGE_KEY_TEMPLATES, JSON.stringify(updated));
+                            notify(t('templateSaved'));
+                            setIsAddingTemplate(false);
+                            setNewTemplateName('');
+                          }}
+                          className={cn(
+                            "flex-1 py-2 font-extrabold rounded-xl text-xs transition-all flex items-center justify-center gap-1.5",
+                            newTemplateName.trim()
+                              ? "bg-cyan-600 hover:bg-cyan-500 text-white cursor-pointer border border-cyan-500/20"
+                              : "bg-slate-800 text-slate-500 cursor-not-allowed opacity-40",
+                            newTemplateName.trim() && !performanceMode ? "shadow-xl shadow-cyan-500/20 active:scale-98" : "shadow-none"
+                          )}
+                        >
+                          Зберегти
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="flex gap-2 mb-4">
+                      <button 
+                        onClick={() => {
+                          setIsAddingTemplate(true);
+                          setNewTemplateName('');
+                          setNewTemplateType('snippet');
+                        }}
+                        className={cn(
+                          "flex-1 py-3 bg-cyan-600 hover:bg-cyan-500 text-white rounded-xl font-black transition-all flex items-center justify-center gap-2 border border-cyan-500/20",
+                          performanceMode ? "shadow-none" : "shadow-xl shadow-cyan-500/20 hover:scale-[1.01] active:scale-95"
+                        )}
+                      >
+                        <Plus size={18} className="stroke-[2.5px]" />
+                        {t('saveAsTemplate')}
+                      </button>
+                    </div>
+                  )}
+
+                  {!isAddingTemplate && templates.length > 0 && (
+                    <div className="flex border-b border-slate-800 mb-4 p-1 bg-slate-950/40 rounded-xl shrink-0">
+                      <button
+                        onClick={() => setTemplateFilter('all')}
+                        className={`flex-1 py-1.5 text-[10px] font-bold rounded-lg transition-all ${
+                          templateFilter === 'all'
+                            ? 'bg-slate-800 text-cyan-400'
+                            : 'text-slate-400 hover:text-slate-200'
+                        }`}
+                      >
+                        Всі ({templates.length})
+                      </button>
+                      <button
+                        onClick={() => setTemplateFilter('post')}
+                        className={`flex-1 py-1.5 text-[10px] font-bold rounded-lg transition-all ${
+                          templateFilter === 'post'
+                            ? 'bg-slate-800 text-cyan-400'
+                            : 'text-slate-400 hover:text-slate-200'
+                        }`}
+                      >
+                        Шаблони допису ({templates.filter(t => t.type === 'post' || !t.type).length})
+                      </button>
+                      <button
+                        onClick={() => setTemplateFilter('snippet')}
+                        className={`flex-1 py-1.5 text-[10px] font-bold rounded-lg transition-all ${
+                          templateFilter === 'snippet'
+                            ? 'bg-slate-800 text-cyan-400'
+                            : 'text-slate-400 hover:text-slate-200'
+                        }`}
+                      >
+                        Фрагменти ({templates.filter(t => t.type === 'snippet').length})
+                      </button>
+                    </div>
+                  )}
 
                   <div className="space-y-3">
                     {templates.length === 0 ? (
@@ -10244,43 +11106,85 @@ function App() {
                         <FileText size={40} className="mx-auto mb-4 opacity-20" />
                         <p>{t('templatesEmpty')}</p>
                       </div>
-                    ) : (
-                      templates.map(tmp => (
-                        <div key={tmp.id} className="group p-4 bg-slate-800/30 border border-slate-700/50 rounded-2xl hover:border-cyan-500/50 transition-all">
-                          <div className="flex items-center justify-between mb-2">
-                            <h4 className="font-bold text-slate-200">{tmp.name}</h4>
-                            <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                              <button 
-                                onClick={() => {
-                                  setContent(tmp.content);
-                                  if (tmp.tags) setPubTags(tmp.tags);
-                                  if (tmp.title) setPubTitle(tmp.title);
-                                  setActiveModal(null);
-                                }}
-                                className="p-1.5 hover:bg-cyan-600/20 text-cyan-400 rounded-lg transition-colors"
-                                title={t('load')}
-                              >
-                                <CheckCircle size={20} />
-                              </button>
-                              <button 
-                                onClick={async () => {
-                                  if (await confirmDialog(t('confirmDeleteTemplate').replace('{name}', tmp.name))) {
-                                    const updated = templates.filter(t => t.id !== tmp.id);
-                                    setTemplates(updated);
-                                    localStorage.setItem('steem_templates', JSON.stringify(updated));
-                                    notify(t('templateDeleted'));
-                                  }
-                                }}
-                                className="p-1.5 hover:bg-red-600/20 text-red-400 rounded-lg transition-colors"
-                              >
-                                <Trash2 size={20} />
-                              </button>
+                    ) : (() => {
+                      const filtered = templates.filter(tmp => {
+                        if (templateFilter === 'post') return tmp.type === 'post' || !tmp.type;
+                        if (templateFilter === 'snippet') return tmp.type === 'snippet';
+                        return true;
+                      });
+
+                      if (filtered.length === 0) {
+                        return (
+                          <div className="text-center py-10 text-slate-500 border border-dashed border-slate-800 rounded-2xl">
+                            <p className="text-xs">Немає шаблонів у цій категорії</p>
+                          </div>
+                        );
+                      }
+
+                      return filtered.map(tmp => {
+                        const isSnippet = tmp.type === 'snippet';
+                        return (
+                          <div key={tmp.id} className="group p-4 bg-slate-800/30 border border-slate-700/50 rounded-2xl hover:border-cyan-500/50 transition-all">
+                            <div className="flex items-start justify-between mb-2">
+                              <div>
+                                <h4 className="font-bold text-slate-200 text-xs sm:text-sm">{tmp.name}</h4>
+                                <span className={`inline-block text-[8px] font-extrabold uppercase tracking-wider px-1.5 py-0.5 rounded-md mt-1 ${
+                                  isSnippet 
+                                    ? 'bg-amber-500/10 text-amber-400 border border-amber-500/20' 
+                                    : 'bg-cyan-500/10 text-cyan-400 border border-cyan-500/20'
+                                }`}>
+                                  {isSnippet ? 'Фрагмент / Вставка' : 'Шаблон допису'}
+                                </span>
+                              </div>
+                              <div className="flex gap-4 items-center pl-2">
+                                <button 
+                                  onClick={async () => {
+                                    if (isSnippet) {
+                                      insertAtCursor(tmp.content);
+                                      notify('Фрагмент вставлено у місце курсору!');
+                                      setActiveModal(null);
+                                    } else {
+                                      if (await confirmDialog('Замінити весь поточний допис цим шаблоном? Поточні дані (заголовок, текст, теги) буде втрачено.')) {
+                                        setContent(tmp.content);
+                                        if (tmp.tags) setPubTags(tmp.tags);
+                                        if (tmp.title) setPubTitle(tmp.title);
+                                        notify('Шаблон допису застосовано!');
+                                        setActiveModal(null);
+                                      }
+                                    }
+                                  }}
+                                  className={`p-1.5 border rounded-lg transition-colors flex items-center justify-center ${
+                                    isSnippet 
+                                      ? 'hover:bg-amber-500/10 text-amber-500 border-amber-500/30' 
+                                      : 'hover:bg-cyan-500/10 text-cyan-400 border-cyan-500/50'
+                                  }`}
+                                  title={isSnippet ? 'Вставити у курсор' : 'Застосувати шаблон'}
+                                >
+                                  {isSnippet ? <PlusCircle size={16} /> : <CheckCircle size={16} />}
+                                </button>
+                                <button 
+                                  onClick={async () => {
+                                    if (await confirmDialog(t('confirmDeleteTemplate').replace('{name}', tmp.name))) {
+                                      const updated = templates.filter(t => t.id !== tmp.id);
+                                      setTemplates(updated);
+                                      localStorage.setItem(STORAGE_KEY_TEMPLATES, JSON.stringify(updated));
+                                      notify(t('templateDeleted'));
+                                    }
+                                  }}
+                                  className="p-1.5 hover:bg-red-600/20 text-red-400 border border-red-500/20 rounded-lg transition-colors flex items-center justify-center"
+                                  title="Видалити"
+                                >
+                                  <Trash2 size={16} />
+                                </button>
+                              </div>
+                            </div>
+                            <div className="bg-slate-950/40 p-2 rounded-xl border border-slate-800/40 mt-1 select-all font-mono text-[10px] leading-relaxed text-slate-400 max-h-24 overflow-y-auto custom-scrollbar whitespace-pre-wrap break-all">
+                              {tmp.content}
                             </div>
                           </div>
-                          <p className="text-xs text-slate-500 line-clamp-2 italic">{tmp.content.substring(0, 100)}...</p>
-                        </div>
-                      ))
-                    )}
+                        );
+                      });
+                    })()}
                   </div>
                 </div>
               </motion.div>
@@ -10896,7 +11800,7 @@ function App() {
                     <div className="pt-4 space-y-3">
                       <div className="flex justify-between text-xs items-center">
                         <span className="text-slate-500">{t('version')}</span>
-                        <span className="bg-cyan-500/10 text-cyan-400 px-2 py-1 rounded-md font-mono font-bold">4.4.4</span>
+                        <span className="bg-cyan-500/10 text-cyan-400 px-2 py-1 rounded-md font-mono font-bold">4.5.8</span>
                       </div>
                       <div className="flex justify-between text-xs items-center">
                         <span className="text-slate-500">{t('license')}</span>
@@ -11354,6 +12258,35 @@ function App() {
                       </div>
                     </div>
 
+                    {/* Neon Editor Text Color Toggle (Active only when Cyber Neon is enabled) */}
+                    {visualStyle === 'neon' && (
+                      <div className="flex items-center justify-between p-4 bg-slate-800/20 border border-slate-700/50 rounded-2xl transition-all duration-300">
+                        <div className="flex items-center gap-3">
+                          <div className="p-2 bg-cyan-500/10 text-cyan-400 rounded-lg"><Type size={18} /></div>
+                          <div>
+                            <p className="text-sm font-bold text-slate-200">
+                              {lang === 'uk' ? 'Кольоровий текст у редакторі' : 'Colored Editor Text'}
+                            </p>
+                            <p className="text-[10px] text-slate-500 uppercase tracking-wide leading-normal mt-0.5">
+                              {lang === 'uk' ? 'Фарбувати текст у редакторі акцентним кольором' : 'Paint text inside editor with the accent color'}
+                            </p>
+                          </div>
+                        </div>
+                        <button 
+                          onClick={() => setNeonTextColored(!neonTextColored)}
+                          className={cn(
+                            "w-10 h-5 rounded-full transition-all relative shrink-0",
+                            neonTextColored ? "bg-cyan-600" : "bg-slate-700"
+                          )}
+                        >
+                          <div className={cn(
+                            "absolute top-1 w-3 h-3 rounded-full bg-white transition-all",
+                            neonTextColored ? "left-6" : "left-1"
+                          )} />
+                        </button>
+                      </div>
+                    )}
+
                     {/* Font Selector */}
                     <div>
                       <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest block mb-2">{t('font')}</label>
@@ -11792,11 +12725,11 @@ function App() {
                        <div className="w-16 h-16 bg-cyan-500/10 rounded-2xl mx-auto flex items-center justify-center text-cyan-400 font-black text-2xl shadow-xl shadow-cyan-500/10">S</div>
                        <div>
                          <h3 className="text-xl font-black tracking-tight">SteemEditor <span className="text-cyan-400">Pro</span></h3>
-                         <p className="text-[10px] text-slate-500 uppercase font-black tracking-[0.2em] pt-1">Version 3.9.9 "Quantum"</p>
+                         <p className="text-[10px] text-slate-500 uppercase font-black tracking-[0.2em] pt-1">Version 4.5.8 "Quantum"</p>
                        </div>
                        <label className="text-[10px] font-black text-slate-500 uppercase tracking-[0.2em] px-1 pt-4 block border-t border-slate-800">Changelog & Updates</label>
                         <div className="mt-2 p-3 bg-slate-950 border border-cyan-500/20 rounded-xl text-left">
-                          <p className="text-xs text-slate-300 font-medium">New in v3.9.9: Gallery Minimization & Expanded Editor Layout</p>
+                          <p className="text-xs text-slate-300 font-medium">New in v4.5.8: Store Import Optimization, Immersive Fullscreen Actions & Neon Highlighting</p>
                         </div>
                        
                        <div className="space-y-2 max-h-60 overflow-y-auto custom-scrollbar bg-slate-900 border border-slate-800 rounded-xl p-3">
@@ -11895,7 +12828,7 @@ function App() {
                                   localStorage.setItem('steem_app_agent', e.target.value);
                                 }}
                                 className="w-full bg-slate-900 border border-slate-700 rounded-lg p-2.5 text-xs text-slate-200 outline-none focus:ring-1 focus:ring-cyan-500"
-                                placeholder="ultrasteemeditor/4.4.4"
+                                placeholder="ultrasteemeditor/4.5.8"
                               />
                             </div>
                           </motion.div>

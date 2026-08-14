@@ -1,4 +1,14 @@
 # Changelog
+## [2026-08-14] - Version 4.5.8 (ultrasteemeditor/4.5.8)
+### Added
+- **Store Import Optimization**: Refactored and optimized state store imports across modules to eliminate inefficient dependencies and ensure clean module coupling.
+- **Template Refinements**: Upgraded and streamlined built-in post templates for enhanced markdown structure and readability.
+- **Immersive Fullscreen Actions**: Enhanced full-screen rendering, ensuring all dropdowns, modal dialogs, and widget action menus display correctly and remain fully accessible without clipping.
+- **Neon Theme Text Highlighting**: Added custom neon text colorization support in visual mode, paired with a dedicated toolbar toggle to enable or disable it on demand.
+- **Precise Caret & Spacer Management**: Refined visual editor cursor placement and block spacer generation (around tables, blockquotes, centers, and iframes) to prevent unexpected jumps and ensure smooth, natural typing.
+- **Babel & Build Stability**: Configured Vite React plugin with compact optimizations for high-performance builds across large source files.
+- **App Identifier Integration**: Updated app agent string and version branding to `ultrasteemeditor/4.5.8` across the app interface, device info panel, and Steem blockchain broadcasting metadata.
+
 ## [2026-08-10] - Version 4.4.4
 ### Added
 - **Babel Optimization**: Configured Vite React plugin with `babel: { compact: true }` to resolve code generator deoptimization warnings for large files.
