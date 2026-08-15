@@ -266,6 +266,9 @@ const translations = {
     downloadMd: "Завантажити .md",
     exportMd: "Експорт .md",
     importMd: "Імпорт .md",
+    clearNativeCache: "Очистити системний кеш",
+    nativeCacheCleared: "Кеш (зображення, списки, тимчасові файли) успішно очищено!",
+    nativeCacheError: "Помилка очищення кешу",
     tagPresets: "Пресет тегів",
     commonTags: "Популярні теги",
     communities: "Спільноти",
@@ -565,6 +568,9 @@ const translations = {
     downloadMd: "Down .md",
     exportMd: "Export .md",
     importMd: "Import .md",
+    clearNativeCache: "Clear System Cache",
+    nativeCacheCleared: "Cache (images, lists, temp files) cleared successfully!",
+    nativeCacheError: "Error clearing cache",
     tagPresets: "Presets",
     commonTags: "Pop. Tags",
     communities: "Communities",
@@ -747,6 +753,9 @@ const translations = {
     downloadMd: "Descargar .md",
     exportMd: "Exportar .md",
     importMd: "Importar .md",
+    clearNativeCache: "Borrar caché del sistema",
+    nativeCacheCleared: "¡Caché (imágenes, listas, temp) borrado exitosamente!",
+    nativeCacheError: "Error al borrar caché",
     tagPresets: "Ajustes de etiquetas",
     commonTags: "Etiquetas comunes",
     communities: "Comunidades",
@@ -1004,6 +1013,9 @@ const translations = {
     downloadMd: ".md 다운로드",
     exportMd: ".md 내보내기",
     importMd: ".md 가져오기",
+    clearNativeCache: "시스템 캐시 지우기",
+    nativeCacheCleared: "캐시(이미지, 목록, 임시 파일)가 성공적으로 삭제되었습니다!",
+    nativeCacheError: "캐시 삭제 오류",
     tagPresets: "태그 프리셋",
     commonTags: "일반 태그",
     communities: "커뮤니티",
@@ -1706,16 +1718,6 @@ function getAllFormatRangesInLine(line: string): FormatRange[] {
         contentStart: r.start + 2,
         contentEnd: r.start + 2,
       });
-    } else if (r.len === 2) {
-      ranges.push({
-        formatKey: 'italic',
-        openTag: '*',
-        closeTag: '*',
-        openIdx: r.start,
-        closeIdx: r.start + 1,
-        contentStart: r.start + 1,
-        contentEnd: r.start + 1,
-      });
     }
   }
 
@@ -1821,16 +1823,6 @@ function getAllFormatRangesInLine(line: string): FormatRange[] {
         closeIdx: r.start + 2,
         contentStart: r.start + 2,
         contentEnd: r.start + 2,
-      });
-    } else if (r.len === 2) {
-      ranges.push({
-        formatKey: 'italic',
-        openTag: '_',
-        closeTag: '_',
-        openIdx: r.start,
-        closeIdx: r.start + 1,
-        contentStart: r.start + 1,
-        contentEnd: r.start + 1,
       });
     }
   }
@@ -4920,7 +4912,9 @@ function App() {
     const caretInLine = caretPos - lineStart;
 
     const ranges = getAllFormatRangesInLine(currentLine);
-    const matchingRange = ranges.find(r => r.formatKey === formatKey && caretInLine >= r.openIdx && caretInLine <= r.closeIdx + r.closeTag.length);
+    const matchingRanges = ranges.filter(r => r.formatKey === formatKey && caretInLine >= r.openIdx && caretInLine <= r.closeIdx + r.closeTag.length);
+    matchingRanges.sort((a, b) => (a.closeIdx - a.openIdx) - (b.closeIdx - b.openIdx));
+    const matchingRange = matchingRanges[0] || null;
 
     if (matchingRange) {
       const { openIdx, closeIdx, contentStart, contentEnd, openTag, closeTag: cTag } = matchingRange;
@@ -7440,6 +7434,130 @@ function App() {
     }
   };
 
+  const handleClearCache = async () => {
+    const isNative = typeof window !== 'undefined' && ((window as any).__TAURI__ || (window as any).Neutralino);
+    if (!isNative) return; // Only meant for native apps
+
+    const confirmed = await confirmDialog("Clear system cache (images, lists, temporary files)? This will NOT delete templates, drafts, or keys.");
+    if (!confirmed) return;
+
+    let cleared = false;
+    
+    // Clear Web LocalStorage caches (safe temporary keys)
+    localStorage.removeItem('steem_gallery_cache_results');
+    localStorage.removeItem('steem_pexels_settings');
+    
+    // Clear any sessionStorage
+    sessionStorage.clear();
+
+    try {
+      // 1. Tauri Cache Clear
+      if ((window as any).__TAURI__) {
+        let pathModule, fsModule;
+        try {
+          pathModule = await import('@tauri-apps/api/path');
+          fsModule = await import('@tauri-apps/plugin-fs');
+        } catch {
+          try {
+            // @ts-ignore
+            pathModule = await import(String('@tauri-apps/api/path'));
+            // @ts-ignore
+            fsModule = await import(String('@tauri-apps/api/fs'));
+          } catch {
+            const tauri = (window as any).__TAURI__;
+            pathModule = tauri.path;
+            fsModule = tauri.fs;
+          }
+        }
+
+        if (pathModule && fsModule) {
+          const cacheDir = await pathModule.appCacheDir();
+          const localDataDir = await pathModule.appLocalDataDir();
+
+          // Safe surgical deletion: only targets folders explicitly known to be cache
+          const clearCachesInDir = async (dirToScan: string, isStrictlyCacheDir: boolean) => {
+            try {
+              const entries = await fsModule.readDir(dirToScan);
+              for (const entry of entries) {
+                if (!entry.name) continue;
+                const lowerName = entry.name.toLowerCase();
+                
+                // If it's a known cache folder (WebKitCache, GPUCache, Cache, Code Cache)
+                if (entry.isDirectory && (lowerName.includes('cache') || lowerName === 'fscacheddata')) {
+                  const targetPath = await pathModule.join(dirToScan, entry.name);
+                  try {
+                    await fsModule.remove(targetPath, { recursive: true });
+                    cleared = true;
+                  } catch (err: any) {
+                    console.debug("Failed to remove cache path:", err);
+                  }
+                } 
+                // Windows WebView2 specific structure: EBWebView/Default/Cache
+                else if (entry.isDirectory && entry.name === 'EBWebView') {
+                  const defaultPath = await pathModule.join(dirToScan, 'EBWebView', 'Default');
+                  try {
+                    const defEntries = await fsModule.readDir(defaultPath);
+                    for (const defEntry of defEntries) {
+                      if (defEntry.isDirectory && defEntry.name && defEntry.name.toLowerCase().includes('cache')) {
+                        const targetPath = await pathModule.join(defaultPath, defEntry.name);
+                        try {
+                          await fsModule.remove(targetPath, { recursive: true });
+                          cleared = true;
+                        } catch (err: any) {
+                          console.debug("Failed to remove webview cache path:", err);
+                        }
+                      }
+                    }
+                  } catch (err: any) {
+                    console.debug("Failed to read EBWebView path:", err);
+                  }
+                }
+                // If we are in a directory strictly dedicated to cache (like ~/.cache/com.ultraeditor.desktop), 
+                // it is safe to delete other temp folders like 'WebKit' which macOS uses
+                else if (isStrictlyCacheDir && entry.isDirectory && lowerName === 'webkit') {
+                  const targetPath = await pathModule.join(dirToScan, entry.name);
+                  try {
+                    await fsModule.remove(targetPath, { recursive: true });
+                    cleared = true;
+                  } catch (err: any) {
+                    console.debug("Failed to remove webkit dir:", err);
+                  }
+                }
+              }
+            } catch (err: any) {
+              console.debug("Failed to scan cache directory:", err);
+            }
+          };
+
+          // 1. Scan the dedicated Cache directory (e.g. ~/.cache/... or ~/Library/Caches/...)
+          // We pass true because we know this dir is strictly for cache, UNLESS it's the exact same as data dir (Windows)
+          await clearCachesInDir(cacheDir, cacheDir !== localDataDir);
+          
+          // 2. Scan the Local Data directory (e.g. ~/.local/share/...)
+          // WebKitGTK sometimes puts 'WebKitCache' here right next to 'local-storage'.
+          // We pass false to ensure we ONLY delete folders with 'cache' in the name and NEVER touch local-storage.
+          if (cacheDir !== localDataDir) {
+            await clearCachesInDir(localDataDir, false);
+          }
+        }
+      }
+
+      // 2. Neutralino Cache Clear (Neutralino has limited direct cache access, but we clear what we can)
+      if ((window as any).Neutralino) {
+        // Unfortunately Neutralino doesn't expose webview cache clearing directly yet,
+        // but we've cleared local temp data above.
+        cleared = true;
+      }
+
+      if (cleared) {
+        notify(t('nativeCacheCleared') || "Cache cleared!", "success");
+      }
+    } catch (err: any) {
+      console.error(err);
+      notify((t('nativeCacheError') || "Error") + ": " + err.message, "error");
+    }
+  };
+
   const exportBackup = async () => {
     try {
       const draftsRaw = localStorage.getItem(STORAGE_KEY_DRAFTS) || "[]";
@@ -7583,7 +7701,10 @@ function App() {
       
     const fullFilename = `${safeFilename || 'steem-post'}.md`;
     
-    await saveFileNatively(fileBlob, fullFilename, 'text/markdown');
+    const saved = await saveFileNatively(fileBlob, fullFilename, 'text/markdown');
+    if (saved) {
+      notify(lang === 'uk' ? `Файл "${fullFilename}" успішно експортовано!` : `File "${fullFilename}" exported successfully!`, 'success');
+    }
   };
 
   const uploadExternalImage = async (url: string, fileName: string = 'image.jpg') => {
@@ -8050,7 +8171,13 @@ function App() {
       `}} />
       {/* Header / Toolbar */}
       <header 
-        className="border-b border-slate-800 bg-slate-900 flex items-center px-2 sm:px-4 h-14 z-[200] relative"
+        className="border-b border-slate-800 bg-slate-900 flex items-center px-2 sm:px-4 z-[200] relative shrink-0"
+        style={{
+          paddingTop: 'env(safe-area-inset-top, 0px)',
+          minHeight: 'calc(3.5rem + env(safe-area-inset-top, 0px))',
+          paddingLeft: 'max(0.5rem, env(safe-area-inset-left, 0px))',
+          paddingRight: 'max(0.5rem, env(safe-area-inset-right, 0px))'
+        }}
       >
         <div className="flex items-center gap-1.5 xs:gap-3 shrink-0">
           <div className="flex items-center gap-1 xs:gap-2">
@@ -8927,12 +9054,18 @@ function App() {
         </AnimatePresence>
 
         {/* Main Content */}
-        <main className="flex-1 flex flex-col min-w-0 bg-slate-950 relative pb-16 lg:pb-0">
+        <main className="flex-1 flex flex-col min-w-0 bg-slate-950 relative pb-[calc(4rem+env(safe-area-inset-bottom,0px))] lg:pb-0">
           <div className="flex-1 flex overflow-hidden">
             {/* Editor Pane */}
             <div 
               ref={editorPaneRef}
-              style={isEditorFullScreen ? { height: vvHeight ? `${vvHeight}px` : '100dvh' } : {}}
+              style={isEditorFullScreen ? { 
+                height: vvHeight ? `${vvHeight}px` : '100dvh',
+                paddingTop: 'env(safe-area-inset-top, 0px)',
+                paddingLeft: 'env(safe-area-inset-left, 0px)',
+                paddingRight: 'env(safe-area-inset-right, 0px)',
+                paddingBottom: 'env(safe-area-inset-bottom, 0px)'
+              } : {}}
               className={cn(
                 "flex-1 flex flex-col min-w-0 border-r border-slate-800 transition-all relative",
                 activeMobileTab !== 'editor' && "hidden lg:flex",
@@ -12634,6 +12767,25 @@ function App() {
                         </div>
                       </div>
                     </div>
+
+                    {/* NATIVE CACHE CLEAR (Visible only in Native Apps) */}
+                    {typeof window !== 'undefined' && ((window as any).__TAURI__ || (window as any).Neutralino) && (
+                      <div className="flex items-center justify-between p-4 bg-rose-500/5 border border-rose-500/20 rounded-2xl">
+                        <div className="flex items-center gap-3">
+                          <div className="p-2 bg-rose-500/10 text-rose-400 rounded-lg"><Trash2 size={18} /></div>
+                          <div>
+                            <h3 className="text-sm font-bold text-white">{t('clearNativeCache') || 'Clear System Cache'}</h3>
+                            <p className="text-[10px] text-slate-400 max-w-[200px] sm:max-w-[300px] leading-tight">Clear images, loaded lists & temporary files. Drafts, templates, and keys will NOT be deleted.</p>
+                          </div>
+                        </div>
+                        <button 
+                          onClick={handleClearCache}
+                          className="px-4 py-2 bg-rose-600/80 hover:bg-rose-500 text-white rounded-xl text-xs font-bold transition-all shadow-lg shadow-rose-900/20 shrink-0"
+                        >
+                          {t('clearNativeCache') || 'Clear'}
+                        </button>
+                      </div>
+                    )}
                   </section>
                 )}
 
@@ -13015,8 +13167,11 @@ function App() {
 
       {/* Mobile Bottom Navigation */}
         <nav 
-          className="lg:hidden absolute bottom-0 left-0 right-0 h-16 bg-slate-900 border-t border-slate-800 grid grid-cols-5 items-center px-1 z-[70] shadow-[0_-4px_20px_rgba(0,0,0,0.5)] transition-all duration-150"
-          
+          className="lg:hidden absolute bottom-0 left-0 right-0 bg-slate-900 border-t border-slate-800 grid grid-cols-5 items-center px-1 z-[70] shadow-[0_-4px_20px_rgba(0,0,0,0.5)] transition-all duration-150"
+          style={{
+            paddingBottom: 'env(safe-area-inset-bottom, 0px)',
+            height: 'calc(4rem + env(safe-area-inset-bottom, 0px))'
+          }}
         >
           <button 
             onClick={() => setActiveMobileTab('editor')}

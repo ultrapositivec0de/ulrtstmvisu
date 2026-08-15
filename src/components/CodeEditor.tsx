@@ -22,7 +22,14 @@ export const CodeEditor = forwardRef<HTMLTextAreaElement, CodeEditorProps>((prop
 
   useEffect(() => {
     if (localRef.current && localRef.current.value !== content) {
+      const prevStart = localRef.current.selectionStart;
+      const prevEnd = localRef.current.selectionEnd;
       localRef.current.value = content;
+      if (document.activeElement === localRef.current && prevStart !== null && prevEnd !== null) {
+        const safeStart = Math.min(prevStart, content.length);
+        const safeEnd = Math.min(prevEnd, content.length);
+        localRef.current.setSelectionRange(safeStart, safeEnd);
+      }
     }
     latestContentRef.current = content;
   }, [content]);
@@ -50,20 +57,11 @@ export const CodeEditor = forwardRef<HTMLTextAreaElement, CodeEditorProps>((prop
 
   React.useEffect(() => {
     if (!localRef.current) return;
-    
-    // Don't override selection range if the element is currently focused and active,
-    // as native browser textarea handling manages selection smoothly.
-    if (document.activeElement === localRef.current) return;
-
-    const timer = requestAnimationFrame(() => {
-      if (selectionStart !== null && selectionEnd !== null) {
-        if (localRef.current?.selectionStart !== selectionStart || localRef.current?.selectionEnd !== selectionEnd) {
-          localRef.current?.setSelectionRange(selectionStart, selectionEnd);
-        }
+    if (selectionStart !== null && selectionEnd !== null && selectionStart !== undefined && selectionEnd !== undefined) {
+      if (localRef.current.selectionStart !== selectionStart || localRef.current.selectionEnd !== selectionEnd) {
+        localRef.current.setSelectionRange(selectionStart, selectionEnd);
       }
-    });
-
-    return () => cancelAnimationFrame(timer);
+    }
   }, [selectionStart, selectionEnd]);
 
   // Flush any pending/debounced changes to the store immediately
