@@ -2020,18 +2020,41 @@ function App() {
   const [tableHover, setTableHover] = useState({ r: 0, c: 0 });
   const [isFullScreen, setIsFullScreen] = useState(false);
   const [isEditorFullScreen, setIsEditorFullScreen] = useState(false);
+  const [vvHeight, setVvHeight] = useState<number | null>(null);
+
+  useEffect(() => {
+    const handleVVResize = () => {
+      if (window.visualViewport) {
+        setVvHeight(window.visualViewport.height);
+      }
+    };
+    if (window.visualViewport) {
+      window.visualViewport.addEventListener('resize', handleVVResize);
+      handleVVResize();
+    }
+    return () => {
+      if (window.visualViewport) window.visualViewport.removeEventListener('resize', handleVVResize);
+    };
+  }, []);
   const previewRef = useRef<HTMLDivElement>(null);
 
   const toggleFullScreen = () => {
     setIsFullScreen(prev => {
       const next = !prev;
-      if (next) {
-        if (!document.fullscreenElement && document.documentElement.requestFullscreen) {
-          document.documentElement.requestFullscreen().catch(() => {});
-        }
+      const isTauri = typeof window !== 'undefined' && !!(window as any).__TAURI_INTERNALS__;
+      if (isTauri) {
+        import('@tauri-apps/api/window').then(({ getCurrentWindow }) => {
+          getCurrentWindow().setFullscreen(next).catch(() => {});
+        }).catch(() => {});
       } else {
-        if (document.fullscreenElement && document.exitFullscreen) {
-          document.exitFullscreen().catch(() => {});
+        if (next) {
+          if (!document.fullscreenElement && document.documentElement.requestFullscreen) {
+            document.documentElement.requestFullscreen().catch(() => {});
+          }
+        } else {
+          if (document.fullscreenElement && document.exitFullscreen) {
+            document.exitFullscreen().catch(() => {});
+          }
         }
       }
       return next;
@@ -2041,13 +2064,20 @@ function App() {
   const toggleEditorFullScreen = () => {
     setIsEditorFullScreen(prev => {
       const next = !prev;
-      if (next) {
-        if (!document.fullscreenElement && document.documentElement.requestFullscreen) {
-          document.documentElement.requestFullscreen().catch(() => {});
-        }
+      const isTauri = typeof window !== 'undefined' && !!(window as any).__TAURI_INTERNALS__;
+      if (isTauri) {
+        import('@tauri-apps/api/window').then(({ getCurrentWindow }) => {
+          getCurrentWindow().setFullscreen(next).catch(() => {});
+        }).catch(() => {});
       } else {
-        if (document.fullscreenElement && document.exitFullscreen) {
-          document.exitFullscreen().catch(() => {});
+        if (next) {
+          if (!document.fullscreenElement && document.documentElement.requestFullscreen) {
+            document.documentElement.requestFullscreen().catch(() => {});
+          }
+        } else {
+          if (document.fullscreenElement && document.exitFullscreen) {
+            document.exitFullscreen().catch(() => {});
+          }
         }
       }
       return next;
@@ -2087,6 +2117,30 @@ function App() {
 
   useEffect(() => {
     const handleGlobalKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'F11') {
+        e.preventDefault();
+        const isTauri = typeof window !== 'undefined' && !!(window as any).__TAURI_INTERNALS__;
+        
+        if (isEditorFullScreen || isFullScreen) {
+          setIsEditorFullScreen(false);
+          setIsFullScreen(false);
+          if (isTauri) {
+             import('@tauri-apps/api/window').then(({ getCurrentWindow }) => getCurrentWindow().setFullscreen(false).catch(() => {}));
+          } else if (document.fullscreenElement && document.exitFullscreen) {
+            document.exitFullscreen().catch(() => {});
+          }
+        } else {
+          setIsFullScreen(true);
+          if (isTauri) {
+             import('@tauri-apps/api/window').then(({ getCurrentWindow }) => getCurrentWindow().setFullscreen(true).catch(() => {}));
+          } else if (!document.fullscreenElement && document.documentElement.requestFullscreen) {
+            document.documentElement.requestFullscreen().catch(() => {});
+          }
+        }
+        return;
+      }
+
+
       if (e.key === 'Escape') {
         if (showTableSelector) {
           setShowTableSelector(false);
@@ -2100,16 +2154,23 @@ function App() {
           setActiveModal(null);
           return;
         }
+        
+        const isTauri = typeof window !== 'undefined' && !!(window as any).__TAURI_INTERNALS__;
+        
         if (isEditorFullScreen) {
           setIsEditorFullScreen(false);
-          if (document.fullscreenElement && document.exitFullscreen) {
+          if (isTauri) {
+             import('@tauri-apps/api/window').then(({ getCurrentWindow }) => getCurrentWindow().setFullscreen(false).catch(() => {}));
+          } else if (document.fullscreenElement && document.exitFullscreen) {
             document.exitFullscreen().catch(() => {});
           }
           return;
         }
         if (isFullScreen) {
           setIsFullScreen(false);
-          if (document.fullscreenElement && document.exitFullscreen) {
+          if (isTauri) {
+             import('@tauri-apps/api/window').then(({ getCurrentWindow }) => getCurrentWindow().setFullscreen(false).catch(() => {}));
+          } else if (document.fullscreenElement && document.exitFullscreen) {
             document.exitFullscreen().catch(() => {});
           }
           return;
@@ -2289,6 +2350,7 @@ function App() {
   const [settingsTab, setSettingsTab] = useState<'general' | 'gallery' | 'vault' | 'keys' | 'about' | 'pwa'>('general');
   const [systemDialog, setSystemDialog] = useState<{
     type: 'confirm' | 'prompt' | 'alert',
+    inputType?: 'text' | 'password',
     title: string,
     message: string,
     resolve: (val: any) => void,
@@ -2315,14 +2377,15 @@ function App() {
     });
   }, [t]);
 
-  const promptDialog = useCallback((message: string, defaultValue: string = "", title?: string) => {
+  const promptDialog = useCallback((message: string, defaultValue: string = "", title?: string, inputType?: "text" | "password") => {
     return new Promise<string | null>((resolve) => {
       setSystemDialog({ 
         type: 'prompt', 
         title: title || t('link'), 
         message, 
         resolve, 
-        defaultValue 
+        defaultValue,
+        inputType 
       });
     });
   }, [t]);
@@ -6654,7 +6717,7 @@ function App() {
       });
     } else {
       if (SecurityService.isLocked()) {
-        const pin = vaultPin || await promptDialog(t('enterPin'));
+        const pin = vaultPin || await promptDialog(t('enterPin'), '', undefined, 'password');
         if (!pin) throw new Error(t('pinRequired'));
         await SecurityService.unlock(pin);
         initVault();
@@ -6929,7 +6992,7 @@ function App() {
     }
     
     if (uploadAuthType === 'VAULT' && SecurityService.isLocked()) {
-        const pass = await promptDialog(t('enterPin'));
+        const pass = await promptDialog(t('enterPin'), '', undefined, 'password');
         if (!pass) throw new Error("Cancelled");
         await SecurityService.unlock(pass);
         initVault();
@@ -7250,21 +7313,32 @@ function App() {
           }
 
           if (saveFn && writeFn) {
-            const ext = defaultFilename.split('.').pop() || '*';
-            const filePath = await saveFn({
-              defaultPath: defaultFilename,
-              filters: [{
-                name: 'Files',
-                extensions: [ext]
-              }]
-            });
+            const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
             
-            if (filePath) {
-              const buffer = await blob.arrayBuffer();
-              await writeFn(filePath, new Uint8Array(buffer));
-              return true;
+            // On mobile Tauri, dialog.save might not be supported and returns null.
+            // Let's attempt it, but if it returns null, we'll fall through to standard web download.
+            // Actually, if it's explicitly mobile, let's just fall through to the Web Blob download
+            // because Tauri WebView on Android typically intercepts download attributes perfectly if configured,
+            // or we at least want to fire the <a> tag fallback.
+            let filePath = null;
+            if (!isMobile) {
+              const ext = defaultFilename.split('.').pop() || '*';
+              filePath = await saveFn({
+                defaultPath: defaultFilename,
+                filters: [{
+                  name: 'Files',
+                  extensions: [ext]
+                }]
+              });
+              
+              if (filePath) {
+                const buffer = await blob.arrayBuffer();
+                await writeFn(filePath, new Uint8Array(buffer));
+                return true;
+              }
+              // User cancelled desktop dialog, don't fall through
+              return false;
             }
-            return false;
           }
         } catch (tauriErr) {
           console.error("Tauri native save failed, trying fallback:", tauriErr);
@@ -7310,7 +7384,25 @@ function App() {
         }
       }
 
-      // 5. STANDARD WEB DOWNLOAD FALLBACK (Anchor element tag)
+      // 5. NATIVE SHARE FALLBACK FOR MOBILE (Android/iOS)
+      // This allows the user to choose where to save the file using the OS Share sheet
+      if (typeof navigator !== 'undefined' && navigator.canShare) {
+        const file = new File([blob], defaultFilename, { type: mimeType });
+        if (navigator.canShare({ files: [file] })) {
+          try {
+            await navigator.share({
+              files: [file],
+              title: defaultFilename
+            });
+            return true;
+          } catch (shareErr: any) {
+            if (shareErr.name === 'AbortError') return false; // User cancelled
+            console.warn("Share API failed, falling back to download:", shareErr);
+          }
+        }
+      }
+
+      // 6. STANDARD WEB DOWNLOAD FALLBACK (Anchor element tag)
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
@@ -7322,6 +7414,20 @@ function App() {
       return true;
     } catch (err: any) {
       console.error("All save operations failed, using fallback:", err);
+      if (typeof navigator !== 'undefined' && navigator.canShare) {
+        const file = new File([blob], defaultFilename, { type: mimeType });
+        if (navigator.canShare({ files: [file] })) {
+          try {
+            await navigator.share({
+              files: [file],
+              title: defaultFilename
+            });
+            return true;
+          } catch (shareErr: any) {
+            console.warn("Share API failed in catch:", shareErr);
+          }
+        }
+      }
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
@@ -7499,7 +7605,7 @@ function App() {
     }
 
     if (uploadAuthType === 'VAULT' && SecurityService.isLocked()) {
-      const pass = await promptDialog(t('enterPin'));
+      const pass = await promptDialog(t('enterPin'), '', undefined, 'password');
       if (!pass) return;
       try {
         await SecurityService.unlock(pass);
@@ -7592,7 +7698,7 @@ function App() {
     }
 
     if (uploadAuthType === 'VAULT' && SecurityService.isLocked()) {
-      const pass = await promptDialog(t('enterPin'));
+      const pass = await promptDialog(t('enterPin'), '', undefined, 'password');
       if (!pass) return;
       try {
         await SecurityService.unlock(pass);
@@ -8826,10 +8932,11 @@ function App() {
             {/* Editor Pane */}
             <div 
               ref={editorPaneRef}
+              style={isEditorFullScreen ? { height: vvHeight ? `${vvHeight}px` : '100dvh' } : {}}
               className={cn(
                 "flex-1 flex flex-col min-w-0 border-r border-slate-800 transition-all relative",
                 activeMobileTab !== 'editor' && "hidden lg:flex",
-                isEditorFullScreen && "bg-slate-950 p-0 fixed inset-0 z-[250]"
+                isEditorFullScreen && "bg-slate-950 p-0 fixed top-0 left-0 right-0 z-[250]"
               )}
             >
 <MobileStatsBar visualStyle={visualStyle} isDarkMode={isDarkMode} t={t} />
@@ -9890,7 +9997,7 @@ function App() {
                 "flex-1 flex flex-col min-w-0 bg-slate-900 relative",
                 activeMobileTab === 'preview' ? "flex" : "hidden",
                 isLivePreviewEnabled ? "lg:flex" : "lg:hidden",
-                isFullScreen && "bg-slate-950 p-4 lg:p-12 overflow-y-auto fixed inset-0 z-[250]"
+                isFullScreen && "bg-slate-950 p-4 lg:p-12 overflow-y-auto fixed top-0 left-0 right-0 z-[250]"
               )}
             >
               <div className="absolute top-4 right-4 z-10 flex gap-2">
@@ -12602,7 +12709,7 @@ function App() {
                           onClick={async () => {
                             if (isUnlocked) SecurityService.lock();
                             else {
-                               const pin = await promptDialog(t('enterPin'));
+                               const pin = await promptDialog(t('enterPin'), '', undefined, 'password');
                                if (pin) {
                                  try {
                                    await SecurityService.unlock(pin);
@@ -13364,7 +13471,7 @@ function App() {
                 {systemDialog.type === 'prompt' && (
                   <input
                     autoFocus
-                    type="text"
+                    type={systemDialog.inputType || "text"}
                     defaultValue={systemDialog.defaultValue}
                     placeholder={systemDialog.placeholder}
                     className="w-full px-4 py-2 mb-6 bg-slate-100 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"

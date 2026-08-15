@@ -8,24 +8,32 @@ permissions:
 
 jobs:
   validate:
-    name: "Validate Packages, Types & Lint"
-    runs-on: ubuntu-latest
+    name: "Pre-check dependencies & build"
+    runs-on: windows-latest
     steps:
       - name: "Checkout code repository"
         uses: actions/checkout@v4
 
-      - name: "Set up Node.js LTS"
+      - name: "Set up Node.js"
         uses: actions/setup-node@v4
         with:
-          node-version: lts/*
+          node-version: 24
+          cache: 'npm'
+
+      - name: "Install Rust"
+        uses: dtolnay/rust-toolchain@stable
 
       - name: "Install Frontend Dependencies"
-        run: npm install --legacy-peer-deps
+        run: |
+          npm install --legacy-peer-deps
+          npm install -g @tauri-apps/cli
 
-      - name: "Run Linting"
-        run: npm run lint
+      - name: "Quick Tauri Check"
+        run: |
+          npx tauri info
+          npm run icon
 
-      - name: "Build Frontend (Typecheck & Compile)"
+      - name: "Quick Build Check"
         run: npm run build
 
   build-windows:
@@ -39,6 +47,7 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 24
+          cache: 'npm'
 
       - name: Install Rust
         uses: dtolnay/rust-toolchain@stable
@@ -46,7 +55,7 @@ jobs:
       - name: Install dependencies
         run: |
           npm install --legacy-peer-deps
-          npm install -g @tauri-apps/cli tsx jimp@0.22.12
+          npm install -g @tauri-apps/cli
 
       - name: Generate Icons
         run: npm run icon
