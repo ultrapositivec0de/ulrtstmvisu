@@ -9,6 +9,11 @@
 - **Babel & Build Stability**: Configured Vite React plugin with compact optimizations for high-performance builds across large source files.
 - **App Identifier Integration**: Updated app agent string and version branding to `ultrasteemeditor/4.5.8` across the app interface, device info panel, and Steem blockchain broadcasting metadata.
 
+### Fixed & Improved
+- **Vault PIN & Upload Retry Workflow**: Resolved an issue in native runtime environments (e.g., AppImage / Linux) where canceling or failing PIN authorization froze image uploading. File input references are now automatically cleared, allowing immediate retry.
+- **Automatic Account Selection for Gallery Uploads**: When Keychain is absent, the gallery upload manager automatically defaults to the active Vault account without requiring manual dropdown switches.
+- **Account Dropdown Styling**: Enhanced account selection dropdowns with clear authentication badges (`🔑 Vault` vs `🛡️ Keychain`) and consistent dark-theme styling.
+
 ## [2026-08-10] - Version 4.4.4
 ### Added
 - **Babel Optimization**: Configured Vite React plugin with `babel: { compact: true }` to resolve code generator deoptimization warnings for large files.

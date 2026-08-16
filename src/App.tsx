@@ -1353,6 +1353,9 @@ const APP_CHANGELOG = [
     version: "v4.5.8",
     date: "2026-08-14",
     changes: [
+      "Vault PIN & Upload Retry Handling: Fixed issue in native environments where canceling or failing PIN authorization froze image uploading. File input references are now automatically cleared and PIN re-attempts are handled seamlessly.",
+      "Smart Gallery Account Selection: Automatically selects available Vault accounts for image uploads when Keychain is unavailable, removing unnecessary manual dropdown switches.",
+      "Account Selector Visual Refinement: Enhanced account selection dropdowns with clear authentication badges (Vault key vs Keychain) and consistent dark-theme styling.",
       "Store Import Optimization: Refactored and optimized state store imports across modules to eliminate inefficient dependencies and ensure clean module coupling.",
       "Template Refinements: Upgraded and streamlined built-in post templates for enhanced markdown structure and readability.",
       "Immersive Fullscreen Actions: Enhanced full-screen rendering, ensuring all dropdowns, modal dialogs, and widget action menus display correctly and remain fully accessible without clipping.",
@@ -2033,20 +2036,20 @@ function App() {
   const toggleFullScreen = () => {
     setIsFullScreen(prev => {
       const next = !prev;
-      const isTauri = typeof window !== 'undefined' && !!(window as any).__TAURI_INTERNALS__;
+      const isTauri = typeof window !== 'undefined' && (!!(window as any).__TAURI_INTERNALS__ || !!(window as any).__TAURI__);
       if (isTauri) {
         import('@tauri-apps/api/window').then(({ getCurrentWindow }) => {
           getCurrentWindow().setFullscreen(next).catch(() => {});
         }).catch(() => {});
+      }
+      // Trigger HTML5 Fullscreen as well so the browser / webview expands across entire display
+      if (next) {
+        if (!document.fullscreenElement && document.documentElement.requestFullscreen) {
+          document.documentElement.requestFullscreen().catch(() => {});
+        }
       } else {
-        if (next) {
-          if (!document.fullscreenElement && document.documentElement.requestFullscreen) {
-            document.documentElement.requestFullscreen().catch(() => {});
-          }
-        } else {
-          if (document.fullscreenElement && document.exitFullscreen) {
-            document.exitFullscreen().catch(() => {});
-          }
+        if (document.fullscreenElement && document.exitFullscreen) {
+          document.exitFullscreen().catch(() => {});
         }
       }
       return next;
@@ -2056,20 +2059,19 @@ function App() {
   const toggleEditorFullScreen = () => {
     setIsEditorFullScreen(prev => {
       const next = !prev;
-      const isTauri = typeof window !== 'undefined' && !!(window as any).__TAURI_INTERNALS__;
+      const isTauri = typeof window !== 'undefined' && (!!(window as any).__TAURI_INTERNALS__ || !!(window as any).__TAURI__);
       if (isTauri) {
         import('@tauri-apps/api/window').then(({ getCurrentWindow }) => {
           getCurrentWindow().setFullscreen(next).catch(() => {});
         }).catch(() => {});
+      }
+      if (next) {
+        if (!document.fullscreenElement && document.documentElement.requestFullscreen) {
+          document.documentElement.requestFullscreen().catch(() => {});
+        }
       } else {
-        if (next) {
-          if (!document.fullscreenElement && document.documentElement.requestFullscreen) {
-            document.documentElement.requestFullscreen().catch(() => {});
-          }
-        } else {
-          if (document.fullscreenElement && document.exitFullscreen) {
-            document.exitFullscreen().catch(() => {});
-          }
+        if (document.fullscreenElement && document.exitFullscreen) {
+          document.exitFullscreen().catch(() => {});
         }
       }
       return next;
@@ -2483,7 +2485,12 @@ function App() {
   const [newMention, setNewMention] = useState('');
   
   // Auth & Publish
-  const [authType, setAuthType] = useState<AuthType | 'VAULT'>('KEYCHAIN');
+  const [authType, setAuthType] = useState<AuthType | 'VAULT'>(() => {
+    if (typeof window !== 'undefined' && !(window as any).steem_keychain) {
+      return 'VAULT';
+    }
+    return 'KEYCHAIN';
+  });
   const [username, setUsername] = useState(() => localStorage.getItem('steem_username') || '');
   const [selectedVaultUser, setSelectedVaultUser] = useState('');
   const [showAccountPrompt, setShowAccountPrompt] = useState(() => !localStorage.getItem('steem_username'));
@@ -2819,12 +2826,26 @@ function App() {
   };
 
   useEffect(() => {
-    if (activeModal === 'publish' && !pubTitle) {
-      const content = useEditorStore.getState().content;
-      const firstLine = content.split('\n')[0].replace(/[#*`]/g, '').trim();
-      if (firstLine) setPubTitle(firstLine.substring(0, 70));
+    if (activeModal === 'publish') {
+      if (typeof window !== 'undefined' && !(window as any).steem_keychain) {
+        setAuthType('VAULT');
+      }
+      if (!pubTitle) {
+        const content = useEditorStore.getState().content;
+        const firstLine = content.split('\n')[0].replace(/[#*`]/g, '').trim();
+        if (firstLine) setPubTitle(firstLine.substring(0, 70));
+      }
     }
   }, [activeModal, pubTitle]);
+
+  useEffect(() => {
+    const hasKeychain = typeof window !== 'undefined' && !!(window as any).steem_keychain;
+    if (!hasKeychain && vaultAccounts.length > 0) {
+      if (!imageUploadAccount || !vaultAccounts.includes(imageUploadAccount)) {
+        setImageUploadAccount(selectedVaultUser || vaultAccounts[0]);
+      }
+    }
+  }, [vaultAccounts, selectedVaultUser, imageUploadAccount]);
 
   const extractMentions = (text: string) => {
     // 1. Remove markdown links [Label](url)
@@ -6711,10 +6732,27 @@ function App() {
       });
     } else {
       if (SecurityService.isLocked()) {
-        const pin = vaultPin || await promptDialog(t('enterPin'), '', undefined, 'password');
-        if (!pin) throw new Error(t('pinRequired'));
-        await SecurityService.unlock(pin);
-        initVault();
+        let unlocked = false;
+        let pinErrorMsg = '';
+        let pinToTry = vaultPin;
+        while (!unlocked) {
+          const pin = pinToTry || await promptDialog(
+            pinErrorMsg ? `${t('pinError')} (${pinErrorMsg}). ${t('enterPin')}` : t('enterPin'),
+            '',
+            undefined,
+            'password'
+          );
+          pinToTry = '';
+          if (!pin) throw new Error(t('pinRequired'));
+          try {
+            await SecurityService.unlock(pin);
+            initVault();
+            unlocked = true;
+          } catch (e: any) {
+            pinErrorMsg = e.message || 'Incorrect PIN';
+            notify(`❌ ${pinErrorMsg}`, 'error');
+          }
+        }
       }
       const comment = {
         author,
@@ -6970,8 +7008,9 @@ function App() {
   };
 
   const handleUploadImageForReader = async (file: File): Promise<string> => {
-    const uploadAuthType = imageUploadAccount ? 'VAULT' : 'KEYCHAIN';
-    let activeUser = imageUploadAccount || username;
+    const hasKeychain = typeof window !== 'undefined' && !!(window as any).steem_keychain;
+    const uploadAuthType = imageUploadAccount ? 'VAULT' : (hasKeychain ? 'KEYCHAIN' : 'VAULT');
+    let activeUser = imageUploadAccount || username || selectedVaultUser || (vaultAccounts.length > 0 ? vaultAccounts[0] : '');
 
     if (!activeUser) {
       if (uploadAuthType !== 'VAULT') {
@@ -6986,10 +7025,25 @@ function App() {
     }
     
     if (uploadAuthType === 'VAULT' && SecurityService.isLocked()) {
-        const pass = await promptDialog(t('enterPin'), '', undefined, 'password');
-        if (!pass) throw new Error("Cancelled");
-        await SecurityService.unlock(pass);
-        initVault();
+      let unlocked = false;
+      let pinErrorMsg = '';
+      while (!unlocked) {
+        const pass = await promptDialog(
+          pinErrorMsg ? `${t('pinError')} (${pinErrorMsg}). ${t('enterPin')}` : t('enterPin'),
+          '',
+          undefined,
+          'password'
+        );
+        if (!pass) throw new Error(t('pinRequired') || "Cancelled");
+        try {
+          await SecurityService.unlock(pass);
+          initVault();
+          unlocked = true;
+        } catch (e: any) {
+          pinErrorMsg = e.message || 'Incorrect PIN';
+          notify(`❌ ${pinErrorMsg}`, 'error');
+        }
+      }
     }
 
     setPubLog({ msg: `Uploading ${file.name}...`, type: 'loading' });
@@ -7307,17 +7361,9 @@ function App() {
           }
 
           if (saveFn && writeFn) {
-            const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
-            
-            // On mobile Tauri, dialog.save might not be supported and returns null.
-            // Let's attempt it, but if it returns null, we'll fall through to standard web download.
-            // Actually, if it's explicitly mobile, let's just fall through to the Web Blob download
-            // because Tauri WebView on Android typically intercepts download attributes perfectly if configured,
-            // or we at least want to fire the <a> tag fallback.
-            let filePath = null;
-            if (!isMobile) {
-              const ext = defaultFilename.split('.').pop() || '*';
-              filePath = await saveFn({
+            const ext = defaultFilename.split('.').pop() || '*';
+            try {
+              const filePath = await saveFn({
                 defaultPath: defaultFilename,
                 filters: [{
                   name: 'Files',
@@ -7329,9 +7375,12 @@ function App() {
                 const buffer = await blob.arrayBuffer();
                 await writeFn(filePath, new Uint8Array(buffer));
                 return true;
+              } else if (typeof filePath === 'string') {
+                // User explicitly cancelled dialog
+                return false;
               }
-              // User cancelled desktop dialog, don't fall through
-              return false;
+            } catch (dialogErr) {
+              console.debug("Tauri dialog.save not fully available on this platform, trying fallbacks:", dialogErr);
             }
           }
         } catch (tauriErr) {
@@ -7435,24 +7484,39 @@ function App() {
   };
 
   const handleClearCache = async () => {
-    const isNative = typeof window !== 'undefined' && ((window as any).__TAURI__ || (window as any).Neutralino);
-    if (!isNative) return; // Only meant for native apps
-
-    const confirmed = await confirmDialog("Clear system cache (images, lists, temporary files)? This will NOT delete templates, drafts, or keys.");
+    const confirmed = await confirmDialog(
+      lang === 'uk' 
+        ? "Очистити кеш переглянутих дописів, тимчасових списків та завантажених зображень? Ваші чернетки, шаблони та збережені ключі НЕ будуть видалені." 
+        : "Clear cached posts, loaded lists, and temporary images? Your drafts, templates, and keys will NOT be deleted."
+    );
     if (!confirmed) return;
 
     let cleared = false;
     
-    // Clear Web LocalStorage caches (safe temporary keys)
+    // Clear Web LocalStorage caches (safe temporary keys only)
     localStorage.removeItem('steem_gallery_cache_results');
     localStorage.removeItem('steem_pexels_settings');
+    localStorage.removeItem('steem_hidden_replies');
     
-    // Clear any sessionStorage
+    // Clear session storage
     sessionStorage.clear();
+    cleared = true;
+
+    // Clear Service Worker / CacheStorage API caches if present (Web & PWA & WebView)
+    if (typeof caches !== 'undefined') {
+      try {
+        const cacheKeys = await caches.keys();
+        await Promise.all(cacheKeys.map(k => caches.delete(k)));
+        cleared = true;
+      } catch (cErr) {
+        console.debug("CacheStorage clear skipped:", cErr);
+      }
+    }
 
     try {
-      // 1. Tauri Cache Clear
-      if ((window as any).__TAURI__) {
+      // Tauri Native Cache Clear
+      const isTauri = typeof window !== 'undefined' && (!!(window as any).__TAURI__ || !!(window as any).__TAURI_INTERNALS__);
+      if (isTauri) {
         let pathModule, fsModule;
         try {
           pathModule = await import('@tauri-apps/api/path');
@@ -7465,92 +7529,78 @@ function App() {
             fsModule = await import(String('@tauri-apps/api/fs'));
           } catch {
             const tauri = (window as any).__TAURI__;
-            pathModule = tauri.path;
-            fsModule = tauri.fs;
+            if (tauri) {
+              pathModule = tauri.path;
+              fsModule = tauri.fs;
+            }
           }
         }
 
         if (pathModule && fsModule) {
-          const cacheDir = await pathModule.appCacheDir();
-          const localDataDir = await pathModule.appLocalDataDir();
+          try {
+            const cacheDir = await pathModule.appCacheDir();
+            const localDataDir = await pathModule.appLocalDataDir();
 
-          // Safe surgical deletion: only targets folders explicitly known to be cache
-          const clearCachesInDir = async (dirToScan: string, isStrictlyCacheDir: boolean) => {
-            try {
-              const entries = await fsModule.readDir(dirToScan);
-              for (const entry of entries) {
-                if (!entry.name) continue;
-                const lowerName = entry.name.toLowerCase();
-                
-                // If it's a known cache folder (WebKitCache, GPUCache, Cache, Code Cache)
-                if (entry.isDirectory && (lowerName.includes('cache') || lowerName === 'fscacheddata')) {
-                  const targetPath = await pathModule.join(dirToScan, entry.name);
-                  try {
-                    await fsModule.remove(targetPath, { recursive: true });
-                    cleared = true;
-                  } catch (err: any) {
-                    console.debug("Failed to remove cache path:", err);
-                  }
-                } 
-                // Windows WebView2 specific structure: EBWebView/Default/Cache
-                else if (entry.isDirectory && entry.name === 'EBWebView') {
-                  const defaultPath = await pathModule.join(dirToScan, 'EBWebView', 'Default');
-                  try {
-                    const defEntries = await fsModule.readDir(defaultPath);
-                    for (const defEntry of defEntries) {
-                      if (defEntry.isDirectory && defEntry.name && defEntry.name.toLowerCase().includes('cache')) {
-                        const targetPath = await pathModule.join(defaultPath, defEntry.name);
-                        try {
-                          await fsModule.remove(targetPath, { recursive: true });
-                          cleared = true;
-                        } catch (err: any) {
-                          console.debug("Failed to remove webview cache path:", err);
+            const clearCachesInDir = async (dirToScan: string, isStrictlyCacheDir: boolean) => {
+              try {
+                const entries = await fsModule.readDir(dirToScan);
+                for (const entry of entries) {
+                  if (!entry.name) continue;
+                  const lowerName = entry.name.toLowerCase();
+                  
+                  if (entry.isDirectory && (lowerName.includes('cache') || lowerName === 'fscacheddata')) {
+                    const targetPath = await pathModule.join(dirToScan, entry.name);
+                    try {
+                      await fsModule.remove(targetPath, { recursive: true });
+                      cleared = true;
+                    } catch (err: any) {
+                      console.debug("Failed to remove cache path:", err);
+                    }
+                  } else if (entry.isDirectory && entry.name === 'EBWebView') {
+                    const defaultPath = await pathModule.join(dirToScan, 'EBWebView', 'Default');
+                    try {
+                      const defEntries = await fsModule.readDir(defaultPath);
+                      for (const defEntry of defEntries) {
+                        if (defEntry.isDirectory && defEntry.name && defEntry.name.toLowerCase().includes('cache')) {
+                          const targetPath = await pathModule.join(defaultPath, defEntry.name);
+                          try {
+                            await fsModule.remove(targetPath, { recursive: true });
+                            cleared = true;
+                          } catch (err: any) {
+                            console.debug("Failed to remove webview cache path:", err);
+                          }
                         }
                       }
+                    } catch (err: any) {
+                      console.debug("Failed to read EBWebView path:", err);
                     }
-                  } catch (err: any) {
-                    console.debug("Failed to read EBWebView path:", err);
+                  } else if (isStrictlyCacheDir && entry.isDirectory && lowerName === 'webkit') {
+                    const targetPath = await pathModule.join(dirToScan, entry.name);
+                    try {
+                      await fsModule.remove(targetPath, { recursive: true });
+                      cleared = true;
+                    } catch (err: any) {
+                      console.debug("Failed to remove webkit dir:", err);
+                    }
                   }
                 }
-                // If we are in a directory strictly dedicated to cache (like ~/.cache/com.ultraeditor.desktop), 
-                // it is safe to delete other temp folders like 'WebKit' which macOS uses
-                else if (isStrictlyCacheDir && entry.isDirectory && lowerName === 'webkit') {
-                  const targetPath = await pathModule.join(dirToScan, entry.name);
-                  try {
-                    await fsModule.remove(targetPath, { recursive: true });
-                    cleared = true;
-                  } catch (err: any) {
-                    console.debug("Failed to remove webkit dir:", err);
-                  }
-                }
+              } catch (err: any) {
+                console.debug("Failed to scan cache directory:", err);
               }
-            } catch (err: any) {
-              console.debug("Failed to scan cache directory:", err);
-            }
-          };
+            };
 
-          // 1. Scan the dedicated Cache directory (e.g. ~/.cache/... or ~/Library/Caches/...)
-          // We pass true because we know this dir is strictly for cache, UNLESS it's the exact same as data dir (Windows)
-          await clearCachesInDir(cacheDir, cacheDir !== localDataDir);
-          
-          // 2. Scan the Local Data directory (e.g. ~/.local/share/...)
-          // WebKitGTK sometimes puts 'WebKitCache' here right next to 'local-storage'.
-          // We pass false to ensure we ONLY delete folders with 'cache' in the name and NEVER touch local-storage.
-          if (cacheDir !== localDataDir) {
-            await clearCachesInDir(localDataDir, false);
+            await clearCachesInDir(cacheDir, cacheDir !== localDataDir);
+            if (cacheDir !== localDataDir) {
+              await clearCachesInDir(localDataDir, false);
+            }
+          } catch (pathErr) {
+            console.debug("Tauri path resolution error:", pathErr);
           }
         }
       }
 
-      // 2. Neutralino Cache Clear (Neutralino has limited direct cache access, but we clear what we can)
-      if ((window as any).Neutralino) {
-        // Unfortunately Neutralino doesn't expose webview cache clearing directly yet,
-        // but we've cleared local temp data above.
-        cleared = true;
-      }
-
       if (cleared) {
-        notify(t('nativeCacheCleared') || "Cache cleared!", "success");
+        notify(lang === 'uk' ? "Кеш перегляду та зображень успішно очищено!" : "Cache cleared successfully!", "success");
       }
     } catch (err: any) {
       console.error(err);
@@ -7708,8 +7758,9 @@ function App() {
   };
 
   const uploadExternalImage = async (url: string, fileName: string = 'image.jpg') => {
-    const uploadAuthType = imageUploadAccount ? 'VAULT' : 'KEYCHAIN';
-    let activeUser = imageUploadAccount || username;
+    const hasKeychain = typeof window !== 'undefined' && !!(window as any).steem_keychain;
+    const uploadAuthType = imageUploadAccount ? 'VAULT' : (hasKeychain ? 'KEYCHAIN' : 'VAULT');
+    let activeUser = imageUploadAccount || username || selectedVaultUser || (vaultAccounts.length > 0 ? vaultAccounts[0] : '');
     
     if (!activeUser) {
       if (uploadAuthType === 'VAULT') {
@@ -7726,14 +7777,24 @@ function App() {
     }
 
     if (uploadAuthType === 'VAULT' && SecurityService.isLocked()) {
-      const pass = await promptDialog(t('enterPin'), '', undefined, 'password');
-      if (!pass) return;
-      try {
-        await SecurityService.unlock(pass);
-        initVault();
-      } catch (e: any) {
-        notify(t('pinError') + e.message, 'error');
-        return;
+      let unlocked = false;
+      let pinErrorMsg = '';
+      while (!unlocked) {
+        const pass = await promptDialog(
+          pinErrorMsg ? `${t('pinError')} (${pinErrorMsg}). ${t('enterPin')}` : t('enterPin'),
+          '',
+          undefined,
+          'password'
+        );
+        if (!pass) return;
+        try {
+          await SecurityService.unlock(pass);
+          initVault();
+          unlocked = true;
+        } catch (e: any) {
+          pinErrorMsg = e.message || 'Incorrect PIN';
+          notify(`❌ ${pinErrorMsg}`, 'error');
+        }
       }
     } else if (uploadAuthType === 'KEYCHAIN') {
       // @ts-ignore
@@ -7798,11 +7859,17 @@ function App() {
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     if (isUploading) return;
     
-    const files = e.target.files;
-    if (!files || files.length === 0) return;
+    const rawFiles = e.target.files;
+    if (!rawFiles || rawFiles.length === 0) return;
+    const files = Array.from(rawFiles);
     
-    const uploadAuthType = imageUploadAccount ? 'VAULT' : 'KEYCHAIN';
-    let activeUser = imageUploadAccount || username;
+    // Clear file input immediately so selecting the same file later always triggers onChange
+    e.target.value = '';
+    if (fileInputRef.current) fileInputRef.current.value = '';
+    
+    const hasKeychain = typeof window !== 'undefined' && !!(window as any).steem_keychain;
+    const uploadAuthType = imageUploadAccount ? 'VAULT' : (hasKeychain ? 'KEYCHAIN' : 'VAULT');
+    let activeUser = imageUploadAccount || username || selectedVaultUser || (vaultAccounts.length > 0 ? vaultAccounts[0] : '');
     
     if (!activeUser) {
       if (uploadAuthType === 'VAULT') {
@@ -7819,14 +7886,24 @@ function App() {
     }
 
     if (uploadAuthType === 'VAULT' && SecurityService.isLocked()) {
-      const pass = await promptDialog(t('enterPin'), '', undefined, 'password');
-      if (!pass) return;
-      try {
-        await SecurityService.unlock(pass);
-        initVault();
-      } catch (e: any) {
-        notify(t('pinError') + e.message, 'error');
-        return;
+      let unlocked = false;
+      let pinErrorMsg = '';
+      while (!unlocked) {
+        const pass = await promptDialog(
+          pinErrorMsg ? `${t('pinError')} (${pinErrorMsg}). ${t('enterPin')}` : t('enterPin'),
+          '',
+          undefined,
+          'password'
+        );
+        if (!pass) return;
+        try {
+          await SecurityService.unlock(pass);
+          initVault();
+          unlocked = true;
+        } catch (e: any) {
+          pinErrorMsg = e.message || 'Incorrect PIN';
+          notify(`❌ ${pinErrorMsg}`, 'error');
+        }
       }
     } else if (uploadAuthType === 'KEYCHAIN') {
       if (!(window as any).steem_keychain) {
@@ -8102,10 +8179,10 @@ function App() {
 
   return (
     <div className={cn(
-      "flex flex-col w-full relative font-sans overflow-hidden transition-colors duration-500 selection:bg-[rgb(var(--accent-color)/0.3)]",
+      "flex flex-col w-full h-full relative font-sans overflow-hidden transition-colors duration-500 selection:bg-[rgb(var(--accent-color)/0.3)]",
       visualStyle === 'neon' ? "theme-neon bg-slate-950 text-cyan-400" : (isDarkMode ? "bg-slate-950 text-slate-100" : "theme-light bg-white text-slate-900 border-slate-200"),
       performanceMode && "perf-mode"
-    )} style={{ height: viewportHeight > 0 ? `${viewportHeight}px` : "100dvh" }}>
+    )}>
       {/* Dynamic Theme Styles */}
       <style dangerouslySetInnerHTML={{ __html: `
         :root {
@@ -8766,20 +8843,35 @@ function App() {
                                 </div>
                                 
                                 <div className="grid grid-cols-2 sm:grid-cols-3 gap-1.5">
-                                  {vaultAccounts.length > 0 && (
-                                    <div className="col-span-2 sm:col-span-3 flex items-center gap-2 p-1 bg-slate-800/50 rounded border border-slate-700/50">
-                                      <select 
-                                        value={imageUploadAccount || ''}
-                                        onChange={(e) => setImageUploadAccount(e.target.value)}
-                                        className="flex-1 bg-transparent text-[10px] text-cyan-400 font-bold outline-none cursor-pointer truncate"
-                                      >
-                                        <option value="" className="bg-slate-900 text-slate-300">@keychain / default</option>
-                                        {vaultAccounts.map(acc => (
-                                          <option key={acc} value={acc} className="bg-slate-900 text-slate-300">
-                                            @{acc} {!SecurityService.isLocked() ? '✓' : '🔒'}
-                                          </option>
-                                        ))}
-                                      </select>
+                                  {(vaultAccounts.length > 0 || !(typeof window !== 'undefined' && (window as any).steem_keychain)) && (
+                                    <div className="col-span-2 sm:col-span-3 flex items-center gap-2 p-1.5 bg-slate-800/80 rounded-xl border border-slate-700/80 shadow-sm">
+                                      {vaultAccounts.length > 0 ? (
+                                        <select 
+                                          value={imageUploadAccount || ((typeof window !== 'undefined' && (window as any).steem_keychain) ? '' : (selectedVaultUser || vaultAccounts[0]))}
+                                          onChange={(e) => setImageUploadAccount(e.target.value)}
+                                          className="flex-1 bg-slate-900 text-[10px] text-cyan-400 font-bold outline-none cursor-pointer truncate px-2.5 py-1.5 rounded-lg border border-slate-700/80 focus:border-cyan-500/60 focus:ring-1 focus:ring-cyan-500/30 transition-all"
+                                          style={{ colorScheme: 'dark' }}
+                                        >
+                                          {(typeof window !== 'undefined' && (window as any).steem_keychain) && (
+                                            <option value="" className="bg-slate-900 text-slate-300 py-1">
+                                              🛡️ {username ? `@${username} (Keychain)` : '@keychain (default)'}
+                                            </option>
+                                          )}
+                                          {vaultAccounts.map(acc => (
+                                            <option key={acc} value={acc} className="bg-slate-900 text-slate-200 py-1">
+                                              🔑 @{acc} (Vault) {!SecurityService.isLocked() ? '✓' : '🔒'}
+                                            </option>
+                                          ))}
+                                        </select>
+                                      ) : (
+                                        <button 
+                                          onClick={() => setActiveModal('keys')}
+                                          className="flex-1 text-[10px] font-bold text-amber-400 bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/30 rounded-lg py-1.5 px-2.5 flex items-center justify-center gap-1.5 transition-all"
+                                        >
+                                          <Lock size={12} />
+                                          <span>{lang === 'uk' ? '🔑 Додати ключ у Vault для вивантаження' : '🔑 Add Vault key for image upload'}</span>
+                                        </button>
+                                      )}
                                     </div>
                                   )}
                                 </div>
@@ -10670,7 +10762,7 @@ function App() {
               </div>
               
               <div className="p-4 sm:p-6 space-y-4 max-h-[70vh] overflow-y-auto custom-scrollbar">
-                <div className="flex gap-2 p-1 bg-slate-800 rounded-xl border border-slate-700">
+                <div className="flex gap-2 p-1 bg-slate-800/80 rounded-xl border border-slate-700/80">
                   <button 
                     onClick={() => setAuthType('KEYCHAIN')}
                     className={cn(
@@ -10679,6 +10771,9 @@ function App() {
                     )}
                   >
                     <ShieldCheck size={18} /> Keychain
+                    {typeof window !== 'undefined' && !(window as any).steem_keychain && (
+                      <span className="text-[9px] font-normal opacity-60">({lang === 'uk' ? 'відсутній' : 'absent'})</span>
+                    )}
                   </button>
                   <button 
                     onClick={() => setAuthType('VAULT')}
@@ -10687,7 +10782,7 @@ function App() {
                       authType === 'VAULT' ? "bg-cyan-600 text-white shadow-lg" : "text-slate-400 hover:text-slate-200"
                     )}
                   >
-                    <Lock size={18} /> Vault
+                    <Lock size={18} /> Vault (Ключ)
                   </button>
                 </div>
 
@@ -10757,11 +10852,12 @@ function App() {
                                   setSelectedVaultUser(e.target.value);
                                   setUsername(e.target.value);
                                 }}
-                                className="w-full bg-slate-900 border border-slate-700 rounded-lg p-2 text-sm text-slate-200 outline-none"
+                                className="w-full bg-slate-900 border border-slate-700/80 rounded-xl p-2.5 text-xs text-slate-200 outline-none focus:ring-2 focus:ring-cyan-500/50 transition-all font-mono"
+                                style={{ colorScheme: 'dark' }}
                               >
-                                <option value="">{t('selectAccount')}</option>
+                                <option value="" className="bg-slate-900 text-slate-400">{t('selectAccount')}</option>
                                 {vaultAccounts.map(acc => (
-                                  <option key={acc} value={acc}>@{acc}</option>
+                                  <option key={acc} value={acc} className="bg-slate-900 text-slate-200 py-1">@{acc}</option>
                                 ))}
                               </select>
                               <div className="p-3 bg-green-500/10 border border-green-500/20 rounded-lg text-[11px] text-green-400 flex items-start gap-2">
@@ -12768,24 +12864,28 @@ function App() {
                       </div>
                     </div>
 
-                    {/* NATIVE CACHE CLEAR (Visible only in Native Apps) */}
-                    {typeof window !== 'undefined' && ((window as any).__TAURI__ || (window as any).Neutralino) && (
-                      <div className="flex items-center justify-between p-4 bg-rose-500/5 border border-rose-500/20 rounded-2xl">
-                        <div className="flex items-center gap-3">
-                          <div className="p-2 bg-rose-500/10 text-rose-400 rounded-lg"><Trash2 size={18} /></div>
-                          <div>
-                            <h3 className="text-sm font-bold text-white">{t('clearNativeCache') || 'Clear System Cache'}</h3>
-                            <p className="text-[10px] text-slate-400 max-w-[200px] sm:max-w-[300px] leading-tight">Clear images, loaded lists & temporary files. Drafts, templates, and keys will NOT be deleted.</p>
-                          </div>
+                    {/* CACHE CLEAR (Visible in all platforms: Tauri, Android, PWA, Web) */}
+                    <div className="flex items-center justify-between p-4 bg-rose-500/5 border border-rose-500/20 rounded-2xl">
+                      <div className="flex items-center gap-3">
+                        <div className="p-2 bg-rose-500/10 text-rose-400 rounded-lg"><Trash2 size={18} /></div>
+                        <div>
+                          <h3 className="text-sm font-bold text-white">
+                            {lang === 'uk' ? 'Очистити кеш застосунку' : (t('clearNativeCache') || 'Clear App Cache')}
+                          </h3>
+                          <p className="text-[10px] text-slate-400 max-w-[200px] sm:max-w-[300px] leading-tight">
+                            {lang === 'uk'
+                              ? 'Очищує кеш зображень, завантажені списки та тимчасові файли. Чернетки, шаблони та ключі НЕ видаляються.'
+                              : 'Clear images, loaded lists & temporary files. Drafts, templates, and keys will NOT be deleted.'}
+                          </p>
                         </div>
-                        <button 
-                          onClick={handleClearCache}
-                          className="px-4 py-2 bg-rose-600/80 hover:bg-rose-500 text-white rounded-xl text-xs font-bold transition-all shadow-lg shadow-rose-900/20 shrink-0"
-                        >
-                          {t('clearNativeCache') || 'Clear'}
-                        </button>
                       </div>
-                    )}
+                      <button 
+                        onClick={handleClearCache}
+                        className="px-4 py-2 bg-rose-600/80 hover:bg-rose-500 text-white rounded-xl text-xs font-bold transition-all shadow-lg shadow-rose-900/20 shrink-0"
+                      >
+                        {lang === 'uk' ? 'Очистити' : (t('clearNativeCache') || 'Clear')}
+                      </button>
+                    </div>
                   </section>
                 )}
 

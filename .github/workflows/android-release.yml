@@ -67,11 +67,19 @@ jobs:
       - name: "Install Frontend Dependencies"
         run: npm install --legacy-peer-deps
 
-      - name: "Regenerate Icons"
-        run: npx tauri icon app-icon.png
-
       - name: "Initialize Tauri Android Project"
         run: npx tauri android init
+
+      - name: "Regenerate Icons"
+        run: |
+          ICON_PATH="app-icon.png"
+          if [ -f "src-tauri/app-icon.png" ]; then
+            ICON_PATH="src-tauri/app-icon.png"
+          elif [ -f "src-tauri/icons/icon.png" ]; then
+            ICON_PATH="src-tauri/icons/icon.png"
+          fi
+          echo "Generating icons from $ICON_PATH..."
+          npx tauri icon "$ICON_PATH"
 
       - name: "Configure Android Manifest Permissions"
         run: |
