@@ -1,0 +1,14 @@
+{
+  "$schema": "../schemas/capability.json",
+  "identifier": "default",
+  "description": "Default capabilities for the Tauri application",
+  "windows": ["main"],
+  "permissions": [
+    "core:path:default",
+    "core:event:default",
+    "core:window:default",
+    "core:app:default",
+    "dialog:default",
+    "fs:default"
+  ]
+}

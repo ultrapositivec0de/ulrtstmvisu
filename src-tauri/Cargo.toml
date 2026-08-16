@@ -1,0 +1,22 @@
+[package]
+name = "ultra-steem-editor"
+version = "4.5.8"
+description = "Tauri Desktop Builder App"
+authors = ["Desktop Developer"]
+edition = "2024"
+
+[lib]
+name = "tauri_app"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2", features = [] }
+tauri-plugin-fs = "2.5.1"
+tauri-plugin-dialog = "2.7.1"
+tauri-plugin-os = "2.3.2"
+tauri-plugin-shell = "2.3.5"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"

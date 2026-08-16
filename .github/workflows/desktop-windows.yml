@@ -1,0 +1,88 @@
+name: "Desktop Build (Windows)"
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  validate:
+    name: "Pre-check dependencies & build"
+    runs-on: windows-latest
+    steps:
+      - name: "Checkout code repository"
+        uses: actions/checkout@v4
+
+      - name: "Set up Node.js"
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: 'npm'
+
+      - name: "Install Rust"
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: "Install Frontend Dependencies"
+        run: |
+          npm install --legacy-peer-deps
+          npm install -g @tauri-apps/cli
+
+      - name: "Quick Tauri Check"
+        run: |
+          npx tauri info
+          npm run icon
+
+      - name: "Quick Build Check"
+        run: npm run build
+
+  build-windows:
+    needs: validate
+    runs-on: windows-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: 'npm'
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Install dependencies
+        run: |
+          npm install --legacy-peer-deps
+          npm install -g @tauri-apps/cli
+
+      - name: Generate Icons
+        run: npm run icon
+
+      - name: Build Web
+        run: npm run build
+
+      - name: Build Desktop (Windows)
+        run: npx tauri build
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Get package version
+        id: package-version
+        shell: bash
+        run: |
+          VERSION=$(node -p "require('./package.json').version")
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ steps.package-version.outputs.version }}
+          name: Release v${{ steps.package-version.outputs.version }}
+          draft: true
+          files: |
+            src-tauri/target/release/bundle/msi/*.msi
+            src-tauri/target/release/bundle/nsis/*.exe
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

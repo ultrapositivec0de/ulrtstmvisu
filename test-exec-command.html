@@ -1,0 +1,12 @@
+<!DOCTYPE html>
+<html>
+<body>
+<textarea id="ta" oninput="console.log('input fired', this.value)"></textarea>
+<script>
+setTimeout(() => {
+  document.getElementById('ta').focus();
+  document.execCommand('insertText', false, 'f');
+}, 1000);
+</script>
+</body>
+</html>

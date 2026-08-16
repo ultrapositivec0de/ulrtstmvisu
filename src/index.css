@@ -1,0 +1,633 @@
+@import "tailwindcss";
+
+:root {
+  font-size: clamp(14px, 0.8vw, 18px);
+  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
+  
+  --bg-main: #020617; /* slate-950 */
+  --bg-sidebar: #0f172a; /* slate-900 */
+  --bg-card: #1e293b; /* slate-800 */
+  --text-main: #f1f5f9; /* slate-100 */
+  --text-muted: #94a3b8; /* slate-400 */
+  --border-color: #1e293b; /* slate-800 */
+  
+  /* Accent Colors (overridden by theme logic) */
+  --accent-color: 6 182 212; /* Cyan 500 */
+  --accent-hex: #06b6d4;
+  --font-editor: "Inter", sans-serif;
+
+  /* Safe Area Insets (Android / iOS / Desktop Notch & Status Bars) */
+  --safe-top: env(safe-area-inset-top, 0px);
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+  --safe-left: env(safe-area-inset-left, 0px);
+  --safe-right: env(safe-area-inset-right, 0px);
+}
+
+html, body, #root {
+  height: 100%;
+  height: 100dvh;
+  width: 100%;
+  margin: 0;
+  padding: 0;
+  overflow: hidden !important;
+  overscroll-behavior: none !important;
+  -webkit-overflow-scrolling: auto !important;
+  touch-action: manipulation;
+  position: fixed;
+  inset: 0;
+}
+
+.editor-font,
+.markdown-body,
+.wysiwyg-editor {
+  font-family: var(--font-editor) !important;
+  font-size: var(--editor-font-size, 16px) !important;
+}
+
+/* AIS_FOCUS_MODE_CSS_START */
+div#root:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(2) > div:nth-of-type(1) {
+  font-weight: normal;
+}
+/* AIS_FOCUS_MODE_CSS_END */
+
+.theme-light {
+  --bg-main: #ffffff;
+  --bg-sidebar: #f8fafc; /* slate-50 */
+  --bg-card: #f1f5f9; /* slate-100 */
+  --text-main: #0f172a; /* slate-900 */
+  --text-muted: #475569; /* slate-600 */
+  --border-color: #e2e8f0; /* slate-200 */
+}
+
+/* Light Theme Overrides for hardcoded slate utilities */
+.theme-light .bg-slate-950 { background-color: var(--bg-main) !important; }
+.theme-light .bg-slate-950\/50 { background-color: rgba(255, 255, 255, 0.5) !important; }
+.theme-light .bg-slate-950\/80 { background-color: rgba(255, 255, 255, 0.8) !important; }
+
+/* bg-slate opacity combinations */
+.theme-light .bg-slate-900\/30 { background-color: rgba(248, 250, 252, 0.3) !important; }
+.theme-light .bg-slate-900\/90 { background-color: rgba(255, 255, 255, 0.9) !important; }
+.theme-light .bg-slate-900\/40 { background-color: rgba(255, 255, 255, 0.4) !important; }
+.theme-light .bg-slate-900\/60 { background-color: rgba(248, 250, 252, 0.6) !important; }
+
+.theme-light .bg-slate-800\/20 { background-color: rgba(241, 245, 249, 0.2) !important; }
+.theme-light .bg-slate-800\/80 { background-color: rgba(241, 245, 249, 0.8) !important; }
+.theme-light .bg-slate-800\/90 { background-color: rgba(241, 245, 249, 0.9) !important; }
+.theme-light .bg-slate-800\/95 { background-color: rgba(241, 245, 249, 0.95) !important; }
+
+.theme-light .bg-slate-500\/10 { background-color: rgba(203, 213, 225, 0.2) !important; }
+
+.theme-light .border-slate-800\/50 { border-color: rgba(226, 232, 240, 0.8) !important; }
+.theme-light .border-slate-700\/50 { border-color: rgba(203, 213, 225, 0.8) !important; }
+.theme-light .border-slate-700\/30 { border-color: rgba(203, 213, 225, 0.5) !important; }
+.theme-light .border-slate-600\/50 { border-color: rgba(148, 163, 184, 0.5) !important; }
+
+.theme-light .border-white\/10 { border-color: #e2e8f0 !important; }
+.theme-light .border-white\/20 { border-color: #cbd5e1 !important; }
+.theme-light .border-white\/30 { border-color: #94a3b8 !important; }
+
+.theme-light .group:hover \.group-hover\:text-slate-400 { color: var(--text-muted) !important; }
+
+/* Checkbox and active states fixes */
+.theme-light .peer:checked ~ \.peer-checked\:bg-cyan-500,
+.theme-light .peer:checked ~ \.peer-checked\:bg-cyan-600 {
+  background-color: var(--accent, #06b6d4) !important;
+}
+
+.theme-light .peer:checked ~ \.peer-checked\:border-cyan-400,
+.theme-light .peer:checked ~ \.peer-checked\:border-cyan-500 {
+  border-color: var(--accent, #06b6d4) !important;
+}
+
+.theme-light .bg-slate-900 { background-color: var(--bg-sidebar) !important; }
+.theme-light .bg-slate-900\/50 { background-color: rgba(248, 250, 252, 0.5) !important; }
+.theme-light .bg-slate-900\/80 { background-color: rgba(248, 250, 252, 0.8) !important; }
+.theme-light .bg-slate-800 { background-color: var(--bg-card) !important; }
+.theme-light .bg-slate-800\/50 { background-color: rgba(241, 245, 249, 0.5) !important; }
+.theme-light .bg-slate-800\/40 { background-color: rgba(241, 245, 249, 0.4) !important; }
+.theme-light .bg-slate-800\/30 { background-color: rgba(241, 245, 249, 0.3) !important; }
+.theme-light .bg-slate-800\/10 { background-color: rgba(241, 245, 249, 0.1) !important; }
+.theme-light .bg-slate-700 { background-color: #e2e8f0 !important; }
+.theme-light .bg-slate-700\/50 { background-color: rgba(226, 232, 240, 0.5) !important; }
+
+.theme-light .border-slate-800 { border-color: var(--border-color) !important; }
+.theme-light .border-slate-700 { border-color: #cbd5e1 !important; }
+
+.theme-light .text-slate-50 { color: #020617 !important; }
+.theme-light .text-slate-100 { color: #0f172a !important; }
+.theme-light .text-slate-200 { color: #020617 !important; }
+.theme-light .text-slate-300 { color: #0f172a !important; }
+.theme-light .text-slate-400 { color: var(--text-muted) !important; }
+.theme-light .text-slate-500 { color: #64748b !important; }
+.theme-light .text-slate-600 { color: #94a3b8 !important; }
+
+/* In light theme, "white" text should generally be dark (for cards, labels, etc.) */
+.theme-light .text-white { color: #020617 !important; }
+
+/* ... EXCEPT when specifically inside primary colored elements like buttons */
+.theme-light .bg-cyan-500.text-white,
+.theme-light .bg-cyan-600.text-white,
+.theme-light .bg-yellow-500.text-white,
+.theme-light .bg-yellow-600.text-white,
+.theme-light .bg-green-500.text-white,
+.theme-light .bg-green-600.text-white,
+.theme-light .bg-red-500.text-white,
+.theme-light .bg-red-600.text-white,
+.theme-light .bg-blue-500.text-white,
+.theme-light .bg-blue-600.text-white {
+  color: #ffffff !important;
+}
+
+.theme-light .hover\:bg-slate-700:hover { background-color: #cbd5e1 !important; }
+.theme-light .hover\:bg-slate-800:hover { background-color: #e2e8f0 !important; }
+.theme-light .hover\:bg-slate-900:hover { background-color: #f1f5f9 !important; }
+
+.theme-light .hover\:text-slate-200:hover { color: #0f172a !important; }
+.theme-light .hover\:text-white:hover { color: #020617 !important; }
+
+/* Neon / Cyberpunk Theme */
+.theme-neon {
+  --bg-main: #020210;
+  --bg-sidebar: #010115;
+  --bg-card: #080820;
+  --text-main: #f0f0ff;
+  --text-muted: #6366f199;
+  --border-color: rgba(var(--accent-rgb), 0.25);
+}
+
+.theme-neon body {
+  background-image: 
+    radial-gradient(circle at 50% 0%, rgba(var(--accent-rgb), 0.15) 0%, transparent 60%),
+    radial-gradient(circle at 100% 100%, rgba(99, 102, 241, 0.1) 0%, transparent 50%);
+}
+
+.theme-neon .bg-slate-950 { background-color: var(--bg-main) !important; }
+.theme-neon .bg-slate-900 { background-color: var(--bg-sidebar) !important; }
+.theme-neon .bg-slate-800 { 
+  background-color: var(--bg-card) !important; 
+  box-shadow: 0 0 20px rgba(var(--accent-rgb), 0.08);
+  border: 1px solid rgba(var(--accent-rgb), 0.15);
+}
+
+.theme-neon .border-slate-800,
+.theme-neon .border-slate-700 { border-color: rgba(var(--accent-rgb), 0.2) !important; }
+
+.theme-neon .text-slate-400,
+.theme-neon .text-slate-500 { color: rgba(var(--accent-rgb), 0.6) !important; }
+
+.theme-neon .text-white,
+.theme-neon .text-slate-100 { color: #f8fafc !important; }
+
+.theme-neon .bg-cyan-500,
+.theme-neon .bg-cyan-600 {
+  background-color: rgb(var(--accent-color)) !important;
+  color: #000 !important;
+  box-shadow: 0 0 20px rgba(var(--accent-rgb), 0.5), 0 0 40px rgba(var(--accent-rgb), 0.2);
+  font-weight: 950;
+  text-shadow: none !important;
+}
+
+.theme-neon .markdown-body { 
+  color: rgba(var(--accent-rgb), 1); 
+  text-shadow: 0 0 2px rgba(var(--accent-rgb), 0.2);
+}
+.theme-neon .markdown-body p,
+.theme-neon .markdown-body li {
+  color: rgba(var(--accent-rgb), 0.9);
+}
+.theme-neon .markdown-body h1, 
+.theme-neon .markdown-body h2, 
+.theme-neon .markdown-body h3 { 
+  color: rgb(var(--accent-color)); 
+  text-shadow: 0 0 12px rgba(var(--accent-rgb), 0.6), 0 0 25px rgba(var(--accent-rgb), 0.3); 
+  border-color: rgba(var(--accent-rgb), 0.4);
+}
+
+.theme-neon .markdown-body a { 
+  color: rgb(var(--accent-color)); 
+  text-shadow: 0 0 10px rgba(var(--accent-rgb), 0.4);
+  background: rgba(var(--accent-rgb), 0.08);
+  padding: 0 4px;
+  border-radius: 4px;
+  text-decoration: underline !important;
+  text-underline-offset: 4px;
+  text-decoration-color: rgba(var(--accent-rgb), 0.5) !important;
+}
+.theme-neon .markdown-body a:hover { 
+  background: rgba(var(--accent-rgb), 0.2);
+  text-shadow: 0 0 15px rgba(var(--accent-rgb), 0.7);
+}
+
+.theme-neon textarea#main-editor {
+  color: rgb(var(--accent-color)) !important;
+  text-shadow: 0 0 12px rgba(var(--accent-rgb), 0.45);
+  font-weight: 500;
+  caret-color: #fff;
+  background: transparent !important;
+}
+
+.theme-neon .neon-icon-glow {
+  filter: drop-shadow(0 0 4px rgba(var(--accent-rgb), 0.6)) drop-shadow(0 0 10px rgba(var(--accent-rgb), 0.2));
+}
+
+body {
+  background-color: var(--bg-main);
+  color: var(--text-main);
+  @apply antialiased overflow-hidden transition-colors duration-300;
+  font-family: var(--font-sans);
+}
+
+.custom-scrollbar::-webkit-scrollbar {
+  width: 4px;
+  height: 4px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-track {
+  @apply bg-transparent;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  @apply bg-slate-800 rounded-full hover:bg-slate-700 transition-colors;
+}
+
+.theme-light .custom-scrollbar::-webkit-scrollbar-thumb { background-color: #cbd5e1; }
+.theme-light .custom-scrollbar::-webkit-scrollbar-thumb:hover { background-color: #94a3b8; }
+
+/* Steem-specific styles */
+.pull-left { float: left; margin-right: 1.5rem; margin-bottom: 1rem; max-width: 50%; }
+.pull-right { float: right; margin-left: 1.5rem; margin-bottom: 1rem; max-width: 50%; }
+.text-justify { text-align: justify; }
+.text-left { text-align: left; }
+.text-right { text-align: right; }
+.clearfix::after { content: ""; clear: both; display: table; }
+.phishy { color: #ef4444 !important; }
+.text-blue { color: #3b82f6 !important; }
+.text-green { color: #22c55e !important; }
+
+/* Markdown body styles */
+.markdown-body, .wysiwyg-editor {
+  @apply leading-relaxed text-slate-300;
+}
+
+/* Optimization for Markdown elements rendering */
+.markdown-body > p,
+.markdown-body > ul,
+.markdown-body > ol,
+.markdown-body > blockquote,
+.markdown-body > table,
+.markdown-body > pre,
+.markdown-body > h1,
+.markdown-body > h2,
+.markdown-body > h3,
+.preview-block-item {
+  content-visibility: auto;
+  contain-intrinsic-size: auto 50px;
+}
+
+/* Performance optimization for WYSIWYG editor direct block elements to prevent full document reflow during active typing */
+.wysiwyg-editor > p,
+.wysiwyg-editor > ul,
+.wysiwyg-editor > ol,
+.wysiwyg-editor > h1,
+.wysiwyg-editor > h2,
+.wysiwyg-editor > h3,
+.wysiwyg-editor > h4,
+.wysiwyg-editor > h5,
+.wysiwyg-editor > h6,
+.wysiwyg-editor > blockquote,
+.wysiwyg-editor > pre,
+.wysiwyg-editor > table,
+.wysiwyg-editor > hr,
+.wysiwyg-editor > img,
+.wysiwyg-editor > .table-spacer,
+.wysiwyg-editor > div,
+.wysiwyg-editor > center {
+  contain: layout style;
+}
+
+.markdown-body h1, .wysiwyg-editor h1 {
+  font-size: 1.8em !important;
+  font-weight: 700 !important;
+  margin-top: 1.5rem !important;
+  margin-bottom: 0.75rem !important;
+  border-bottom: 1px solid rgba(148, 163, 184, 0.2) !important;
+  padding-bottom: 0.5rem !important;
+}
+.markdown-body h2, .wysiwyg-editor h2 {
+  font-size: 1.5em !important;
+  font-weight: 700 !important;
+  margin-top: 1.25rem !important;
+  margin-bottom: 0.5rem !important;
+}
+.markdown-body h3, .wysiwyg-editor h3 {
+  font-size: 1.3em !important;
+  font-weight: 700 !important;
+  margin-top: 1rem !important;
+  margin-bottom: 0.5rem !important;
+}
+.markdown-body p {
+  margin-top: 0 !important;
+  margin-bottom: 1rem !important;
+  line-height: 1.6 !important;
+}
+.wysiwyg-editor p {
+  margin-top: 0 !important;
+  margin-bottom: 0.2rem !important;
+  line-height: 1.4 !important;
+}
+.markdown-body ul {
+  list-style-type: disc !important;
+  padding-left: 1.5rem !important;
+  margin-top: 0 !important;
+  margin-bottom: 0 !important;
+}
+.wysiwyg-editor ul {
+  list-style-type: disc !important;
+  padding-left: 1.5rem !important;
+  margin-top: 0 !important;
+  margin-bottom: 0 !important;
+}
+.markdown-body ol {
+  list-style-type: decimal !important;
+  padding-left: 1.5rem !important;
+  margin-top: 0 !important;
+  margin-bottom: 0 !important;
+}
+.wysiwyg-editor ol {
+  list-style-type: decimal !important;
+  padding-left: 1.5rem !important;
+  margin-top: 0 !important;
+  margin-bottom: 0 !important;
+}
+.markdown-body li {
+  margin-top: 0 !important;
+  margin-bottom: 0 !important;
+}
+.markdown-body li > p {
+  margin: 0 !important;
+}
+.markdown-body li > ul, .markdown-body li > ol {
+  margin: 0 !important;
+}
+.wysiwyg-editor li {
+  margin-top: 0 !important;
+  margin-bottom: 0 !important;
+}
+.wysiwyg-editor li > p {
+  margin: 0 !important;
+}
+.wysiwyg-editor li > ul, .wysiwyg-editor li > ol {
+  margin: 0 !important;
+}
+.markdown-body blockquote, .wysiwyg-editor blockquote {
+  border-left: 4px solid rgba(148, 163, 184, 0.5) !important;
+  padding-left: 1rem !important;
+  font-style: italic !important;
+  margin-top: 0 !important;
+  margin-bottom: 0.75rem !important;
+}
+.markdown-body code, .wysiwyg-editor code { @apply bg-slate-800 px-1.5 py-0.5 rounded text-sm font-mono text-cyan-400; }
+.markdown-body pre, .wysiwyg-editor pre { @apply bg-slate-900 p-4 rounded-xl mb-4 overflow-x-auto border border-slate-800; }
+.markdown-body pre code, .wysiwyg-editor pre code { @apply bg-transparent p-0 text-slate-300; }
+.markdown-body table, .wysiwyg-editor table { @apply w-full border-collapse mb-4; max-width: 100%; overflow-x: auto; }
+.markdown-body th, .markdown-body td, .wysiwyg-editor th, .wysiwyg-editor td { @apply border border-slate-800 p-2 text-left; }
+.markdown-body th, .wysiwyg-editor th { @apply bg-slate-900 font-bold; }
+.markdown-body img, .wysiwyg-editor img { @apply rounded-xl max-w-full h-auto object-contain; max-height: 500px; }
+.markdown-body hr, .wysiwyg-editor hr { @apply border-slate-800 my-8; }
+.markdown-body a, .wysiwyg-editor a { @apply text-cyan-400 hover:underline; }
+
+/* Light Theme Markdown Overrides */
+.theme-light .markdown-body, .theme-light .wysiwyg-editor { color: var(--text-main); }
+.theme-light .markdown-body h1, .theme-light .wysiwyg-editor h1,
+.theme-light .markdown-body h2, .theme-light .wysiwyg-editor h2,
+.theme-light .markdown-body h3, .theme-light .wysiwyg-editor h3 { color: #0f172a; border-color: #cbd5e1; }
+.theme-light .markdown-body blockquote, .theme-light .wysiwyg-editor blockquote { border-color: #cbd5e1; color: var(--text-muted); }
+.theme-light .markdown-body code, .theme-light .wysiwyg-editor code { background-color: #e2e8f0; color: var(--accent); }
+.theme-light .markdown-body pre, .theme-light .wysiwyg-editor pre { background-color: #f1f5f9; border-color: #cbd5e1; }
+.theme-light .markdown-body pre code, .theme-light .wysiwyg-editor pre code { background-color: transparent; color: #0f172a; }
+.theme-light .markdown-body hr, .theme-light .wysiwyg-editor hr { border-color: #cbd5e1; }
+.theme-light .markdown-body th, .theme-light .wysiwyg-editor th,
+.theme-light .markdown-body td, .theme-light .wysiwyg-editor td { border-color: #cbd5e1; }
+.theme-light .markdown-body th, .theme-light .wysiwyg-editor th { background-color: #f8fafc; color: #0f172a; }
+
+.image-blocked-placeholder {
+  @apply p-4 border border-dashed border-slate-700/50 rounded-xl bg-slate-900/30 text-[11px] text-slate-500 italic my-3 flex items-center justify-center gap-2;
+}
+
+
+/* Widget formatting tools Light Mode fixes */
+.theme-light .bg-slate-900\/90 { background-color: rgba(255, 255, 255, 0.9) !important; }
+.theme-light .bg-slate-900\/40 { background-color: rgba(248, 250, 252, 0.4) !important; }
+.theme-light .bg-white\/5 { background-color: rgba(15, 23, 42, 0.05) !important; }
+.theme-light .bg-white\/10 { background-color: rgba(15, 23, 42, 0.1) !important; }
+.theme-light .hover\:bg-white\/5:hover { background-color: rgba(15, 23, 42, 0.05) !important; }
+.theme-light .hover\:bg-white\/10:hover { background-color: rgba(15, 23, 42, 0.1) !important; }
+.theme-light .border-white\/5 { border-color: rgba(15, 23, 42, 0.05) !important; }
+.theme-light .bg-white\/5.text-white { color: #020617 !important; }
+.theme-light .bg-white\/10.text-white { color: #020617 !important; }
+
+.theme-light .bg-slate-950\/60 { background-color: rgba(255, 255, 255, 0.6) !important; }
+
+/* --- WYSIWYG Visyal Editor Styles --- */
+.wysiwyg-editor {
+  outline: none;
+  @apply break-words;
+}
+.wysiwyg-editor sub, .markdown-body sub {
+  vertical-align: sub !important;
+  font-size: 0.75em !important;
+  line-height: 0 !important;
+}
+.wysiwyg-editor table {
+  width: 100%;
+  table-layout: fixed;
+  word-wrap: break-word;
+  border-collapse: collapse;
+  margin: 1.5rem 0;
+  border: 1px solid rgba(6, 182, 212, 0.2);
+}
+.wysiwyg-editor th, .wysiwyg-editor td {
+  border: 1px solid rgba(148, 163, 184, 0.3);
+  padding: 10px;
+  min-width: 80px;
+  min-height: 36px;
+  position: relative;
+  transition: all 0.2s ease;
+}
+.wysiwyg-editor td:focus, .wysiwyg-editor th:focus {
+  outline: 2px solid #06b6d4;
+  outline-offset: -2px;
+  background-color: rgba(6, 182, 212, 0.05);
+}
+.wysiwyg-editor th {
+  background-color: rgba(6, 182, 212, 0.08);
+  font-weight: 700;
+  color: #22d3ee;
+}
+.wysiwyg-editor img {
+  max-width: 100%;
+  max-height: 300px;
+  width: auto;
+  height: auto;
+  object-fit: contain;
+  border-radius: 8px;
+  margin: 12px 0;
+  display: inline-block;
+  border: 1px solid rgba(148, 163, 184, 0.15);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  transition: all 0.2s ease-in-out;
+}
+.wysiwyg-editor img:hover {
+  border-color: #06b6d4;
+  box-shadow: 0 4px 16px rgba(6, 182, 212, 0.25);
+  cursor: pointer;
+}
+.wysiwyg-editor .pull-left, .markdown-body .pull-left {
+  float: left;
+  margin-right: 1.5rem;
+  margin-bottom: 1rem;
+  max-width: 45%;
+}
+.wysiwyg-editor .pull-right, .markdown-body .pull-right {
+  float: right;
+  margin-left: 1.5rem;
+  margin-bottom: 1rem;
+  max-width: 45%;
+}
+.wysiwyg-editor .clearfix, .markdown-body .clearfix {
+  clear: both;
+}
+.wysiwyg-editor .text-center {
+  text-align: center;
+}
+.wysiwyg-editor .text-justify {
+  text-align: justify;
+}
+.theme-light .wysiwyg-editor sub {
+  color: #0891b2;
+  background-color: rgba(8, 145, 178, 0.06);
+  border-bottom-color: rgba(8, 145, 178, 0.4);
+}
+.theme-light .wysiwyg-editor sub::before {
+  color: #0e7490;
+}
+.theme-light .wysiwyg-editor th, .theme-light .wysiwyg-editor td {
+  border-color: rgba(148, 163, 184, 0.4);
+}
+.theme-light .wysiwyg-editor th {
+  background-color: rgba(8, 145, 178, 0.04);
+}
+
+.wysiwyg-editor:empty::before {
+  content: "Почніть вводити текст тут... (✍️ Можна вставляти картинки й таблиці з підписами)";
+  color: #64748b;
+  pointer-events: none;
+  font-style: italic;
+  font-size: 0.95rem;
+}
+
+
+
+/* Spacer element to allow focusing and creating new lines around block elements */
+
+/* Prominent spacer element */
+.wysiwyg-editor .table-spacer[data-empty="true"] {
+  min-height: 2.5rem;
+  margin: 1rem 0;
+  padding: 0.5rem 0.75rem;
+  border-radius: 8px;
+  transition: all 0.2s ease;
+  cursor: text;
+  background-color: rgba(255, 255, 255, 0.04);
+  border: 1px dashed rgba(148, 163, 184, 0.4);
+  display: block;
+  position: relative;
+}
+.wysiwyg-editor .table-spacer[data-empty="true"]::before {
+  content: attr(data-placeholder);
+  color: rgba(148, 163, 184, 0.45);
+  font-size: 0.85rem;
+  font-style: italic;
+  position: absolute;
+  left: 0.75rem;
+  top: 50%;
+  transform: translateY(-50%);
+  pointer-events: none;
+}
+.wysiwyg-editor .table-spacer[data-empty="true"]:hover {
+  background-color: rgba(255, 255, 255, 0.06);
+  border-color: rgba(6, 182, 212, 0.5);
+}
+.wysiwyg-editor .table-spacer[data-empty="true"]:focus,
+.wysiwyg-editor .table-spacer[data-empty="true"]:focus-within {
+  background-color: rgba(6, 182, 212, 0.12) !important;
+  border-color: rgba(6, 182, 212, 0.8) !important;
+  box-shadow: 0 0 0 2px rgba(6, 182, 212, 0.2);
+  outline: none;
+}
+.wysiwyg-editor .table-spacer[data-empty="true"]:focus::before,
+.wysiwyg-editor .table-spacer[data-empty="true"]:focus-within::before {
+  display: none;
+}
+
+.theme-light .wysiwyg-editor .table-spacer[data-empty="true"] {
+  background-color: rgba(0, 0, 0, 0.03);
+  border-color: rgba(15, 23, 42, 0.2);
+}
+.theme-light .wysiwyg-editor .table-spacer[data-empty="true"]::before {
+  color: rgba(15, 23, 42, 0.3);
+}
+.theme-light .wysiwyg-editor .table-spacer[data-empty="true"]:hover {
+  background-color: rgba(0, 0, 0, 0.06);
+  border-color: rgba(8, 145, 178, 0.5);
+}
+.theme-light .wysiwyg-editor .table-spacer[data-empty="true"]:focus,
+.theme-light .wysiwyg-editor .table-spacer[data-empty="true"]:focus-within {
+  background-color: rgba(8, 145, 178, 0.1) !important;
+  border-color: rgba(8, 145, 178, 0.8) !important;
+  box-shadow: 0 0 0 2px rgba(8, 145, 178, 0.2);
+}
+
+/* --- PERFORMANCE MODE GLOBAL GPU & COMPOSITING OPTIMIZATIONS --- */
+.perf-mode,
+.perf-mode * {
+  /* Disable expensive backdrop-blur GPU layers */
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+
+  /* Remove heavy drop-shadows, glow filters, and text glows */
+  box-shadow: none !important;
+  text-shadow: none !important;
+  filter: none !important;
+
+  /* Disable or accelerate long CSS transitions and keyframe animations to prevent UI jank */
+  animation: none !important;
+  transition: none !important;
+  animation-duration: 0s !important;
+  transition-duration: 0s !important;
+}
+
+/* Remove full-page radial gradients in neon mode when performance mode is active */
+.perf-mode.theme-neon body,
+.perf-mode.theme-neon {
+  background-image: none !important;
+}
+
+/* Ensure translucent floating bars & cards become solid & crystal clear without blur */
+.perf-mode [class*="backdrop-blur"],
+.perf-mode .backdrop-blur-sm,
+.perf-mode .backdrop-blur-md,
+.perf-mode .backdrop-blur-lg,
+.perf-mode .backdrop-blur-\[1px\] {
+  background-color: var(--bg-sidebar, #0f172a) !important;
+}
+
+.theme-light.perf-mode [class*="backdrop-blur"],
+.theme-light.perf-mode .backdrop-blur-sm,
+.theme-light.perf-mode .backdrop-blur-md,
+.theme-light.perf-mode .backdrop-blur-lg,
+.theme-light.perf-mode .backdrop-blur-\[1px\] {
+  background-color: var(--bg-sidebar, #f8fafc) !important;
+}
+

@@ -1,0 +1,241 @@
+name: "Tauri Multiplatform Build & Release"
+
+on:
+  workflow_dispatch: # Allows manual trigger from GitHub Actions tab
+
+# Grant necessary permissions for creating GitHub Releases
+permissions:
+  contents: write
+
+jobs:
+  validate:
+    name: "Validate Packages, Types & Lint"
+    runs-on: ubuntu-26.04
+    steps:
+      - name: "Checkout code repository"
+        uses: actions/checkout@v4
+
+      - name: "Set up Node.js 24"
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: 'npm'
+
+      - name: "Install Frontend Dependencies"
+        run: npm install --legacy-peer-deps
+
+      - name: "Run Linting"
+        run: npm run lint
+
+      - name: "Build Frontend (Typecheck & Compile)"
+        run: npm run build
+
+  publish-tauri:
+    name: "Build & Release (${{ matrix.platform }})"
+    needs: validate
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: "windows-latest" # Builds Windows EXE and MSI installer
+            args: ""
+          - platform: "ubuntu-26.04" # Builds Linux Debian (.deb) and AppImage packages Using modern Ubuntu environment
+            args: ""
+
+    runs-on: ${{ matrix.platform }}
+    steps:
+      - name: "Checkout code repository"
+        uses: actions/checkout@v4
+
+      - name: "Set up Node.js 24"
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: 'npm'
+
+      - name: "Install Rust stable toolchain"
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: "Rust Cache"
+        uses: swatinem/rust-cache@v2
+        with:
+          workspaces: "./src-tauri -> target"
+
+      - name: "Install Linux dependencies (Debian/AppImage required libraries)"
+        if: startsWith(matrix.platform, 'ubuntu-')
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libwebkit2gtk-4.1-dev \
+            build-essential \
+            curl \
+            wget \
+            file \
+            libxdo-dev \
+            libssl-dev \
+            libayatana-appindicator3-dev \
+            librsvg2-dev \
+            rpm
+
+      - name: "Install Frontend Dependencies"
+        run: npm install --legacy-peer-deps
+
+      - name: "Regenerate Icons"
+        run: npx tauri icon app-icon.png
+
+      - name: "Build Frontend & Compile desktop binaries with Tauri Action"
+        uses: tauri-apps/tauri-action@v1
+        env:
+          # Token required to push binary draft release to GitHub
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          
+          # Optional: Tauri Update Updater signing keys
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+          
+          # Optional: macOS Apple Developer credentials for signing and notarization
+          APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
+          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+          APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
+          APPLE_PROVIDER_SHORT_NAME: ${{ secrets.APPLE_PROVIDER_SHORT_NAME }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
+          
+          # Optional: Windows Code Signing (Certificates)
+          # Windows binaries can be signed directly using tauri CLI configurations
+        with:
+          tagName: v__VERSION__ # Auto replaced with package version by Tauri Action
+          releaseName: "Release v__VERSION__"
+          releaseBody: "Automated desktop build for Windows and Linux.\n\n### Signatures and Hashes\nVerify your binary download signatures with Tauri native tools."
+          releaseDraft: true
+          prerelease: false
+          args: ${{ matrix.args }}
+
+  publish-android:
+    name: "Build & Release (Android)"
+    needs: publish-tauri
+    runs-on: ubuntu-26.04
+    steps:
+      - name: "Checkout code repository"
+        uses: actions/checkout@v4
+
+      - name: "Set up Node.js 24"
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: 'npm'
+
+      - name: "Setup Java (JDK 24)"
+        uses: actions/setup-java@v4
+        with:
+          distribution: "zulu"
+          java-version: "24"
+
+      - name: "Install Rust stable toolchain"
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: "aarch64-linux-android,armv7-linux-androideabi,i686-linux-android,x86_64-linux-android"
+
+      - name: "Rust Cache"
+        uses: swatinem/rust-cache@v2
+        with:
+          workspaces: "./src-tauri -> target"
+
+      - name: "Install dependencies (NDK/SDK tools if needed)"
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential
+
+      - name: "Install Frontend Dependencies"
+        run: npm install --legacy-peer-deps
+
+      - name: "Initialize Tauri Android Project"
+        run: npx tauri android init
+
+      - name: "Regenerate Icons"
+        run: |
+          ICON_PATH="app-icon.png"
+          if [ -f "src-tauri/app-icon.png" ]; then
+            ICON_PATH="src-tauri/app-icon.png"
+          elif [ -f "src-tauri/icons/icon.png" ]; then
+            ICON_PATH="src-tauri/icons/icon.png"
+          fi
+          echo "Generating icons from $ICON_PATH..."
+          npx tauri icon "$ICON_PATH"
+
+      - name: "Configure Android Manifest Permissions"
+        run: |
+          MANIFEST_PATH="src-tauri/gen/android/app/src/main/AndroidManifest.xml"
+          
+          # --- PERMISSION CHEAT SHEET (To add, use metadata.json -> requestFramePermissions) ---
+          # CAMERA, RECORD_AUDIO, ACCESS_FINE_LOCATION, READ_MEDIA_IMAGES (Android 13+), 
+          # READ_EXTERNAL_STORAGE (Android 12-), WRITE_EXTERNAL_STORAGE (Android 12-)
+          # ------------------------------------------------------------------------------------
+
+          # 1. READ permissions from metadata.json (handling multi-line)
+          RAW_PERMS=$(cat metadata.json | tr -d '\n' | grep -oP '(?<="requestFramePermissions":\[).*?(?=\])' | tr -d '" ' | tr ',' ' ')
+          
+          # 2. Add defaults & Map frontend names to Android format
+          PERMISSIONS="INTERNET READ_EXTERNAL_STORAGE WRITE_EXTERNAL_STORAGE READ_MEDIA_IMAGES"
+          for P in $RAW_PERMS; do
+            UPPER_P=$(echo $P | tr '[:lower:]' '[:upper:]')
+            PERMISSIONS="$PERMISSIONS $UPPER_P"
+          done
+          
+          if [ -f "$MANIFEST_PATH" ]; then
+            echo "Updating Android Manifest at $MANIFEST_PATH"
+            sed -i '/android.permission./d' "$MANIFEST_PATH"
+            
+            # 3. Inject unique sorted permissions before <application>
+            INJECT=""
+            for P in $(echo $PERMISSIONS | tr ' ' '\n' | sort -u); do
+              INJECT="${INJECT}    <uses-permission android:name=\"android.permission.${P}\" />\n"
+            done
+            
+            sed -i "/<application/i $INJECT" "$MANIFEST_PATH"
+            echo "Successfully updated manifest with: $PERMISSIONS"
+          else
+            echo "Skipping: Android manifest not found at $MANIFEST_PATH (Wait for Tauri to generate it)"
+          fi
+
+      - name: "Configure Release Build Signing with Debug Key"
+        shell: python
+        run: |
+          import os
+          path = "src-tauri/gen/android/app/build.gradle.kts"
+          if os.path.exists(path):
+              with open(path, "r") as f:
+                  content = f.read()
+              if 'signingConfig = signingConfigs.getByName("debug")' not in content:
+                  content = content.replace('getByName("release") {', 'getByName("release") {\n            signingConfig = signingConfigs.getByName("debug")')
+                  with open(path, "w") as f:
+                      f.write(content)
+                  print("Successfully patched build.gradle.kts to use debug signing key.")
+              else:
+                  print("build.gradle.kts was already patched.")
+          else:
+              print("Error: build.gradle.kts not found!")
+              exit(1)
+
+      - name: "Build Frontend"
+        run: npm run build
+
+      - name: "Build Android APK & AAB"
+        run: npx tauri android build --apk --split-per-abi
+
+      - name: "Get package version"
+        id: package-version
+        run: |
+          VERSION=$(node -p "require('./package.json').version")
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+
+      - name: "Upload Android Binaries to GitHub Draft Release"
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: "v${{ steps.package-version.outputs.version }}"
+          name: "Release v${{ steps.package-version.outputs.version }}"
+          draft: true
+          files: |
+            src-tauri/gen/android/app/build/outputs/apk/**/*.apk
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
