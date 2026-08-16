@@ -3930,6 +3930,7 @@ function App() {
   }, []);
 
   // Visual Viewport API for mobile virtual keyboard height detection
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [viewportHeight, setViewportHeight] = useState(() => typeof window !== 'undefined' ? window.innerHeight : 0);
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [_keyboardOffset, setKeyboardOffset] = useState(0);
@@ -11773,8 +11774,24 @@ function App() {
                       onClick={async () => {
                         if (await confirmDialog(t('loadDraftConfirm'))) {
                           setContent(draft.body);
+                          setPubTitle(draft.title);
                           setCurrentDraftId(draft.id);
                           localStorage.removeItem('steem_autosave_temp_visual_html');
+                          
+                          if (editorMode === 'visual' && wysiwygRef.current) {
+                            isSyncingRef.current = true;
+                            const m = getMarked();
+                            if (m) {
+                              const parsed = await m.parse(draft.body);
+                              if (wysiwygRef.current) {
+                                wysiwygRef.current.innerHTML = parsed;
+                                localStorage.setItem('steem_autosave_temp_visual_html', parsed);
+                                localStorage.setItem('steem_visual_html_is_stale', 'false');
+                              }
+                            }
+                            isSyncingRef.current = false;
+                          }
+                          
                           setActiveModal(null);
                         }
                       }}
