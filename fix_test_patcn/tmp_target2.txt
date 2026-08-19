@@ -1,0 +1,36 @@
+          const clonedEndNode = getNodeByPath(clonedWysiwyg, pathEnd);
+          
+          if (clonedStartNode && clonedEndNode) {
+            // Re-create the range within the cloned DOM
+            const clonedRange = document.createRange();
+            
+            try {
+              clonedRange.setStart(clonedStartNode, range.startOffset);
+              clonedRange.setEnd(clonedEndNode, range.endOffset);
+              
+              const startMarkerNode = document.createTextNode('\x01');
+              const endMarkerNode = document.createTextNode('\x02');
+              
+              // Insert end first so it doesn't affect the start position
+              const endRange = clonedRange.cloneRange();
+              endRange.collapse(false);
+              endRange.insertNode(endMarkerNode);
+              
+              const startRange = clonedRange.cloneRange();
+              startRange.collapse(true);
+              startRange.insertNode(startMarkerNode);
+              
+              const htmlWithMarkers = clonedWysiwyg.innerHTML;
+              const rawMd = htmlToMarkdown(htmlWithMarkers);
+              
+              const startIdx = rawMd.indexOf('\x01');
+              const cleanMdAfterStart = rawMd.replace('\x01', '');
+              const endIdx = cleanMdAfterStart.indexOf('\x02');
+              
+              if (startIdx !== -1 && endIdx !== -1) {
+                const pos = { start: startIdx, end: endIdx };
+                cursorPositionRef.current = pos;
+                localStorage.setItem('steem_editor_cursor', JSON.stringify(pos));
+                
+                // Sync to Zustand store
+                const cleanMd = cleanMdAfterStart.replace('\x02', '');

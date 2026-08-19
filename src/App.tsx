@@ -978,6 +978,22 @@ function App() {
 
   useEffect(() => {
     const handleGlobalKeyDown = (e: KeyboardEvent) => {
+      // Intercept WebKitGTK 'f' key fullscreen exit on Linux
+      if (e.key === 'f' || e.key === 'F' || e.code === 'KeyF') {
+        const isTauri = typeof window !== 'undefined' && !!(window as any).__TAURI_INTERNALS__;
+        if (isTauri && (isFullScreen || isEditorFullScreen || document.fullscreenElement)) {
+          if (!e.ctrlKey && !e.metaKey && !e.altKey) {
+            e.preventDefault();
+            const target = e.target as HTMLElement;
+            const isInput = target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable;
+            if (isInput) {
+              document.execCommand('insertText', false, e.key);
+            }
+            return;
+          }
+        }
+      }
+
       if (e.key === 'F11') {
         e.preventDefault();
         const isTauri = typeof window !== 'undefined' && !!(window as any).__TAURI_INTERNALS__;
@@ -3039,24 +3055,25 @@ function App() {
           const clonedEndNode = getNodeByPath(clonedWysiwyg, pathEnd);
           
           if (clonedStartNode && clonedEndNode) {
-            // Re-create the range within the cloned DOM
-            const clonedRange = document.createRange();
-            
             try {
-              clonedRange.setStart(clonedStartNode, range.startOffset);
-              clonedRange.setEnd(clonedEndNode, range.endOffset);
-              
-              const startMarkerNode = document.createTextNode('\x01');
-              const endMarkerNode = document.createTextNode('\x02');
-              
-              // Insert end first so it doesn't affect the start position
-              const endRange = clonedRange.cloneRange();
-              endRange.collapse(false);
-              endRange.insertNode(endMarkerNode);
-              
-              const startRange = clonedRange.cloneRange();
-              startRange.collapse(true);
-              startRange.insertNode(startMarkerNode);
+              if (clonedStartNode === clonedEndNode && clonedStartNode.nodeType === Node.TEXT_NODE) {
+                  const text = clonedStartNode.nodeValue || '';
+                  clonedStartNode.nodeValue = text.slice(0, range.startOffset) + '\x01' + text.slice(range.startOffset, range.endOffset) + '\x02' + text.slice(range.endOffset);
+              } else {
+                  if (clonedEndNode.nodeType === Node.TEXT_NODE) {
+                      const text = clonedEndNode.nodeValue || '';
+                      clonedEndNode.nodeValue = text.slice(0, range.endOffset) + '\x02' + text.slice(range.endOffset);
+                  } else {
+                      clonedEndNode.insertBefore(document.createTextNode('\x02'), clonedEndNode.childNodes[range.endOffset]);
+                  }
+                  
+                  if (clonedStartNode.nodeType === Node.TEXT_NODE) {
+                      const text = clonedStartNode.nodeValue || '';
+                      clonedStartNode.nodeValue = text.slice(0, range.startOffset) + '\x01' + text.slice(range.startOffset);
+                  } else {
+                      clonedStartNode.insertBefore(document.createTextNode('\x01'), clonedStartNode.childNodes[range.startOffset]);
+                  }
+              }
               
               const htmlWithMarkers = clonedWysiwyg.innerHTML;
               const rawMd = htmlToMarkdown(htmlWithMarkers);
@@ -3071,8 +3088,7 @@ function App() {
                 localStorage.setItem('steem_editor_cursor', JSON.stringify(pos));
                 
                 // Sync to Zustand store
-                const cleanMd = cleanMdAfterStart.replace('\x02', '');
-                const rowColPos = getRowColFromOffset(cleanMd, startIdx);
+                const cleanMd = cleanMdAfterStart.replace('\x02', '');                const rowColPos = getRowColFromOffset(cleanMd, startIdx);
                 useEditorStore.getState().setCursor(rowColPos);
                 useEditorStore.getState().setSelection(startIdx, endIdx);
               } else if (startIdx !== -1) {
@@ -3596,11 +3612,7 @@ function App() {
   }, [widgetPos, isWidgetVisible]);
 
   const handleEditorKeyDown = useCallback((e: React.KeyboardEvent<HTMLTextAreaElement>) => {
-    if (widgetPos === 'floating' && !e.ctrlKey && !e.metaKey && e.key !== 'Shift') {
-      if (isWidgetVisible && !isWidgetMenuOpen) {
-        setIsWidgetVisible(false);
-      }
-    }
+    
 
     if (e.key === 'Enter') {
       if (!editorRef.current) return;
@@ -4564,11 +4576,7 @@ function App() {
   const handleWysiwygKeyDown = useCallback((e: React.KeyboardEvent<HTMLDivElement>) => {
     const isMod = e.ctrlKey || e.metaKey;
     
-    if (widgetPos === 'floating' && !isMod && e.key !== 'Shift') {
-      if (isWidgetVisible && !isWidgetMenuOpen) {
-        setIsWidgetVisible(false);
-      }
-    }
+    
 
     if (e.key === 'Tab') {
       e.preventDefault();
@@ -7629,7 +7637,7 @@ function App() {
                   setShowMobileTools1(!showMobileTools1);
                   if (!showMobileTools1) setShowMobileTools2(false);
                 }}
-                className="lg:hidden flex items-center justify-center bg-slate-800/30 p-2 rounded-xl border border-slate-700/30 text-slate-400 hover:text-white hover:bg-slate-700/50 transition-all size-10"
+                className="lg:hidden flex items-center justify-center bg-slate-800/30 p-2 rounded-xl border border-slate-700/30 text-slate-400 hover:text-white hover:bg-slate-700/50 transition-all min-w-[2.5rem] min-h-[2.5rem]"
                 title="Tools"
              >
                 <Layers size={20} />
@@ -7698,7 +7706,7 @@ function App() {
                   setShowMobileTools2(!showMobileTools2);
                   if (!showMobileTools2) setShowMobileTools1(false);
                 }}
-                className="lg:hidden flex items-center justify-center bg-slate-800/30 p-2 rounded-xl border border-slate-700/30 text-slate-400 hover:text-white hover:bg-slate-700/50 transition-all size-10"
+                className="lg:hidden flex items-center justify-center bg-slate-800/30 p-2 rounded-xl border border-slate-700/30 text-slate-400 hover:text-white hover:bg-slate-700/50 transition-all min-w-[2.5rem] min-h-[2.5rem]"
                 title="Files"
              >
                 <FilePlus size={20} />
@@ -7887,7 +7895,7 @@ function App() {
                                   <button 
                                     onClick={() => {
                                       fileInputRef.current?.click();
-                                      if (window.innerWidth < 1024) setIsWidgetVisible(false);
+                                      // if (window.innerWidth < 1024) setIsWidgetVisible(false); // Kept visible as requested
                                     }}
                                     disabled={isUploading}
                                     className="px-3 py-1.5 flex-1 bg-cyan-600 hover:bg-cyan-500 disabled:opacity-50 border border-cyan-500/30 rounded-lg text-[10px] font-bold transition-all flex items-center justify-center gap-1.5 min-w-0"
@@ -8067,7 +8075,7 @@ function App() {
                                 <button 
                                   onClick={() => {
                                     insertGrid();
-                                    if (window.innerWidth < 1024) setIsWidgetVisible(false);
+                                    // if (window.innerWidth < 1024) setIsWidgetVisible(false); // Kept visible as requested
                                   }}
                                   disabled={galleryMode === 'local' ? images.filter(i => i.selected).length === 0 : pexelsResults.filter(p => p.selected).length === 0}
                                   className="flex-1 px-3 py-1.5 bg-slate-800 hover:bg-cyan-900 disabled:opacity-50 border border-slate-700 hover:border-cyan-700 text-cyan-400 rounded-lg text-[10px] font-bold transition-colors flex items-center justify-center gap-1.5 min-w-0"
@@ -8141,7 +8149,7 @@ function App() {
                             onToggle={toggleImageSelection}
                             onInsert={(url, name, pos) => {
                               insertImage(url, name, pos);
-                              if (window.innerWidth < 1024) setIsWidgetVisible(false);
+                              // if (window.innerWidth < 1024) setIsWidgetVisible(false); // Kept visible as requested
                             }}
                             onHost={uploadExternalImage}
                             onDelete={(i) => {
@@ -8165,7 +8173,7 @@ function App() {
                             onToggle={(i) => setPexelsResults(prev => prev.map((p, j) => i === j ? { ...p, selected: !p.selected } : p))}
                             onInsert={(photo, pos) => {
                               insertExternalImage(photo, pos);
-                              if (window.innerWidth < 1024) setIsWidgetVisible(false);
+                              // if (window.innerWidth < 1024) setIsWidgetVisible(false); // Kept visible as requested
                             }}
                             t={t}
                             isCollapsed={isGalleryCollapsed}
@@ -8675,9 +8683,7 @@ function App() {
                   onDemandSyncEnabled={onDemandSyncEnabled}
                   onChange={() => {
                     saveCursorPosition();
-                    if (widgetPos === 'floating' && isWidgetVisible && !isWidgetMenuOpen) {
-                      setIsWidgetVisible(false);
-                    }
+                    
                   }}
                   onSelect={saveCursorPosition}
                   onKeyUp={saveCursorPosition}
@@ -8701,8 +8707,8 @@ function App() {
                     (visualStyle === 'neon' && neonTextColored) ? "text-cyan-400 font-normal" : "text-slate-300",
                     beautifyEnabled ? "px-4 lg:px-8 pt-4 lg:pt-6 max-w-[clamp(40rem,60vw,80rem)] mx-auto selection:bg-[rgb(var(--accent-color)/0.3)]" : "px-3 pt-3 lg:px-6 lg:pt-6",
                     isKeyboardOpen 
-                      ? "pb-6 mb-[4rem] lg:pb-6 lg:mb-[5rem]" 
-                      : "pb-6 mb-[8rem] lg:pb-6 lg:mb-[5rem]"
+                      ? "pb-6 mb-[6rem] lg:pb-6 lg:mb-[5rem]" 
+                      : "pb-6 mb-[10rem] lg:pb-6 lg:mb-[5rem]"
                   )}
                   placeholder={`${t('placeholder')}\n\n\n\n\nОМ АХ ХУМ СО ХА\n♡`}
                 />
@@ -8918,8 +8924,8 @@ function App() {
                     (visualStyle === 'neon' && neonTextColored) ? "text-cyan-400 font-normal" : "text-slate-300",
                     beautifyEnabled ? "px-4 lg:px-8 pt-4 lg:pt-6 max-w-4xl mx-auto selection:bg-[rgb(var(--accent-color)/0.3)]" : "px-4 pt-4 lg:px-6 lg:pt-6",
                     isKeyboardOpen 
-                      ? "pb-6 mb-[4rem] lg:pb-6 lg:mb-[5rem]" 
-                      : "pb-6 mb-[8rem] lg:pb-6 lg:mb-[5rem]"
+                      ? "pb-6 mb-[6rem] lg:pb-6 lg:mb-[5rem]" 
+                      : "pb-6 mb-[10rem] lg:pb-6 lg:mb-[5rem]"
                   )}
                   style={{ minHeight: '200px' }}
                 />
@@ -9098,11 +9104,16 @@ function App() {
                         style.left = Math.min(rightBound, Math.max(leftBound, floatingPos.x));
                         style.top = floatingPos.y < 150 ? floatingPos.y + 40 : floatingPos.y - 80;
                       } else if (window.innerWidth < 1024) {
-                        if (isKeyboardOpen) {
-                          style.bottom = `calc(${keyboardOffset > 0 ? keyboardOffset : 0}px + 0.2rem)`;
-                        } else {
-                          style.bottom = 'calc(4rem + 0.15rem)';
-                        }
+                        style.position = 'fixed';
+                        // Keep widget inside the viewport explicitly on mobile
+                        style.top = 'auto';
+                        style.left = '0';
+                        style.right = '0';
+                        style.margin = '0 auto';
+                        // When fullscreen, only keyboard offset. When not fullscreen, add 4rem for bottom nav bar.
+                        style.bottom = isEditorFullScreen 
+                           ? `calc(${keyboardOffset > 0 ? keyboardOffset : 0}px + 0.5rem)` 
+                           : `calc(${keyboardOffset > 0 ? keyboardOffset : 0}px + 4rem + 0.5rem)`;
                       }
                       
                       return style;
@@ -12472,10 +12483,11 @@ function App() {
       {/* Mobile Bottom Navigation */}
         <nav 
           className={cn(
-            "lg:hidden absolute bottom-0 left-0 right-0 bg-slate-900 border-t border-slate-800 grid grid-cols-5 items-center px-1 z-[70] shadow-[0_-4px_20px_rgba(0,0,0,0.5)] transition-all duration-200",
-            isKeyboardOpen ? "translate-y-full opacity-0 pointer-events-none" : "translate-y-0 opacity-100"
+            "lg:hidden fixed left-0 right-0 bg-slate-900 border-t border-slate-800 grid grid-cols-5 items-center px-1 z-[70] shadow-[0_-4px_20px_rgba(0,0,0,0.5)] transition-all duration-200",
+            (isKeyboardOpen && isEditorFullScreen) ? "translate-y-full opacity-0 pointer-events-none" : "translate-y-0 opacity-100"
           )}
           style={{
+            bottom: `${(isKeyboardOpen && !isEditorFullScreen) ? keyboardOffset : 0}px`,
             paddingBottom: 'env(safe-area-inset-bottom, 0px)',
             height: 'calc(4rem + env(safe-area-inset-bottom, 0px))'
           }}
