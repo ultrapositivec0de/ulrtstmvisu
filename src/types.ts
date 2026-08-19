@@ -76,7 +76,7 @@ export interface SteemPost {
   url?: string;
 }
 
-export type Language = 'uk' | 'en' | 'es' | 'ko';
+export type Language = 'uk' | 'en' | 'es' | 'ko' | string;
 
 export type AuthType = 'KEYCHAIN' | 'VAULT';
 

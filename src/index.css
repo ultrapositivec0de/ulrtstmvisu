@@ -326,66 +326,49 @@ body {
   margin-top: 1rem !important;
   margin-bottom: 0.5rem !important;
 }
-.markdown-body p {
+.markdown-body p, .wysiwyg-editor p {
   margin-top: 0 !important;
-  margin-bottom: 1rem !important;
+  margin-bottom: 0.85rem !important;
   line-height: 1.6 !important;
+  min-height: 1.5rem;
 }
-.wysiwyg-editor p {
-  margin-top: 0 !important;
-  margin-bottom: 0.2rem !important;
-  line-height: 1.4 !important;
+.wysiwyg-editor p:empty,
+.wysiwyg-editor p:has(> br:only-child) {
+  min-height: 1.5rem;
 }
-.markdown-body ul {
+.markdown-body ul, .wysiwyg-editor ul {
   list-style-type: disc !important;
   padding-left: 1.5rem !important;
-  margin-top: 0 !important;
-  margin-bottom: 0 !important;
+  margin-top: 0.5rem !important;
+  margin-bottom: 0.85rem !important;
 }
-.wysiwyg-editor ul {
-  list-style-type: disc !important;
-  padding-left: 1.5rem !important;
-  margin-top: 0 !important;
-  margin-bottom: 0 !important;
-}
-.markdown-body ol {
+.markdown-body ol, .wysiwyg-editor ol {
   list-style-type: decimal !important;
   padding-left: 1.5rem !important;
+  margin-top: 0.5rem !important;
+  margin-bottom: 0.85rem !important;
+}
+.markdown-body li, .wysiwyg-editor li {
   margin-top: 0 !important;
   margin-bottom: 0 !important;
+  padding-left: 0.25rem !important;
+  line-height: 1.5 !important;
 }
-.wysiwyg-editor ol {
-  list-style-type: decimal !important;
-  padding-left: 1.5rem !important;
-  margin-top: 0 !important;
-  margin-bottom: 0 !important;
-}
-.markdown-body li {
-  margin-top: 0 !important;
-  margin-bottom: 0 !important;
-}
-.markdown-body li > p {
+.markdown-body li > p, .wysiwyg-editor li > p {
   margin: 0 !important;
+  display: inline;
 }
-.markdown-body li > ul, .markdown-body li > ol {
-  margin: 0 !important;
-}
-.wysiwyg-editor li {
-  margin-top: 0 !important;
-  margin-bottom: 0 !important;
-}
-.wysiwyg-editor li > p {
-  margin: 0 !important;
-}
+.markdown-body li > ul, .markdown-body li > ol,
 .wysiwyg-editor li > ul, .wysiwyg-editor li > ol {
-  margin: 0 !important;
+  margin-top: 0 !important;
+  margin-bottom: 0 !important;
 }
 .markdown-body blockquote, .wysiwyg-editor blockquote {
   border-left: 4px solid rgba(148, 163, 184, 0.5) !important;
   padding-left: 1rem !important;
   font-style: italic !important;
-  margin-top: 0 !important;
-  margin-bottom: 0.75rem !important;
+  margin-top: 0.5rem !important;
+  margin-bottom: 0.85rem !important;
 }
 .markdown-body code, .wysiwyg-editor code { @apply bg-slate-800 px-1.5 py-0.5 rounded text-sm font-mono text-cyan-400; }
 .markdown-body pre, .wysiwyg-editor pre { @apply bg-slate-900 p-4 rounded-xl mb-4 overflow-x-auto border border-slate-800; }

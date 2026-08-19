@@ -239,13 +239,14 @@ export function htmlToMarkdown(html: string): string {
 
         if (className.includes('table-spacer') || el.hasAttribute('data-placeholder') || el.hasAttribute('data-empty')) {
            const cleanedText = inner.replace(/↵\s*(Початок|Кінець|Новий|Top|End|New|Inicio|Fin|Nuevo|게시물|새)\s*(допису|publicación|post|параграф|рядок|párrafo|paragraph|문단|시작|끝)?.*/gi, '').trim();
-           if (cleanedText === '' || el.getAttribute('data-empty') === 'true') {
+           const visibleText = (el.textContent || '').replace(/↵\s*(Початок|Кінець|Новий|Top|End|New|Inicio|Fin|Nuevo|게시물|새)\s*(допису|publicación|post|параграф|рядок|párrafo|paragraph|문단|시작|끝)?.*/gi, '').trim();
+           if (cleanedText === '' || visibleText === '') {
              return '';
            }
         }
 
         if (inner.trim() === '') {
-           if (className.includes('table-spacer') && el.getAttribute('data-empty') === 'true') {
+           if (className.includes('table-spacer') && ((el.textContent || '').trim() === '' || el.getAttribute('data-empty') === 'true')) {
              return '';
            }
            return inner.length > 0 ? inner : '\n';
@@ -265,6 +266,14 @@ export function htmlToMarkdown(html: string): string {
   return md
     .replace(/\u200B/g, '')
     .replace(/\r\n/g, '\n')
+    .replace(/(\|[^\n]+\|)(\n{3,})(\|[^\n]+\|)/g, (match, r1, nl, r2) => {
+      const count = nl.length - 1;
+      return `${r1}${nl.substring(0, count)}${r2}`;
+    })
+    .replace(/((?:^|\n)[\t ]*(?:[-*+]|\d+\.)[^\n]+)(\n{3,})([\t ]*(?:[-*+]|\d+\.)[^\n]+)/g, (match, r1, nl, r2) => {
+      const count = nl.length - 1;
+      return `${r1}${nl.substring(0, count)}${r2}`;
+    })
     .trim();
 }
 

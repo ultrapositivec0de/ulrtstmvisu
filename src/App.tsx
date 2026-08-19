@@ -30,6 +30,7 @@ import Reader from './components/Reader';
 import { zipSync, unzipSync, strToU8, strFromU8 } from 'fflate';
 import { htmlToMarkdown, convertBareImageUrlsToMarkdown, isImageAndProxyUrl } from './lib/editorSync';
 import { useEditorWorker } from './hooks/useEditorWorker';
+import { translations, AVAILABLE_LANGUAGES, getTranslation, type TranslationKey } from './locales';
 
 // --- Constants ---
 const COMMUNITIES = [
@@ -64,1130 +65,6 @@ const COMMON_TAGS = ['life', 'betterlife', 'thediarygame', 'club5050', 'club75',
 
 // Detect native environment (Tauri / Android Wrapper)
 // const IS_NATIVE = typeof window !== 'undefined' && (!!(window as any).__TAURI__ || !!(window as any).AndroidBridge || navigator.userAgent.includes('SteemEditorNative'));
-
-// --- Translations ---
-const translations = {
-  uk: {
-    saveDraftBeforeNew: "Зберегти поточний допис як чернетку перед створенням нового?",
-    confirmNewPost: "Ви впевнені, що хочете почати новий допис? Поточний текст буде втрачено, якщо він не збережений.",
-    confirmDeleteAccount: "Ви впевнені, що хочете видалити акаунт {acc}?",
-    confirmResetVault: "Ви впевнені, що хочете скинути Сховище? Усі дані будуть видалені.",
-    confirmClearApiKeys: "Очистити всі API ключі?",
-    general: "Загальні",
-    about: "Про застосунок",
-    vault: "Сховище",
-    pwa: "Встановлення",
-    enterPin: "Введіть ПІН-код",
-    sessionActive: "СЕСІЯ АКТИВНА",
-    vaultClosed: "СХОВИЩЕ ЗАКРИТЕ",
-    addMention: "Додати користувача (без @):",
-    performanceMode: "Режим продуктивності",
-    widgetSettings: "Налаштування віджета",
-    appearance: "Зовнішній вигляд",
-    theme: "Тема",
-    font: "Шрифт",
-    widgetPos: "Позиція віджета",
-    posFloating: "Плаваючий",
-    posBottom: "Знизу",
-    posPreview: "Прев'ю",
-    widgetMinimal: "Мінімалістичний режим",
-    widgetOpacity: "Прозорість",
-    activeToolsSort: "Сортування інструментів",
-    settingsToolsDesc: "Увімкніть та впорядкуйте інструменти, які будуть доступні у плаваючому віджеті.",
-    gallerySettings: "Налаштування галереї",
-    vaultSecurity: "Безпека Сховища",
-    accounts: "Акаунти",
-    importBtn: "ІМПОРТУВАТИ ТАБЛИЦЮ",
-    editor: "Редактор",
-    preview: "Прев'ю",
-    gallery: "Галерея",
-    settings: "Налаштування",
-    publish: "Опублікувати",
-    drafts: "Чернетки",
-    templates: "Шаблони",
-    tags: "Теги",
-    mentions: "Згадки",
-    tagGroups: "Групи тегів",
-    addTagGroup: "Додати групу",
-    importTable: "Імпорт таблиці",
-    schedule: "Розклад",
-    saveDraft: "Зберегти чернетку",
-    insert: "Вставити",
-    delete: "Видалити",
-    cancel: "Скасувати",
-    confirm: "Підтвердити",
-    username: "Користувач",
-    title: "Заголовок",
-    removeFirstLine: "Видалити перший рядок з тексту",
-    tagsPlaceholder: "теги через пробіл",
-    cacheCleared: "Кеш галереї очищено",
-    pexelsSearch: "Пошук у Pexels",
-    noDrafts: "Чернеток немає",
-    noTemplates: "Шаблонів немає",
-    wordsLabel: "Слів",
-    cleanWordsLabel: "Чистих слів",
-    charsLabel: "Символів",
-    words: "слів",
-    chars: "симв",
-    clean: "чисто",
-    editorTools: "Інструменти",
-    steemitSetup: "Налаштування Steemit",
-    themeCyan: "Ціан (Ніч)",
-    themeEmerald: "Смарагд",
-    themeOrange: "Захід сонця",
-    themeRose: "Кварц",
-    fontSans: "Sans (Inter)",
-    fontSerif: "Serif (PT Serif)",
-    fontMono: "Mono (JetBrains)",
-    advanced: "Додатково",
-    appAgent: "Агент застосунку",
-    rewardType: "Тип винагороди",
-    rewardsSP: "100% SP",
-    rewards50: "50% / 50%",
-    trafficOptimization: "Оптимізація трафіку",
-    trafficDesc: "Мініатюри в галереї",
-    darkMode: "Темна тема",
-    lightMode: "Світла тема",
-    exifEnabled: "Зчитувати EXIF",
-    exifDesc: "Додавати параметри зйомки після фото",
-    beneficiaries: "Бенефіціари",
-    addBeneficiary: "Додати",
-    weight: "%",
-    fromMentions: "Із згадувань",
-    noBeneficiaries: "Немає бенефіціарів",
-    mentionsList: "Список згадок",
-    signaturePolicy: "Перевірка підпису",
-    signatureMissing: "Підпис відсутній у кінці поста!",
-    signatureFound: "Підпис знайдено.",
-    twoTapPublish: "Швидка публікація",
-    applyGroup: "Вставити групу",
-    importTableTitle: "Імпорт таблиці",
-    importTableDesc: "Вставте дані з Excel, Google Sheets або CSV. Ми автоматично перетворимо їх у Markdown.",
-    importTablePlaceholder: "Вставте дані сюди...",
-    tableFormat: "Формат таблиці",
-    loadDraftConfirm: "Завантажити цю чернетку? Поточний текст буде замінено.",
-    parts: "частин",
-    splitPost: "Розділити допис",
-    splitPostDesc: "Розділити довгий текст на кілька частин по ~300 слів.",
-    minWordsPerPart: "Мін. слів на частину",
-    splitBtn: "РОЗДІЛИТИ",
-    formatting: "Форматування",
-    steemitOptions: "Опції Steemit",
-    clearfix: "Фікс. текст (Clearfix)",
-    imageFormat: "Формат зображень",
-    additional: "Додатково",
-    pexelsAttribution: "Атрибуція Pexels",
-    pexelsLink: "Посилання в фото",
-    pexelsKey: "Ключ Pexels",
-    vaultPin: "ПІН-код Vault",
-    unlock: "Розблокувати",
-    lock: "Заблокувати",
-    keys: "Ключі",
-    mobileEditor: "Ред",
-    mobilePreview: "Прев",
-    queue: "Черга",
-    addToQueue: "В чергу",
-    queueEmpty: "Черга порожня",
-    publishNext: "Опублікувати наступний",
-    autoPublish: "Авто-публікація",
-    status: "Статус",
-    pending: "Очікує",
-    published: "Опубліковано",
-    error: "Помилка",
-    gridWithCaptions: "Додати підписи до сітки",
-    placeholder: "Почніть писати свій шедевр тут...",
-    fillRequired: "Будь ласка, заповніть усі обов'язкові поля.",
-    publishing: "⏳ Початок публікації...",
-    publishedSuccess: "✅ Опубліковано!",
-    noKeychain: "Steem Keychain не знайдено.",
-    pinRequired: "ПІН-код обов'язковий",
-    saveSuccess: "Збережено!",
-    fillAll: "Заповніть усі поля!",
-    noAccount: "Оберіть акаунт!",
-    pinShort: "ПІН-код занадто короткий (мін. 4)",
-    vaultInit: "Сховище ініціалізовано!",
-    accountAdded: "Акаунт додано!",
-    bold: "Жирний",
-    italic: "Курсив",
-    strike: "Закреслений",
-    h1: "Заголовок 1",
-    h2: "Заголовок 2",
-    h3: "Заголовок 3",
-    quote: "Цитата",
-    link: "Посилання",
-    hr: "Розділювач",
-    justify: "По ширині",
-    center: "По центру",
-    addAccount: "Додати акаунт",
-    templateName: "Назва шаблону",
-    saveTemplate: "Зберегти шаблон",
-    mentionUsername: "Користувач",
-    saveMention: "Додати",
-    search: "Пошук",
-    light: "Світла",
-    dark: "Темна",
-    syncScroll: "Синхронне прокручування",
-    dragToReorder: "Перетягніть для зміни порядку",
-    transparent: "Прозорий",
-    borderless: "Без рамок",
-    systemDialogAlert: "Повідомлення",
-    systemDialogConfirm: "Підтвердіть дію",
-    systemDialogPrompt: "Введіть дані",
-    aboutDesc: "Ultra Steem Editor — професійний багатопотоковий редактор для Steem з безпекою на базі Web Crypto (AES-GCM), подвійним шифруванням та захистом ПІН-кодом. Оптимізовано для великих файлів.",
-    aboutApp: "Про застосунок",
-    packagesUsed: "Використані пакети (NPM)",
-    removedPackages: "Прибрані пакети (Оптимізація)",
-    externalLibs: "Зовнішні бібліотеки (CDN)",
-    credits: "Авторство та розробка",
-    aiCredits: "ШІ (Gemini AI)",
-    humanCredits: "Людина",
-    aiTasks: "Написання коду, тех. оптимізація, реалізація логіки",
-    humanTasks: "Ідея, творче спрямування, тестування, асистування",
-    appAgentDesc: "Мета-рядок, що додається до ваших постів.",
-    version: "Версія",
-    developer: "Розробник",
-    github: "GitHub",
-    license: "Ліцензія",
-    copyright: "2024 SteemEditor Pro. Всі права захищені.",
-    showInWidget: "Показувати у віджеті",
-    hideInWidget: "Приховати у віджеті",
-    opacity: "Прозорість",
-    noBorder: "Без рамок",
-    resetWidget: "Скинути вигляд",
-    templatesEmpty: "Список шаблонів порожній",
-    saveAsTemplate: "Зберегти як шаблон",
-    confirmDeleteTemplate: "Видалити шаблон {name}?",
-    templateSaved: "Шаблон збережено!",
-    templateDeleted: "Шаблон видалено!",
-    mentionAdded: "Згадування додано!",
-    mentionDeleted: "Згадування видалено!",
-    confirmDeleteMention: "Видалити згадування @{name}?",
-    table: "Таблиця",
-    downloadMd: "Завантажити .md",
-    exportMd: "Експорт .md",
-    importMd: "Імпорт .md",
-    clearNativeCache: "Очистити системний кеш",
-    nativeCacheCleared: "Кеш (зображення, списки, тимчасові файли) успішно очищено!",
-    nativeCacheError: "Помилка очищення кешу",
-    tagPresets: "Пресет тегів",
-    commonTags: "Популярні теги",
-    communities: "Спільноти",
-    indent: "Відступ (4 пр.)",
-    escape: "Екранування",
-    codeBlock: "Блок коду",
-    inlineCode: "Код в рядку",
-    addTags: "Додати теги",
-    attribution: "Атрибуція автора",
-    linkInImg: "Лінк у картинці",
-    createGrid: "Створити сітку",
-    account: "Акаунт",
-    leftText: "Зліва + текст",
-    rightText: "Справа + текст",
-    asIs: "Як є",
-    uploadToSteemit: "Завантажити на Steemit",
-    pexelsError: "Помилка Pexels: Перевірте API ключ або підключення.",
-    linkPrompt: "Це посилання. Введіть текст для нього (або залиште порожнім):",
-    urlPrompt: "Введіть URL:",
-    leftContent: " ✍️ ",
-    rightContent: " ✍️ ",
-    loadingParser: "Завантаження парсера...",
-    previewError: "Помилка рендерингу превью",
-    untitled: "Без назви",
-    needVaultAccount: "Для вивантаження зображень необхідно обрати акаунт у сховищі (Vault)!",
-    pinError: "Помилка ПІН-коду: ",
-    preparingUpload: "⏳ Підготовка до завантаження...",
-    proxyAttempt: "⏳ Спроба через проксі...",
-    proxyError: "Не вдалося завантажити зображення навіть через проксі (CORS)",
-    signingImage: "⏳ Підпис зображення...",
-    uploadingSteemit: "⏳ Вивантаження на SteemitImages...",
-    serverError: "Помилка сервера: ",
-    uploadSuccess: "✅ Зображення успішно завантажено!",
-    uploadProgress: "⏳ Завантаження {current} з {total}: {name}...",
-    uploadComplete: "✅ Завантажено {count} з {total} зображень.",
-    pasteUrl: "Вставте посилання тут...",
-    fullScreen: "Повний екран",
-    enterNewPin: "Введіть новий ПІН-код",
-    enterPinPlaceholder: "Введіть ПІН-код",
-    usernameNoAt: "Нікнейм (без @)",
-    vaultUnlocked: "Сховище розблоковано",
-    vaultLocked: "Сховище заблоковано",
-    vaultTitle: "Сховище акаунтів",
-    vaultWarning: "Подвійне шифрування: ПІН-код захищає Майстер-ключ, який шифрує ваші акаунти.",
-    pinSetup: "Налаштування ПІН-коду",
-    pinSetupDesc: "Встановіть ПІН-код для захисту вашого сховища. Він не зберігається ніде, крім вашої голови.",
-    createVault: "СТВОРИТИ СХОВИЩЕ",
-    unlockBtn: "РОЗБЛОКУВАТИ",
-    yourAccounts: "Ваші акаунти",
-    newAccount: "Новий акаунт",
-    postingKeyPlaceholder: "Posting Key (5J...)",
-    done: "Готово",
-    publishToSteem: "Публікація в Steem",
-    vaultNotConfigured: "Сховище не налаштовано. Встановіть ПІН-код у налаштуваннях.",
-    setupVaultBtn: "Налаштувати сховище",
-    vaultActive: "Сховище активне",
-    vaultActiveDesc: "Ви можете публікувати пости від обраного акаунта.",
-    selectAccount: "Оберіть акаунт...",
-    autosaveActive: "Автозбереження активно",
-    clear: "Очистити",
-    saveToVault: "ЗБЕРЕГТИ В СХОВИЩЕ",
-    protectedByMK: "Захищено MK",
-    vaultEmpty: "Сховище порожнє",
-    resetVault: "Скинути все сховище",
-    save: "ЗБЕРЕГТИ",
-    links: "ПОСИЛАННЯ",
-    text: "ТЕКСТ",
-    keys_mobile: "КЛЮЧІ",
-    clearfixDesc: "Запобігає обтіканню текстом після зображень зліва/справа.",
-    splitSuccess: "Допис розділено на {count} частин та збережено в чернетки!",
-    importTableSuccess: "Таблицю успішно імпортовано!",
-    pexelsKeyRequired: "Спочатку додайте API ключ Pexels у налаштуваннях (отримайте його на pexels.com після реєстрації).",
-    pixabayKeyRequired: "Спочатку додайте API ключ Pixabay у налаштуваннях (отримайте його на pixabay.com після реєстрації).",
-    unsplashKeyRequired: "Спочатку додайте API ключ Unsplash (Access Key) у налаштуваннях (отримайте його на unsplash.com/developers).",
-    pixabayError: "Помилка Pixabay: Перевірте API ключ або підключення.",
-    unsplashError: "Помилка Unsplash: Перевірте API ключ або підключення.",
-    working: "В роботі",
-    ready: "Затверджено",
-    pixabayKey: "Ключ Pixabay",
-    unsplashKey: "Ключ Unsplash",
-    enableThumbnails: "Мініатюри в галереї",
-    caption: "Підпис",
-    addCaption: "Додати підпис",
-    typeHere: " ✍️ ",
-    image: "Зображення",
-    description: "Опис",
-    color: "Колір",
-    rowLayout: "Рядок поруч",
-    colImgText: "Фото → Опис",
-    colTextImg: "Опис → Фото",
-    alignLeft: "Ліворуч",
-    alignCenter: "По центру",
-    alignRight: "Праворуч",
-    align: "Вирівнювання",
-    gridLayout: "Макет сітки",
-    redText: "Червоний текст",
-    loadMore: "Завантажити ще",
-    saveUnencrypted: "Зберегти без PIN-коду",
-    unsplashAppId: "Unsplash Application ID",
-    unsplashAccessKey: "Unsplash Access Key",
-    unsplashSecretKey: "Unsplash Secret Key",
-    keysCleared: "API ключі очищено!",
-    clearApiKeys: "Очистити API ключі",
-    clearCache: "Очистити кеш",
-    textWrap: "Обтікання текстом",
-    performanceDesc: "Вимикає деякі анімації та підсвічування для підвищення швидкості роботи.",
-    allSettings: "Усі налаштування",
-    widgetNoBorder: "Без рамок",
-    saved: "Збережено",
-    load: "Завантажити",
-    newPost: "Новий допис",
-    welcomeTitle: "Привіт! 👋",
-    welcomeDesc: "Додайте свій Steem нікнейм для персоналізованих сповіщень про відповіді, завантаження зображень та швидкої публікації через Keychain.",
-    saveAndStart: "Зберегти і Почати",
-    skipForNow: "Пропустити (можна додати пізніше)",
-    installApp: "Встановити додаток",
-    pwaInstallDesc: "Встановіть Steem Editor як швидкий і легкий додаток на свій пристрій з підтримкою офлайн-роботи.",
-    pwaInstalled: "Додаток успішно встановлено!",
-    pwaAlreadyInstalled: "Додаток уже встановлено",
-    pwaInstallFailed: "Не вдалося запустити встановлення",
-    pwaPlatformSupport: "Підтримується на Android, iOS, Windows та macOS.",
-  },
-  en: {
-    saveDraftBeforeNew: "Save current post as draft before starting new?",
-    confirmNewPost: "Are you sure you want to start a new post? Current text will be lost if not saved.",
-    performanceDesc: "Disables some animations and highlights for better performance.",
-    allSettings: "All Settings",
-    widgetNoBorder: "No Border",
-    saved: "Saved",
-    load: "Load",
-    newPost: "New Post",
-    welcomeTitle: "Welcome! 👋",
-    welcomeDesc: "Add your Steem username for personalized reply notifications, image uploads, and quick posting via Keychain.",
-    saveAndStart: "Save & Start",
-    skipForNow: "Skip for now (can add later)",
-    aboutDesc: "Ultra Steem Editor — professional multi-threaded editor for Steem with Web Crypto (AES-GCM) security, double encryption, and PIN protection. Optimized for large files.",
-    aboutApp: "About App",
-    packagesUsed: "Packages Used (NPM)",
-    removedPackages: "Removed Packages (Optimization)",
-    externalLibs: "External Libraries (CDN)",
-    credits: "Credits & Development",
-    aiCredits: "AI (Gemini AI)",
-    humanCredits: "Human",
-    aiTasks: "Code writing, tech optimization, logic implementation",
-    humanTasks: "Idea, creative direction, testing, assisting",
-    appAgentDesc: "Meta string added to your posts.",
-    version: "Version",
-    developer: "Developer",
-    license: "License",
-    confirmDeleteAccount: "Delete account @{acc}?",
-    confirmResetVault: "Reset Vault? All accounts will be removed.",
-    confirmClearApiKeys: "Clear all API keys?",
-    general: "General",
-    about: "About",
-    vault: "Vault",
-    pwa: "PWA Install",
-    enterPin: "Enter PIN",
-    sessionActive: "SESSION ACTIVE",
-    vaultClosed: "VAULT CLOSED",
-    addMention: "Add user (no @):",
-    performanceMode: "Performance Mode",
-    widgetSettings: "Widget Settings",
-    appearance: "Appearance",
-    theme: "Theme",
-    font: "Font",
-    widgetPos: "Widget Position",
-    posFloating: "Floating",
-    posBottom: "Bottom",
-    posPreview: "Preview Pane",
-    widgetMinimal: "Minimal Mode",
-    widgetOpacity: "Opacity",
-    activeToolsSort: "Tools Sort",
-    settingsToolsDesc: "Configure floating widget tools.",
-    gallerySettings: "Gallery Settings",
-    vaultSecurity: "Vault Security",
-    accounts: "Accounts",
-    importBtn: "IMPORT",
-    cacheCleared: "Gallery cache cleared",
-    editor: "Editor",
-    preview: "Preview",
-    gallery: "Gallery",
-    settings: "Settings",
-    publish: "Publish",
-    drafts: "Drafts",
-    templates: "Templates",
-    tags: "Tags",
-    mentions: "Mentions",
-    tagGroups: "Tag Groups",
-    addTagGroup: "Add Group",
-    importTable: "Import Table",
-    schedule: "Schedule",
-    saveDraft: "Save Draft",
-    insert: "Insert",
-    delete: "Delete",
-    cancel: "Cancel",
-    confirm: "Confirm",
-    username: "Username",
-    title: "Title",
-    removeFirstLine: "Remove 1st line from post body",
-    tagsPlaceholder: "tags by space",
-    pexelsSearch: "Pexels Search",
-    noDrafts: "No drafts",
-    noTemplates: "No templates",
-    wordsLabel: "Words",
-    cleanWordsLabel: "Clean",
-    charsLabel: "Chars",
-    words: "words",
-    chars: "chars",
-    clean: "clean",
-    editorTools: "Tools",
-    steemitSetup: "Steemit Setup",
-    themeCyan: "Cyan",
-    themeEmerald: "Emerald",
-    themeOrange: "Orange",
-    themeRose: "Rose",
-    fontSans: "Sans (Inter)",
-    fontSerif: "Serif (PT Serif)",
-    fontMono: "Mono (JetBrains)",
-    advanced: "Advanced",
-    appAgent: "App Agent",
-    rewardType: "Reward Type",
-    rewardsSP: "100% SP",
-    rewards50: "50/50",
-    trafficOptimization: "Load Speed",
-    trafficDesc: "Gallery Thumbnails",
-    darkMode: "Dark",
-    lightMode: "Light",
-    exifEnabled: "Read EXIF",
-    exifDesc: "Insert camera metadata",
-    beneficiaries: "Beneficiaries",
-    addBeneficiary: "Add",
-    weight: "%",
-    fromMentions: "From mentions",
-    noBeneficiaries: "Empty",
-    mentionsList: "Mentions",
-    signaturePolicy: "Sig. Check",
-    signatureMissing: "Missing signature!",
-    signatureFound: "Signature Found",
-    twoTapPublish: "Fast Pub.",
-    applyGroup: "Apply",
-    importTableTitle: "Import Table",
-    importTableDesc: "Paste from Excel/Sheets.",
-    importTablePlaceholder: "Paste here...",
-    tableFormat: "Format",
-    loadDraftConfirm: "Load draft?",
-    parts: "parts",
-    splitPost: "Split Post",
-    splitPostDesc: "Split long text.",
-    minWordsPerPart: "Min words",
-    splitBtn: "SPLIT",
-    steemitOptions: "Options",
-    clearfix: "Clearfix",
-    imageFormat: "Img Format",
-    additional: "Additional",
-    pexelsAttribution: "Pexels Attr.",
-    pexelsLink: "Pexels Link",
-    pexelsKey: "Pexels Key",
-    vaultPin: "Vault PIN",
-    unlock: "Unlock",
-    lock: "Lock",
-    keys: "Keys",
-    mobileEditor: "Ed",
-    mobilePreview: "Pre",
-    queue: "Queue",
-    addToQueue: "To Queue",
-    queueEmpty: "Queue empty",
-    publishNext: "Pub. Next",
-    autoPublish: "Auto Pub.",
-    status: "Status",
-    pending: "Pending",
-    published: "Published",
-    gridWithCaptions: "Captions",
-    placeholder: "Start typing...",
-    fillRequired: "Fill required fields.",
-    publishing: "⏳ Publishing...",
-    publishedSuccess: "✅ Published!",
-    noKeychain: "Keychain not found.",
-    pinRequired: "PIN required",
-    saveSuccess: "Saved!",
-    fillAll: "Fill all!",
-    noAccount: "Select account!",
-    pinShort: "PIN short",
-    vaultInit: "Initialized!",
-    accountAdded: "Added!",
-    bold: "Bold",
-    italic: "Italic",
-    strike: "Strike",
-    h1: "H1",
-    h2: "H2",
-    h3: "H3",
-    quote: "Quote",
-    link: "Link",
-    hr: "HR",
-    justify: "Justify",
-    center: "Center",
-    table: "Table",
-    downloadMd: "Down .md",
-    exportMd: "Export .md",
-    importMd: "Import .md",
-    clearNativeCache: "Clear System Cache",
-    nativeCacheCleared: "Cache (images, lists, temp files) cleared successfully!",
-    nativeCacheError: "Error clearing cache",
-    tagPresets: "Presets",
-    commonTags: "Pop. Tags",
-    communities: "Communities",
-    indent: "Indent",
-    escape: "Escape",
-    codeBlock: "Code Block",
-    inlineCode: "Inline Code",
-    addTags: "Add Tags",
-    attribution: "Attr.",
-    linkInImg: "Link in Img",
-    createGrid: "Grid",
-    account: "Account",
-    leftText: "LeftText",
-    rightText: "RightText",
-    asIs: "As Is",
-    uploadToSteemit: "To Steemit",
-    pexelsError: "Pexels Error",
-    linkPrompt: "Link text:",
-    urlPrompt: "URL:",
-    leftContent: " ✍️ ",
-    rightContent: " ✍️ ",
-    loadingParser: "Loading...",
-    previewError: "Render error",
-    untitled: "Untitled",
-    needVaultAccount: "Select account in Vault!",
-    pinError: "PIN Error: ",
-    preparingUpload: "⏳ Preparing...",
-    proxyAttempt: "⏳ Proxy...",
-    proxyError: "CORS Error",
-    signingImage: "⏳ Signing...",
-    uploadingSteemit: "⏳ Uploading...",
-    serverError: "Server Error: ",
-    uploadSuccess: "✅ Done!",
-    uploadProgress: "⏳ {current}/{total}...",
-    uploadComplete: "✅ Uploaded {count}.",
-    pasteUrl: "Paste link...",
-    fullScreen: "FS",
-    enterNewPin: "New PIN",
-    enterPinPlaceholder: "Enter PIN",
-    addAccount: "Add Acc",
-    usernameNoAt: "Username",
-    vaultUnlocked: "Unlocked",
-    vaultLocked: "Locked",
-    templateName: "Name...",
-    vaultTitle: "Vault",
-    vaultWarning: "PIN protects MK.",
-    pinSetup: "PIN Setup",
-    pinSetupDesc: "Set PIN.",
-    createVault: "CREATE",
-    unlockBtn: "UNLOCK",
-    yourAccounts: "Accounts",
-    newAccount: "New",
-    postingKeyPlaceholder: "Key",
-    done: "Done",
-    publishToSteem: "To Steem",
-    vaultNotConfigured: "Vault not set.",
-    setupVaultBtn: "Setup",
-    vaultActive: "Active",
-    vaultActiveDesc: "Ready.",
-    selectAccount: "Account...",
-    autosaveActive: "Autosave",
-    clear: "Clear",
-    saveToVault: "SAVE",
-    protectedByMK: "Safe",
-    vaultEmpty: "Empty",
-    resetVault: "Reset All",
-    save: "SAVE",
-    links: "LINKS",
-    text: "TEXT",
-    keys_mobile: "KEYS",
-    formatting: "Formatting",
-    rowLayout: "Row",
-    colImgText: "Col Img-Txt",
-    colTextImg: "Col Txt-Img",
-    alignLeft: "Left",
-    alignCenter: "Center",
-    alignRight: "Right",
-    align: "Align",
-    gridLayout: "Grid",
-    redText: "Red",
-    loadMore: "More",
-    saveUnencrypted: "No PIN",
-    unsplashAppId: "Unsplash ID",
-    unsplashAccessKey: "Unsplash Key",
-    unsplashSecretKey: "Unsplash Sec",
-    clearCache: "Clear Cache",
-    textWrap: "Text Wrap",
-    keysCleared: "Cleared!",
-    clearApiKeys: "Clear Keys",
-    installApp: "Install App",
-    pwaInstallDesc: "Install Steem Editor as a fast, lightweight app on your device with offline support.",
-    pwaInstalled: "App successfully installed!",
-    pwaAlreadyInstalled: "App is already installed",
-    pwaInstallFailed: "Failed to launch installation",
-    pwaPlatformSupport: "Supported on Android, iOS, Windows, and macOS.",
-  },
-  es: {
-    editor: "Editor",
-    preview: "Previsualización",
-    gallery: "Galería",
-    settings: "Ajustes",
-    pwa: "PWA Instalar",
-    publish: "Publicar",
-    drafts: "Borradores",
-    templates: "Plantillas",
-    tags: "Etiquetas",
-    mentions: "Menciones",
-    tagGroups: "Grupos de etiquetas",
-    addTagGroup: "Añadir grupo",
-    importTable: "Importar tabla",
-    schedule: "Programar",
-    saveDraft: "Guardar borrador",
-    insert: "Insertar",
-    delete: "Eliminar",
-    cancel: "Cancelar",
-    confirm: "Confirmar",
-    username: "Usuario",
-    title: "Título",
-    removeFirstLine: "Quitar la 1ª línea del cuerpo",
-    tagsPlaceholder: "etiquetas separadas por espacios",
-    pexelsSearch: "Buscar en Pexels",
-    noDrafts: "No hay borradores",
-    noTemplates: "No hay plantillas",
-    wordsLabel: "Palabras",
-    cleanWordsLabel: "Palabras limpias",
-    charsLabel: "Caracteres",
-    words: "palabras",
-    chars: "caracteres",
-    clean: "limpio",
-    formatting: "Formato",
-    steemitOptions: "Opciones Steemit",
-    clearfix: "Limpiar flotado (Clearfix)",
-    imageFormat: "Formato de imagen",
-    additional: "Adicional",
-    pexelsAttribution: "Atribución Pexels",
-    pexelsLink: "Enlace en foto",
-    pexelsKey: "Clave Pexels",
-    vaultPin: "PIN de Bóveda",
-    unlock: "Desbloquear",
-    lock: "Bloquear",
-    keys: "Claves",
-    mobileEditor: "Ed",
-    mobilePreview: "Pre",
-    queue: "Cola",
-    addToQueue: "A la cola",
-    queueEmpty: "La cola está vacía",
-    publishNext: "Publicar siguiente",
-    autoPublish: "Auto Publicar",
-    status: "Estado",
-    pending: "Pendiente",
-    published: "Publicado",
-    error: "Error",
-    placeholder: "Comience a escribir su obra maestra aquí...",
-    fillRequired: "Por favor complete todos los campos requeridos.",
-    publishing: "⏳ Publicando...",
-    publishedSuccess: "✅ ¡Publicado!",
-    noKeychain: "Steem Keychain no encontrado.",
-    enterPin: "Ingrese el PIN para desbloquear la bóveda:",
-    pinRequired: "PIN requerido",
-    saveSuccess: "¡Guardado!",
-    fillAll: "¡Complete todos los campos!",
-    noAccount: "¡Seleccione cuenta!",
-    pinShort: "PIN demasiado corto (mín. 4)",
-    vaultInit: "¡Bóveda inicializada!",
-    accountAdded: "¡Cuenta añadida!",
-    sessionActive: "SESIÓN ACTIVA",
-    vaultClosed: "BÓVEDA CERRADA",
-    bold: "Negrita",
-    italic: "Cursiva",
-    strike: "Tachado",
-    h1: "Título 1",
-    h2: "Título 2",
-    h3: "Título 3",
-    quote: "Cita",
-    link: "Enlace",
-    hr: "Línea horizontal",
-    justify: "Justificar",
-    center: "Centrar",
-    table: "Tabla",
-    downloadMd: "Descargar .md",
-    exportMd: "Exportar .md",
-    importMd: "Importar .md",
-    clearNativeCache: "Borrar caché del sistema",
-    nativeCacheCleared: "¡Caché (imágenes, listas, temp) borrado exitosamente!",
-    nativeCacheError: "Error al borrar caché",
-    tagPresets: "Ajustes de etiquetas",
-    commonTags: "Etiquetas comunes",
-    communities: "Comunidades",
-    indent: "Sangría",
-    escape: "Escapar",
-    codeBlock: "Bloque de código",
-    inlineCode: "Código en línea",
-    addTags: "Añadir etiquetas",
-    attribution: "Atribución",
-    linkInImg: "Enlace en imagen",
-    createGrid: "Crear cuadrícula",
-    account: "Cuenta",
-    leftText: "Izquierda + texto",
-    rightText: "Derecha + texto",
-    asIs: "Como está",
-    uploadToSteemit: "Subir a Steemit",
-    pexelsError: "Error de Pexels",
-    linkPrompt: "Enlace:",
-    urlPrompt: "URL:",
-    leftContent: " ✍️ ",
-    rightContent: " ✍️ ",
-    loadingParser: "Cargando...",
-    previewError: "Error de vista previa",
-    untitled: "Sin título",
-    needVaultAccount: "¡Necesitas una cuenta en la Bóveda!",
-    pinError: "Error de PIN: ",
-    preparingUpload: "⏳ Preparando...",
-    proxyAttempt: "⏳ Intento por proxy...",
-    proxyError: "Error de carga",
-    signingImage: "⏳ Firmando...",
-    uploadingSteemit: "⏳ Subiendo...",
-    serverError: "Error de servidor",
-    uploadSuccess: "✅ ¡Subida con éxito!",
-    uploadProgress: "⏳ Subiendo {current} de {total}...",
-    uploadComplete: "✅ Subida completada.",
-    pasteUrl: "Pegar URL aquí...",
-    fullScreen: "Pantalla completa",
-    enterNewPin: "Nuevo PIN",
-    enterPinPlaceholder: "PIN",
-    addAccount: "Añadir cuenta",
-    usernameNoAt: "Usuario (sin @)",
-    confirmResetVault: "¡Esto borrará TODO!",
-    vaultUnlocked: "Bóveda desbloqueada",
-    vaultLocked: "Bóveda bloqueada",
-    templateName: "Nombre de plantilla...",
-    vaultTitle: "Bóveda de Cuentas",
-    vaultWarning: "El PIN protege la Llave Maestra.",
-    pinSetup: "Configuración de PIN",
-    pinSetupDesc: "Establece un PIN.",
-    createVault: "CREAR BÓVEDA",
-    unlockBtn: "DESCIFRAR",
-    yourAccounts: "Tus Cuentas",
-    newAccount: "Nueva Cuenta",
-    postingKeyPlaceholder: "Posting Key",
-    done: "Hecho",
-    publishToSteem: "Publicar en Steem",
-    vaultNotConfigured: "Bóveda no configurada.",
-    setupVaultBtn: "Configurar Bóveda",
-    vaultActive: "Bóveda Activa",
-    vaultActiveDesc: "Puedes publicar posts.",
-    selectAccount: "Seleccionar cuenta...",
-    autosaveActive: "Autoguardado activo",
-    clear: "Limpiar",
-    saveToVault: "GUARDAR EN BÓVEDA",
-    protectedByMK: "Protegido por MK",
-    confirmDeleteAccount: "¿Borrar cuenta @{acc}?",
-    vaultEmpty: "Bóveda vacía",
-    resetVault: "Reiniciar bóveda",
-    save: "GUARDAR",
-    links: "ENLACES",
-    text: "TEXTO",
-    keys_mobile: "CLAVES",
-    importTableTitle: "Importar Tabla",
-    importTableDesc: "Pegue datos de Excel, Google Sheets o CSV. Los convertiremos a Markdown.",
-    importTablePlaceholder: "Pegue los datos aquí...",
-    importBtn: "IMPORTAR",
-    settingsToolsDesc: "Seleccione las herramientas que desea ver en el menú flotante.",
-    loadDraftConfirm: "¿Cargar este borrador? El texto actual será reemplazado.",
-    tableFormat: "Formato de tabla",
-    importTableSuccess: "¡Tabla importada con éxito!",
-    pexelsKeyRequired: "Agregue su clave API de Pexels en los ajustes primero.",
-    pixabayKeyRequired: "Agregue su clave API de Pixabay en los ajustes primero.",
-    unsplashKeyRequired: "Agregue su clave API de Unsplash en los ajustes primero.",
-    pixabayError: "Error de Pixabay: Verifique la clave API o la conexión.",
-    unsplashError: "Error de Unsplash: Verifique la clave API o la conexión.",
-    widgetSettings: "Ajustes del Widget",
-    widgetPos: "Posición del Widget",
-    posFloating: "Flotante (cerca del cursor)",
-    posBottom: "Fondo del Editor (fijo)",
-    posPreview: "En el panel de vista previa",
-    widgetOpacity: "Opacidad del Widget",
-    widgetMinimal: "Minimalista (sin bordes)",
-    activeToolsSort: "Orden de herramientas activas",
-    working: "Trabajando",
-    ready: "Listo",
-    pixabayKey: "Clave Pixabay",
-    unsplashKey: "Clave Unsplash",
-    performanceMode: "Modo rendimiento",
-    enableThumbnails: "Miniaturas de galería",
-    caption: "Subtítulo",
-    addCaption: "Añadir subtítulo",
-    typeHere: " ✍️ ",
-    image: "Imagen",
-    description: "Descripción",
-    color: "Color",
-    rowLayout: "Diseño en fila",
-    colImgText: "Img → Texto",
-    colTextImg: "Texto → Img",
-    alignLeft: "Izquierda",
-    alignCenter: "Centro",
-    alignRight: "Derecha",
-    align: "Alineación",
-    gridLayout: "Diseño de cuadrícula",
-    applyGroup: "Aplicar Grupo",
-    redText: "Texto rojo",
-    loadMore: "Cargar más",
-    saveUnencrypted: "Guardar sin PIN",
-    unsplashAppId: "Unsplash Application ID",
-    unsplashAccessKey: "Unsplash Access Key",
-    unsplashSecretKey: "Unsplash Secret Key",
-    clearCache: "Limpiar caché de galería",
-    textWrap: "Ajuste de texto",
-    cacheCleared: "Caché de galería limpia",
-    appearance: "Apariencia",
-    theme: "Tema",
-    font: "Fuente",
-    editorTools: "Herramientas",
-    vaultSecurity: "Seguridad de Bóveda",
-    steemitSetup: "Configuración Steemit",
-    themeCyan: "Cian",
-    themeEmerald: "Esmeralda",
-    themeOrange: "Naranja",
-    themeRose: "Cuarzo",
-    fontSans: "Sans",
-    fontSerif: "Serif",
-    fontMono: "Mono",
-    advanced: "Avanzado",
-    appAgent: "Agente de App",
-    rewardType: "Tipo de recompensa",
-    rewardsSP: "100% SP",
-    rewards50: "50/50",
-    rewards0: "Sin recompensas",
-    beneficiaries: "Beneficiarios",
-    addBeneficiary: "Añadir beneficiario",
-    weight: "Peso (%)",
-    mentionsList: "Menciones",
-    parts: "partes",
-    splitPost: "Dividir post",
-    splitPostDesc: "Dividir texto largo.",
-    minWordsPerPart: "Mín. palabras por parte",
-    splitBtn: "DIVIDIR",
-    splitSuccess: "¡Post dividido!",
-    newPost: "Nueva publicación",
-    confirmNewPost: "¿Iniciar una nueva publicación? (Se perderán los cambios no guardados)",
-    gridWithCaptions: "Cuadrícula con subtítulos",
-    clearfixDesc: "Evita que el texto rodee imágenes.",
-    signaturePolicy: "Política de firma",
-    signatureMissing: "Falta firma",
-    signatureFound: "Firma encontrada",
-    twoTapPublish: "Publicación rápida",
-    noBeneficiaries: "Sin beneficiarios",
-    confirmClearApiKeys: "¿Limpiar claves API?",
-    keysCleared: "¡Claves limpias!",
-    clearApiKeys: "Limpiar claves API",
-    installApp: "Instalar App",
-    pwaInstallDesc: "Instale Steem Editor como una aplicación rápida y ligera en su dispositivo con soporte sin conexión.",
-    pwaInstalled: "¡Aplicación instalada con éxito!",
-    pwaAlreadyInstalled: "La aplicación ya está instalada",
-    pwaInstallFailed: "No se pudo iniciar la instalación",
-    pwaPlatformSupport: "Soportado en Android, iOS, Windows y macOS.",
-  },
-  ko: {
-    editor: "에디터",
-    preview: "미리보기",
-    gallery: "갤러리",
-    settings: "설정",
-    pwa: "PWA 설치",
-    publish: "게시하기",
-    drafts: "초안",
-    templates: "템플릿",
-    tags: "태그",
-    mentions: "멘션",
-    tagGroups: "태그 그룹",
-    addTagGroup: "그룹 추가",
-    importTable: "표 가져오기",
-    schedule: "예약",
-    saveDraft: "초안 저장",
-    insert: "삽입",
-    delete: "삭제",
-    cancel: "취소",
-    confirm: "확인",
-    username: "사용자 이름",
-    title: "제목",
-    removeFirstLine: "본문에서 첫 번째 줄 제거",
-    tagsPlaceholder: "여백으로 태그 구분",
-    pexelsSearch: "Pexels 검색",
-    noDrafts: "저장된 초안이 없습니다",
-    noTemplates: "템플릿이 없습니다",
-    wordsLabel: "단어 수",
-    cleanWordsLabel: "순수 단어 수",
-    charsLabel: "글자 수",
-    words: "단어",
-    chars: "자",
-    clean: "정제",
-    formatting: "서식",
-    steemitOptions: "스팀잇 옵션",
-    clearfix: "텍스트 줄바꿈 방지 (Clearfix)",
-    imageFormat: "이미지 형식",
-    additional: "추가 설정",
-    pexelsAttribution: "Pexels 출처 표기",
-    pexelsLink: "사진에 링크 포함",
-    pexelsKey: "Pexels 키",
-    vaultPin: "Vault PIN",
-    unlock: "잠금 해제",
-    lock: "잠금",
-    keys: "키 설정",
-    mobileEditor: "편집",
-    mobilePreview: "보기",
-    queue: "대기열",
-    addToQueue: "대기열에 추가",
-    queueEmpty: "대기열이 비어 있습니다",
-    publishNext: "다음 게시물 게시",
-    autoPublish: "자동 게시",
-    status: "상태",
-    pending: "대기 중",
-    published: "게시됨",
-    error: "오류",
-    placeholder: "여기에 당신의 걸작을 작성해 보세요...",
-    fillRequired: "모든 필수 항목을 입력해 주세요.",
-    publishing: "⏳ 게시 중...",
-    publishedSuccess: "✅ 게시 완료!",
-    noKeychain: "Steem Keychain을 찾을 수 없습니다.",
-    enterPin: "Vault를 잠금 해제하려면 PIN을 입력하세요:",
-    pinRequired: "PIN이 필요합니다",
-    saveSuccess: "저장되었습니다!",
-    fillAll: "모든 항목을 입력하세요!",
-    noAccount: "계정을 선택하세요!",
-    pinShort: "PIN이 너무 짧습니다 (최소 4자)",
-    vaultInit: "Vault가 초기화되었습니다!",
-    accountAdded: "계정이 추가되었습니다!",
-    sessionActive: "세션 활성",
-    vaultClosed: "저장소 닫힘",
-    bold: "굵게",
-    italic: "기울임",
-    strike: "취소선",
-    h1: "제목 1",
-    h2: "제목 2",
-    h3: "제목 3",
-    quote: "인용",
-    link: "링크",
-    hr: "가로 구분선",
-    justify: "양쪽 맞춤",
-    center: "가운데 맞춤",
-    table: "표",
-    downloadMd: ".md 다운로드",
-    exportMd: ".md 내보내기",
-    importMd: ".md 가져오기",
-    clearNativeCache: "시스템 캐시 지우기",
-    nativeCacheCleared: "캐시(이미지, 목록, 임시 파일)가 성공적으로 삭제되었습니다!",
-    nativeCacheError: "캐시 삭제 오류",
-    tagPresets: "태그 프리셋",
-    commonTags: "일반 태그",
-    communities: "커뮤니티",
-    indent: "들여쓰기",
-    escape: "이스케이프",
-    codeBlock: "코드 블록",
-    inlineCode: "인라인 코드",
-    addTags: "태그 추가",
-    attribution: "출처 표기",
-    linkInImg: "이미지에 링크",
-    createGrid: "그리드 생성",
-    account: "계정",
-    leftText: "왼쪽 정렬 + 텍스트",
-    rightText: "오른쪽 정렬 + 텍스트",
-    asIs: "그대로",
-    uploadToSteemit: "스팀잇에 업로드",
-    pexelsError: "Pexels 오류",
-    linkPrompt: "링크 텍스트:",
-    urlPrompt: "URL 입력:",
-    leftContent: " ✍️ ",
-    rightContent: " ✍️ ",
-    loadingParser: "로딩 중...",
-    previewError: "미리보기 오류",
-    untitled: "제목 없음",
-    needVaultAccount: "계정을 먼저 선택하세요!",
-    pinError: "PIN 오류: ",
-    preparingUpload: "⏳ 준비 중...",
-    proxyAttempt: "⏳ 프록시 시도 중...",
-    proxyError: "업로드 실패",
-    signingImage: "⏳ 서명 중...",
-    uploadingSteemit: "⏳ 업로드 중...",
-    serverError: "서버 오류",
-    uploadSuccess: "✅ 업로드 성공!",
-    uploadProgress: "⏳ 업로드 중 {current}/{total}...",
-    uploadComplete: "✅ 업로드 완료.",
-    pasteUrl: "URL 붙여넣기...",
-    fullScreen: "전체 화면",
-    enterNewPin: "새 PIN 입력",
-    enterPinPlaceholder: "PIN 입력",
-    addAccount: "계정 추가",
-    usernameNoAt: "사용자명 (@ 제외)",
-    confirmResetVault: "모든 데이터가 삭제됩니다!",
-    vaultUnlocked: "저장소 잠금 해제됨",
-    vaultLocked: "저장소 잠금됨",
-    templateName: "템플릿 이름...",
-    vaultTitle: "계정 저장소",
-    vaultWarning: "PIN이 마스터 키를 보호합니다.",
-    pinSetup: "PIN 설정",
-    pinSetupDesc: "PIN을 설정하세요.",
-    createVault: "저장소 생성",
-    unlockBtn: "잠금 해제",
-    yourAccounts: "내 계정",
-    newAccount: "새 계정",
-    postingKeyPlaceholder: "포스팅 키",
-    done: "완료",
-    publishToSteem: "스팀에 게시",
-    vaultNotConfigured: "저장소가 설정되지 않았습니다.",
-    setupVaultBtn: "저장소 설정",
-    vaultActive: "저장소 활성",
-    vaultActiveDesc: "게시물을 올릴 수 있습니다.",
-    selectAccount: "계정 선택...",
-    autosaveActive: "자동 저장 활성",
-    clear: "지우기",
-    saveToVault: "저장소에 저장",
-    protectedByMK: "MK로 보호됨",
-    confirmDeleteAccount: "@{acc} 계정을 삭제하시겠습니까?",
-    vaultEmpty: "저장소가 비어 있습니다",
-    resetVault: "저장소 초기화",
-    save: "저장",
-    links: "링크",
-    text: "텍스트",
-    keys_mobile: "키",
-    importTableTitle: "표 가져오기",
-    importTableDesc: "Excel, Google 시트, CSV 데이터를 붙여넣으세요. Markdown으로 변환됩니다.",
-    importTablePlaceholder: "여기에 데이터 붙여넣기...",
-    importBtn: "가져오기",
-    settingsToolsDesc: "텍스트 편집 시 플로팅 메뉴에 표시할 도구를 선택하세요.",
-    loadDraftConfirm: "이 초안을 불러오시겠습니까? 현재 텍스트가 대체됩니다.",
-    tableFormat: "표 형식",
-    importTableSuccess: "표를 성공적으로 가져왔습니다!",
-    pexelsKeyRequired: "설정에서 Pexels API 키를 먼저 추가하세요.",
-    pixabayKeyRequired: "설정에서 Pixabay API 키를 먼저 추가하세요.",
-    unsplashKeyRequired: "설정에서 Unsplash Access Key를 먼저 추가하세요.",
-    pixabayError: "Pixabay 오류: API 키 또는 연결을 확인하세요.",
-    unsplashError: "Unsplash 오류: API 키 또는 연결을 확인하세요.",
-    widgetSettings: "위젯 설정",
-    widgetPos: "위젯 위치",
-    posFloating: "플로팅 (커서 근처)",
-    posBottom: "에디터 하단 (고정)",
-    posPreview: "미리보기 패널",
-    widgetOpacity: "위젯 투명도",
-    widgetMinimal: "미니멀리스트 (테두리 없음)",
-    activeToolsSort: "도구 정렬",
-    working: "작업 중",
-    ready: "준비됨",
-    pixabayKey: "Pixabay 키",
-    unsplashKey: "Unsplash 키",
-    performanceMode: "성능 모드",
-    enableThumbnails: "갤러리 썸네일",
-    caption: "캡션",
-    addCaption: "캡션 추가",
-    typeHere: " ✍️ ",
-    image: "이미지",
-    description: "설명",
-    color: "색상",
-    rowLayout: "가로 레이아웃",
-    colImgText: "이미지 → 텍스트",
-    colTextImg: "텍스트 → 이미지",
-    alignLeft: "왼쪽",
-    alignCenter: "가운데",
-    alignRight: "오른쪽",
-    align: "정렬",
-    gridLayout: "그리드 레이아웃",
-    applyGroup: "그룹 적용",
-    redText: "빨간 텍스트",
-    loadMore: "더 불러오기",
-    saveUnencrypted: "PIN 없이 저장",
-    unsplashAppId: "Unsplash Application ID",
-    unsplashAccessKey: "Unsplash Access Key",
-    unsplashSecretKey: "Unsplash Secret Key",
-    clearCache: "갤러리 캐시 삭제",
-    textWrap: "텍스트 줄바꿈",
-    cacheCleared: "갤러리 캐시가 삭제되었습니다",
-    appearance: "모양",
-    theme: "테마",
-    font: "글꼴",
-    editorTools: "도구",
-    vaultSecurity: "보안",
-    steemitSetup: "스팀잇 설정",
-    themeCyan: "시안",
-    themeEmerald: "에메랄드",
-    themeOrange: "오렌지",
-    themeRose: "로즈",
-    fontSans: "Sans",
-    fontSerif: "Serif",
-    fontMono: "Mono",
-    advanced: "고급",
-    appAgent: "앱 에이전트",
-    rewardType: "보상 유형",
-    rewardsSP: "100% SP",
-    rewards50: "50/50",
-    rewards0: "보상 없음",
-    beneficiaries: "수혜자",
-    addBeneficiary: "수혜자 추가",
-    weight: "가중치 (%)",
-    mentionsList: "멘션 리스트",
-    parts: "부분",
-    splitPost: "포스트 분할",
-    splitPostDesc: "긴 텍스트를 나눕니다.",
-    minWordsPerPart: "부분당 최소 단어",
-    splitBtn: "분할",
-    splitSuccess: "포스트가 분할되었습니다!",
-    newPost: "새 게시물",
-    confirmNewPost: "새 게시물을 시작하시겠습니까? (저장하지 않은 변경 사항은 손실됩니다)",
-    gridWithCaptions: "캡션이 있는 그리드",
-    clearfixDesc: "이미지 뒤에 텍스트 줄바꿈을 방지합니다.",
-    signaturePolicy: "서명 확인",
-    signatureMissing: "서명 누락",
-    signatureFound: "서명 확인됨",
-    twoTapPublish: "빠른 게시",
-    noBeneficiaries: "수혜자 없음",
-    confirmClearApiKeys: "API 키를 삭제하시겠습니까?",
-    keysCleared: "API 키가 삭제되었습니다!",
-    clearApiKeys: "API 키 삭제",
-    installApp: "앱 설치",
-    pwaInstallDesc: "오프라인 지원을 제공하는 빠르고 가벼운 앱으로 Steem Editor를 기기에 설치하세요.",
-    pwaInstalled: "앱이 성공적으로 설치되었습니다!",
-    pwaAlreadyInstalled: "앱이 이미 설치되어 있습니다",
-    pwaInstallFailed: "설치를 시작하지 못했습니다",
-    pwaPlatformSupport: "Android, iOS, Windows 및 macOS에서 지원됩니다.",
-  }
-};
 
 // Ensure Buffer is available globally for some libraries
 if (typeof window !== 'undefined') {
@@ -1263,6 +140,26 @@ const getMarked = () => {
           const count = newlines.length - 2;
           return '\n\n' + Array(count).fill('<br>').join('') + '\n\n';
         });
+
+        // Prevent distinct list blocks separated by blank lines from merging into a single list; generate a real break/paragraph so cursor can be placed between them
+        let prevLists = '';
+        while (prevLists !== normalizedText) {
+          prevLists = normalizedText;
+          normalizedText = normalizedText.replace(/(```[\s\S]*?```|`[^`\n]*`)|(^|\n)([\t ]*(?:[-*+]|\d+\.)[^\n]+)(\n\s*\n)([\t ]*(?:[-*+]|\d+\.)[^\n]+)/g, (match, code, pre, item1, newlines, item2) => {
+            if (code) return code;
+            return `${pre || ''}${item1}\n\n<br>\n\n${item2}`;
+          });
+        }
+
+        // Prevent distinct tables separated by blank lines from sticking together; generate a real break/paragraph so cursor can be placed between them
+        let prevTables = '';
+        while (prevTables !== normalizedText) {
+          prevTables = normalizedText;
+          normalizedText = normalizedText.replace(/(```[\s\S]*?```|`[^`\n]*`)|(\|[^\n]+\|)(\n\s*\n)(\|[^\n]+\|)/g, (match, code, row1, newlines, row2) => {
+            if (code) return code;
+            return `${row1}\n\n<br>\n\n${row2}`;
+          });
+        }
 
         let textWithImageMarkdown = convertBareImageUrlsToMarkdown(normalizedText);
         
@@ -1985,13 +882,13 @@ function App() {
   const [activeView, setActiveView] = useState<'editor' | 'reader'>('editor');
   const [lang, setLang] = useState<Language>(() => {
     const saved = localStorage.getItem('steem_lang');
-    if (saved && ['uk', 'en', 'es', 'ko'].includes(saved)) return saved as Language;
+    if (saved && (translations[saved] || AVAILABLE_LANGUAGES.some(l => l.code === saved))) return saved;
     const browserLang = navigator?.language?.slice(0, 2);
-    if (['uk', 'en', 'es', 'ko'].includes(browserLang || '')) return browserLang as Language;
+    if (browserLang && (translations[browserLang] || AVAILABLE_LANGUAGES.some(l => l.code === browserLang))) return browserLang;
     return 'uk';
   });
 
-  const t = useCallback((key: keyof typeof translations['uk']) => (translations[lang] as any)[key] || key, [lang]);
+  const t = useCallback((key: TranslationKey) => getTranslation(lang, key), [lang]);
 
   const contentForPublish = useEditorStore(state => activeModal === 'publish' ? state.content : '');
   const setContent = useEditorStore(state => state.setContent);
@@ -3516,112 +2413,161 @@ function App() {
     return '';
   }, []);
 
+  const findDomPositionForMarkdownOffset = (container: HTMLElement, markdown: string, offset: number): { node: Node, offset: number } | null => {
+    if (!container) return null;
+    const lines = markdown.split('\n');
+    let lineIdx = 0;
+    let colIdx = 0;
+    let acc = 0;
+    for (let i = 0; i < lines.length; i++) {
+      if (acc + lines[i].length >= offset || i === lines.length - 1) {
+        lineIdx = i;
+        colIdx = Math.max(0, offset - acc);
+        break;
+      }
+      acc += lines[i].length + 1;
+    }
+    
+    const rawLine = lines[lineIdx] || '';
+    const prefixMatch = rawLine.match(/^(#{1,6}\s+|[-*+]\s+(\[[ xX]\]\s+)?|\d+\.\s+|>\s*)/);
+    const prefixLen = prefixMatch ? prefixMatch[0].length : 0;
+    const targetCol = Math.max(0, colIdx - prefixLen);
+    const cleanLineText = rawLine.substring(prefixLen).trim();
+    
+    const blocks = Array.from(container.querySelectorAll('h1, h2, h3, h4, h5, h6, li, p, blockquote, td, th, pre, div'));
+    if (blocks.length === 0) {
+      if (container.firstChild) {
+        return { node: container.firstChild, offset: 0 };
+      }
+      return { node: container, offset: 0 };
+    }
+    
+    let targetBlock: Element | null = null;
+    
+    if (cleanLineText === '') {
+      const idealIdx = Math.min(blocks.length - 1, Math.floor((lineIdx / Math.max(1, lines.length)) * blocks.length));
+      let bestBlock = blocks[idealIdx];
+      let minDiff = 9999;
+      blocks.forEach((b, idx) => {
+        const isBlockEmpty = (b.textContent || '').trim() === '';
+        if (isBlockEmpty) {
+          const diff = Math.abs(idx - idealIdx);
+          if (diff < minDiff) {
+            minDiff = diff;
+            bestBlock = b;
+          }
+        }
+      });
+      targetBlock = bestBlock;
+    } else {
+      const candidates: { block: Element, index: number, score: number }[] = [];
+      const idealIdx = Math.min(blocks.length - 1, Math.floor((lineIdx / Math.max(1, lines.length)) * blocks.length));
+      
+      blocks.forEach((b, idx) => {
+        const bText = (b.textContent || '').trim();
+        if (bText && (bText.includes(cleanLineText) || cleanLineText.includes(bText))) {
+          const score = Math.abs(idx - idealIdx);
+          candidates.push({ block: b, index: idx, score });
+        }
+      });
+      
+      if (candidates.length > 0) {
+        candidates.sort((a, b) => a.score - b.score);
+        targetBlock = candidates[0].block;
+      } else {
+        targetBlock = blocks[idealIdx];
+      }
+    }
+    
+    if (!targetBlock) return { node: container, offset: 0 };
+    
+    let charAcc = 0;
+    let foundNode: Node | null = null;
+    let foundOffset = 0;
+    
+    const walk = (node: Node) => {
+      if (foundNode) return;
+      if (node.nodeType === Node.TEXT_NODE) {
+        const len = (node.nodeValue || '').length;
+        if (charAcc + len >= targetCol) {
+          foundNode = node;
+          foundOffset = Math.max(0, Math.min(targetCol - charAcc, len));
+        } else {
+          charAcc += len;
+        }
+      } else {
+        for (const child of Array.from(node.childNodes)) {
+          walk(child);
+          if (foundNode) break;
+        }
+      }
+    };
+    
+    walk(targetBlock);
+    
+    if (!foundNode) {
+      return { node: targetBlock, offset: 0 };
+    }
+    
+    return { node: foundNode, offset: foundOffset };
+  };
+
   const syncCursorMarkdownToVisual = useCallback(async () => {
     try {
       if (!wysiwygRef.current) return;
       
-      const startMarker = 'STARTCARETMARKER';
-      const endMarker = 'ENDCARETMARKER';
-      
-      let mdWithMarkers = '';
       const pos = cursorPositionRef.current;
-      
       let textContent = useEditorStore.getState().content;
       if (!textContent.endsWith('\n')) {
         textContent += '\n';
       }
       
-      if (pos) {
-        const { start, end } = pos;
-        
-        // Helper to find a safe marker position that does not break markdown syntax
-        const getSafeMarkerPosition = (text: string, index: number): number => {
-          let idx = Math.max(0, Math.min(index, text.length));
-          
-          // 1. Avoid being inside an HTML tag <...>
-          const leftLess = text.lastIndexOf('<', idx);
-          const leftGreater = text.lastIndexOf('>', idx);
-          if (leftLess !== -1 && leftLess > leftGreater) {
-            const rightGreater = text.indexOf('>', idx);
-            if (rightGreater !== -1) {
-              idx = rightGreater + 1;
-            }
-          }
-          
-          // Find the start and end of the current line
-          const lineStart = text.lastIndexOf('\n', idx - 1) + 1;
-          let lineEnd = text.indexOf('\n', idx);
-          if (lineEnd === -1) lineEnd = text.length;
-          const line = text.substring(lineStart, lineEnd);
-          const offsetInLine = idx - lineStart;
-          
-          // 2. Avoid breaking table alignment rows
-          if (/^[\s|:.-]+$/.test(line) && line.includes("-") && line.includes("|")) {
-            const prevLineStart = text.lastIndexOf("\n", lineStart - 2) + 1;
-            const prevLine = text.substring(prevLineStart, lineStart - 1);
-            const lastPipe = prevLine.lastIndexOf("|");
-            if (lastPipe > 0) {
-              return prevLineStart + lastPipe;
-            }
-            return Math.max(0, lineStart - 1);
-          }
-          // 2b. Avoid breaking the end of a table row
-          if (line.trim().startsWith("|") && line.includes("|", 1)) {
-            const lastPipe = line.lastIndexOf("|");
-            if (lastPipe > 0 && offsetInLine >= lastPipe) {
-               idx = lineStart + lastPipe;
-            }
-          }
-          // 2c. Avoid breaking Horizontal Rules (HR)
-          if (/^(\s*[-*_]\s*){3,}$/.test(line)) {
-            if (lineEnd >= text.length) {
-              return lineEnd;
-            }
-            // Always move to the next line because placing it on the previous line turns it into an H2
-            return getSafeMarkerPosition(text, lineEnd + 1);
-          }
-          // 3. Avoid being before block markers (lists, blockquotes, table pipes, headings, code fences)
-          const match = line.match(/^(\s*(?:[*\-+]|\d+\.|>|\||#{1,6}|```)\s*)/);
-          if (match) {
-            const prefixLength = match[1].length;
-            if (offsetInLine < prefixLength) {
-              idx = lineStart + prefixLength;
-            }
-          }
-          
-          return idx;
-        };
-
-        const safeStart = getSafeMarkerPosition(textContent, start);
-        const safeEnd = getSafeMarkerPosition(textContent, end);
-
-        if (safeStart === safeEnd) {
-          mdWithMarkers = textContent.substring(0, safeStart) + startMarker + textContent.substring(safeStart);
-        } else {
-          mdWithMarkers = textContent.substring(0, safeStart) + startMarker + textContent.substring(safeStart, safeEnd) + endMarker + textContent.substring(safeEnd);
-        }
-      } else {
-        mdWithMarkers = textContent;
-      }
-      
       const m = getMarked();
-      const processed = processContentForSteem(mdWithMarkers);
+      const processed = processContentForSteem(textContent);
       if (m) {
         let rawHtml = await m.parse(processed);
         
-        // Ensure block elements have spacers so users can arrow out
         const tempDiv = document.createElement('div');
         tempDiv.innerHTML = rawHtml;
 
-          // Convert inline-intended divs back to spans for the visual editor
-          tempDiv.querySelectorAll('div.phishy, div.text-blue, div.text-green').forEach(div => {
-             const span = document.createElement('span');
-             span.className = div.className;
-             span.innerHTML = div.innerHTML;
-             if (div.parentNode) div.parentNode.replaceChild(span, div);
+        // Convert inline-intended divs back to spans for the visual editor
+        tempDiv.querySelectorAll('div.phishy, div.text-blue, div.text-green').forEach(div => {
+           const span = document.createElement('span');
+           span.className = div.className;
+           span.innerHTML = div.innerHTML;
+           if (div.parentNode) div.parentNode.replaceChild(span, div);
+        });
+
+        // Normalize any loose paragraphs inside list items
+        tempDiv.querySelectorAll('li > p:only-child').forEach(p => {
+           const parent = p.parentNode;
+           if (parent) {
+              while (p.firstChild) {
+                 parent.insertBefore(p.firstChild, p);
+              }
+              parent.removeChild(p);
+           }
+        });
+
+        // Normalize bare <br> tags at root level into paragraphs
+        Array.from(tempDiv.childNodes).forEach(node => {
+           if (node.nodeType === Node.ELEMENT_NODE && (node as HTMLElement).tagName === 'BR') {
+              const p = document.createElement('p');
+              p.innerHTML = '<br>';
+              tempDiv.replaceChild(p, node);
+           }
+        });
+
+        // Clean up formatting whitespace text nodes inside lists and tables so they do not create phantom gaps
+        tempDiv.querySelectorAll('ul, ol, table, thead, tbody, tr').forEach(parent => {
+          Array.from(parent.childNodes).forEach(child => {
+            if (child.nodeType === Node.TEXT_NODE && !child.nodeValue?.trim()) {
+              parent.removeChild(child);
+            }
           });
+        });
         
-        const blockTags = ['TABLE', 'PRE', 'BLOCKQUOTE', 'UL', 'OL', 'CENTER', 'IFRAME', 'HR'];
+        const blockTags = ['TABLE'];
 
         // Clean up any orphan or non-boundary spacers
         tempDiv.querySelectorAll('.table-spacer, [data-placeholder], [data-empty]').forEach((spacerEl) => {
@@ -3640,7 +2586,7 @@ function App() {
            }
         });
 
-        // 1. One Top Spacer at the very top of the editor if the first element is a block element
+        // 1. One Top Spacer at the very top of the editor if the first element is a table
         const firstEl = tempDiv.firstElementChild;
         if (firstEl && blockTags.includes(firstEl.tagName) && !firstEl.classList.contains('top-spacer')) {
            if (!tempDiv.querySelector('.top-spacer')) {
@@ -3653,7 +2599,7 @@ function App() {
            }
         }
         
-        // 2. One Bottom Spacer at the very bottom of the editor ONLY if last element is a block element
+        // 2. One Bottom Spacer at the very bottom of the editor ONLY if last element is a table
         const lastEl = tempDiv.lastElementChild;
         if (lastEl && blockTags.includes(lastEl.tagName) && !lastEl.classList.contains('bottom-spacer')) {
            if (!tempDiv.querySelector('.bottom-spacer')) {
@@ -3682,85 +2628,18 @@ function App() {
         if (pos) {
           const range = document.createRange();
           let rangeSet = false;
-          let startNodeInfo: { node: Node, offset: number } | null = null;
-          let endNodeInfo: { node: Node, offset: number } | null = null;
           
-          const walkAndFindMarkers = (node: Node) => {
-             if (node.nodeType === Node.TEXT_NODE) {
-                let val = node.nodeValue || '';
-                if (val.includes(startMarker) && val.includes(endMarker)) {
-                   const sIdx = val.indexOf(startMarker);
-                   val = val.replace(startMarker, '');
-                   const eIdx = val.indexOf(endMarker);
-                   val = val.replace(endMarker, '');
-                   node.nodeValue = val;
-                   startNodeInfo = { node, offset: sIdx };
-                   endNodeInfo = { node, offset: eIdx };
-                } else {
-                   if (val.includes(startMarker)) {
-                      const idx = val.indexOf(startMarker);
-                      val = val.replace(startMarker, '');
-                      node.nodeValue = val;
-                      startNodeInfo = { node, offset: idx };
-                   }
-                   if (val.includes(endMarker)) {
-                      const idx = val.indexOf(endMarker);
-                      val = val.replace(endMarker, '');
-                      node.nodeValue = val;
-                      endNodeInfo = { node, offset: idx };
-                   }
-                }
-             } else {
-                const children = Array.from(node.childNodes);
-                for (const child of children) {
-                   walkAndFindMarkers(child);
-                }
-             }
-          };
+          const startTarget = findDomPositionForMarkdownOffset(wysiwygRef.current, textContent, pos.start);
+          const endTarget = pos.start !== pos.end ? findDomPositionForMarkdownOffset(wysiwygRef.current, textContent, pos.end) : startTarget;
           
-          walkAndFindMarkers(wysiwygRef.current);
-          
-          if (startNodeInfo && endNodeInfo) {
-            const sInfo = startNodeInfo as { node: Node, offset: number };
-            const eInfo = endNodeInfo as { node: Node, offset: number };
-            range.setStart(sInfo.node, sInfo.offset);
-            range.setEnd(eInfo.node, eInfo.offset);
+          if (startTarget && endTarget) {
+            range.setStart(startTarget.node, startTarget.offset);
+            range.setEnd(endTarget.node, endTarget.offset);
             rangeSet = true;
-          } else if (startNodeInfo) {
-            const sInfo = startNodeInfo as { node: Node, offset: number };
-            range.setStart(sInfo.node, sInfo.offset);
+          } else if (startTarget) {
+            range.setStart(startTarget.node, startTarget.offset);
             range.collapse(true);
             rangeSet = true;
-          } else if (!rangeSet && pos && wysiwygRef.current) {
-            let currentLength = 0;
-            let foundNode: Node | null = null;
-            let foundOffset = 0;
-
-            const walkTextNodes = (node: Node) => {
-              if (foundNode) return;
-              if (node.nodeType === Node.TEXT_NODE) {
-                const len = (node.nodeValue || '').length;
-                if (currentLength + len >= pos.start) {
-                  foundNode = node;
-                  foundOffset = Math.max(0, Math.min(pos.start - currentLength, len));
-                } else {
-                  currentLength += len;
-                }
-              } else {
-                for (const child of Array.from(node.childNodes)) {
-                  walkTextNodes(child);
-                  if (foundNode) break;
-                }
-              }
-            };
-
-            walkTextNodes(wysiwygRef.current);
-
-            if (foundNode) {
-              range.setStart(foundNode, foundOffset);
-              range.collapse(true);
-              rangeSet = true;
-            }
           }
           
           if (rangeSet) {
@@ -3780,7 +2659,7 @@ function App() {
               // Ensure element has active blinking cursor
               wysiwygRef.current.focus();
 
-              if (startNodeInfo) {
+              if (startTarget) {
                  scrollCaretIntoView('center');
                  
                  const images = wysiwygRef.current.querySelectorAll('img');
@@ -3839,8 +2718,37 @@ function App() {
              span.innerHTML = div.innerHTML;
              if (div.parentNode) div.parentNode.replaceChild(span, div);
           });
+
+          // Normalize any loose paragraphs inside list items
+          tempDiv.querySelectorAll('li > p:only-child').forEach(p => {
+             const parent = p.parentNode;
+             if (parent) {
+                while (p.firstChild) {
+                   parent.insertBefore(p.firstChild, p);
+                }
+                parent.removeChild(p);
+             }
+          });
+
+          // Normalize bare <br> tags at root level into paragraphs
+          Array.from(tempDiv.childNodes).forEach(node => {
+             if (node.nodeType === Node.ELEMENT_NODE && (node as HTMLElement).tagName === 'BR') {
+                const p = document.createElement('p');
+                p.innerHTML = '<br>';
+                tempDiv.replaceChild(p, node);
+             }
+          });
+
+          // Clean up formatting whitespace text nodes inside lists and tables so they do not create phantom gaps
+          tempDiv.querySelectorAll('ul, ol, table, thead, tbody, tr').forEach(parent => {
+            Array.from(parent.childNodes).forEach(child => {
+              if (child.nodeType === Node.TEXT_NODE && !child.nodeValue?.trim()) {
+                parent.removeChild(child);
+              }
+            });
+          });
           
-          const blockTags = ['TABLE', 'PRE', 'BLOCKQUOTE', 'UL', 'OL', 'CENTER', 'IFRAME', 'HR'];
+          const blockTags = ['TABLE'];
 
           // Clean up any orphan or non-boundary spacers
           tempDiv.querySelectorAll('.table-spacer, [data-placeholder], [data-empty]').forEach((spacerEl) => {
@@ -4029,7 +2937,7 @@ function App() {
 
   const restoreMarkdownCursorAndScroll = useCallback((retryCount = 0) => {
     if (!editorRef.current) {
-      if (retryCount < 10) {
+      if (retryCount < 15) {
         setTimeout(() => restoreMarkdownCursorAndScroll(retryCount + 1), 30);
       }
       return;
@@ -4300,7 +3208,7 @@ function App() {
           wysiwygRef.current.focus({ preventScroll: true });
           saveVisualSelection();
         }
-      }, 100);
+      }, 150);
     } else {
       saveVisualSelection();
       isSyncingRef.current = true;
@@ -4318,7 +3226,7 @@ function App() {
       setTimeout(() => {
         restoreMarkdownCursorAndScroll();
         saveCursorPosition();
-      }, 50);
+      }, 150);
     }
   }, [editorMode, saveCursorPosition, syncCursorMarkdownToVisual, syncCursorVisualToMarkdown, saveVisualSelection, setContent, restoreMarkdownCursorAndScroll]);
 
@@ -4381,7 +3289,7 @@ function App() {
           } else {
              isSyncingRef.current = false;
           }
-       }, 100);
+       }, 150);
     } else {
        saveVisualSelection();
        saveCursorPosition();
@@ -5191,6 +4099,27 @@ function App() {
       else if (prefix === '<sup>') command = 'superscript';
 
       if (command) {
+        if (isCollapsed) {
+          const sel = window.getSelection();
+          if (sel && sel.rangeCount > 0) {
+            const r = sel.getRangeAt(0);
+            const container = r.startContainer;
+            let isEmpty = false;
+            if (container.nodeType === Node.ELEMENT_NODE) {
+               if ((container.textContent || '').replace(/[\u200B\s\n]/g, '') === '') isEmpty = true;
+            } else if (container.nodeType === Node.TEXT_NODE) {
+               if ((container.textContent || '').replace(/[\u200B\s\n]/g, '') === '') isEmpty = true;
+            }
+            if (isEmpty) {
+              const zwsp = document.createTextNode('\u200B');
+              r.insertNode(zwsp);
+              r.setStart(zwsp, 1);
+              r.setEnd(zwsp, 1);
+              sel.removeAllRanges();
+              sel.addRange(r);
+            }
+          }
+        }
         document.execCommand(command, false);
         const selAfter = window.getSelection();
         if (selAfter && selAfter.rangeCount > 0 && shouldExpandWord) {
@@ -5458,6 +4387,201 @@ function App() {
     setContent(newContent);
   }, [ editorMode, restoreVisualSelection, updateContentFromWysiwyg, insertHtmlAtCursor, setContent]);
 
+  const tryHeadingEnterBreakout = useCallback((shiftKey: boolean = false): boolean => {
+    if (shiftKey) return false;
+    const sel = window.getSelection();
+    if (!sel || sel.rangeCount === 0 || !wysiwygRef.current) return false;
+    const range = sel.getRangeAt(0);
+    const node = range.startContainer;
+    if (!node) return false;
+
+    let headingEl: HTMLElement | null = node.nodeType === Node.TEXT_NODE ? node.parentElement : (node as HTMLElement);
+    while (headingEl && headingEl !== wysiwygRef.current && !['H1', 'H2', 'H3', 'H4', 'H5', 'H6'].includes(headingEl.tagName)) {
+      headingEl = headingEl.parentElement;
+    }
+
+    if (!headingEl || headingEl === wysiwygRef.current) return false;
+    const parent = headingEl.parentNode;
+    if (!parent) return false;
+
+    const headingText = (headingEl.textContent || '').replace(/[\u200B\s\n]/g, '');
+
+    // Case 1: Heading is completely empty -> turn into standard paragraph
+    if (headingText === '') {
+      const p = document.createElement('p');
+      p.innerHTML = '<br>';
+      parent.replaceChild(p, headingEl);
+
+      const newRange = document.createRange();
+      newRange.selectNodeContents(p);
+      newRange.collapse(true);
+      sel.removeAllRanges();
+      sel.addRange(newRange);
+      savedVisualRangeRef.current = newRange.cloneRange();
+      if (wysiwygRef.current) wysiwygRef.current.focus({ preventScroll: true });
+      updateContentFromWysiwyg();
+      return true;
+    }
+
+    // Case 2: Check if cursor is at the end, beginning, or middle
+    const marker = document.createElement('span');
+    marker.id = 'temp-heading-marker';
+    try {
+      range.insertNode(marker);
+
+      const hasText = (n: Node): boolean => {
+        if (n.nodeType === Node.TEXT_NODE) {
+          return (n.nodeValue?.replace(/[\u200B\s\n]/g, '') || '').length > 0;
+        }
+        if (n.nodeType === Node.ELEMENT_NODE) {
+          const el = n as HTMLElement;
+          if (el.tagName === 'BR' || el.id === 'temp-heading-marker') return false;
+          return (el.textContent?.replace(/[\u200B\s\n]/g, '') || '').length > 0;
+        }
+        return false;
+      };
+
+      // Scan left from marker
+      let isLeftEmpty = true;
+      let currLeft: Node | null = marker;
+      while (currLeft && currLeft !== headingEl) {
+        let sib = currLeft.previousSibling;
+        while (sib) {
+          if (sib.nodeType === Node.ELEMENT_NODE && (sib as HTMLElement).tagName === 'BR') break;
+          if (hasText(sib)) { isLeftEmpty = false; break; }
+          sib = sib.previousSibling;
+        }
+        if (!isLeftEmpty || (currLeft.previousSibling && (currLeft.previousSibling as HTMLElement).tagName === 'BR')) break;
+        currLeft = currLeft.parentNode;
+      }
+
+      // Scan right from marker
+      let isRightEmpty = true;
+      let currRight: Node | null = marker;
+      while (currRight && currRight !== headingEl) {
+        let sib = currRight.nextSibling;
+        while (sib) {
+          if (sib.nodeType === Node.ELEMENT_NODE && (sib as HTMLElement).tagName === 'BR') break;
+          if (hasText(sib)) { isRightEmpty = false; break; }
+          sib = sib.nextSibling;
+        }
+        if (!isRightEmpty || (currRight.nextSibling && (currRight.nextSibling as HTMLElement).tagName === 'BR')) break;
+        currRight = currRight.parentNode;
+      }
+
+      // Find direct child of heading containing the marker
+      let directChild: Node | null = marker;
+      while (directChild && directChild.parentNode !== headingEl) {
+        directChild = directChild.parentNode;
+      }
+
+      if (directChild) {
+        const childs: Node[] = Array.from(headingEl.childNodes);
+        const directIndex = childs.indexOf(directChild);
+        const leftChildren = directIndex > 0 ? childs.slice(0, directIndex) : [];
+        const rightChildren = directIndex + 1 < childs.length ? childs.slice(directIndex + 1) : [];
+
+        // Clean trailing/leading <br>
+        while (leftChildren.length > 0 && leftChildren[leftChildren.length - 1].nodeType === Node.ELEMENT_NODE && (leftChildren[leftChildren.length - 1] as HTMLElement).tagName === 'BR') {
+          leftChildren.pop();
+        }
+        while (rightChildren.length > 0 && rightChildren[0].nodeType === Node.ELEMENT_NODE && (rightChildren[0] as HTMLElement).tagName === 'BR') {
+          rightChildren.shift();
+        }
+
+        // If at the end of the heading: create <p><br></p> AFTER heading
+        if (isRightEmpty) {
+          headingEl.innerHTML = '';
+          if (leftChildren.length > 0) {
+            leftChildren.forEach(c => headingEl!.appendChild(c));
+          } else {
+            headingEl.innerHTML = '<br>';
+          }
+
+          const p = document.createElement('p');
+          p.innerHTML = '<br>';
+          parent.insertBefore(p, headingEl.nextSibling);
+
+          const newRange = document.createRange();
+          newRange.selectNodeContents(p);
+          newRange.collapse(true);
+          sel.removeAllRanges();
+          sel.addRange(newRange);
+          savedVisualRangeRef.current = newRange.cloneRange();
+          if (wysiwygRef.current) wysiwygRef.current.focus({ preventScroll: true });
+          updateContentFromWysiwyg();
+          return true;
+        }
+
+        // If at the beginning of the heading: create <p><br></p> BEFORE heading, stay in heading
+        if (isLeftEmpty) {
+          headingEl.innerHTML = '';
+          if (rightChildren.length > 0) {
+            rightChildren.forEach(c => headingEl!.appendChild(c));
+          } else {
+            headingEl.innerHTML = '<br>';
+          }
+
+          const p = document.createElement('p');
+          p.innerHTML = '<br>';
+          parent.insertBefore(p, headingEl);
+
+          const newRange = document.createRange();
+          newRange.selectNodeContents(headingEl);
+          newRange.collapse(true);
+          sel.removeAllRanges();
+          sel.addRange(newRange);
+          savedVisualRangeRef.current = newRange.cloneRange();
+          if (wysiwygRef.current) wysiwygRef.current.focus({ preventScroll: true });
+          updateContentFromWysiwyg();
+          return true;
+        }
+
+        // If in the middle of the heading: split into two headings
+        const leftHeading = headingEl;
+        const rightHeading = document.createElement(leftHeading.tagName.toLowerCase());
+        rightHeading.className = leftHeading.className;
+
+        leftHeading.innerHTML = '';
+        leftChildren.forEach(c => leftHeading.appendChild(c));
+
+        rightHeading.innerHTML = '';
+        if (rightChildren.length > 0) {
+          rightChildren.forEach(c => rightHeading.appendChild(c));
+        } else {
+          rightHeading.innerHTML = '<br>';
+        }
+
+        parent.insertBefore(rightHeading, leftHeading.nextSibling);
+
+        const newRange = document.createRange();
+        newRange.selectNodeContents(rightHeading);
+        newRange.collapse(true);
+        sel.removeAllRanges();
+        sel.addRange(newRange);
+        savedVisualRangeRef.current = newRange.cloneRange();
+        if (wysiwygRef.current) wysiwygRef.current.focus({ preventScroll: true });
+        updateContentFromWysiwyg();
+        return true;
+      }
+    } catch (err) {
+      console.warn('Heading breakout error:', err);
+    } finally {
+      if (marker.parentNode) {
+        marker.parentNode.removeChild(marker);
+      }
+    }
+    return false;
+  }, [updateContentFromWysiwyg]);
+
+  const handleWysiwygBeforeInput = useCallback((e: any) => {
+    if (e.inputType === 'insertParagraph' || e.inputType === 'insertLineBreak') {
+      if (tryHeadingEnterBreakout(false)) {
+        e.preventDefault();
+      }
+    }
+  }, [tryHeadingEnterBreakout]);
+
   const handleWysiwygKeyDown = useCallback((e: React.KeyboardEvent<HTMLDivElement>) => {
     const isMod = e.ctrlKey || e.metaKey;
     
@@ -5473,30 +4597,11 @@ function App() {
       return;
     }
 
-    if (e.key === 'Enter' && !isMod && !e.shiftKey) {
-      const sel = window.getSelection();
-      if (sel && sel.rangeCount > 0 && sel.isCollapsed) {
-        let blockElement = sel.focusNode as HTMLElement | null;
-        while (blockElement && blockElement.nodeType !== Node.ELEMENT_NODE) {
-            blockElement = blockElement.parentElement as HTMLElement | null;
-        }
-        if (blockElement && blockElement.closest) {
-            const headingElement = blockElement.closest('h1, h2, h3, h4, h5, h6, blockquote, center');
-            if (headingElement && (headingElement.textContent || '').replace(/[\u200B\s\n]/g, '') === '') {
-                e.preventDefault();
-                // Instead of formatBlock, we manually replace it to ensure it becomes a paragraph
-                const p = document.createElement('p');
-                p.innerHTML = '<br>';
-                if (headingElement.parentNode) headingElement.parentNode.replaceChild(p, headingElement);
-                const newRange = document.createRange();
-                newRange.setStart(p, 0);
-                newRange.collapse(true);
-                sel.removeAllRanges();
-                sel.addRange(newRange);
-                updateContentFromWysiwyg();
-                return;
-            }
-        }
+    // 1. Single Enter on Heading breakout
+    if ((e.key === 'Enter' || e.keyCode === 13) && !isMod && !e.shiftKey) {
+      if (tryHeadingEnterBreakout(e.shiftKey)) {
+        e.preventDefault();
+        return;
       }
     }
 
@@ -6040,7 +5145,7 @@ function App() {
         return;
       }
     }
-  }, [fmt, handleLink, insertHtmlAtCursor, widgetPos, isWidgetVisible, isWidgetMenuOpen, setIsWidgetVisible, updateContentFromWysiwyg, activeFormats, handleIndent]);
+  }, [fmt, handleLink, insertHtmlAtCursor, widgetPos, isWidgetVisible, isWidgetMenuOpen, setIsWidgetVisible, updateContentFromWysiwyg, activeFormats, handleIndent, tryHeadingEnterBreakout]);
 
   const importTable = useCallback(() => {
     setActiveModal('tableImport');
@@ -8525,22 +7630,23 @@ function App() {
                        initial={{ opacity: 0, y: 5, scale: 0.95 }}
                        animate={{ opacity: 1, y: 0, scale: 1 }}
                        exit={{ opacity: 0, y: 5, scale: 0.95 }}
-                       className="absolute top-full right-0 mt-2 bg-slate-800 border border-slate-700 rounded-xl shadow-2xl overflow-hidden z-50 min-w-[80px]"
+                       className="absolute top-full right-0 mt-2 bg-slate-800 border border-slate-700 rounded-xl shadow-2xl overflow-hidden z-50 min-w-[120px]"
                      >
-                       {(['uk', 'en', 'es', 'ko'] as const).map(l => (
+                       {AVAILABLE_LANGUAGES.map(item => (
                          <button
-                           key={l}
+                           key={item.code}
                            onClick={() => {
-                             setLang(l);
-                             localStorage.setItem('steem_lang', l);
+                             setLang(item.code);
+                             localStorage.setItem('steem_lang', item.code);
                              setShowLangMenu(false);
                            }}
                            className={cn(
-                             "flex items-center w-full text-left px-3 py-2 text-[10px] font-black uppercase transition-colors border-b last:border-0 border-slate-700/50",
-                             lang === l ? "bg-cyan-600/20 text-cyan-400" : "text-slate-400 hover:text-white hover:bg-slate-700"
+                             "flex items-center justify-between w-full text-left px-3 py-2 text-[10px] font-black uppercase transition-colors border-b last:border-0 border-slate-700/50 gap-2",
+                             lang === item.code ? "bg-cyan-600/20 text-cyan-400" : "text-slate-400 hover:text-white hover:bg-slate-700"
                            )}
                          >
-                           {l}
+                           <span>{item.label}</span>
+                           <span className="text-[9px] font-normal normal-case opacity-70">{item.nativeName}</span>
                          </button>
                        ))}
                      </motion.div>
@@ -9635,6 +8741,7 @@ function App() {
                   ref={wysiwygRef}
                   contentEditable
                   suppressContentEditableWarning
+                  onBeforeInput={handleWysiwygBeforeInput}
                   onKeyDown={handleWysiwygKeyDown}
                   onPaste={async (e) => {
                     e.preventDefault();
@@ -9734,7 +8841,7 @@ function App() {
                       }
                     });
 
-                    const blockTags = ['TABLE', 'PRE', 'BLOCKQUOTE', 'UL', 'OL', 'CENTER', 'IFRAME', 'HR'];
+                    const blockTags = ['TABLE'];
 
                     // Ensure top spacer is added ONLY if first element is a special block element and no top-spacer exists
                     const firstEl = target.firstElementChild;
@@ -9837,7 +8944,7 @@ function App() {
                     saveVisualSelection();
                   }}
                   className={cn(
-                    "flex-1 w-full bg-transparent text-base outline-none overflow-y-auto custom-scrollbar transition-colors duration-700 editor-font prose prose-invert prose-cyan max-w-none wysiwyg-editor whitespace-pre-wrap",
+                    "flex-1 w-full bg-transparent text-base outline-none overflow-y-auto custom-scrollbar transition-colors duration-700 editor-font prose prose-invert prose-cyan max-w-none wysiwyg-editor break-words",
                     (visualStyle === 'neon' && neonTextColored) ? "text-cyan-400 font-normal" : "text-slate-300",
                     beautifyEnabled ? "px-4 lg:px-8 pt-4 lg:pt-6 max-w-4xl mx-auto selection:bg-[rgb(var(--accent-color)/0.3)]" : "px-4 pt-4 lg:px-6 lg:pt-6",
                     "pb-4 mb-[85px] lg:mb-[85px]"
@@ -9978,12 +9085,12 @@ function App() {
                             onMouseDown={(e) => e.preventDefault()}
                             onClick={tool.action} 
                             className={cn(
-                              "toolbar-btn flex-shrink-0 flex items-center justify-center hover:bg-cyan-600 hover:text-white rounded-xl transition-colors font-bold",
+                              "toolbar-btn flex-shrink-0 flex items-center justify-center rounded-xl transition-colors font-bold",
                               isToolActive 
-                                ? "bg-cyan-950 text-cyan-400 border border-cyan-500/50 shadow-none"
+                                ? "bg-cyan-500/20 text-cyan-400 border border-cyan-500/30 shadow-none"
                                 : !widgetNoBorder 
-                                  ? "bg-slate-800 border border-slate-600/50 text-slate-300 shadow-none"
-                                  : "bg-transparent text-slate-400 hover:bg-white/10"
+                                  ? "bg-slate-800 hover:bg-slate-700 border border-slate-600/50 text-slate-300 shadow-none"
+                                  : "bg-transparent text-slate-400 hover:bg-slate-800"
                             )}
                           >
                             {tool.label}
