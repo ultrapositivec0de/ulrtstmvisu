@@ -1,0 +1,27 @@
+name: Full Sync to Public Org Repo
+
+on:
+  push:
+    branches:
+      - main # або master
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Private Repo
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Push to Public Org Repo
+        env:
+          PUBLIC_TOKEN: ${{ secrets.PUBLIC_ORG_TOKEN }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          
+          # Оновлений URL з вашими параметрами:
+          git remote add public-org https://x-access-token:${PUBLIC_TOKEN}@github.com/ultrapositivec0de/ulrtstmvisu.git
+          
+          git push public-org main --force
