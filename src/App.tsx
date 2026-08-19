@@ -9,7 +9,7 @@ import {
   Trash2, X, ChevronLeft, ChevronRight, ChevronUp, ChevronDown,
   Eye, EyeOff, Edit3, Plus, ShieldCheck, Key,
   Search, List as ListIcon, Lock, LayoutGrid, Maximize2, Minimize2, Calendar, Tags, Shield, Bell, ArrowRight, Clock,
-  Code, Terminal, Indent, Layers, CheckCircle, PlusCircle, Check, AlignLeft, AlignRight, Rows, Columns, PanelLeft, PanelRight, PanelLeftClose, PanelLeftOpen, Moon, Sun, FilePlus, Zap, MoveVertical, Info, Globe, FileUp, FileDown, Copy, SplitSquareHorizontal, Type, Download, Sparkles
+  Code, Terminal, Indent, Layers, CheckCircle, PlusCircle, Check, AlignLeft, AlignRight, Rows, Columns, PanelLeft, PanelRight, PanelLeftClose, PanelLeftOpen, Moon, Sun, FilePlus, Zap, MoveVertical, Info, Globe, FileUp, FileDown, Copy, SplitSquareHorizontal, Type, Download, Sparkles, Images
 } from 'lucide-react';
 import { motion, AnimatePresence, Reorder } from 'motion/react';
 import { marked } from 'marked';
@@ -31,37 +31,7 @@ import { zipSync, unzipSync, strToU8, strFromU8 } from 'fflate';
 import { htmlToMarkdown, convertBareImageUrlsToMarkdown, isImageAndProxyUrl } from './lib/editorSync';
 import { useEditorWorker } from './hooks/useEditorWorker';
 import { translations, AVAILABLE_LANGUAGES, getTranslation, type TranslationKey } from './locales';
-
-// --- Constants ---
-const COMMUNITIES = [
-  { id: 'ukraine', name: 'Steem Ukraine', tags: ['hive-145157', 'ukraine', 'steemexclusive'] },
-  { id: 'venezuela', name: 'Steem Venezuela', tags: ['hive-193637', 'venezuela', 'steemexclusive'] },
-  { id: 'colombia', name: 'Colombia-Original', tags: ['hive-113376', 'colombia', 'steemexclusive'] },
-  { id: 'bangladesh', name: 'Steem Bangladesh', tags: ['hive-138339', 'bangladesh', 'steemexclusive'] },
-  { id: 'indonesia', name: 'Steem Indonesia', tags: ['hive-133280', 'indonesia', 'steemexclusive'] },
-  { id: 'xpilar', name: 'World of Xpilar', tags: ['hive-185836', 'xpilar', 'steemexclusive'] },
-  { id: 'betterlife', name: 'Steem For Betterlife', tags: ['hive-153970', 'betterlife', 'steemexclusive'] },
-  { id: 'entrepreneurs', name: 'Steem Entrepreneurs', tags: ['hive-181136', 'steem-entrepreneurs', 'steemexclusive'] },
-  { id: 'kids', name: 'Steem Kids & Parents', tags: ['hive-139765', 'steemkids', 'steemexclusive'] },
-  { id: 'newcomers', name: 'Newcomers Community', tags: ['hive-172186', 'achievement1'] },
-  { id: 'writing', name: 'Writing & Reviews', tags: ['hive-190212', 'writing', 'steemexclusive'] },
-  { id: 'foods', name: 'Steem Foods', tags: ['hive-180301', 'steemfoods', 'steemexclusive'] },
-  { id: 'fashion', name: 'Fashion & Style', tags: ['hive-125125', 'fashion', 'steemexclusive'] },
-  { id: 'crypto', name: 'Crypto Academy', tags: ['hive-108451', 'cryptoacademy', 'steemexclusive'] },
-  { id: 'travel', name: 'Steem Travel', tags: ['hive-163291', 'travel', 'steemexclusive'] },
-  { id: 'art', name: 'Steem Art', tags: ['hive-185836', 'art', 'steemexclusive'] },
-  { id: 'garden', name: 'Steem Garden', tags: ['hive-180821', 'garden', 'steemexclusive'] },
-  { id: 'news', name: 'Steem News', tags: ['hive-179607', 'news', 'steemexclusive'] },
-  { id: 'promo', name: 'PromoSteem', tags: ['hive-152200', 'promosteem', 'steemexclusive'] },
-  { id: 'woa', name: 'World of Animals', tags: ['hive-140292', 'animals', 'steemexclusive'] },
-  { id: 'learn', name: 'Steem Learning', tags: ['hive-190212', 'learning', 'steemexclusive'] },
-  { id: 'tech', name: 'Steem Tech', tags: ['hive-190212', 'technology', 'steemexclusive'] },
-  { id: 'dev', name: 'Development', tags: ['hive-151113', 'dev', 'steem', 'steemexclusive'] },
-  { id: 'sport', name: 'Steem Sport', tags: ['hive-106444', 'sport', 'steemexclusive'] },
-  { id: 'health', name: 'Steem Health', tags: ['hive-168205', 'health', 'steemexclusive'] },
-];
-
-const COMMON_TAGS = ['life', 'betterlife', 'thediarygame', 'club5050', 'club75', 'club100', 'art', 'photography', 'travel', 'food', 'nature', 'blog', 'creative', 'dev', 'steem', 'lifestyle', 'news', 'steemit', 'sharing', 'review', 'tutorial'];
+import { COMMUNITIES, COMMON_TAGS } from './data/communities';
 
 // Detect native environment (Tauri / Android Wrapper)
 // const IS_NATIVE = typeof window !== 'undefined' && (!!(window as any).__TAURI__ || !!(window as any).AndroidBridge || navigator.userAgent.includes('SteemEditorNative'));
@@ -213,7 +183,7 @@ const STORAGE_KEY_FLOAT_CONFIG = 'steem_float_config';
 const STORAGE_KEY_IMAGES = 'steem_uploaded_images_v2';
 const STORAGE_KEY_QUEUE = 'steem_queue_v2';
 
-const DEFAULT_FLOAT_TOOLS = ['B', 'I', 'sub', 'sup', 'Img', 'Caption', 'Mentions', 'Table', 'Separator', 'Grid', 'HR'];
+const DEFAULT_FLOAT_TOOLS = ['B', 'I', 'sub', 'sup', 'Img', 'Gallery', 'Caption', 'Mentions', 'Table', 'Separator', 'Grid', 'HR'];
 
 // --- Components ---
 
@@ -2593,7 +2563,7 @@ function App() {
               const pBefore = document.createElement('p');
               pBefore.className = 'table-spacer top-spacer';
               pBefore.setAttribute('data-empty', 'true');
-              pBefore.setAttribute('data-placeholder', lang === 'uk' ? '↵ Новий параграф...' : lang === 'es' ? '↵ Nuevo párrafo...' : lang === 'ko' ? '↵ 새 문단...' : '↵ New paragraph...');
+              pBefore.setAttribute('data-placeholder', t('newParagraphPlaceholder'));
               pBefore.innerHTML = '<br>';
               tempDiv.insertBefore(pBefore, firstEl);
            }
@@ -2606,7 +2576,7 @@ function App() {
               const pAfter = document.createElement('p');
               pAfter.className = 'table-spacer bottom-spacer';
               pAfter.setAttribute('data-empty', 'true');
-              pAfter.setAttribute('data-placeholder', lang === 'uk' ? '↵ Новий параграф...' : lang === 'es' ? '↵ Nuevo párrafo...' : lang === 'ko' ? '↵ 새 문단...' : '↵ New paragraph...');
+              pAfter.setAttribute('data-placeholder', t('newParagraphPlaceholder'));
               pAfter.innerHTML = '<br>';
               tempDiv.appendChild(pAfter);
            }
@@ -2682,7 +2652,7 @@ function App() {
     } catch (e) {
       console.warn('syncCursorMarkdownToVisual error:', e);
     }
-  }, [lang, scrollCaretIntoView]);
+  }, [scrollCaretIntoView, t]);
 
   // Bidirectional sync: sync content to visual editor unless visual editor currently has focus
   useEffect(() => {
@@ -2839,9 +2809,11 @@ function App() {
 
   // Visual Viewport API for mobile virtual keyboard height detection
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  const [viewportHeight, setViewportHeight] = useState(() => typeof window !== 'undefined' ? window.innerHeight : 0);
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  const [_keyboardOffset, setKeyboardOffset] = useState(0);
+  const [_viewportHeight, setViewportHeight] = useState(() => typeof window !== 'undefined' ? window.innerHeight : 0);
+  const [keyboardOffset, setKeyboardOffset] = useState(0);
+  const [isKeyboardOpen, setIsKeyboardOpen] = useState(false);
+  const [isMiniGalleryOpen, setIsMiniGalleryOpen] = useState(false);
+  const [justInsertedUrl, setJustInsertedUrl] = useState<string | null>(null);
 
   useEffect(() => {
     if (typeof window === 'undefined' || !window.visualViewport) return;
@@ -2852,11 +2824,18 @@ function App() {
       const layoutHeight = window.innerHeight;
       const visualHeight = vv.height;
       setViewportHeight(visualHeight);
-      const diff = layoutHeight - visualHeight - vv.offsetTop;
-      if (diff > 80) {
+      const diff = Math.max(0, layoutHeight - visualHeight - vv.offsetTop);
+      if (diff > 60) {
         setKeyboardOffset(diff);
+        setIsKeyboardOpen(true);
       } else {
         setKeyboardOffset(0);
+        setIsKeyboardOpen(false);
+      }
+
+      if (typeof document !== 'undefined' && document.documentElement) {
+        document.documentElement.style.setProperty('--vv-height', `${visualHeight}px`);
+        document.documentElement.style.setProperty('--keyboard-offset', `${diff > 60 ? diff : 0}px`);
       }
     };
 
@@ -4912,76 +4891,58 @@ function App() {
                 }
                 currRight = currRight.parentNode;
               }
-
               if (isLeftEmpty && isRightEmpty) {
                 e.preventDefault();
+                
+                const rLeft = document.createRange();
+                rLeft.setStart(escapeTarget, 0);
+                rLeft.setEndBefore(marker);
+                const leftFrag = rLeft.cloneContents();
+                
+                const rRight = document.createRange();
+                rRight.setStartAfter(marker);
+                rRight.setEnd(escapeTarget, escapeTarget.childNodes.length);
+                const rightFrag = rRight.cloneContents();
 
-                // Find the direct child of escapeTarget that is or contains the marker
-                let directChild: Node | null = marker;
-                while (directChild && directChild.parentNode !== escapeTarget) {
-                  directChild = directChild.parentNode;
+                if (leftFrag.lastChild && leftFrag.lastChild.nodeType === Node.ELEMENT_NODE && (leftFrag.lastChild as HTMLElement).tagName === 'BR') {
+                  leftFrag.removeChild(leftFrag.lastChild);
                 }
+                if (rightFrag.firstChild && rightFrag.firstChild.nodeType === Node.ELEMENT_NODE && (rightFrag.firstChild as HTMLElement).tagName === 'BR') {
+                  rightFrag.removeChild(rightFrag.firstChild);
+                }
+                
+                const checkFragHasContent = (frag: DocumentFragment) => {
+                   if ((frag.textContent || '').replace(/[\u200B\s\n]/g, '').length > 0) return true;
+                   if (frag.querySelector('img, iframe, video, td, th, hr')) return true;
+                   return false;
+                };
+                
+                const leftHasContent = checkFragHasContent(leftFrag);
+                const rightHasContent = checkFragHasContent(rightFrag);
 
-                if (directChild) {
-                  const childs: Node[] = Array.from(escapeTarget.childNodes);
-                  const directIndex = childs.indexOf(directChild);
-
-                  const leftChildren = directIndex > 0 ? childs.slice(0, directIndex) : [];
-                  const rightChildren = directIndex + 1 < childs.length ? childs.slice(directIndex + 1) : [];
-
-                  // Remove trailing <br> from left side
-                  if (leftChildren.length > 0) {
-                    const last = leftChildren[leftChildren.length - 1];
-                    if (last.nodeType === Node.ELEMENT_NODE && (last as HTMLElement).tagName === 'BR') {
-                      leftChildren.pop();
-                    }
+                const p = document.createElement('p');
+                p.innerHTML = '<br>';
+                const parentNode = escapeTarget.parentNode;
+                if (parentNode) {
+                  if (leftHasContent && rightHasContent) {
+                    const rightBlock = document.createElement(escapeTarget.tagName.toLowerCase());
+                    rightBlock.className = escapeTarget.className;
+                    escapeTarget.innerHTML = '';
+                    escapeTarget.appendChild(leftFrag);
+                    rightBlock.appendChild(rightFrag);
+                    parentNode.insertBefore(rightBlock, escapeTarget.nextSibling);
+                    parentNode.insertBefore(p, rightBlock);
+                  } else if (leftHasContent) {
+                    escapeTarget.innerHTML = '';
+                    escapeTarget.appendChild(leftFrag);
+                    parentNode.insertBefore(p, escapeTarget.nextSibling);
+                  } else if (rightHasContent) {
+                    escapeTarget.innerHTML = '';
+                    escapeTarget.appendChild(rightFrag);
+                    parentNode.insertBefore(p, escapeTarget);
+                  } else {
+                    parentNode.replaceChild(p, escapeTarget);
                   }
-
-                  // Remove leading <br> from right side
-                  if (rightChildren.length > 0) {
-                    const first = rightChildren[0];
-                    if (first.nodeType === Node.ELEMENT_NODE && (first as HTMLElement).tagName === 'BR') {
-                      rightChildren.shift();
-                    }
-                  }
-
-                  // Create the escape paragraph
-                  const p = document.createElement('p');
-                  p.innerHTML = '<br>';
-
-                  const parentNode = escapeTarget.parentNode;
-                  if (parentNode) {
-                    const leftHasContent = leftChildren.some(hasText);
-                    const rightHasContent = rightChildren.some(hasText);
-
-                    if (leftHasContent && rightHasContent) {
-                      // Split in half
-                      const leftBlock = escapeTarget;
-                      const rightBlock = document.createElement(leftBlock.tagName.toLowerCase());
-                      rightBlock.className = leftBlock.className;
-
-                      leftBlock.innerHTML = '';
-                      leftChildren.forEach(c => leftBlock.appendChild(c));
-
-                      rightChildren.forEach(c => rightBlock.appendChild(c));
-
-                      parentNode.insertBefore(rightBlock, leftBlock.nextSibling);
-                      parentNode.insertBefore(p, rightBlock);
-                    } else if (leftHasContent) {
-                      // Escape at the end
-                      escapeTarget.innerHTML = '';
-                      leftChildren.forEach(c => escapeTarget.appendChild(c));
-                      parentNode.insertBefore(p, escapeTarget.nextSibling);
-                    } else if (rightHasContent) {
-                      // Escape at the beginning
-                      escapeTarget.innerHTML = '';
-                      rightChildren.forEach(c => escapeTarget.appendChild(c));
-                      parentNode.insertBefore(p, escapeTarget);
-                    } else {
-                      // Both sides are empty, completely replace escapeTarget with paragraph
-                      parentNode.replaceChild(p, escapeTarget);
-                    }
-
                     // Focus the new paragraph
                     const newRange = document.createRange();
                     newRange.selectNodeContents(p);
@@ -4994,7 +4955,6 @@ function App() {
                     updateContentFromWysiwyg();
                     return;
                   }
-                }
               }
             } catch (err) {
               console.warn('Unified escape breakout error:', err);
@@ -6859,7 +6819,7 @@ function App() {
     
     const saved = await saveFileNatively(fileBlob, fullFilename, 'text/markdown');
     if (saved) {
-      notify(lang === 'uk' ? `Файл "${fullFilename}" успішно експортовано!` : `File "${fullFilename}" exported successfully!`, 'success');
+      notify(`${t('fileExportSuccess')} (${fullFilename})`, 'success');
     }
   };
 
@@ -7126,7 +7086,7 @@ function App() {
         }
       } catch (err: any) {
         console.error(err);
-        setPubLog({ msg: `❌ Помилка у файлі ${i + 1}: ${file.name} - ${err.message}`, type: 'error' });
+        setPubLog({ msg: `❌ ${t('fileError')} ${i + 1}: ${file.name} - ${err.message}`, type: 'error' });
         await new Promise(resolve => setTimeout(resolve, 3000));
       }
     }
@@ -7139,6 +7099,9 @@ function App() {
         type: 'success' 
       });
       setTimeout(() => setPubLog({ msg: '', type: null }), 3000);
+      if (files.length > 1) {
+        setIsMiniGalleryOpen(true);
+      }
     }
   };
 
@@ -7191,7 +7154,7 @@ function App() {
     'Esc': { label: '\\', action: () => fmt('\\', '') },
     'HR': { label: '—', action: () => insertAtCursor('\n\n---\n\n') },
     'Color': { label: <span className="text-red-500 font-bold text-lg">A</span>, action: () => fmt('<div class="phishy">', '</div>') },
-    'Caption': { label: 'Підп', action: async () => {
+    'Caption': { label: t('captionShort'), action: async () => {
       const url = await promptDialog(t('urlPrompt'));
       if (!url) return;
       const cap = await promptDialog(t('caption'), '');
@@ -7215,6 +7178,9 @@ function App() {
     }},
     'Img': { label: <ImageIcon size={20} />, action: () => {
       fileInputRef.current?.click();
+    }},
+    'Gallery': { label: <Images size={20} />, action: () => {
+      setIsMiniGalleryOpen(prev => !prev);
     }}
   };
 
@@ -7399,7 +7365,7 @@ function App() {
                 activeView === 'reader' ? "bg-cyan-600 text-white shadow-none neon-tab-glow" : "text-slate-500 hover:text-slate-300"
               )}
             >
-              <Globe size={16} className={cn(visualStyle === 'neon' && "neon-icon-glow")} /> <span className="hidden xs:inline">{lang === 'uk' ? 'Читач' : 'Reader'}</span>
+              <Globe size={16} className={cn(visualStyle === 'neon' && "neon-icon-glow")} /> <span className="hidden xs:inline">{t('reader')}</span>
             </button>
           </div>
         </div>
@@ -7761,7 +7727,7 @@ function App() {
                 <div className="flex flex-col lg:flex-row lg:items-center bg-slate-900 border border-slate-700 rounded-lg overflow-hidden shrink-0">
                    <button onClick={() => { saveDraft('working'); setShowMobileTools2(false); }} className="px-3 lg:px-2 py-2 lg:py-1.5 hover:bg-slate-800 text-slate-300 border-b lg:border-b-0 lg:border-r border-slate-700 flex items-center justify-center lg:justify-start gap-1.5 text-[10px] lg:text-[9px] font-black uppercase transition-colors" title={t('saveDraft')}>
                      <Save size={20} /> 
-                     <span className="lg:hidden xl:inline">{lang === 'uk' ? 'Зберегти' : 'Save'}</span>
+                     <span className="lg:hidden xl:inline">{t('saveDraft')}</span>
                    </button>
                    <button onClick={() => { saveDraft('ready'); setShowMobileTools2(false); }} className={cn(
                      "px-3 lg:px-2 py-2 lg:py-1.5 flex items-center justify-center transition-colors hover:bg-[rgb(var(--accent-color)/0.1)] text-[rgb(var(--accent-color))] hover:text-[rgb(var(--accent-color))]"
@@ -7796,6 +7762,8 @@ function App() {
       <div className="flex flex-1 overflow-hidden relative">
         <div className={cn("flex-1 overflow-hidden bg-slate-900 flex flex-col", activeView !== 'reader' && "hidden")}>
             <Reader 
+              lang={lang}
+              t={t}
               onEditPost={handleEditPost}
               onVote={handleReaderVote}
               onComment={handleReaderComment}
@@ -7827,7 +7795,7 @@ function App() {
                     <button 
                       onClick={() => setIsGalleryCollapsed(!isGalleryCollapsed)}
                       className="p-1.5 rounded-lg bg-slate-800/50 hover:bg-slate-800 text-slate-400 hover:text-white transition-colors"
-                      title={isGalleryCollapsed ? (lang === 'uk' ? 'Розгорнути галерею' : 'Expand Gallery') : (lang === 'uk' ? 'Згорнути галерею' : 'Collapse Gallery')}
+                      title={isGalleryCollapsed ? t('expandGallery') : t('collapseGallery')}
                     >
                       {isGalleryCollapsed ? <PanelLeftOpen size={16} /> : <PanelLeftClose size={16} />}
                     </button>
@@ -7976,7 +7944,7 @@ function App() {
                                           className="flex-1 text-[10px] font-bold text-amber-400 bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/30 rounded-lg py-1.5 px-2.5 flex items-center justify-center gap-1.5 transition-all"
                                         >
                                           <Lock size={12} />
-                                          <span>{lang === 'uk' ? '🔑 Додати ключ у Vault для вивантаження' : '🔑 Add Vault key for image upload'}</span>
+                                          <span>{t('addVaultKeyForUpload')}</span>
                                         </button>
                                       )}
                                     </div>
@@ -8297,7 +8265,7 @@ function App() {
                       <span className={cn(
                         isLivePreviewEnabled ? "hidden xl:inline" : "hidden sm:inline"
                       )}>
-                        {lang === 'uk' ? 'Візуальний' : lang === 'es' ? 'Editor Visual' : lang === 'ko' ? '비주얼 에디터' : 'Visual Editor'}
+                        {t('visualEditor')}
                       </span>
                     </button>
                     <button 
@@ -8314,7 +8282,7 @@ function App() {
                       <span className={cn(
                         isLivePreviewEnabled ? "hidden xl:inline" : "hidden sm:inline"
                       )}>
-                        {lang === 'uk' ? 'Markdown-код' : lang === 'es' ? 'Código Markdown' : lang === 'ko' ? '마크다운 코드' : 'Markdown Code'}
+                        {t('markdownCode')}
                       </span>
                     </button>
                     <button
@@ -8326,12 +8294,12 @@ function App() {
                           ? "bg-cyan-600 text-white shadow-sm ring-1 ring-cyan-400" 
                           : (isDarkMode || visualStyle === 'neon' ? "text-slate-500 hover:text-cyan-400 hover:bg-slate-800" : "text-slate-500 hover:text-cyan-600 hover:bg-slate-200")
                       )}
-                      title={isEditorFullScreen ? (lang === 'uk' ? "Вийти з повноекранного режиму (Esc)" : "Exit Fullscreen (Esc)") : (lang === 'uk' ? "Повноекранний режим" : "Fullscreen")}
+                      title={isEditorFullScreen ? t('exitFullscreen') : t('fullscreen')}
                     >
                       {isEditorFullScreen ? <Minimize2 size={12} className="text-white" /> : <Maximize2 size={12} />}
                       {isEditorFullScreen && (
                         <span className="text-[10px] font-bold uppercase tracking-wider hidden xs:inline">
-                          {lang === 'uk' ? 'Вихід' : 'Exit'}
+                          {t('exit')}
                         </span>
                       )}
                     </button>
@@ -8357,13 +8325,13 @@ function App() {
                         ? (isDarkMode || visualStyle === 'neon' ? "bg-cyan-950/40 border-cyan-800/60 text-cyan-400 hover:bg-cyan-900/40" : "bg-cyan-50 border-cyan-200 text-cyan-700 hover:bg-cyan-100/50") 
                         : (isDarkMode || visualStyle === 'neon' ? "bg-slate-950/40 border-slate-800/60 text-slate-400 hover:text-slate-200 hover:bg-slate-900/40" : "bg-slate-100/50 border-slate-200 text-slate-600 hover:text-slate-900 hover:bg-slate-200/50")
                     )}
-                    title={lang === 'uk' ? (!onDemandSyncEnabled ? "Безперервна синхронізація (увімкнено)" : "Увімкнути безперервну синхронізацію") : (!onDemandSyncEnabled ? "Continuous real-time sync (enabled)" : "Enable continuous real-time sync")}
+                    title={!onDemandSyncEnabled ? t('realtimeSyncActive') : t('enableRealtimeSync')}
                   >
                     <RefreshCw size={12} className={cn(!onDemandSyncEnabled ? "text-cyan-400" : "text-slate-500")} />
                     <span className={cn(
                       isLivePreviewEnabled ? "hidden xl:inline" : "hidden xs:inline"
                     )}>
-                      {lang === 'uk' ? 'Реал-тайм' : 'Real-time'}
+                      {t('realtime')}
                     </span>
                     {!onDemandSyncEnabled && (
                       <span className="w-1.5 h-1.5 rounded-full bg-[rgb(var(--accent-color))] shrink-0" />
@@ -8380,7 +8348,7 @@ function App() {
                         ? (isDarkMode || visualStyle === 'neon' ? "bg-cyan-950/40 border-cyan-800/60 text-cyan-400 hover:bg-cyan-900/40" : "bg-cyan-50 border-cyan-200 text-cyan-700 hover:bg-cyan-100/50") 
                         : (isDarkMode || visualStyle === 'neon' ? "bg-slate-950/40 border-slate-800/60 text-slate-400 hover:text-slate-200 hover:bg-slate-900/40" : "bg-slate-100/50 border-slate-200 text-slate-600 hover:text-slate-900 hover:bg-slate-200/50")
                     )}
-                    title={lang === 'uk' ? "Увімкнути/вимкнути прев'ю перегляду" : "Enable/Disable Live Preview"}
+                    title={t('toggleLivePreview')}
                   >
                     {isLivePreviewEnabled ? <Eye size={12} className={cn(isDarkMode || visualStyle === 'neon' ? "text-cyan-400" : "text-cyan-600")} /> : <EyeOff size={12} className="text-slate-500" />}
                     <span className={cn(
@@ -8410,13 +8378,13 @@ function App() {
                         ? (isDarkMode || visualStyle === 'neon' ? "bg-cyan-950/40 border-cyan-800/60 text-cyan-400 hover:bg-cyan-900/40" : "bg-cyan-50 border-cyan-200 text-cyan-700 hover:bg-cyan-100/50") 
                         : (isDarkMode || visualStyle === 'neon' ? "bg-slate-950/40 border-slate-800/60 text-slate-400 hover:text-slate-200 hover:bg-slate-900/40" : "bg-slate-100/50 border-slate-200 text-slate-600 hover:text-slate-900 hover:bg-slate-200/50")
                     )}
-                    title={lang === 'uk' ? (beautifyEnabled ? "Б'ютіфікація (увімкнено)" : "Увімкнути б'ютіфікацію") : (beautifyEnabled ? "Beautification (enabled)" : "Enable beautification")}
+                    title={beautifyEnabled ? t('beautifyActiveTitle') : t('enableBeautifyTitle')}
                   >
                     <Sparkles size={12} className={cn(beautifyEnabled ? "text-cyan-400" : "text-slate-500")} />
                     <span className={cn(
                       isLivePreviewEnabled ? "hidden xl:inline" : "hidden xs:inline"
                     )}>
-                      {lang === 'uk' ? "Б'ютіфікація" : "Beautify"}
+                      {t('beautify')}
                     </span>
                     {beautifyEnabled && (
                       <span className="w-1.5 h-1.5 rounded-full bg-[rgb(var(--accent-color))] shrink-0" />
@@ -8443,13 +8411,13 @@ function App() {
                           ? "bg-cyan-950/40 border-cyan-800/60 text-cyan-400 hover:bg-cyan-900/40" 
                           : "bg-slate-950/40 border-slate-800/60 text-slate-400 hover:text-slate-200 hover:bg-slate-900/40"
                       )}
-                      title={lang === 'uk' ? (neonTextColored ? "Кольоровий текст (увімкнено)" : "Увімкнути кольоровий текст") : (neonTextColored ? "Colored Text (enabled)" : "Enable colored text")}
+                      title={neonTextColored ? t('colorTextActiveTitle') : t('enableColorTextTitle')}
                     >
                       <Type size={12} className={cn(neonTextColored ? "text-cyan-400" : "text-slate-500")} />
                       <span className={cn(
                         isLivePreviewEnabled ? "hidden xl:inline" : "hidden xs:inline"
                       )}>
-                        {lang === 'uk' ? "Колір" : "Color"}
+                        {t('color')}
                       </span>
                       {neonTextColored && (
                         <span className="w-1.5 h-1.5 rounded-full bg-[rgb(var(--accent-color))] shrink-0" />
@@ -8468,13 +8436,13 @@ function App() {
                           ? "bg-cyan-600 text-white border-cyan-500 shadow-none"
                           : (isDarkMode || visualStyle === 'neon' ? "bg-slate-950/40 border-slate-800/60 text-slate-400 hover:text-slate-200 hover:bg-slate-900/40" : "bg-slate-100/50 border-slate-200 text-slate-600 hover:text-slate-900 hover:bg-slate-200/50")
                       )}
-                      title={lang === 'uk' ? "Налаштування відступів, б'ютіфікації та іконок" : "Spacing, Beautification & Size Settings"}
+                      title={t('spacingSettingsTitle')}
                     >
                       <MoveVertical size={12} />
                       <span className={cn(
                         isLivePreviewEnabled ? "hidden xl:inline" : "hidden xs:inline"
                       )}>
-                        {lang === 'uk' ? 'Відступи' : 'Spacing'}
+                        {t('spacing')}
                       </span>
                     </button>
 
@@ -8501,7 +8469,7 @@ function App() {
                               isDarkMode || visualStyle === 'neon' ? "border-slate-800" : "border-slate-100"
                             )}>
                               <span className="text-[10px] font-extrabold uppercase tracking-widest text-slate-500">
-                                {lang === 'uk' ? 'Опції розмітки' : 'Layout Options'}
+                                {t('layoutOptions')}
                               </span>
                               <button 
                                 onClick={() => setIsSpacingMenuOpen(false)}
@@ -8523,7 +8491,7 @@ function App() {
                                     {lang === 'uk' ? "Б'ютіфікація" : "Beautification"}
                                   </span>
                                   <span className="text-[9px] text-slate-500 font-medium block">
-                                    {lang === 'uk' ? "Покращене оформлення" : "Enhanced styling"}
+                                    {t('enhancedStyling')}
                                   </span>
                                 </div>
                               </div>
@@ -8551,7 +8519,7 @@ function App() {
                             <div className="space-y-2">
                               <div className="flex justify-between items-center">
                                 <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">
-                                  {lang === 'uk' ? 'Відступи абзаців' : 'Paragraph Spacing'}
+                                  {t('paragraphSpacing')}
                                 </span>
                                 <span className="text-[10px] font-mono font-bold text-cyan-400 bg-cyan-950/40 border border-cyan-800/30 px-1.5 py-0.5 rounded">
                                   {wysiwygSpacing}px
@@ -8562,10 +8530,10 @@ function App() {
                                 isDarkMode || visualStyle === 'neon' ? "bg-slate-950/40 border-slate-800/60" : "bg-slate-50 border-slate-200"
                               )}>
                                 {[
-                                  { id: 6, label: lang === 'uk' ? 'Комп' : 'Comp' },
-                                  { id: 14, label: lang === 'uk' ? 'Збал' : 'Bal' },
-                                  { id: 20, label: lang === 'uk' ? 'Стан' : 'Norm' },
-                                  { id: 28, label: lang === 'uk' ? 'Прос' : 'Spac' }
+                                  { id: 6, label: t('spacingCompact') },
+                                  { id: 14, label: t('spacingBalanced') },
+                                  { id: 20, label: t('spacingNormal') },
+                                  { id: 28, label: t('spacingSpacious') }
                                 ].map(p => (
                                   <button
                                     key={p.id}
@@ -8609,7 +8577,7 @@ function App() {
                             )}>
                               <div className="flex justify-between items-center">
                                 <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">
-                                  {lang === 'uk' ? 'Розмір шрифту' : 'Editor Font Size'}
+                                  {t('fontSize')}
                                 </span>
                                 <span className="text-[10px] font-mono font-bold text-cyan-400 bg-cyan-950/40 border border-cyan-800/30 px-1.5 py-0.5 rounded">
                                   {editorFontSize}px
@@ -8620,10 +8588,10 @@ function App() {
                                 isDarkMode || visualStyle === 'neon' ? "bg-slate-950/40 border-slate-800/60" : "bg-slate-50 border-slate-200"
                               )}>
                                 {[
-                                  { id: 14, label: lang === 'uk' ? 'Дрібний' : 'Small' },
-                                  { id: 16, label: lang === 'uk' ? 'Стандарт' : 'Normal' },
-                                  { id: 18, label: lang === 'uk' ? 'Великий' : 'Large' },
-                                  { id: 22, label: lang === 'uk' ? 'Макс' : 'Max' }
+                                  { id: 14, label: t('fontSmall') },
+                                  { id: 16, label: t('fontNormal') },
+                                  { id: 18, label: t('fontLarge') },
+                                  { id: 22, label: t('fontMax') }
                                 ].map(p => (
                                   <button
                                     key={p.id}
@@ -8667,7 +8635,7 @@ function App() {
                             )}>
                               <div className="flex justify-between items-center">
                                 <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">
-                                  {lang === 'uk' ? 'Розмір іконок' : 'Toolbar Icon Size'}
+                                  {t('iconSize')}
                                 </span>
                                 <span className="text-[10px] font-mono font-bold text-cyan-400 bg-cyan-950/40 border border-cyan-800/30 px-1.5 py-0.5 rounded">
                                   {toolbarIconSize}px
@@ -8732,7 +8700,9 @@ function App() {
                     "flex-1 w-full bg-transparent text-base outline-none resize-none custom-scrollbar transition-all duration-700 editor-font",
                     (visualStyle === 'neon' && neonTextColored) ? "text-cyan-400 font-normal" : "text-slate-300",
                     beautifyEnabled ? "px-4 lg:px-8 pt-4 lg:pt-6 max-w-[clamp(40rem,60vw,80rem)] mx-auto selection:bg-[rgb(var(--accent-color)/0.3)]" : "px-3 pt-3 lg:px-6 lg:pt-6",
-                    "pb-4 mb-[85px] lg:mb-[85px]"
+                    isKeyboardOpen 
+                      ? "pb-6 mb-[4rem] lg:pb-6 lg:mb-[5rem]" 
+                      : "pb-6 mb-[8rem] lg:pb-6 lg:mb-[5rem]"
                   )}
                   placeholder={`${t('placeholder')}\n\n\n\n\nОМ АХ ХУМ СО ХА\n♡`}
                 />
@@ -8947,7 +8917,9 @@ function App() {
                     "flex-1 w-full bg-transparent text-base outline-none overflow-y-auto custom-scrollbar transition-colors duration-700 editor-font prose prose-invert prose-cyan max-w-none wysiwyg-editor break-words",
                     (visualStyle === 'neon' && neonTextColored) ? "text-cyan-400 font-normal" : "text-slate-300",
                     beautifyEnabled ? "px-4 lg:px-8 pt-4 lg:pt-6 max-w-4xl mx-auto selection:bg-[rgb(var(--accent-color)/0.3)]" : "px-4 pt-4 lg:px-6 lg:pt-6",
-                    "pb-4 mb-[85px] lg:mb-[85px]"
+                    isKeyboardOpen 
+                      ? "pb-6 mb-[4rem] lg:pb-6 lg:mb-[5rem]" 
+                      : "pb-6 mb-[8rem] lg:pb-6 lg:mb-[5rem]"
                   )}
                   style={{ minHeight: '200px' }}
                 />
@@ -9001,6 +8973,108 @@ function App() {
                 </div>
               )}
 
+              {/* Compact Mini-Gallery Strip */}
+              <AnimatePresence>
+                {isMiniGalleryOpen && images.length > 0 && !activeModal && (window.innerWidth >= 1024 || !isSidebarOpen) && (
+                  <motion.div
+                    key="mini-gallery-strip"
+                    initial={{ opacity: 0, y: 15, scale: 0.96 }}
+                    animate={{ opacity: 1, y: 0, scale: 1 }}
+                    exit={{ opacity: 0, y: 15, scale: 0.96 }}
+                    transition={{ duration: 0.15 }}
+                    style={{
+                      bottom: window.innerWidth < 1024
+                        ? (isKeyboardOpen 
+                            ? `calc(${keyboardOffset > 0 ? keyboardOffset : 0}px + var(--toolbar-btn-size, 3rem) + 0.35rem)` 
+                            : 'calc(4rem + var(--toolbar-btn-size, 3rem) + 0.25rem)')
+                        : (widgetPos === 'bottom' ? 'calc(4.5rem)' : undefined)
+                    }}
+                    className={cn(
+                      "z-[155] p-2 flex flex-col gap-1.5 bg-slate-900/95 backdrop-blur-md border border-cyan-500/30 rounded-2xl shadow-2xl transition-all",
+                      window.innerWidth < 1024 
+                        ? "fixed left-3 right-3 max-w-lg mx-auto" 
+                        : "absolute left-4 right-4 max-w-2xl mx-auto"
+                    )}
+                  >
+                    <div className="flex items-center justify-between px-1">
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs font-bold text-cyan-400 flex items-center gap-1.5">
+                          <Images size={14} />
+                          {t('miniGallery')} ({images.length})
+                        </span>
+                        <span className="text-[10px] text-slate-400 hidden sm:inline">
+                          • {t('tapToInsert')}
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-1">
+                        <button
+                          type="button"
+                          onMouseDown={(e) => e.preventDefault()}
+                          onClick={() => fileInputRef.current?.click()}
+                          className="px-2 py-0.5 text-[10px] font-bold bg-cyan-600/80 hover:bg-cyan-500 text-white rounded-md flex items-center gap-1 transition-colors"
+                          title="Upload more"
+                        >
+                          <Plus size={12} />
+                          <span>+</span>
+                        </button>
+                        <button
+                          type="button"
+                          onMouseDown={(e) => e.preventDefault()}
+                          onClick={() => setIsMiniGalleryOpen(false)}
+                          className="p-1 text-slate-400 hover:text-white rounded-md hover:bg-slate-800 transition-colors"
+                          title={t('close')}
+                        >
+                          <X size={14} />
+                        </button>
+                      </div>
+                    </div>
+
+                    <div 
+                      className="flex items-center gap-2 overflow-x-auto py-1 px-0.5 no-scrollbar scroll-smooth"
+                      style={{ scrollbarWidth: 'none' }}
+                    >
+                      {images.map((img, idx) => (
+                        <button
+                          key={img.url || idx}
+                          type="button"
+                          onMouseDown={(e) => e.preventDefault()}
+                          onClick={(e) => {
+                            e.preventDefault();
+                            insertImage(img.url, img.name, 'plain');
+                            setJustInsertedUrl(img.url);
+                            setTimeout(() => setJustInsertedUrl(null), 1200);
+                          }}
+                          className={cn(
+                            "group relative shrink-0 w-14 h-14 rounded-xl overflow-hidden border transition-all active:scale-95 focus:outline-none",
+                            justInsertedUrl === img.url 
+                              ? "border-emerald-400 ring-2 ring-emerald-400/50 scale-105" 
+                              : "border-slate-700 hover:border-cyan-400"
+                          )}
+                          title={`${img.name} - ${t('tapToInsert')}`}
+                        >
+                          <img 
+                            src={img.url} 
+                            alt={img.name} 
+                            className="w-full h-full object-cover group-hover:opacity-90 transition-opacity"
+                            referrerPolicy="no-referrer"
+                            loading="lazy"
+                          />
+                          {justInsertedUrl === img.url ? (
+                            <div className="absolute inset-0 bg-emerald-950/80 backdrop-blur-xs flex items-center justify-center text-emerald-400">
+                              <Check size={18} className="stroke-[3]" />
+                            </div>
+                          ) : (
+                            <div className="absolute bottom-0 inset-x-0 bg-slate-950/75 py-0.5 text-[8px] text-center text-slate-300 font-mono truncate px-0.5">
+                              {idx + 1}
+                            </div>
+                          )}
+                        </button>
+                      ))}
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+
               {/* Tamed Widget - Now with arrow navigation and smart positioning */}
               {isWidgetVisible && !activeModal && (window.innerWidth >= 1024 || !isSidebarOpen) && (
                   <div 
@@ -9023,6 +9097,12 @@ function App() {
                         const rightBound = rect.right - widgetWidth - 10;
                         style.left = Math.min(rightBound, Math.max(leftBound, floatingPos.x));
                         style.top = floatingPos.y < 150 ? floatingPos.y + 40 : floatingPos.y - 80;
+                      } else if (window.innerWidth < 1024) {
+                        if (isKeyboardOpen) {
+                          style.bottom = `calc(${keyboardOffset > 0 ? keyboardOffset : 0}px + 0.2rem)`;
+                        } else {
+                          style.bottom = 'calc(4rem + 0.15rem)';
+                        }
                       }
                       
                       return style;
@@ -9033,7 +9113,7 @@ function App() {
                         ? "shadow-none border-none border-transparent py-0 px-0 bg-slate-900"
                         : "bg-slate-900 border border-white/10 rounded-3xl p-1 shadow-none",
                       widgetPos === 'floating' ? (
-                        "absolute " + (window.innerWidth < 1024 ? "bottom-[4.5rem] left-4 right-4 rounded-3xl" : "")
+                        "absolute " + (window.innerWidth < 1024 ? "left-4 right-4 rounded-3xl" : "")
                       ) : (
                         "absolute bottom-4 left-4 right-4 rounded-3xl mx-auto max-w-2xl"
                       )
@@ -9880,7 +9960,7 @@ function App() {
                   >
                     <ShieldCheck size={18} /> Keychain
                     {typeof window !== 'undefined' && !(window as any).steem_keychain && (
-                      <span className="text-[9px] font-normal opacity-60">({lang === 'uk' ? 'відсутній' : 'absent'})</span>
+                      <span className="text-[9px] font-normal opacity-60">({t('absent')})</span>
                     )}
                   </button>
                   <button 
@@ -11179,7 +11259,7 @@ function App() {
                           }}
                           className="w-full py-4 bg-cyan-600 hover:bg-cyan-500 rounded-3xl text-sm font-black text-white flex items-center justify-center gap-3 transition-all shadow-xl shadow-cyan-600/20 text-center"
                         >
-                          <Settings size={18} /> {lang === 'uk' ? 'Розширені налаштування' : 'Advanced Settings'}
+                          <Settings size={18} /> {t('advancedSettings')}
                         </button>
                         <a 
                           href="/"
@@ -11187,7 +11267,7 @@ function App() {
                           rel="noopener noreferrer"
                           className="w-full py-4 bg-gradient-to-r from-emerald-600 to-teal-500 hover:from-emerald-500 hover:to-teal-400 rounded-3xl text-sm font-black text-white flex items-center justify-center gap-3 transition-all shadow-xl shadow-emerald-600/20 text-center"
                         >
-                          <Maximize2 size={18} /> {lang === 'uk' ? 'Повний екран та Тестування' : 'Full Preview & Testing'}
+                          <Maximize2 size={18} /> {t('fullPreviewTesting')}
                         </a>
                         <button 
                           onClick={() => {
@@ -11196,7 +11276,7 @@ function App() {
                           }}
                           className="w-full py-4 bg-slate-800 hover:bg-slate-700 border border-slate-700/50 rounded-3xl text-sm font-black text-slate-300 flex items-center justify-center gap-3 transition-all"
                         >
-                          <Info size={18} /> {lang === 'uk' ? 'Про додаток' : 'About App'}
+                          <Info size={18} /> {t('about')}
                         </button>
                       </div>
                     </div>
@@ -11725,10 +11805,10 @@ function App() {
                           <div className="p-2 bg-cyan-500/10 text-cyan-400 rounded-lg"><Type size={18} /></div>
                           <div>
                             <p className="text-sm font-bold text-slate-200">
-                              {lang === 'uk' ? 'Кольоровий текст у редакторі' : 'Colored Editor Text'}
+                              {t('coloredEditorText')}
                             </p>
                             <p className="text-[10px] text-slate-500 uppercase tracking-wide leading-normal mt-0.5">
-                              {lang === 'uk' ? 'Фарбувати текст у редакторі акцентним кольором' : 'Paint text inside editor with the accent color'}
+                              {t('coloredEditorTextDesc')}
                             </p>
                           </div>
                         </div>
@@ -11806,7 +11886,7 @@ function App() {
                     <div className="space-y-4 pt-4 border-t border-slate-800">
                       <div className="flex items-center justify-between">
                         <span className="text-xs font-bold text-slate-200">
-                          {lang === 'uk' ? "Синхронне пролистування" : "Synchronous scrolling"}
+                          {t('syncScroll')}
                         </span>
                         <button 
                           onClick={() => {
@@ -11830,7 +11910,7 @@ function App() {
                       <div className="space-y-2 pt-2 border-t border-slate-800/40">
                         <div className="flex justify-between items-center">
                           <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
-                            {lang === 'uk' ? "Розмір шрифту редактора" : "Editor Font Size"}
+                            {t('fontSize')}
                           </label>
                           <span className="text-xs font-mono font-bold text-cyan-400 bg-cyan-950/40 border border-cyan-800/30 px-2 py-0.5 rounded">
                             {editorFontSize} px
@@ -11884,7 +11964,7 @@ function App() {
                       <div className="space-y-2 pt-2 border-t border-slate-800/40">
                         <div className="flex justify-between items-center">
                           <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
-                            {lang === 'uk' ? "Розмір піктограм панелі" : "Toolbar Icon Size"}
+                            {t('iconSize')}
                           </label>
                           <span className="text-xs font-mono font-bold text-cyan-400 bg-cyan-950/40 border border-cyan-800/30 px-2 py-0.5 rounded">
                             {toolbarIconSize} px
@@ -11937,7 +12017,7 @@ function App() {
                       <div className="space-y-2 pt-2 border-t border-slate-800/40">
                         <div className="flex justify-between items-center">
                           <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
-                            {lang === 'uk' ? "Відступи у візуальному режимі" : "Visual Editor Spacing"}
+                            {t('visualSpacing')}
                           </label>
                           <span className="text-xs font-mono font-bold text-cyan-400 bg-cyan-950/40 border border-cyan-800/30 px-2 py-0.5 rounded">
                             {wysiwygSpacing} px
@@ -11994,7 +12074,7 @@ function App() {
                         <div className="p-2 bg-rose-500/10 text-rose-400 rounded-lg"><Trash2 size={18} /></div>
                         <div>
                           <h3 className="text-sm font-bold text-white">
-                            {lang === 'uk' ? 'Очистити кеш застосунку' : (t('clearNativeCache') || 'Clear App Cache')}
+                            {t('clearAppCache')}
                           </h3>
                           <p className="text-[10px] text-slate-400 max-w-[200px] sm:max-w-[300px] leading-tight">
                             {lang === 'uk'
@@ -12007,7 +12087,7 @@ function App() {
                         onClick={handleClearCache}
                         className="px-4 py-2 bg-rose-600/80 hover:bg-rose-500 text-white rounded-xl text-xs font-bold transition-all shadow-lg shadow-rose-900/20 shrink-0"
                       >
-                        {lang === 'uk' ? 'Очистити' : (t('clearNativeCache') || 'Clear')}
+                        {t('clearAction')}
                       </button>
                     </div>
                   </section>
@@ -12326,7 +12406,7 @@ function App() {
                     <div className="p-6 bg-slate-900 border border-slate-800 rounded-2xl text-center space-y-4">
                       <div className="w-16 h-16 bg-gradient-to-br from-cyan-500 to-blue-600 rounded-2xl mx-auto flex items-center justify-center text-white font-black text-2xl shadow-xl shadow-cyan-500/20">S</div>
                       <div>
-                        <h3 className="text-xl font-black tracking-tight">{lang === 'uk' ? 'Підтримка PWA' : 'PWA Support'}</h3>
+                        <h3 className="text-xl font-black tracking-tight">{t('pwaSupport')}</h3>
                         <p className="text-[10px] text-slate-500 uppercase font-black tracking-[0.2em] pt-1">{t('pwaPlatformSupport')}</p>
                       </div>
 
@@ -12391,7 +12471,10 @@ function App() {
 
       {/* Mobile Bottom Navigation */}
         <nav 
-          className="lg:hidden absolute bottom-0 left-0 right-0 bg-slate-900 border-t border-slate-800 grid grid-cols-5 items-center px-1 z-[70] shadow-[0_-4px_20px_rgba(0,0,0,0.5)] transition-all duration-150"
+          className={cn(
+            "lg:hidden absolute bottom-0 left-0 right-0 bg-slate-900 border-t border-slate-800 grid grid-cols-5 items-center px-1 z-[70] shadow-[0_-4px_20px_rgba(0,0,0,0.5)] transition-all duration-200",
+            isKeyboardOpen ? "translate-y-full opacity-0 pointer-events-none" : "translate-y-0 opacity-100"
+          )}
           style={{
             paddingBottom: 'env(safe-area-inset-bottom, 0px)',
             height: 'calc(4rem + env(safe-area-inset-bottom, 0px))'

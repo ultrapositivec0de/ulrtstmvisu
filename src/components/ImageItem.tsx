@@ -138,7 +138,7 @@ const ImageItem = React.memo(({
                    "bg-slate-900/80 hover:bg-slate-700 backdrop-blur-sm rounded text-white transition-colors",
                    galleryView === 'grid' ? "p-1" : "p-0.5"
                 )}
-                title={galleryView === 'grid' ? 'Вліво' : 'Вгору'}
+                title={galleryView === 'grid' ? t('moveLeft') : t('moveUp')}
               >
                 {galleryView === 'grid' ? <ChevronLeft size={12} /> : <ChevronUp size={12} />}
               </button>
@@ -151,7 +151,7 @@ const ImageItem = React.memo(({
                    "bg-slate-900/80 hover:bg-slate-700 backdrop-blur-sm rounded text-white transition-colors",
                    galleryView === 'grid' ? "p-1" : "p-0.5"
                 )}
-                title={galleryView === 'grid' ? 'Вправо' : 'Вниз'}
+                title={galleryView === 'grid' ? t('moveRight') : t('moveDown')}
               >
                 {galleryView === 'grid' ? <ChevronRight size={12} /> : <ChevronDown size={12} />}
               </button>

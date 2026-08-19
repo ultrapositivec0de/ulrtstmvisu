@@ -3,20 +3,17 @@ name: Full Sync to Public Org Repo
 on:
   push:
     branches:
-      - main # Якщо ваша головна гілка називається master — змініть тут на master
+      - main # або master
 
 jobs:
   sync:
     runs-on: ubuntu-latest
     steps:
-      # 1. Завантажуємо код, ВИМКНУВШИ збереження дефолтних прав github-actions[bot]
       - name: Checkout Private Repo
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
-          persist-credentials: false # <--- ЦЕ КЛЮЧОВИЙ РЯДОК, ЯКИЙ ВИПРАВЛЯЄ ПОМИЛКУ 403!
 
-      # 2. Пушимо за допомогою вашого токена
       - name: Push to Public Org Repo
         env:
           PUBLIC_TOKEN: ${{ secrets.PUBLIC_ORG_TOKEN }}
@@ -24,11 +21,7 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           
-          # Про всяк випадок очищаємо будь-які залишки авторизації
-          git config --unset-all http.https://github.com/.extraheader || true
-          
-          # Додаємо публічний репозиторій
+          # Оновлений URL з вашими параметрами:
           git remote add public-org https://x-access-token:${PUBLIC_TOKEN}@github.com/ultrapositivec0de/ulrtstmvisu.git
           
-          # Пушимо гілку main (або master, якщо у вас master: git push public-org HEAD:main --force)
-          git push public-org HEAD:main --force
+          git push public-org main --force

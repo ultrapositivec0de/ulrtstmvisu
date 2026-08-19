@@ -52,6 +52,8 @@ import DOMPurify from "dompurify";
 import { cn } from "../lib/utils";
 import { callWithFallback } from "../lib/steem";
 import { ReaderConfig, SteemPost } from "../types";
+import { getTranslation, type TranslationKey } from "../locales";
+import { POPULAR_COMMUNITIES, POPULAR_TAGS } from "../data/communities";
 
 function getWordCounts(body: string) {
   const dirtyWords = body.trim().split(/\s+/).length;
@@ -73,6 +75,8 @@ function getWordCounts(body: string) {
 }
 
 interface ReaderProps {
+  lang?: string;
+  t?: (key: TranslationKey) => string;
   onEditPost: (post: SteemPost) => void;
   onComment: (
     parentAuthor: string,
@@ -100,55 +104,6 @@ const STORAGE_KEY_READER_CONFIG = "steem_reader_config_v1";
 const STORAGE_KEY_RESPONDED = "steem_responded_v1";
 const STORAGE_KEY_DRAFTS = "steem_reader_drafts_v1";
 
-const POPULAR_COMMUNITIES = [
-  { id: "hive-145157", name: "Ukraine on Steem", desc: "Українська спільнота" },
-  { id: "hive-193637", name: "Venezuela", desc: "Steem Venezuela" },
-  { id: "hive-111111", name: "Korea", desc: "Steem Korea" },
-  { id: "hive-172186", name: "Pakistan", desc: "Steem Pakistan" },
-  { id: "hive-103393", name: "Bangladesh", desc: "Steem Bangladesh" },
-  { id: "hive-105017", name: "Betterlife", desc: "World Community" },
-  { id: "hive-151446", name: "Kids", desc: "Steem Kids" },
-];
-
-const POPULAR_TAGS = [
-  "ua",
-  "ukraine",
-  "steemexclusive",
-  "thediarygame",
-  "steem",
-  "steemit",
-  "art",
-  "travel",
-  "photography",
-  "creative",
-  "writing",
-  "promo-steem",
-  "wox",
-  "steem-languages",
-  "betterlife",
-  "lifestyle",
-  "food",
-  "news",
-  "vlog",
-  "nature",
-  "technology",
-  "steem-ua",
-  "ukraine-steem",
-  "steemitblog",
-  "cryptocurrency",
-  "bitcoin",
-  "finance",
-  "life",
-  "contest",
-  "learnsteem",
-  "steem-engine",
-  "community",
-  "blog",
-  "diary",
-  "story",
-  "adventure",
-];
-
 const ReplyBox = React.memo(
   ({
     id,
@@ -156,9 +111,10 @@ const ReplyBox = React.memo(
     onChange,
     onSend,
     onCancel,
-    placeholder = "Your reply...",
+    placeholder,
     draftKey,
     onUploadImage,
+    t,
   }: {
     id?: string;
     value: string;
@@ -168,7 +124,11 @@ const ReplyBox = React.memo(
     placeholder?: string;
     draftKey?: string;
     onUploadImage?: (file: File) => Promise<string>;
+    t?: (k: TranslationKey) => string;
   }) => {
+    const currentLang = (typeof localStorage !== "undefined" ? localStorage.getItem("steem_lang") : null) || "uk";
+    const loc = (k: TranslationKey) => t ? t(k) : getTranslation(currentLang, k);
+    const resolvedPlaceholder = placeholder || loc("yourReplyPlaceholder");
     const textareaRef = useRef<HTMLTextAreaElement>(null);
     const [sending, setSending] = useState(false);
     const [uploading, setUploading] = useState(false);
@@ -262,7 +222,7 @@ const ReplyBox = React.memo(
           }}
           rows={4}
           className="w-full bg-slate-950 border border-slate-800 rounded p-3 text-[12px] min-h-[120px] max-h-[40vh] md:max-h-[50vh] outline-none focus:ring-1 focus:ring-cyan-500 resize-none font-sans overflow-y-auto transition-all custom-scrollbar"
-          placeholder={placeholder}
+          placeholder={resolvedPlaceholder}
           onKeyDown={(e) => {
             if (e.key === "Enter" && e.ctrlKey && !sending && value.trim()) {
               handleSend();
@@ -274,7 +234,7 @@ const ReplyBox = React.memo(
             {onUploadImage && (
               <label className="cursor-pointer text-slate-500 hover:text-cyan-400 flex items-center gap-1.5 transition-colors">
                 <ImageIcon size={18} />
-                <span className="text-[10px] hidden sm:inline">Image</span>
+                <span className="text-[10px] hidden sm:inline">{loc("image")}</span>
                 <input
                   type="file"
                   accept="image/*"
@@ -285,7 +245,7 @@ const ReplyBox = React.memo(
               </label>
             )}
             <span className="text-[10px] text-slate-500 leading-none">
-              Ctrl + Enter to send
+              {loc("ctrlEnterToSend")}
             </span>
           </div>
           <div className="flex justify-end gap-2">
@@ -294,7 +254,7 @@ const ReplyBox = React.memo(
                 onClick={onCancel}
                 className="px-2 py-1 text-[10px] text-slate-500 hover:text-slate-300"
               >
-                Cancel
+                {loc("cancel")}
               </button>
             )}
             <button
@@ -307,7 +267,7 @@ const ReplyBox = React.memo(
               ) : (
                 <Send size={16} />
               )}
-              {sending ? "Sending..." : "Send"}
+              {sending ? loc("sending") : loc("send")}
             </button>
           </div>
         </div>
@@ -317,6 +277,8 @@ const ReplyBox = React.memo(
 );
 
 export default function Reader({
+  lang: propLang,
+  t: propT,
   onEditPost,
   onComment,
   onVote,
@@ -329,6 +291,12 @@ export default function Reader({
   targetReaderPost,
   rawInboxData,
 }: ReaderProps) {
+  const t = useCallback((k: TranslationKey) => {
+    if (propT) return propT(k);
+    const currentLang = propLang || (typeof localStorage !== "undefined" ? localStorage.getItem("steem_lang") : null) || "uk";
+    return getTranslation(currentLang, k);
+  }, [propT, propLang]);
+
   const [posts, setPosts] = useState<SteemPost[]>(() => {
     try {
       const saved = localStorage.getItem('steem_cached_posts');
@@ -386,7 +354,7 @@ export default function Reader({
   const [isCurationLoading, setIsCurationLoading] = useState(false);
   const [curationError, setCurationError] = useState<string | null>(null);
   const [curationTemplate, setCurationTemplate] = useState(
-    "Вітаємо! Ваш пост отримав апвоут від спільноти. Продовжуйте в тому ж дусі!",
+    t("communityUpvoteGreet"),
   );
   const [selectedForVote, setSelectedForVote] = useState<Set<string>>(
     new Set(),
@@ -428,7 +396,7 @@ export default function Reader({
     setHasInitiatedCuration(true);
     if (config.excludeMuted && !currentUser) {
       setCurationError(
-        "Введіть свій нікнейм для фільтрації ігнорованих акаунтів (або вимкніть опцію у налаштуваннях)",
+        t("feedFilteredNickPrompt"),
       );
       setCurationPosts([]);
       return;
@@ -1633,7 +1601,7 @@ export default function Reader({
       // Replace image tags with a placeholder hint
       html = html.replace(
         /<img[^>]*>/g,
-        '<div class="image-blocked-placeholder">📷 [Зображення приховано]</div>',
+        '<div class="image-blocked-placeholder">${t("imageHiddenBlocked")}</div>',
       );
     }
 
@@ -1665,7 +1633,7 @@ export default function Reader({
                       type="text"
                       value={searchTag || ""}
                       onChange={(e) => setSearchTag(e.target.value)}
-                      placeholder="Search Feed tags..."
+                      placeholder={t("searchFeedTags")}
                       className="w-full bg-slate-800 border border-slate-700 rounded-lg py-2 pl-10 pr-4 focus:ring-2 focus:ring-cyan-500 outline-none transition-all"
                       onKeyDown={(e) => e.key === "Enter" && handleSearch()}
                     />
@@ -1686,7 +1654,7 @@ export default function Reader({
                           <button
                             onClick={() => onUserUpdate("")}
                             className="p-2 hover:bg-slate-700 text-slate-500 hover:text-red-400 transition-colors border-l border-slate-700"
-                            title="Change Account"
+                            title={t("changeAccount")}
                           >
                             <LogOut size={18} />
                           </button>
@@ -1698,7 +1666,7 @@ export default function Reader({
                           </div>
                           <input
                             type="text"
-                            placeholder="Username..."
+                            placeholder={t("usernamePlaceholder")}
                             className="bg-transparent border-none outline-none px-2 text-xs w-24 text-cyan-400 placeholder:text-slate-600"
                             onKeyDown={(e) => {
                               if (e.key === "Enter") {
@@ -1776,7 +1744,7 @@ export default function Reader({
                   : "border-transparent text-slate-500 hover:text-slate-300",
               )}
             >
-              <Layout size={18} /> <span className="hidden sm:inline">Feed</span>
+              <Layout size={18} /> <span className="hidden sm:inline">{t("feed")}</span>
             </button>
             <button
               onClick={() => {
@@ -1789,7 +1757,7 @@ export default function Reader({
                   : "border-transparent text-slate-500 hover:text-slate-300",
               )}
             >
-              <Briefcase size={18} /> <span className="hidden lg:inline">Curation Dashboard</span><span className="hidden sm:inline lg:hidden">Curation</span>
+              <Briefcase size={18} /> <span className="hidden lg:inline">{t("curationDashboard")}</span><span className="hidden sm:inline lg:hidden">{t("curation")}</span>
             </button>
             <button
               onClick={() => {
@@ -1802,13 +1770,13 @@ export default function Reader({
                   : "border-transparent text-slate-500 hover:text-slate-300",
               )}
             >
-              <Settings size={18} /> <span className="hidden sm:inline">Settings</span>
+              <Settings size={18} /> <span className="hidden sm:inline">{t("settings")}</span>
             </button>
 
             <button
               onClick={() => setIsReaderHeaderOpen(!isReaderHeaderOpen)}
               className="ml-2 w-7 h-7 flex items-center justify-center text-slate-500 hover:text-slate-300 hover:bg-slate-800 rounded-lg transition-colors"
-              title={isReaderHeaderOpen ? "Collapse header" : "Expand header"}
+              title={isReaderHeaderOpen ? t("collapseHeader") : t("expandHeader")}
             >
               {isReaderHeaderOpen ? (
                 <ChevronUp size={20} />
@@ -1827,7 +1795,7 @@ export default function Reader({
                      setExpandedPosts(new Set(postList.map((p) => p.permlink)));
                   }}
                   className="px-2 py-1 bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-slate-200 rounded text-[10px] font-bold transition-colors flex items-center gap-1"
-                  title="Expand All"
+                  title={t("expandAll")}
                 >
                   <ChevronDown size={18} />
                   <span className="hidden md:inline">Expand All</span>
@@ -1836,7 +1804,7 @@ export default function Reader({
                 <button
                   onClick={() => setExpandedPosts(new Set())}
                   className="px-2 py-1 bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-slate-200 rounded text-[10px] font-bold transition-colors flex items-center gap-1"
-                  title="Collapse All"
+                  title={t("collapseAll")}
                 >
                   <ChevronUp size={18} />
                   <span className="hidden md:inline">Collapse All</span>
@@ -1895,7 +1863,7 @@ export default function Reader({
                   ? "bg-cyan-600/20 text-cyan-400 border-cyan-500/30"
                   : "text-slate-500 border-slate-800 hover:bg-slate-800",
               )}
-              title="Auto-show inbox on new replies"
+              title={t("autoShowInboxTitle")}
             >
               <BellRing size={16} className={cn(!config.autoShowInbox && "opacity-50")} /><span className="hidden sm:inline">Auto-Inbox: {config.autoShowInbox ? "ON" : "OFF"}</span>
             </button>
@@ -1952,7 +1920,7 @@ export default function Reader({
                     }}
                     className="text-[10px] text-slate-500 hover:text-red-400 flex items-center gap-1 ml-2 transition-colors px-2 py-1 bg-slate-800/50 rounded-lg hover:bg-red-500/10"
                   >
-                    <CheckCheck size={16} /> Mark All Read
+                    <CheckCheck size={16} /> {t("markAllRead")}
                   </button>
                 )}
               </div>
@@ -1994,11 +1962,11 @@ export default function Reader({
               ) : loadingInbox ? (
                 <div className="flex flex-col items-center justify-center h-40 text-slate-500">
                   <RefreshCw className="animate-spin mb-2" />
-                  <p className="text-xs">Loading replies...</p>
+                  <p className="text-xs">{t("loadingReplies")}</p>
                 </div>
               ) : inbox.length === 0 ? (
                 <div className="text-center py-20 text-slate-500">
-                  <p>No recent replies found.</p>
+                  <p>{t("noRepliesFound")}</p>
                   <button
                     onClick={() => fetchInbox(false)}
                     className="mt-4 text-xs text-cyan-500 hover:underline"
@@ -2049,7 +2017,7 @@ export default function Reader({
                           <div className="flex items-center justify-between mb-2">
                             <span className="text-[10px] uppercase tracking-wider font-bold text-slate-500 flex items-center gap-1.5">
                               <GitBranch size={12} className="text-cyan-500/80 rotate-180" />
-                              Діалог у гілці @{firstReply.parent_author}
+                              {t("threadDialog")} @{firstReply.parent_author}
                             </span>
                             
                             <button
@@ -2061,9 +2029,9 @@ export default function Reader({
                                 });
                               }}
                               className="text-[10px] text-slate-500 hover:text-red-400 opacity-0 group-hover/thread:opacity-100 transition-opacity flex items-center gap-1"
-                              title="Mark thread as read"
+                              title={t("markThreadAsRead")}
                             >
-                              <X size={14} /> Сховати гілку
+                              <X size={14} /> {t("hideThread")}
                             </button>
                           </div>
 
@@ -2095,7 +2063,7 @@ export default function Reader({
                                           }}
                                           className="text-cyan-500 hover:text-cyan-400 underline font-semibold cursor-pointer"
                                         >
-                                          Контекст вгору ↑
+                                          {t("contextUp")}
                                         </button>
                                       )}
                                     </div>
@@ -2116,7 +2084,7 @@ export default function Reader({
                             if (chains.length === 0) {
                               return (
                                 <div className="flex items-center justify-between text-[11px] text-slate-500 p-2 bg-slate-900/30 rounded-xl">
-                                  <span>Попередній контекст завантажується...</span>
+                                  <span>{t("contextLoading")}</span>
                                   <button
                                     onClick={() => {
                                       const [pa, pp] = threadKey.split('/');
@@ -2124,7 +2092,7 @@ export default function Reader({
                                     }}
                                     className="text-[10px] text-cyan-500 hover:underline"
                                   >
-                                    Оновити контекст
+                                    {t("refreshContext")}
                                   </button>
                                 </div>
                               );
@@ -2151,7 +2119,7 @@ export default function Reader({
                             className="w-full py-2 bg-slate-900 hover:bg-slate-850 border border-slate-800/80 rounded-xl text-[11px] text-cyan-400 hover:text-cyan-300 flex items-center justify-center gap-1.5 transition-colors"
                           >
                             <ChevronDown size={14} />
-                            Показати ще {hiddenCount} {hiddenCount === 1 ? 'коментар' : hiddenCount < 5 ? 'коментарі' : 'коментарів'} у цій гілці
+                            {t("showMoreComments")} ({hiddenCount}) {t("inThisThread")}
                           </button>
                         )}
 
@@ -2168,7 +2136,7 @@ export default function Reader({
                             className="w-full py-1 bg-slate-900 hover:bg-slate-850 border border-slate-800/80 rounded-xl text-[11px] text-slate-400 hover:text-slate-300 flex items-center justify-center gap-1.5 transition-colors"
                           >
                             <ChevronUp size={14} />
-                            Згорнути гілку діалогу
+                            {t("collapseThread")}
                           </button>
                         )}
 
@@ -2196,7 +2164,7 @@ export default function Reader({
                                     )
                                   }
                                   className="absolute top-2 right-2 p-1 text-slate-500 hover:text-red-400 opacity-0 group-hover/item:opacity-100 transition-opacity"
-                                  title="Hide this comment"
+                                  title={t("hideThisComment")}
                                 >
                                   <X size={14} />
                                 </button>
@@ -2244,7 +2212,7 @@ export default function Reader({
                                         }}
                                         className="flex items-center gap-2 px-2 py-1 bg-slate-900 hover:bg-slate-800 rounded text-[10px] text-cyan-400 font-bold transition-all border border-cyan-500/10"
                                       >
-                                        <ImageIcon size={16} /> Показати фото
+                                        <ImageIcon size={16} /> {t("showPhoto")}
                                       </button>
                                     )}
                                   {isLong && (
@@ -2293,16 +2261,16 @@ export default function Reader({
                                         })
                                       }
                                       className="absolute -right-1 -top-2 p-1 bg-slate-900 border border-slate-800 rounded-full text-slate-500 hover:text-red-400 shadow-lg"
-                                      title="Collapse Thread"
+                                      title={t("collapseThread")}
                                     >
                                       <ChevronUp size={14} />
                                     </button>
-                                    {threads[reply.permlink].map((t) => (
+                                    {threads[reply.permlink].map((item) => (
                                       <div
-                                        key={`${t.author}/${t.permlink}`}
+                                        key={`${item.author}/${item.permlink}`}
                                         className={cn(
                                           "p-2 rounded text-[10px] space-y-1 group",
-                                          t.author === currentUser
+                                          item.author === currentUser
                                             ? "bg-cyan-500/5 border border-cyan-500/10"
                                             : "bg-slate-900/50",
                                         )}
@@ -2312,19 +2280,19 @@ export default function Reader({
                                             <span
                                               className={cn(
                                                 "font-bold",
-                                                t.author === currentUser
+                                                item.author === currentUser
                                                   ? "text-cyan-400"
                                                   : "text-slate-400",
                                               )}
                                             >
-                                              @{t.author}
+                                              @{item.author}
                                             </span>
-                                            {t.author === currentUser ? (
+                                            {item.author === currentUser ? (
                                               <button
                                                 onClick={() =>
                                                   setEditingReply({
-                                                    permlink: t.permlink,
-                                                    body: t.body,
+                                                    permlink: item.permlink,
+                                                    body: item.body,
                                                   })
                                                 }
                                                 className="hidden group-hover:block text-[8px] text-yellow-500/70 hover:text-yellow-400 uppercase font-bold"
@@ -2336,8 +2304,8 @@ export default function Reader({
                                                 <button
                                                   onClick={() =>
                                                     handleLocalVote(
-                                                      t.author,
-                                                      t.permlink,
+                                                      item.author,
+                                                      item.permlink,
                                                       voteWeight,
                                                     )
                                                   }
@@ -2347,9 +2315,9 @@ export default function Reader({
                                                 </button>
                                                 <button
                                                   onClick={() => {
-                                                    setReplyingTo(t);
+                                                    setReplyingTo(item);
                                                     setFloatingCommentBody(
-                                                      `> ${t.body.substring(0, 100)}${t.body.length > 100 ? "..." : ""}\n\n`,
+                                                      `> ${item.body.substring(0, 100)}${item.body.length > 100 ? "..." : ""}\n\n`,
                                                     );
                                                   }}
                                                   className="text-[8px] text-green-500/70 hover:text-green-400 font-bold uppercase"
@@ -2360,13 +2328,13 @@ export default function Reader({
                                             )}
                                           </div>
                                           <span>
-                                            {new Date(t.created + "Z").toLocaleTimeString([], {
+                                            {new Date(item.created + "Z").toLocaleTimeString([], {
                                               hour: "2-digit",
                                               minute: "2-digit",
                                             })}
                                           </span>
                                         </div>
-                                        {editingReply?.permlink === t.permlink ? (
+                                        {editingReply?.permlink === item.permlink ? (
                                           <div className="space-y-2 mt-1">
                                             <ReplyBox
                                               value={editingReply.body}
@@ -2375,13 +2343,13 @@ export default function Reader({
                                                   prev ? { ...prev, body: txt } : null,
                                                 )
                                               }
-                                              placeholder="Edit comment..."
+                                              placeholder={t("editCommentPlaceholder")}
                                               onUploadImage={onUploadImage}
                                               onCancel={() => setEditingReply(null)}
                                               onSend={async (body) => {
                                                 await handleLocalComment(
-                                                  t.parent_author,
-                                                  t.parent_permlink,
+                                                  item.parent_author,
+                                                  item.parent_permlink,
                                                   body,
                                                   editingReply.permlink,
                                                 );
@@ -2395,21 +2363,21 @@ export default function Reader({
                                             <div
                                               className="markdown-body text-[10px]"
                                               dangerouslySetInnerHTML={{
-                                                __html: renderContent(t.body, t.permlink),
+                                                __html: renderContent(item.body, item.permlink),
                                               }}
                                             />
                                             {config.loadImages === false &&
-                                              !revealedImages.has(t.permlink) && (
+                                              !revealedImages.has(item.permlink) && (
                                                 <button
                                                   onClick={(e) => {
                                                     e.stopPropagation();
                                                     setRevealedImages((prev) =>
-                                                      new Set(prev).add(t.permlink),
+                                                      new Set(prev).add(item.permlink),
                                                     );
                                                   }}
                                                   className="flex items-center gap-1.5 mt-1 text-[9px] text-cyan-400 hover:text-cyan-300 font-bold"
                                                 >
-                                                  <ImageIcon size={14} /> Показати фото
+                                                  <ImageIcon size={14} /> {t("showPhoto")}
                                                 </button>
                                               )}
                                           </>
@@ -2423,7 +2391,7 @@ export default function Reader({
                                   <div className="bg-slate-900 border-l-2 border-green-500/50 p-2 rounded-r-lg space-y-1">
                                     <div className="flex items-center justify-between">
                                       <span className="text-[9px] font-bold text-green-400/60 uppercase">
-                                        Ваша відповідь:
+                                        {t("yourReply")}
                                       </span>
                                       <button
                                         onClick={() =>
@@ -2437,7 +2405,7 @@ export default function Reader({
                                         }
                                         className="text-[9px] text-slate-500 hover:text-slate-300 underline"
                                       >
-                                        {showMyReplies.has(reply.permlink) ? "Сховати" : "Показати"}
+                                        {showMyReplies.has(reply.permlink) ? t("hide") : t("show")}
                                       </button>
                                     </div>
                                     {showMyReplies.has(reply.permlink) && (
@@ -2578,18 +2546,17 @@ export default function Reader({
                       className="mb-4 opacity-20 text-slate-400"
                     />
                     <p className="text-lg font-bold text-slate-300">
-                      Ваша стрічка чекає
+                      {t("feedWaiting")}
                     </p>
                     <p className="text-xs mb-8 max-w-xs text-center text-slate-500">
-                      Оберіть теги або натисніть кнопку нижче для завантаження
-                      контенту.
+                      {t("feedWaitingDesc")}
                     </p>
                     <button
                       onClick={fetchPosts}
                       className="px-8 py-3 bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 rounded-xl text-sm font-bold transition-all active:scale-95 flex items-center gap-2"
                     >
                       <RefreshCw size={20} />
-                      Завантажити дописи
+                      {t("loadPosts")}
                     </button>
                   </div>
                 )}
@@ -2600,22 +2567,22 @@ export default function Reader({
                       className="animate-spin mb-4 text-slate-600"
                       size={32}
                     />
-                    <p className="text-sm">Отримуємо свіжі дописи...</p>
+                    <p className="text-sm">{t("fetchingPosts")}</p>
                   </div>
                 )}
 
                 {posts.length === 0 && !loading && hasInitiatedFeed && (
                   <div className="text-center py-20 text-slate-500 bg-slate-900/30 rounded-2xl border border-slate-800/50">
                     <FileText size={48} className="mx-auto mb-4 opacity-20" />
-                    <p className="text-lg font-bold">Порожньо</p>
+                    <p className="text-lg font-bold">{t("emptyFeed")}</p>
                     <p className="text-sm text-slate-600">
-                      Не вдалося знайти дописів за вашими тегами.
+                      {t("emptyFeedDesc")}
                     </p>
                     <button
                       onClick={fetchPosts}
                       className="mt-4 text-cyan-500 hover:underline flex items-center gap-2 mx-auto"
                     >
-                      <RefreshCw size={18} /> Спробуйте ще раз
+                      <RefreshCw size={18} /> {t("tryAgain")}
                     </button>
                   </div>
                 )}
@@ -2690,7 +2657,7 @@ export default function Reader({
                                   );
                                 }}
                                 className="p-1 hover:bg-slate-700 text-slate-500 hover:text-cyan-400 rounded transition-colors"
-                                title="Copy Link"
+                                title={t("copyLink")}
                               >
                                 <Share2 size={14} />
                               </button>
@@ -2702,7 +2669,7 @@ export default function Reader({
                                       onMuteUser(post.author, true);
                                   }}
                                   className="p-1 hover:bg-slate-700 text-slate-500 hover:text-red-400 rounded transition-colors"
-                                  title="Mute User"
+                                  title={t("muteUser")}
                                 >
                                   <VolumeX size={14} />
                                 </button>
@@ -2730,7 +2697,7 @@ export default function Reader({
                                   "p-1.5 sm:p-2 hover:bg-green-500/10 rounded-lg text-slate-500 hover:text-green-500 transition-colors flex items-center gap-1",
                                   hasVoted && "text-cyan-400",
                                 )}
-                                title="Quick Vote"
+                                title={t("quickVote")}
                               >
                                 <ArrowBigUp size={20} />
                                 <span className="text-[10px] sm:text-xs font-bold">
@@ -2746,7 +2713,7 @@ export default function Reader({
                                   fetchComments(post.author, post.permlink);
                                 }}
                                 className="flex items-center gap-1 text-slate-400 hover:text-cyan-400 px-2 py-1 bg-slate-950/30 hover:bg-slate-900 rounded-lg hidden sm:flex transition-all border border-slate-800/40 hover:border-cyan-500/20"
-                                title="Завантажити коментарі"
+                                title={t("loadComments")}
                               >
                                 <MessageSquare size={16} />
                                 <span className="text-[10px] sm:text-xs font-semibold">{post.children}</span>
@@ -2785,7 +2752,7 @@ export default function Reader({
                                       el.scrollIntoView({ behavior: "smooth" });
                                   }, 200);
                                 }}
-                                title="Open & Go to bottom"
+                                title={t("openAndGoToBottom")}
                                 className="text-slate-500 p-1 hover:bg-slate-800 rounded flex flex-col justify-center items-center"
                               >
                                 <ChevronsDown size={20} />
@@ -2834,7 +2801,7 @@ export default function Reader({
                                     }}
                                     className="flex items-center gap-2 px-4 py-2 bg-slate-800 hover:bg-slate-700 rounded-xl text-sm text-cyan-400 font-bold transition-all border border-cyan-500/10 shadow-lg"
                                   >
-                                    <ImageIcon size={18} /> Показати фото допису
+                                    <ImageIcon size={18} /> {t("showPostPhoto")}
                                   </button>
                                 </div>
                               )}
@@ -2876,7 +2843,7 @@ export default function Reader({
                                   "flex items-center gap-1.5 px-3 py-1.5 hover:bg-slate-800 rounded-lg transition-all border border-transparent text-slate-400 hover:text-cyan-400",
                                   loadingComments.has(post.permlink) && "animate-pulse text-cyan-400"
                                 )}
-                                title="Завантажити коментарі"
+                                title={t("loadComments")}
                               >
                                 <MessageSquare
                                   size={18}
@@ -2908,13 +2875,13 @@ export default function Reader({
                                     ? "text-green-400 bg-green-500/10 border-green-500/20"
                                     : "text-slate-400 hover:text-green-400",
                                 )}
-                                title="Написати коментар"
+                                title={t("writeComment")}
                               >
                                 <Edit3 size={18} />
-                                <span className="text-sm font-medium">Коментувати</span>
+                                <span className="text-sm font-medium">{t("commentAction")}</span>
                                 {respondedReplies[post.permlink] && (
                                   <span className="hidden sm:inline-block ml-1 px-1.5 py-0.5 bg-green-500/20 text-[8px] font-bold uppercase rounded text-green-400 tracking-tighter">
-                                    Ви відповіли
+                                    {t("youReplied")}
                                   </span>
                                 )}
                               </button>
@@ -2925,7 +2892,7 @@ export default function Reader({
                                   className="flex items-center gap-1.5 px-3 py-1.5 hover:bg-slate-800 rounded-lg text-slate-400 hover:text-yellow-400 transition-all border border-transparent hover:border-yellow-500/20"
                                 >
                                   <Edit size={18} />
-                                  <span className="text-sm">Edit</span>
+                                  <span className="text-sm">{t("edit")}</span>
                                 </button>
                               )}
 
@@ -2944,7 +2911,7 @@ export default function Reader({
                                       }))
                                     }
                                     className="p-1.5 hover:bg-slate-800 rounded-lg text-slate-500 hover:text-green-500 transition-colors"
-                                    title="Add to WhiteList"
+                                    title={t("addToWhitelist")}
                                   >
                                     <UserCheck size={18} />
                                   </button>
@@ -2962,7 +2929,7 @@ export default function Reader({
                                     }))
                                   }
                                   className="p-1.5 hover:bg-slate-800 rounded-lg text-slate-500 hover:text-red-500 transition-colors"
-                                  title="Add to BlackList"
+                                  title={t("addToBlacklist")}
                                 >
                                   <UserX size={18} />
                                 </button>
@@ -2977,21 +2944,21 @@ export default function Reader({
                                       <button
                                         onClick={() => insertText("**", "**")}
                                         className="p-1.5 hover:bg-slate-700 rounded text-slate-400 hover:text-white"
-                                        title="Bold"
+                                        title={t("bold")}
                                       >
                                         <Bold size={20} />
                                       </button>
                                       <button
                                         onClick={() => insertText("_", "_")}
                                         className="p-1.5 hover:bg-slate-700 rounded text-slate-400 hover:text-white"
-                                        title="Italic"
+                                        title={t("italic")}
                                       >
                                         <Italic size={20} />
                                       </button>
                                       <button
                                         onClick={() => insertText(">", "")}
                                         className="p-1.5 hover:bg-slate-700 rounded text-slate-400 hover:text-white"
-                                        title="Quote"
+                                        title={t("quote")}
                                       >
                                         <QuoteIcon size={20} />
                                       </button>
@@ -3000,7 +2967,7 @@ export default function Reader({
                                           insertText("[", "](url)")
                                         }
                                         className="p-1.5 hover:bg-slate-700 rounded text-slate-400 hover:text-white"
-                                        title="Link"
+                                        title={t("link")}
                                       >
                                         <LinkIcon size={20} />
                                       </button>
@@ -3009,7 +2976,7 @@ export default function Reader({
                                           insertText("![", "](url)")
                                         }
                                         className="p-1.5 hover:bg-slate-700 rounded text-slate-400 hover:text-white"
-                                        title="Image"
+                                        title={t("image")}
                                       >
                                         <ImageIcon size={20} />
                                       </button>
@@ -3053,8 +3020,7 @@ export default function Reader({
                                             }}
                                             className="mt-2 flex items-center gap-2 px-3 py-1.5 bg-slate-800 hover:bg-slate-700 rounded-lg text-xs text-cyan-400 font-bold transition-all border border-cyan-500/10"
                                           >
-                                            <ImageIcon size={18} /> Показати
-                                            фото коментаря
+                                            <ImageIcon size={18} /> {t("showCommentPhoto")}
                                           </button>
                                         )}
                                     </>
@@ -3064,7 +3030,7 @@ export default function Reader({
                                       draftKey={`post-comment-${post.permlink}`}
                                       value={commentBody}
                                       onChange={setCommentBody}
-                                      placeholder="Your constructive feedback..."
+                                      placeholder={t("constructiveFeedbackPlaceholder")}
                                       onSend={async (body) => {
                                         await handleLocalComment(
                                           post.author,
@@ -3090,7 +3056,7 @@ export default function Reader({
                               <div className="p-4 bg-slate-950/30 border-t border-slate-800">
                                 <div className="flex items-center justify-between mb-4">
                                   <h4 className="text-xs font-bold uppercase tracking-widest text-slate-500 flex items-center gap-2">
-                                    <MessageSquare size={18} /> Comments (
+                                    <MessageSquare size={18} /> {t("comments")} (
                                     {post.children})
                                   </h4>
                                   {loadingComments.has(post.permlink) && (
@@ -3117,6 +3083,7 @@ export default function Reader({
                                         excludeMuted={config.excludeMuted}
                                         mutedUsers={mutedUsersRef.current}
                                         onSelection={handleMouseUp}
+                                        t={t}
                                       />
                                     ),
                                   )}
@@ -3132,7 +3099,7 @@ export default function Reader({
                                         }
                                         className="text-xs text-cyan-500 hover:underline"
                                       >
-                                        Load comments...
+                                        {t("loadCommentsDots")}
                                       </button>
                                     )}
                                 </div>
@@ -3165,11 +3132,7 @@ export default function Reader({
                           setIsCurationSettingsOpen(!isCurationSettingsOpen)
                         }
                         className="p-2 bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-slate-200 rounded-xl transition-colors border border-slate-700"
-                        title={
-                          isCurationSettingsOpen
-                            ? "Collapse settings"
-                            : "Expand settings"
-                        }
+                        title={isCurationSettingsOpen ? t("collapseSettings") : t("expandSettings")}
                       >
                         {isCurationSettingsOpen ? (
                           <ChevronUp size={20} />
@@ -3184,8 +3147,7 @@ export default function Reader({
                         animate={{ opacity: 1 }}
                         className="text-slate-500 text-sm mb-6 max-w-xl"
                       >
-                        Advanced curation mode for communities. Efficiently
-                        review, batch vote, and auto-reply to contributions.
+                        {t("curationDesc")}
                       </motion.p>
                     )}
 
@@ -3202,7 +3164,7 @@ export default function Reader({
                           <div className="space-y-4">
                             <div>
                               <label className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-1.5 block">
-                                Community / Target
+                                {t("communityTarget")}
                               </label>
                               <div className="flex gap-2">
                                 <input
@@ -3230,7 +3192,7 @@ export default function Reader({
                                     }
                                   }}
                                   className="flex-1 bg-slate-950 border border-slate-800 rounded-xl px-4 py-2 text-sm outline-none focus:ring-1 focus:ring-purple-500 placeholder:text-slate-700"
-                                  placeholder="hive-XXXX, @user or #tag"
+                                  placeholder={t("curationTagPlaceholder")}
                                 />
                                 <button
                                   onClick={() => fetchCurationFeed(curationTagInput.trim())}
@@ -3274,11 +3236,11 @@ export default function Reader({
                           <div className="space-y-4">
                             <div className="flex items-center justify-between">
                               <label className="text-xs font-bold text-slate-500 uppercase tracking-widest">
-                                Filter Options
+                                {t("filterOptions")}
                               </label>
                               <label className="flex items-center gap-2 cursor-pointer group">
                                 <span className="text-[10px] text-slate-400 group-hover:text-slate-200">
-                                  Strict Match
+                                  {t("strictMatch")}
                                 </span>
                                 <input
                                   type="checkbox"
@@ -3319,7 +3281,7 @@ export default function Reader({
                                   ))
                                 ) : (
                                   <span className="text-[10px] text-slate-600 italic">
-                                    No tags filtered...
+                                    {t("noTagsFiltered")}
                                   </span>
                                 )}
                               </div>
@@ -3346,7 +3308,7 @@ export default function Reader({
                             <div className="grid grid-cols-3 gap-2">
                               <div className="space-y-1.5">
                                 <label className="text-[10px] font-bold text-slate-600 uppercase tracking-widest block">
-                                  Type
+                                  {t("type")}
                                 </label>
                                 <div className="flex bg-slate-950 p-0.5 rounded-lg border border-slate-800">
                                   <button
@@ -3360,7 +3322,7 @@ export default function Reader({
                                         : "text-slate-500 hover:text-slate-300",
                                     )}
                                   >
-                                    Comments
+                                    {t("comments")}
                                   </button>
                                   <button
                                     onClick={() => {
@@ -3373,13 +3335,13 @@ export default function Reader({
                                         : "text-slate-500 hover:text-slate-300",
                                     )}
                                   >
-                                    Posts
+                                    {t("posts")}
                                   </button>
                                 </div>
                               </div>
                               <div className="space-y-1.5">
                                 <label className="text-[10px] font-bold text-slate-600 uppercase tracking-widest block">
-                                  Sort
+                                  {t("sort")}
                                 </label>
                                 <div className="flex bg-slate-950 p-0.5 rounded-lg border border-slate-800">
                                   <button
@@ -3391,7 +3353,7 @@ export default function Reader({
                                         : "text-slate-500 hover:text-slate-300",
                                     )}
                                   >
-                                    Newest
+                                    {t("newest")}
                                   </button>
                                   <button
                                     onClick={() => setCurationSort("length")}
@@ -3402,13 +3364,13 @@ export default function Reader({
                                         : "text-slate-500 hover:text-slate-300",
                                     )}
                                   >
-                                    Length
+                                    {t("length")}
                                   </button>
                                 </div>
                               </div>
                               <div className="col-span-3 sm:col-span-1 space-y-1.5">
                                 <label className="text-[10px] font-bold text-slate-600 uppercase tracking-widest block">
-                                  Age Limit
+                                  {t("ageLimit")}
                                 </label>
                                 <div className="flex bg-slate-950 p-0.5 rounded-lg border border-slate-800 h-[28px] items-center">
                                   <input
@@ -3427,14 +3389,14 @@ export default function Reader({
                                     className="w-full bg-transparent text-center text-[10px] font-bold text-purple-400 outline-none"
                                   />
                                   <span className="text-[9px] text-slate-500 pr-2">
-                                    days
+                                    {t("days")}
                                   </span>
                                 </div>
                               </div>
                             </div>
                           </div>
 
-                          {/* Column 3: Response Template */}
+                          {/* Column 3: {t("responseTemplate")} */}
                           <div className="space-y-4">
                             <div className="flex items-center justify-between">
                               <label className="text-xs font-bold text-slate-500 uppercase tracking-widest block">
@@ -3442,7 +3404,7 @@ export default function Reader({
                               </label>
                               <label className="flex items-center gap-2 cursor-pointer group">
                                 <span className="text-[10px] text-slate-400 group-hover:text-slate-200">
-                                  Auto-Reply after Vote
+                                  {t("autoReplyAfterVote")}
                                 </span>
                                 <input
                                   type="checkbox"
@@ -3460,7 +3422,7 @@ export default function Reader({
                                 setCurationTemplate(e.target.value)
                               }
                               className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 h-[80px] text-xs outline-none focus:ring-1 focus:ring-purple-500 custom-scrollbar resize-none"
-                              placeholder="Your signature comment or curation note... (will be used for auto-reply)"
+                              placeholder={t("curationTemplatePlaceholder")}
                             />
                             
                             <div className="mt-3 flex items-center justify-between bg-slate-900/50 p-2 rounded-lg border border-slate-800 gap-2">
@@ -3477,7 +3439,7 @@ export default function Reader({
                                   className="accent-purple-500"
                                 />
                                 <span className="text-[10px] text-slate-400 group-hover:text-slate-200 uppercase font-bold tracking-tight">
-                                  Log Votes
+                                  {t("logVotes")}
                                 </span>
                               </label>
                               <div className="flex gap-2">
@@ -3521,7 +3483,7 @@ export default function Reader({
                                   }}
                                   className="text-[9px] font-bold uppercase px-2 py-1 bg-cyan-600 hover:bg-cyan-500 text-white rounded transition shadow"
                                 >
-                                  Export MD
+                                  {t("exportMd")}
                                 </button>
                               </div>
                             </div>
@@ -3544,7 +3506,7 @@ export default function Reader({
                     />
                     <div className="flex-1">
                       <p className="text-sm font-bold text-red-400">
-                        Connection Error
+                        {t("connectionError")}
                       </p>
                       <p className="text-xs text-red-500/80 mt-1">
                         {curationError}
@@ -3553,7 +3515,7 @@ export default function Reader({
                         onClick={fetchCurationFeed}
                         className="mt-2 text-xs font-bold text-white bg-red-600 hover:bg-red-500 px-3 py-1 rounded-lg transition-colors"
                       >
-                        Try Again
+                        {t("tryAgain")}
                       </button>
                     </div>
                   </motion.div>
@@ -3573,7 +3535,7 @@ export default function Reader({
                                 ? "bg-purple-600 text-white"
                                 : "text-slate-500 hover:text-slate-300",
                             )}
-                            title={`${cols} columns`}
+                            title={`${cols} ${t("columns")}`}
                           >
                             {cols}
                           </button>
@@ -3593,14 +3555,12 @@ export default function Reader({
                           className="h-8 px-3 bg-slate-800 hover:bg-slate-700 rounded-lg text-[10px] font-bold flex items-center gap-2 border border-slate-700 transition-colors"
                         >
                           <CheckCheck size={18} />
-                          {selectedForVote.size === curationPosts.length
-                            ? "Deselect"
-                            : "Select"}
+                          {selectedForVote.size === curationPosts.length ? t("deselect") : t("select")}
                         </button>
 
                         <div className="flex items-center gap-1 ml-1 border-l border-slate-800 pl-2">
                           <span className="text-[10px] font-bold text-slate-500 uppercase mr-1 hidden sm:inline">
-                            By age:
+                            {t("byAge")}
                           </span>
                           {[1, 2, 3].map((days) => (
                             <button
@@ -3626,7 +3586,7 @@ export default function Reader({
                       </div>
 
                       <span className="text-[10px] text-slate-500 font-mono ml-2 border-l border-slate-800 pl-3">
-                        {selectedForVote.size} / {curationPosts.length} selected
+                        {selectedForVote.size} / {curationPosts.length} {t("selected")}
                       </span>
                     </div>
 
@@ -3634,7 +3594,7 @@ export default function Reader({
                       <div className="flex items-center gap-3">
                         <div className="flex flex-col items-end">
                           <span className="text-[10px] font-bold text-purple-400 uppercase">
-                            Batch Processing...
+                            {t("batchProcessing")}
                           </span>
                           <span className="text-xs font-mono">
                             {batchVotingStatus.current} /{" "}
@@ -3658,7 +3618,7 @@ export default function Reader({
                         className="px-6 py-2 bg-green-600 hover:bg-green-500 disabled:opacity-30 disabled:grayscale rounded-xl font-bold text-sm transition-all flex items-center gap-2 shadow-lg shadow-green-500/20 active:scale-95"
                       >
                         <Zap size={18} />
-                        Vote & Reply to Selected
+                        {t("voteAndReplySelected")}
                       </button>
                     )}
                   </div>
@@ -3671,7 +3631,7 @@ export default function Reader({
                       size={32}
                     />
                     <p className="text-sm font-medium">
-                      Аналізуємо внески спільноти...
+                      {t("analyzingCommunity")}
                     </p>
                   </div>
                 )}
@@ -3683,18 +3643,17 @@ export default function Reader({
                       className="mb-4 opacity-20 text-purple-400"
                     />
                     <p className="text-lg font-bold text-slate-300">
-                      Готові до курації?
+                      {t("readyToCurate")}
                     </p>
                     <p className="text-xs mb-8 max-w-xs text-center text-slate-500">
-                      Ми не завантажуємо контент автоматично. Оберіть критерії
-                      та натисніть кнопку нижче.
+                      {t("curationStartHint")}
                     </p>
                     <button
                       onClick={fetchCurationFeed}
                       className="px-8 py-3 bg-purple-600 hover:bg-purple-500 text-white rounded-xl text-sm font-bold transition-all shadow-lg shadow-purple-900/20 active:scale-95 flex items-center gap-2"
                     >
                       <RefreshCw size={20} />
-                      Розпочати сканування
+                      {t("startScan")}
                     </button>
                   </div>
                 )}
@@ -3772,7 +3731,7 @@ export default function Reader({
                           <div className="flex flex-wrap shrink-0 items-center gap-1 pointer-events-auto">
                             <div
                               className="flex items-center gap-1 bg-slate-800/50 border border-slate-700/50 px-2 py-0.5 rounded-full text-[10px] font-bold uppercase"
-                              title={`${counts.clean} clean words, ${counts.dirty} dirty words`}
+                              title={`${counts.clean} ${t("cleanWords")}, ${counts.dirty} ${t("dirtyWords")}`}
                             >
                               <FileText size={14} className="text-slate-500" />
                               <span
@@ -3797,7 +3756,7 @@ export default function Reader({
                                 );
                               }}
                               className="p-1.5 hover:bg-slate-800 rounded-lg text-slate-500 hover:text-cyan-400 transition-colors"
-                              title="Copy Link"
+                              title={t("copyLink")}
                             >
                               <Share2 size={16} />
                             </button>
@@ -3842,7 +3801,7 @@ export default function Reader({
                                   }}
                                   className="mt-2 flex items-center gap-2 px-3 py-1 bg-slate-900 hover:bg-slate-800 rounded text-[10px] text-cyan-400 font-bold transition-all border border-cyan-500/10"
                                 >
-                                  <ImageIcon size={16} /> Показати фото
+                                  <ImageIcon size={16} /> {t("showPhoto")}
                                 </button>
                               )}
                             {!isExpanded && post.body.length > 200 && (
@@ -3862,7 +3821,7 @@ export default function Reader({
                             }}
                             className="w-full py-1 text-[10px] font-bold text-slate-500 hover:text-purple-400 uppercase tracking-widest text-center"
                           >
-                            {isExpanded ? "Collapse" : "Expand Content"}
+                            {isExpanded ? t("collapse") : t("expandContent")}
                           </button>
                         </div>
 
@@ -3873,7 +3832,7 @@ export default function Reader({
                           {isSelected && (
                             <div className="space-y-1.5 animate-in slide-in-from-top-2 duration-200">
                               <label className="text-[9px] font-bold text-purple-400/70 uppercase flex justify-between">
-                                <span>Individual Comment (Optional)</span>
+                                <span>{t("individualCommentOptional")}</span>
                                 {individualComments[post.permlink] && (
                                   <button
                                     onClick={() =>
@@ -3892,7 +3851,7 @@ export default function Reader({
                               <textarea
                                 className="w-full bg-slate-950 border border-slate-700 rounded-lg p-2 text-[11px] outline-none focus:ring-1 focus:ring-purple-500 custom-scrollbar min-h-[60px]"
                                 id={`curation-comment-${post.permlink}`}
-                                placeholder="Custom comment for THIS post..."
+                                placeholder={t("customCommentPlaceholder")}
                                 value={individualComments[post.permlink] || ""}
                                 onChange={(e) =>
                                   setIndividualComments((prev) => ({
@@ -3905,7 +3864,7 @@ export default function Reader({
                           )}
                           <div className="flex items-center justify-between">
                             <span className="text-[10px] font-bold text-slate-500 uppercase">
-                              Weight
+                              {t("weight")}
                             </span>
                             <span className="text-xs font-mono font-bold text-green-400">
                               {(weight / 100).toFixed(0)}%
@@ -3939,17 +3898,16 @@ export default function Reader({
                         <Zap size={32} className="text-slate-600" />
                       </div>
                       <p className="text-lg font-bold text-slate-300">
-                        Черга порожня
+                        {t("queueEmpty")}
                       </p>
                       <p className="text-sm text-slate-500 text-center max-w-xs">
-                        Усе вже перевірено або не знайдено нових публікацій за
-                        вашими тегами.
+                        {t("queueEmptyDesc")}
                       </p>
                       <button
                         onClick={fetchCurationFeed}
                         className="mt-6 text-purple-400 font-bold hover:underline flex items-center gap-2"
                       >
-                        <RefreshCw size={18} /> Сканувати ще раз
+                        <RefreshCw size={18} /> {t("scanAgain")}
                       </button>
                     </div>
                   )}
@@ -3963,7 +3921,7 @@ export default function Reader({
                 <div className="p-4 border-b border-slate-800 flex items-center justify-between">
                   <h2 className="text-xl font-bold flex items-center gap-2">
                     <Settings size={24} className="text-cyan-400" />
-                    Reader Settings
+                    {t("readerSettings")}
                   </h2>
                 </div>
 
@@ -3971,7 +3929,7 @@ export default function Reader({
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                     <div className="space-y-2">
                       <label className="text-sm font-medium text-slate-400">
-                        Limit per user
+                        {t("limitPerUser")}
                       </label>
                       <div className="flex items-center gap-3">
                         <input
@@ -3994,7 +3952,7 @@ export default function Reader({
                     </div>
                     <div className="space-y-2">
                       <label className="text-sm font-medium text-slate-400">
-                        Period (days)
+                        {t("periodDays")}
                       </label>
                       <div className="flex items-center gap-3">
                         <input
@@ -4017,7 +3975,7 @@ export default function Reader({
                     </div>
                     <div className="space-y-2">
                       <label className="text-sm font-medium text-slate-400">
-                        Content Width
+                        {t("contentWidth")}
                       </label>
                       <div className="flex items-center gap-3">
                         <input
@@ -4043,10 +4001,9 @@ export default function Reader({
 
                   <div className="flex items-center gap-4 p-4 bg-slate-800/50 rounded-xl border border-slate-700/50">
                     <div className="flex-1">
-                      <h4 className="font-bold">Load Images</h4>
+                      <h4 className="font-bold">{t("loadImages")}</h4>
                       <p className="text-xs text-slate-500">
-                        Automatically load images in posts. Disable to save
-                        traffic.
+                        {t("loadImagesDesc")}
                       </p>
                     </div>
                     <button
@@ -4071,9 +4028,9 @@ export default function Reader({
 
                   <div className="flex items-center gap-4 p-4 bg-slate-800/50 rounded-xl border border-slate-700/50">
                     <div className="flex-1">
-                      <h4 className="font-bold">Auto-Load Comments</h4>
+                      <h4 className="font-bold">{t("autoLoadComments")}</h4>
                       <p className="text-xs text-slate-500">
-                        Automatically load comments when opening a feed post.
+                        {t("autoLoadCommentsDesc")}
                       </p>
                     </div>
                     <button
@@ -4101,9 +4058,9 @@ export default function Reader({
 
                   <div className="flex items-center gap-4 p-4 bg-slate-800/50 rounded-xl border border-slate-700/50">
                     <div className="flex-1">
-                      <h4 className="font-bold">Only Whitelist Mode</h4>
+                      <h4 className="font-bold">{t("onlyWhitelistMode")}</h4>
                       <p className="text-xs text-slate-500">
-                        Only load posts from users in your white list.
+                        {t("onlyWhitelistDesc")}
                       </p>
                     </div>
                     <button
@@ -4130,11 +4087,10 @@ export default function Reader({
                   <div className="flex items-center gap-4 p-4 bg-slate-800/50 rounded-xl border border-slate-700/50">
                     <div className="flex-1">
                       <h4 className="font-bold flex items-center gap-2">
-                        Exclude Muted Accounts
+                        {t("excludeMutedAccounts")}
                       </h4>
                       <p className="text-xs text-slate-500">
-                        Automatically skip loading posts/comments from accounts
-                        muted by current user.
+                        {t("excludeMutedDesc")}
                       </p>
                     </div>
                     <button
@@ -4162,12 +4118,10 @@ export default function Reader({
                     <div className="flex items-center justify-between">
                       <div className="flex-1">
                         <h4 className="font-bold flex items-center gap-2">
-                          <VolumeX size={20} className="text-red-400" /> Manage
-                          Muted Accounts (Blockchain)
+                          <VolumeX size={20} className="text-red-400" /> {t("manageMutedAccounts")}
                         </h4>
                         <p className="text-xs text-slate-500">
-                          View and unmute accounts you've ignored on the
-                          blockchain. Loaded only on demand.
+                          {t("manageMutedDesc")}
                         </p>
                       </div>
                       <button
@@ -4200,7 +4154,7 @@ export default function Reader({
                         }}
                         className="px-4 py-1.5 rounded-lg text-sm font-bold bg-slate-900 border border-slate-700 hover:border-cyan-500 text-slate-300 transition-all font-mono"
                       >
-                        {showMutedManager ? "Hide List" : "Load List"}
+                        {showMutedManager ? t("hideList") : t("loadList")}
                       </button>
                     </div>
 
@@ -4220,7 +4174,7 @@ export default function Reader({
                             <div className="p-3 bg-slate-950 rounded-xl border border-slate-800 max-h-48 overflow-y-auto custom-scrollbar space-y-1">
                               {fetchedMutedUsers.length === 0 ? (
                                 <p className="text-center text-slate-500 text-sm py-4">
-                                  No muted accounts found.
+                                  {t("noMutedAccounts")}
                                 </p>
                               ) : (
                                 fetchedMutedUsers.map((username) => (
@@ -4242,7 +4196,7 @@ export default function Reader({
                                       }}
                                       className="px-3 py-1 bg-red-500/10 hover:bg-red-500/20 text-red-400 rounded text-xs font-bold transition-all border border-red-500/20"
                                     >
-                                      Unmute
+                                      {t("unmute")}
                                     </button>
                                   </div>
                                 ))
@@ -4260,13 +4214,13 @@ export default function Reader({
                         <div className="flex items-center gap-2 text-green-500">
                           <UserCheck size={20} />
                           <h3 className="text-sm font-bold uppercase tracking-wider">
-                            White List ({config.whiteList.length})
+                            {t("whiteList")} ({config.whiteList.length})
                           </h3>
                         </div>
                         <div className="flex items-center gap-2">
                           <label
                             className="cursor-pointer p-1.5 hover:bg-slate-800 rounded text-slate-400 hover:text-white transition-colors"
-                            title="Import Whitelist"
+                            title={t("importWhitelist")}
                           >
                             <Upload size={18} />
                             <input
@@ -4319,7 +4273,7 @@ export default function Reader({
                               URL.revokeObjectURL(url);
                             }}
                             className="p-1.5 hover:bg-slate-800 rounded text-slate-400 hover:text-white transition-colors"
-                            title="Export Whitelist"
+                            title={t("exportWhitelist")}
                           >
                             <Download size={18} />
                           </button>
@@ -4328,7 +4282,7 @@ export default function Reader({
                       <div className="flex gap-2">
                         <input
                           type="text"
-                          placeholder="Add username..."
+                          placeholder={t("addUsernamePlaceholder")}
                           className="flex-1 bg-slate-950 border border-slate-800 rounded-lg px-3 py-1.5 text-sm outline-none focus:ring-1 focus:ring-green-500"
                           onKeyDown={(e) => {
                             if (e.key === "Enter") {
@@ -4382,13 +4336,13 @@ export default function Reader({
                         <div className="flex items-center gap-2 text-red-500">
                           <UserX size={20} />
                           <h3 className="text-sm font-bold uppercase tracking-wider">
-                            Black List ({config.blackList.length})
+                            {t("blackList")} ({config.blackList.length})
                           </h3>
                         </div>
                         <div className="flex items-center gap-2">
                           <label
                             className="cursor-pointer p-1.5 hover:bg-slate-800 rounded text-slate-400 hover:text-white transition-colors"
-                            title="Import Blacklist"
+                            title={t("importBlacklist")}
                           >
                             <Upload size={18} />
                             <input
@@ -4441,7 +4395,7 @@ export default function Reader({
                               URL.revokeObjectURL(url);
                             }}
                             className="p-1.5 hover:bg-slate-800 rounded text-slate-400 hover:text-white transition-colors"
-                            title="Export Blacklist"
+                            title={t("exportBlacklist")}
                           >
                             <Download size={18} />
                           </button>
@@ -4450,7 +4404,7 @@ export default function Reader({
                       <div className="flex gap-2">
                         <input
                           type="text"
-                          placeholder="Add username..."
+                          placeholder={t("addUsernamePlaceholder")}
                           className="flex-1 bg-slate-950 border border-slate-800 rounded-lg px-3 py-1.5 text-sm outline-none focus:ring-1 focus:ring-red-500"
                           onKeyDown={(e) => {
                             if (e.key === "Enter") {
@@ -4509,7 +4463,7 @@ export default function Reader({
                     }}
                     className="px-6 py-2 bg-cyan-600 hover:bg-cyan-500 rounded-xl font-bold transition-all shadow-lg active:scale-95"
                   >
-                    Apply & Go to Feed
+                    {t("applyAndGoToFeed")}
                   </button>
                 </div>
               </motion.div>
@@ -4520,9 +4474,9 @@ export default function Reader({
         {posts.length === 0 && !loading && (
           <div className="flex flex-col items-center justify-center py-20 text-slate-500/50">
             <Search size={64} className="mb-4" />
-            <p className="text-xl font-medium">No voices heard here yet.</p>
+            <p className="text-xl font-medium">{t("noVoicesHeard")}</p>
             <p className="text-sm">
-              Try broadening your search or period limit.
+              {t("noVoicesHint")}
             </p>
           </div>
         )}
@@ -4548,16 +4502,16 @@ export default function Reader({
               <button
                 onClick={handleQuote}
                 className="flex items-center gap-1.5 text-xs font-bold text-cyan-400 hover:text-cyan-300 transition-colors"
-                title="Add selection as quote"
+                title={t("addSelectionQuote")}
               >
-                <QuoteIcon size={18} /> Quote
+                <QuoteIcon size={18} /> {t("quote")}
               </button>
               <div className="w-px h-3 bg-slate-700" />
               <button
                 onClick={handleQuote}
                 className="flex items-center gap-1.5 text-xs font-bold text-green-400 hover:text-green-300 transition-colors"
               >
-                <MessageSquare size={18} /> Reply
+                <MessageSquare size={18} /> {t("reply")}
               </button>
               <div className="w-px h-3 bg-slate-700" />
               <button
@@ -4590,27 +4544,27 @@ export default function Reader({
                   <button
                     onClick={() => insertFloatingText("**", "**")}
                     className="p-1 hover:bg-slate-700 rounded text-slate-400 hover:text-white"
-                    title="Bold"
+                    title={t("bold")}
                   >
                     <Bold size={18} />
                   </button>
                   <button
                     onClick={() => insertFloatingText("_", "_")}
                     className="p-1 hover:bg-slate-700 rounded text-slate-400 hover:text-white"
-                    title="Italic"
+                    title={t("italic")}
                   >
                     <Italic size={18} />
                   </button>
                   <button
                     onClick={() => insertFloatingText(">", "")}
                     className="p-1 hover:bg-slate-700 rounded text-slate-400 hover:text-white"
-                    title="Quote"
+                    title={t("quote")}
                   >
                     <QuoteIcon size={18} />
                   </button>
                 </div>
                 <span className="text-[9px] font-bold text-slate-500 uppercase tracking-tighter truncate max-w-[150px]">
-                  To @{commentingPost?.author}
+                  {t("toUser")} @{commentingPost?.author}
                 </span>
               </div>
 
@@ -4650,7 +4604,7 @@ export default function Reader({
                       setFloatingCommentBody("");
                     }}
                     onUploadImage={onUploadImage}
-                    placeholder={`Quick reply to @${commentingPost?.author}`}
+                    placeholder={`${t("quickReplyTo")} @${commentingPost?.author}`}
                   />
                 )}
               </div>
@@ -4674,6 +4628,7 @@ function CommentItem({
   excludeMuted = false,
   mutedUsers = [],
   onSelection,
+  t,
 }: {
   comment: SteemPost;
   currentUser: string | null | undefined;
@@ -4686,7 +4641,10 @@ function CommentItem({
   excludeMuted?: boolean;
   mutedUsers?: string[];
   onSelection?: (post: SteemPost, e?: React.MouseEvent | MouseEvent) => void;
+  t?: (k: TranslationKey) => string;
 }) {
+  const currentLang = (typeof localStorage !== "undefined" ? localStorage.getItem("steem_lang") : null) || "uk";
+  const loc = (k: TranslationKey) => t ? t(k) : getTranslation(currentLang, k);
   const [localComment, setLocalComment] = useState(comment);
   const [showReply, setShowReply] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
@@ -4770,7 +4728,7 @@ function CommentItem({
             {canDelete && (
               <button
                 onClick={async () => {
-                  if (confirm("Delete comment?")) {
+                  if (confirm(loc("confirmDeleteComment"))) {
                     setIsDeleting(true);
                     try {
                       if (onDeleteComment)
@@ -4780,7 +4738,7 @@ function CommentItem({
                         );
                       setLocalComment((prev) => ({
                         ...prev,
-                        body: "*Comment deleted*",
+                        body: "*" + loc("commentDeleted") + "*",
                       }));
                     } catch (e) {
                       console.error(e);
@@ -4789,7 +4747,7 @@ function CommentItem({
                   }
                 }}
                 className="text-red-500 hover:text-red-400"
-                title="Delete comment"
+                title={loc("deleteComment")}
               >
                 <Trash2 size={16} />
               </button>
@@ -4801,7 +4759,7 @@ function CommentItem({
                 setShowReply(false);
               }}
               className="text-yellow-500 hover:text-yellow-400"
-              title="Edit comment"
+              title={loc("editComment")}
             >
               <Edit size={16} />
             </button>
@@ -4814,7 +4772,7 @@ function CommentItem({
           <ReplyBox
             value={editBody}
             onChange={setEditBody}
-            placeholder="Edit your comment..."
+            placeholder={loc("editYourCommentPlaceholder")}
             onUploadImage={onUploadImage}
             onSend={async (body) => {
               await onComment(
@@ -4882,7 +4840,7 @@ function CommentItem({
           )}
         >
           <MessageSquare size={16} />
-          <span>Reply</span>
+          <span>{loc("reply")}</span>
         </button>
         {localComment.children > 0 && replies.length === 0 && (
           <button
@@ -4892,7 +4850,7 @@ function CommentItem({
             {loadingReplies ? (
               <RefreshCw size={14} className="animate-spin" />
             ) : (
-              <span>Show {localComment.children} replies</span>
+              <span>{loc("showReplies")} ({localComment.children})</span>
             )}
           </button>
         )}
@@ -4904,7 +4862,7 @@ function CommentItem({
             draftKey={`comment-reply-${localComment.permlink}`}
             value={replyBody}
             onChange={setReplyBody}
-            placeholder={`Reply to @${localComment.author}`}
+            placeholder={`${loc("replyTo")} @${localComment.author}`}
             onSend={async (body) => {
               const activeUser = currentUser || "you";
               const tempPermlink = `re-${localComment.author.replace(/\./g, '')}-${Date.now()}`;
@@ -4961,6 +4919,7 @@ function CommentItem({
               excludeMuted={excludeMuted}
               mutedUsers={mutedUsers}
               onSelection={onSelection}
+              t={t}
             />
           ))}
         </div>
