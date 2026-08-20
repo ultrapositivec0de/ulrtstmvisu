@@ -87,16 +87,16 @@ div#root:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-t
 .theme-light .border-white\/20 { border-color: #cbd5e1 !important; }
 .theme-light .border-white\/30 { border-color: #94a3b8 !important; }
 
-.theme-light .group:hover \.group-hover\:text-slate-400 { color: var(--text-muted) !important; }
+.theme-light .group:hover .group-hover\:text-slate-400 { color: var(--text-muted) !important; }
 
 /* Checkbox and active states fixes */
-.theme-light .peer:checked ~ \.peer-checked\:bg-cyan-500,
-.theme-light .peer:checked ~ \.peer-checked\:bg-cyan-600 {
+.theme-light .peer:checked ~ .peer-checked\:bg-cyan-500,
+.theme-light .peer:checked ~ .peer-checked\:bg-cyan-600 {
   background-color: var(--accent, #06b6d4) !important;
 }
 
-.theme-light .peer:checked ~ \.peer-checked\:border-cyan-400,
-.theme-light .peer:checked ~ \.peer-checked\:border-cyan-500 {
+.theme-light .peer:checked ~ .peer-checked\:border-cyan-400,
+.theme-light .peer:checked ~ .peer-checked\:border-cyan-500 {
   border-color: var(--accent, #06b6d4) !important;
 }
 

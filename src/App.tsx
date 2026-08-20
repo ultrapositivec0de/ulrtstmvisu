@@ -217,6 +217,16 @@ const IconButton = ({
 
 const APP_CHANGELOG = [
   {
+    version: "v4.5.9",
+    date: "2026-08-20",
+    changes: [
+      "Mobile Formatting Bar Alignment: Fixed mobile formatting widget position on Android devices to stay firmly visible and accessible above the virtual keyboard and bottom navigation bar without hiding during active typing.",
+      "Viewport & Keyboard Offset Optimization: Enhanced visual editor scroll management and responsive keyboard offset handling in fullscreen and standard modes.",
+      "Editor Bottom Padding Expansion: Expanded bottom margin during typing to ensure smooth scrolling and avoid content occlusion behind the floating toolbar.",
+      "Workspace Organization: Moved temporary scripts, patches, and diagnostic tools to the dedicated ./fix_test_patcn/ directory for root cleanliness."
+    ]
+  },
+  {
     version: "v4.5.8",
     date: "2026-08-14",
     changes: [
@@ -1637,7 +1647,7 @@ function App() {
   const [pubTitle, setPubTitle] = useState('');
   const [removeTitleLine, setRemoveTitleLine] = useState(() => localStorage.getItem('steem_remove_title_line') !== 'false');
   const [pubTags, setPubTags] = useState('');
-  const [appAgent, setAppAgent] = useState(localStorage.getItem('steem_app_agent') || 'ultrasteemeditor/4.5.8');
+  const [appAgent, setAppAgent] = useState(localStorage.getItem('steem_app_agent') || 'ultrasteemeditor/4.5.9');
   const [rewardType, setRewardType] = useState<'SP' | '50' | '0'>( (localStorage.getItem('steem_reward_type') as any) || '50');
   const [beneficiaries, setBeneficiaries] = useState<{account: string, weight: number}[]>([]);
   const [benName, setBenName] = useState('');
@@ -11351,7 +11361,7 @@ function App() {
                     <div className="pt-4 space-y-3">
                       <div className="flex justify-between text-xs items-center">
                         <span className="text-slate-500">{t('version')}</span>
-                        <span className="bg-cyan-500/10 text-cyan-400 px-2 py-1 rounded-md font-mono font-bold">4.5.8</span>
+                        <span className="bg-cyan-500/10 text-cyan-400 px-2 py-1 rounded-md font-mono font-bold">4.5.9</span>
                       </div>
                       <div className="flex justify-between text-xs items-center">
                         <span className="text-slate-500">{t('license')}</span>
@@ -12299,11 +12309,11 @@ function App() {
                        <div className="w-16 h-16 bg-cyan-500/10 rounded-2xl mx-auto flex items-center justify-center text-cyan-400 font-black text-2xl shadow-xl shadow-cyan-500/10">S</div>
                        <div>
                          <h3 className="text-xl font-black tracking-tight">SteemEditor <span className="text-cyan-400">Pro</span></h3>
-                         <p className="text-[10px] text-slate-500 uppercase font-black tracking-[0.2em] pt-1">Version 4.5.8 "Quantum"</p>
+                         <p className="text-[10px] text-slate-500 uppercase font-black tracking-[0.2em] pt-1">Version 4.5.9 "Quantum"</p>
                        </div>
                        <label className="text-[10px] font-black text-slate-500 uppercase tracking-[0.2em] px-1 pt-4 block border-t border-slate-800">Changelog & Updates</label>
                         <div className="mt-2 p-3 bg-slate-950 border border-cyan-500/20 rounded-xl text-left">
-                          <p className="text-xs text-slate-300 font-medium">New in v4.5.8: Store Import Optimization, Immersive Fullscreen Actions & Neon Highlighting</p>
+                          <p className="text-xs text-slate-300 font-medium">New in v4.5.9: Mobile Android formatting bar pinned above keyboard & viewport improvements</p>
                         </div>
                        
                        <div className="space-y-2 max-h-60 overflow-y-auto custom-scrollbar bg-slate-900 border border-slate-800 rounded-xl p-3">
@@ -12402,7 +12412,7 @@ function App() {
                                   localStorage.setItem('steem_app_agent', e.target.value);
                                 }}
                                 className="w-full bg-slate-900 border border-slate-700 rounded-lg p-2.5 text-xs text-slate-200 outline-none focus:ring-1 focus:ring-cyan-500"
-                                placeholder="ultrasteemeditor/4.5.8"
+                                placeholder="ultrasteemeditor/4.5.9"
                               />
                             </div>
                           </motion.div>

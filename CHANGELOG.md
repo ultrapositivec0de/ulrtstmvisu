@@ -1,4 +1,11 @@
 # Changelog
+## [2026-08-20] - Version 4.5.9 (ultrasteemeditor/4.5.9)
+### Added & Improved
+- **Mobile Formatting Bar Alignment**: Fixed mobile formatting widget position on Android devices to stay firmly visible and accessible above the virtual keyboard and bottom navigation bar without hiding during active typing.
+- **Viewport & Keyboard Offset Optimization**: Enhanced visual editor scroll management and responsive keyboard offset handling in fullscreen and standard modes.
+- **Editor Bottom Padding Expansion**: Expanded bottom margin during typing to ensure smooth scrolling and avoid content occlusion behind the floating toolbar.
+- **Workspace Hygiene**: Cleaned up diagnostic utilities and organized temporary scripts into the dedicated `./fix_test_patcn/` directory.
+
 ## [2026-08-14] - Version 4.5.8 (ultrasteemeditor/4.5.8)
 ### Added
 - **Store Import Optimization**: Refactored and optimized state store imports across modules to eliminate inefficient dependencies and ensure clean module coupling.
