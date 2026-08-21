@@ -1,4 +1,10 @@
 # Changelog
+## [2026-08-20] - Version 4.6.0 (ultrasteemeditor/4.6.0)
+### Added & Improved
+- **Bidirectional Cursor & Spacing Synchronization**: Fixed multi-line formatting offset calculations so that the caret retains its precise line and character position within continuous styled blocks (`**1**`, `**2**`, `**3**`) during Visual ↔ Markdown mode toggles without jumping to the top of the block.
+- **Empty Line Integrity & Spacing Stability**: Eliminated geometric blank line multiplication when transitioning between modes while the cursor resides on an empty line.
+- **Desktop & Mobile Configuration Sync**: Updated version references across Web, Tauri (`tauri.conf.json`, `Cargo.toml`), Neutralino (`neutralino.config.json`), App Agents, and Application Metadata to `4.6.0` for release readiness.
+
 ## [2026-08-20] - Version 4.5.9 (ultrasteemeditor/4.5.9)
 ### Added & Improved
 - **Mobile Formatting Bar Alignment**: Fixed mobile formatting widget position on Android devices to stay firmly visible and accessible above the virtual keyboard and bottom navigation bar without hiding during active typing.

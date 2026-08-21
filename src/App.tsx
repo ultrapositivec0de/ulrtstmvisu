@@ -30,6 +30,7 @@ import Reader from './components/Reader';
 import { zipSync, unzipSync, strToU8, strFromU8 } from 'fflate';
 import { htmlToMarkdown, convertBareImageUrlsToMarkdown, isImageAndProxyUrl } from './lib/editorSync';
 import { useEditorWorker } from './hooks/useEditorWorker';
+import { useVisualViewport } from './hooks/useVisualViewport';
 import { translations, AVAILABLE_LANGUAGES, getTranslation, type TranslationKey } from './locales';
 import { COMMUNITIES, COMMON_TAGS } from './data/communities';
 
@@ -216,6 +217,15 @@ const IconButton = ({
 );
 
 const APP_CHANGELOG = [
+  {
+    version: "v4.6.0",
+    date: "2026-08-20",
+    changes: [
+      "Bidirectional Cursor & Spacing Sync: Fixed formatting block positioning with accurate multi-line offset calculations so cursor doesn't jump to the top line in styled blocks (**1**, **2**, **3**).",
+      "Empty Line Preservation: Eliminated geometric line multiplication when switching between Visual and Markdown modes with cursor on empty lines.",
+      "Tauri & Neutralino Desktop Release Sync: Synchronized desktop application manifests and configuration files to v4.6.0."
+    ]
+  },
   {
     version: "v4.5.9",
     date: "2026-08-20",
@@ -892,41 +902,28 @@ function App() {
   const [tableHover, setTableHover] = useState({ r: 0, c: 0 });
   const [isFullScreen, setIsFullScreen] = useState(false);
   const [isEditorFullScreen, setIsEditorFullScreen] = useState(false);
-  const [vvHeight, setVvHeight] = useState<number | null>(null);
-
-  useEffect(() => {
-    const handleVVResize = () => {
-      if (window.visualViewport) {
-        setVvHeight(window.visualViewport.height);
-      }
-    };
-    if (window.visualViewport) {
-      window.visualViewport.addEventListener('resize', handleVVResize);
-      handleVVResize();
-    }
-    return () => {
-      if (window.visualViewport) window.visualViewport.removeEventListener('resize', handleVVResize);
-    };
-  }, []);
+  const { viewportHeight: vvHeight, keyboardOffset, isKeyboardOpen } = useVisualViewport();
   const previewRef = useRef<HTMLDivElement>(null);
+
+  const isTauriEnv = () => typeof window !== 'undefined' && (!!(window as any).__TAURI_INTERNALS__ || !!(window as any).__TAURI__);
 
   const toggleFullScreen = () => {
     setIsFullScreen(prev => {
       const next = !prev;
-      const isTauri = typeof window !== 'undefined' && (!!(window as any).__TAURI_INTERNALS__ || !!(window as any).__TAURI__);
-      if (isTauri) {
+      if (isTauriEnv()) {
         import('@tauri-apps/api/window').then(({ getCurrentWindow }) => {
           getCurrentWindow().setFullscreen(next).catch(() => {});
         }).catch(() => {});
-      }
-      // Trigger HTML5 Fullscreen as well so the browser / webview expands across entire display
-      if (next) {
-        if (!document.fullscreenElement && document.documentElement.requestFullscreen) {
-          document.documentElement.requestFullscreen().catch(() => {});
-        }
       } else {
-        if (document.fullscreenElement && document.exitFullscreen) {
-          document.exitFullscreen().catch(() => {});
+        // Only in standard web browser / PWA use HTML5 Fullscreen
+        if (next) {
+          if (!document.fullscreenElement && document.documentElement.requestFullscreen) {
+            document.documentElement.requestFullscreen().catch(() => {});
+          }
+        } else {
+          if (document.fullscreenElement && document.exitFullscreen) {
+            document.exitFullscreen().catch(() => {});
+          }
         }
       }
       return next;
@@ -936,19 +933,20 @@ function App() {
   const toggleEditorFullScreen = () => {
     setIsEditorFullScreen(prev => {
       const next = !prev;
-      const isTauri = typeof window !== 'undefined' && (!!(window as any).__TAURI_INTERNALS__ || !!(window as any).__TAURI__);
-      if (isTauri) {
+      if (isTauriEnv()) {
         import('@tauri-apps/api/window').then(({ getCurrentWindow }) => {
           getCurrentWindow().setFullscreen(next).catch(() => {});
         }).catch(() => {});
-      }
-      if (next) {
-        if (!document.fullscreenElement && document.documentElement.requestFullscreen) {
-          document.documentElement.requestFullscreen().catch(() => {});
-        }
       } else {
-        if (document.fullscreenElement && document.exitFullscreen) {
-          document.exitFullscreen().catch(() => {});
+        // Only in standard web browser / PWA use HTML5 Fullscreen
+        if (next) {
+          if (!document.fullscreenElement && document.documentElement.requestFullscreen) {
+            document.documentElement.requestFullscreen().catch(() => {});
+          }
+        } else {
+          if (document.fullscreenElement && document.exitFullscreen) {
+            document.exitFullscreen().catch(() => {});
+          }
         }
       }
       return next;
@@ -956,7 +954,9 @@ function App() {
   };
 
   useEffect(() => {
+    // Only listen to HTML5 fullscreen changes in pure web mode
     const handleFullscreenChange = () => {
+      if (isTauriEnv()) return; // Do not let webkit HTML5 events interfere with Tauri native window state
       const isNativeFs = !!(
         document.fullscreenElement ||
         (document as any).webkitFullscreenElement ||
@@ -988,25 +988,9 @@ function App() {
 
   useEffect(() => {
     const handleGlobalKeyDown = (e: KeyboardEvent) => {
-      // Intercept WebKitGTK 'f' key fullscreen exit on Linux
-      if (e.key === 'f' || e.key === 'F' || e.code === 'KeyF') {
-        const isTauri = typeof window !== 'undefined' && !!(window as any).__TAURI_INTERNALS__;
-        if (isTauri && (isFullScreen || isEditorFullScreen || document.fullscreenElement)) {
-          if (!e.ctrlKey && !e.metaKey && !e.altKey) {
-            e.preventDefault();
-            const target = e.target as HTMLElement;
-            const isInput = target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable;
-            if (isInput) {
-              document.execCommand('insertText', false, e.key);
-            }
-            return;
-          }
-        }
-      }
-
       if (e.key === 'F11') {
         e.preventDefault();
-        const isTauri = typeof window !== 'undefined' && !!(window as any).__TAURI_INTERNALS__;
+        const isTauri = isTauriEnv();
         
         if (isEditorFullScreen || isFullScreen) {
           setIsEditorFullScreen(false);
@@ -1027,7 +1011,6 @@ function App() {
         return;
       }
 
-
       if (e.key === 'Escape') {
         if (showTableSelector) {
           setShowTableSelector(false);
@@ -1042,7 +1025,7 @@ function App() {
           return;
         }
         
-        const isTauri = typeof window !== 'undefined' && !!(window as any).__TAURI_INTERNALS__;
+        const isTauri = isTauriEnv();
         
         if (isEditorFullScreen) {
           setIsEditorFullScreen(false);
@@ -1647,7 +1630,7 @@ function App() {
   const [pubTitle, setPubTitle] = useState('');
   const [removeTitleLine, setRemoveTitleLine] = useState(() => localStorage.getItem('steem_remove_title_line') !== 'false');
   const [pubTags, setPubTags] = useState('');
-  const [appAgent, setAppAgent] = useState(localStorage.getItem('steem_app_agent') || 'ultrasteemeditor/4.5.9');
+  const [appAgent, setAppAgent] = useState(localStorage.getItem('steem_app_agent') || 'ultrasteemeditor/4.6.0');
   const [rewardType, setRewardType] = useState<'SP' | '50' | '0'>( (localStorage.getItem('steem_reward_type') as any) || '50');
   const [beneficiaries, setBeneficiaries] = useState<{account: string, weight: number}[]>([]);
   const [benName, setBenName] = useState('');
@@ -2416,21 +2399,191 @@ function App() {
     let colIdx = 0;
     let acc = 0;
     for (let i = 0; i < lines.length; i++) {
-      if (acc + lines[i].length >= offset || i === lines.length - 1) {
+      const lineLen = lines[i].length;
+      if (acc + lineLen >= offset || i === lines.length - 1) {
         lineIdx = i;
         colIdx = Math.max(0, offset - acc);
         break;
       }
-      acc += lines[i].length + 1;
+      acc += lineLen + 1;
     }
     
     const rawLine = lines[lineIdx] || '';
+
+    // Check if current line is part of a markdown table (contains pipe separators)
+    const isTableRow = rawLine.trim().startsWith('|') || (rawLine.includes('|') && rawLine.trim().endsWith('|'));
+    if (isTableRow) {
+      // Identify which table this belongs to and the row index
+      let tableIndex = 0;
+      let rowInTable = 0;
+      let inTable = false;
+      let isHeaderDivider = false;
+
+      for (let i = 0; i <= lineIdx; i++) {
+        const curLine = lines[i].trim();
+        const curIsTable = curLine.startsWith('|') || (curLine.includes('|') && curLine.endsWith('|'));
+        if (curIsTable) {
+          if (!inTable) {
+            inTable = true;
+            rowInTable = 0;
+            tableIndex++;
+          } else {
+            rowInTable++;
+          }
+          if (i === lineIdx) {
+            isHeaderDivider = /^\|?(\s*:?-+:?\s*\|?)+\s*$/.test(curLine);
+          }
+        } else {
+          inTable = false;
+        }
+      }
+
+      const allDomTables = Array.from(container.querySelectorAll('table'));
+      const targetTable = allDomTables[tableIndex - 1] || allDomTables[0];
+      if (targetTable) {
+        const allTrs = Array.from(targetTable.querySelectorAll('tr'));
+        let targetTrIdx = 0;
+        if (isHeaderDivider) {
+          targetTrIdx = 0;
+        } else if (rowInTable >= 2) {
+          targetTrIdx = rowInTable - 1;
+        } else {
+          targetTrIdx = rowInTable;
+        }
+        const targetTr = allTrs[Math.min(targetTrIdx, allTrs.length - 1)] || allTrs[0];
+
+        if (targetTr) {
+          const pipeParts = rawLine.split('|');
+          const cellSegments: { cellIdx: number; startCol: number; endCol: number; raw: string }[] = [];
+          let curRunningCol = 0;
+          for (let p = 0; p < pipeParts.length; p++) {
+            const part = pipeParts[p];
+            const segStart = curRunningCol;
+            const segEnd = curRunningCol + part.length;
+            curRunningCol = segEnd + 1; // +1 for '|'
+
+            if (p === 0 && rawLine.startsWith('|')) continue;
+            if (p === pipeParts.length - 1 && rawLine.endsWith('|') && part === '') continue;
+
+            cellSegments.push({
+              cellIdx: cellSegments.length,
+              startCol: segStart,
+              endCol: segEnd,
+              raw: part
+            });
+          }
+
+          let matchedCellIdx = 0;
+          let offsetInCell = 0;
+
+          for (const seg of cellSegments) {
+            if (colIdx >= seg.startCol && colIdx <= seg.endCol) {
+              matchedCellIdx = seg.cellIdx;
+              const leadingSpaces = (seg.raw.match(/^\s*/)?.[0] || '').length;
+              const rawOffset = Math.max(0, colIdx - seg.startCol - leadingSpaces);
+              const textBeforeCol = seg.raw.substring(leadingSpaces, leadingSpaces + rawOffset);
+              offsetInCell = textBeforeCol
+                .replace(/\[([^\]]*)\]\([^)]*\)/g, '$1')
+                .replace(/\[([^\]]*)\]\(.*$/g, '$1')
+                .replace(/[[\]]/g, '')
+                .replace(/!\[([^\]]*)\]\([^)]*\)/g, '$1')
+                .replace(/(\*\*|__|\*|_|~~|`)/g, '')
+                .replace(/<[/]?[^>]+>/g, '').length;
+              break;
+            }
+          }
+
+          const domCells = Array.from(targetTr.querySelectorAll('th, td'));
+          const targetCell = domCells[Math.min(matchedCellIdx, domCells.length - 1)] || domCells[0];
+
+          if (targetCell) {
+            let charAcc = 0;
+            let foundNode: Node | null = null;
+            let foundOffset = 0;
+            let lastTextNode: Node | null = null;
+            let lastTextLen = 0;
+
+            const walkCell = (node: Node) => {
+              if (foundNode) return;
+              if (node.nodeType === Node.TEXT_NODE) {
+                lastTextNode = node;
+                const text = node.nodeValue || '';
+                const len = text.length;
+                lastTextLen = len;
+                if (charAcc + len >= offsetInCell) {
+                  foundNode = node;
+                  foundOffset = Math.max(0, Math.min(offsetInCell - charAcc, len));
+                } else {
+                  charAcc += len;
+                }
+              } else {
+                for (const child of Array.from(node.childNodes)) {
+                  walkCell(child);
+                  if (foundNode) break;
+                }
+              }
+            };
+
+            walkCell(targetCell);
+
+            if (foundNode) {
+              return { node: foundNode, offset: foundOffset };
+            } else if (lastTextNode) {
+              return { node: lastTextNode, offset: lastTextLen };
+            }
+            return { node: targetCell, offset: 0 };
+          }
+        }
+      }
+    }
+
+    // Determine the paragraph block in Markdown (continuous non-blank lines around lineIdx)
+    let blockStartLine = lineIdx;
+    while (blockStartLine > 0 && lines[blockStartLine - 1].trim() !== '') {
+      blockStartLine--;
+    }
+    let blockEndLine = lineIdx;
+    while (blockEndLine < lines.length - 1 && lines[blockEndLine + 1].trim() !== '') {
+      blockEndLine++;
+    }
+
     const prefixMatch = rawLine.match(/^(#{1,6}\s+|[-*+]\s+(\[[ xX]\]\s+)?|\d+\.\s+|>\s*)/);
     const prefixLen = prefixMatch ? prefixMatch[0].length : 0;
-    const targetCol = Math.max(0, colIdx - prefixLen);
-    const cleanLineText = rawLine.substring(prefixLen).trim();
     
-    const blocks = Array.from(container.querySelectorAll('h1, h2, h3, h4, h5, h6, li, p, blockquote, td, th, pre, div'));
+    // Calculate exact offset within the multi-line paragraph block in DOM
+    let targetOffsetInBlock = 0;
+    for (let l = blockStartLine; l < lineIdx; l++) {
+      const curL = lines[l];
+      const pMatch = curL.match(/^(#{1,6}\s+|[-*+]\s+(\[[ xX]\]\s+)?|\d+\.\s+|>\s*)/);
+      const pLen = pMatch ? pMatch[0].length : 0;
+      const strippedL = curL.substring(pLen)
+        .replace(/\[([^\]]*)\]\([^)]*\)/g, '$1')
+        .replace(/\[([^\]]*)\]\(.*$/g, '$1')
+        .replace(/[[\]]/g, '')
+        .replace(/!\[([^\]]*)\]\([^)]*\)/g, '$1')
+        .replace(/(\*\*|__|\*|_|~~|`)/g, '')
+        .replace(/<[/]?[^>]+>/g, '');
+      targetOffsetInBlock += strippedL.length + 1; // +1 for the <br> or soft line break
+    }
+
+    const rawBeforeCursor = rawLine.substring(prefixLen, colIdx);
+    const inLineOffset = rawBeforeCursor
+      .replace(/\[([^\]]*)\]\([^)]*\)/g, '$1')
+      .replace(/\[([^\]]*)\]\(.*$/g, '$1')
+      .replace(/[[\]]/g, '')
+      .replace(/!\[([^\]]*)\]\([^)]*\)/g, '$1')
+      .replace(/(\*\*|__|\*|_|~~|`)/g, '')
+      .replace(/<[/]?[^>]+>/g, '').length;
+
+    targetOffsetInBlock += inLineOffset;
+    
+    const cleanLineText = rawLine.substring(prefixLen)
+      .replace(/(\*\*|__|\*|_|~~|`)/g, '')
+      .replace(/\[([^\]]*)\]\([^)]*\)/g, '$1')
+      .replace(/<[/]?[^>]+>/g, '')
+      .trim();
+    
+    const blocks = Array.from(container.querySelectorAll('h1, h2, h3, h4, h5, h6, li, p, blockquote, td, th, pre'));
     if (blocks.length === 0) {
       if (container.firstChild) {
         return { node: container.firstChild, offset: 0 };
@@ -2480,17 +2633,24 @@ function App() {
     let charAcc = 0;
     let foundNode: Node | null = null;
     let foundOffset = 0;
+    let lastTextNode: Node | null = null;
+    let lastTextLen = 0;
     
     const walk = (node: Node) => {
       if (foundNode) return;
       if (node.nodeType === Node.TEXT_NODE) {
-        const len = (node.nodeValue || '').length;
-        if (charAcc + len >= targetCol) {
+        lastTextNode = node;
+        const text = node.nodeValue || '';
+        const len = text.length;
+        lastTextLen = len;
+        if (charAcc + len >= targetOffsetInBlock) {
           foundNode = node;
-          foundOffset = Math.max(0, Math.min(targetCol - charAcc, len));
+          foundOffset = Math.max(0, Math.min(targetOffsetInBlock - charAcc, len));
         } else {
           charAcc += len;
         }
+      } else if (node.nodeName.toLowerCase() === 'br') {
+        charAcc += 1;
       } else {
         for (const child of Array.from(node.childNodes)) {
           walk(child);
@@ -2502,6 +2662,9 @@ function App() {
     walk(targetBlock);
     
     if (!foundNode) {
+      if (lastTextNode) {
+        return { node: lastTextNode, offset: lastTextLen };
+      }
       return { node: targetBlock, offset: 0 };
     }
     
@@ -2833,49 +2996,8 @@ function App() {
      }
   }, []);
 
-  // Visual Viewport API for mobile virtual keyboard height detection
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  const [_viewportHeight, setViewportHeight] = useState(() => typeof window !== 'undefined' ? window.innerHeight : 0);
-  const [keyboardOffset, setKeyboardOffset] = useState(0);
-  const [isKeyboardOpen, setIsKeyboardOpen] = useState(false);
   const [isMiniGalleryOpen, setIsMiniGalleryOpen] = useState(false);
   const [justInsertedUrl, setJustInsertedUrl] = useState<string | null>(null);
-
-  useEffect(() => {
-    if (typeof window === 'undefined' || !window.visualViewport) return;
-
-    const handleVisualViewportChange = () => {
-      const vv = window.visualViewport;
-      if (!vv) return;
-      const layoutHeight = window.innerHeight;
-      const visualHeight = vv.height;
-      setViewportHeight(visualHeight);
-      const diff = Math.max(0, layoutHeight - visualHeight - vv.offsetTop);
-      if (diff > 60) {
-        setKeyboardOffset(diff);
-        setIsKeyboardOpen(true);
-      } else {
-        setKeyboardOffset(0);
-        setIsKeyboardOpen(false);
-      }
-
-      if (typeof document !== 'undefined' && document.documentElement) {
-        document.documentElement.style.setProperty('--vv-height', `${visualHeight}px`);
-        document.documentElement.style.setProperty('--keyboard-offset', `${diff > 60 ? diff : 0}px`);
-      }
-    };
-
-    handleVisualViewportChange();
-    window.visualViewport.addEventListener('resize', handleVisualViewportChange);
-    window.visualViewport.addEventListener('scroll', handleVisualViewportChange);
-
-    return () => {
-      if (window.visualViewport) {
-        window.visualViewport.removeEventListener('resize', handleVisualViewportChange);
-        window.visualViewport.removeEventListener('scroll', handleVisualViewportChange);
-      }
-    };
-  }, []);
 
   const hasRestoredInitialCursorRef = useRef(false);
 
@@ -3056,6 +3178,17 @@ function App() {
       if (range && wysiwygRef.current) {
         // Create a temporary clone to safely insert marker elements
         const clonedWysiwyg = wysiwygRef.current.cloneNode(true) as HTMLElement;
+
+        // Clean any auxiliary elements or indicators from the clone before inserting markers
+        clonedWysiwyg.querySelectorAll('.table-controls, .col-resizer, .row-resizer, [data-ignore-sync]').forEach(el => el.remove());
+        
+        clonedWysiwyg.querySelectorAll('.table-spacer, [data-placeholder]').forEach(spacer => {
+          if ((spacer.textContent || '').trim() === '' && (!spacer.children.length || (spacer.children.length === 1 && spacer.firstElementChild?.tagName === 'BR'))) {
+            spacer.className = '';
+            spacer.removeAttribute('data-placeholder');
+            spacer.removeAttribute('data-empty');
+          }
+        });
         
         const pathStart = getNodePath(wysiwygRef.current, range.startContainer);
         const pathEnd = getNodePath(wysiwygRef.current, range.endContainer);
@@ -3068,20 +3201,26 @@ function App() {
             try {
               if (clonedStartNode === clonedEndNode && clonedStartNode.nodeType === Node.TEXT_NODE) {
                   const text = clonedStartNode.nodeValue || '';
-                  clonedStartNode.nodeValue = text.slice(0, range.startOffset) + '\x01' + text.slice(range.startOffset, range.endOffset) + '\x02' + text.slice(range.endOffset);
+                  const sOff = Math.min(range.startOffset, text.length);
+                  const eOff = Math.min(range.endOffset, text.length);
+                  clonedStartNode.nodeValue = text.slice(0, sOff) + '\x01' + text.slice(sOff, eOff) + '\x02' + text.slice(eOff);
               } else {
                   if (clonedEndNode.nodeType === Node.TEXT_NODE) {
                       const text = clonedEndNode.nodeValue || '';
-                      clonedEndNode.nodeValue = text.slice(0, range.endOffset) + '\x02' + text.slice(range.endOffset);
+                      const eOff = Math.min(range.endOffset, text.length);
+                      clonedEndNode.nodeValue = text.slice(0, eOff) + '\x02' + text.slice(eOff);
                   } else {
-                      clonedEndNode.insertBefore(document.createTextNode('\x02'), clonedEndNode.childNodes[range.endOffset]);
+                      const idx = Math.min(range.endOffset, clonedEndNode.childNodes.length);
+                      clonedEndNode.insertBefore(document.createTextNode('\x02'), clonedEndNode.childNodes[idx] || null);
                   }
                   
                   if (clonedStartNode.nodeType === Node.TEXT_NODE) {
                       const text = clonedStartNode.nodeValue || '';
-                      clonedStartNode.nodeValue = text.slice(0, range.startOffset) + '\x01' + text.slice(range.startOffset);
+                      const sOff = Math.min(range.startOffset, text.length);
+                      clonedStartNode.nodeValue = text.slice(0, sOff) + '\x01' + text.slice(sOff);
                   } else {
-                      clonedStartNode.insertBefore(document.createTextNode('\x01'), clonedStartNode.childNodes[range.startOffset]);
+                      const idx = Math.min(range.startOffset, clonedStartNode.childNodes.length);
+                      clonedStartNode.insertBefore(document.createTextNode('\x01'), clonedStartNode.childNodes[idx] || null);
                   }
               }
               
@@ -3093,24 +3232,27 @@ function App() {
               const endIdx = cleanMdAfterStart.indexOf('\x02');
               
               if (startIdx !== -1 && endIdx !== -1) {
+                const cleanMd = cleanMdAfterStart.replace('\x02', '');
                 const pos = { start: startIdx, end: endIdx };
                 cursorPositionRef.current = pos;
                 localStorage.setItem('steem_editor_cursor', JSON.stringify(pos));
                 
                 // Sync to Zustand store
-                const cleanMd = cleanMdAfterStart.replace('\x02', '');                const rowColPos = getRowColFromOffset(cleanMd, startIdx);
+                const rowColPos = getRowColFromOffset(cleanMd, startIdx);
                 useEditorStore.getState().setCursor(rowColPos);
                 useEditorStore.getState().setSelection(startIdx, endIdx);
+                return { start: startIdx, end: endIdx, md: cleanMd };
               } else if (startIdx !== -1) {
+                const cleanMd = cleanMdAfterStart;
                 const pos = { start: startIdx, end: startIdx };
                 cursorPositionRef.current = pos;
                 localStorage.setItem('steem_editor_cursor', JSON.stringify(pos));
                 
                 // Sync to Zustand store
-                const cleanMd = cleanMdAfterStart;
                 const rowColPos = getRowColFromOffset(cleanMd, startIdx);
                 useEditorStore.getState().setCursor(rowColPos);
                 useEditorStore.getState().setSelection(startIdx, startIdx);
+                return { start: startIdx, end: startIdx, md: cleanMd };
               }
             } catch (e) {
               console.warn("Failed to apply range on cloned DOM", e);
@@ -3121,6 +3263,7 @@ function App() {
     } catch (e) {
       console.warn('syncCursorVisualToMarkdown error:', e);
     }
+    return null;
   }, []);
 
   // Automatic Cursor & Scroll Position Restoration after page reload
@@ -3195,6 +3338,8 @@ function App() {
         const start = editorRef.current.selectionStart;
         const end = editorRef.current.selectionEnd;
         const pos = getRowColFromOffset(val, start);
+        cursorPositionRef.current = { start, end };
+        localStorage.setItem('steem_editor_cursor', JSON.stringify({ start, end }));
         useEditorStore.setState({
           content: val,
           cursor: pos,
@@ -3213,14 +3358,18 @@ function App() {
           wysiwygRef.current.focus({ preventScroll: true });
           saveVisualSelection();
         }
-      }, 150);
+      }, 60);
     } else {
       saveVisualSelection();
       isSyncingRef.current = true;
-      syncCursorVisualToMarkdown();
+      const syncResult = syncCursorVisualToMarkdown();
       
       // Always synchronize when switching from visual to markdown code
-      if (wysiwygRef.current) {
+      if (syncResult && syncResult.md) {
+        if (syncResult.md !== useEditorStore.getState().content) {
+          setContent(syncResult.md);
+        }
+      } else if (wysiwygRef.current) {
         const md = htmlToMarkdown(wysiwygRef.current.innerHTML);
         if (md !== useEditorStore.getState().content) {
           setContent(md);
@@ -3231,7 +3380,7 @@ function App() {
       setTimeout(() => {
         restoreMarkdownCursorAndScroll();
         saveCursorPosition();
-      }, 150);
+      }, 60);
     }
   }, [editorMode, saveCursorPosition, syncCursorMarkdownToVisual, syncCursorVisualToMarkdown, saveVisualSelection, setContent, restoreMarkdownCursorAndScroll]);
 
@@ -8239,7 +8388,10 @@ function App() {
         </AnimatePresence>
 
         {/* Main Content */}
-        <main className="flex-1 flex flex-col min-w-0 bg-slate-950 relative pb-[calc(4rem+env(safe-area-inset-bottom,0px))] lg:pb-0">
+        <main className={cn(
+          "flex-1 flex flex-col min-w-0 bg-slate-950 relative transition-all",
+          (isEditorFullScreen || isFullScreen || isKeyboardOpen) ? "pb-0 lg:pb-0" : "pb-[calc(4rem+env(safe-area-inset-bottom,0px))] lg:pb-0"
+        )}>
           <div className="flex-1 flex overflow-hidden">
             {/* Editor Pane */}
             <div 
@@ -8254,7 +8406,7 @@ function App() {
               className={cn(
                 "flex-1 flex flex-col min-w-0 border-r border-slate-800 transition-all relative",
                 activeMobileTab !== 'editor' && "hidden lg:flex",
-                isEditorFullScreen && "bg-slate-950 p-0 fixed top-0 left-0 right-0 z-[250]"
+                isEditorFullScreen && "bg-slate-950 p-0 fixed inset-0 z-[250]"
               )}
             >
 <MobileStatsBar visualStyle={visualStyle} isDarkMode={isDarkMode} t={t} />
@@ -8717,8 +8869,10 @@ function App() {
                     (visualStyle === 'neon' && neonTextColored) ? "text-cyan-400 font-normal" : "text-slate-300",
                     beautifyEnabled ? "px-4 lg:px-8 pt-4 lg:pt-6 max-w-[clamp(40rem,60vw,80rem)] mx-auto selection:bg-[rgb(var(--accent-color)/0.3)]" : "px-3 pt-3 lg:px-6 lg:pt-6",
                     isKeyboardOpen 
-                      ? "pb-6 mb-[6rem] lg:pb-6 lg:mb-[5rem]" 
-                      : "pb-6 mb-[10rem] lg:pb-6 lg:mb-[5rem]"
+                      ? "pb-6 mb-[4.5rem] lg:pb-6 lg:mb-[5rem]" 
+                      : (isEditorFullScreen || isFullScreen
+                          ? "pb-6 mb-[4.5rem] lg:pb-6 lg:mb-[5rem]"
+                          : "pb-6 mb-[8.5rem] lg:pb-6 lg:mb-[5rem]")
                   )}
                   placeholder={`${t('placeholder')}\n\n\n\n\nОМ АХ ХУМ СО ХА\n♡`}
                 />
@@ -8934,8 +9088,10 @@ function App() {
                     (visualStyle === 'neon' && neonTextColored) ? "text-cyan-400 font-normal" : "text-slate-300",
                     beautifyEnabled ? "px-4 lg:px-8 pt-4 lg:pt-6 max-w-4xl mx-auto selection:bg-[rgb(var(--accent-color)/0.3)]" : "px-4 pt-4 lg:px-6 lg:pt-6",
                     isKeyboardOpen 
-                      ? "pb-6 mb-[6rem] lg:pb-6 lg:mb-[5rem]" 
-                      : "pb-6 mb-[10rem] lg:pb-6 lg:mb-[5rem]"
+                      ? "pb-6 mb-[4.5rem] lg:pb-6 lg:mb-[5rem]" 
+                      : (isEditorFullScreen || isFullScreen
+                          ? "pb-6 mb-[4.5rem] lg:pb-6 lg:mb-[5rem]"
+                          : "pb-6 mb-[8.5rem] lg:pb-6 lg:mb-[5rem]")
                   )}
                   style={{ minHeight: '200px' }}
                 />
@@ -9002,7 +9158,9 @@ function App() {
                       bottom: window.innerWidth < 1024
                         ? (isKeyboardOpen 
                             ? `calc(${keyboardOffset > 0 ? keyboardOffset : 0}px + var(--toolbar-btn-size, 3rem) + 0.35rem)` 
-                            : 'calc(4rem + var(--toolbar-btn-size, 3rem) + 0.25rem)')
+                            : (isEditorFullScreen || isFullScreen
+                                ? 'calc(env(safe-area-inset-bottom, 0px) + var(--toolbar-btn-size, 3rem) + 0.35rem)'
+                                : 'calc(4rem + env(safe-area-inset-bottom, 0px) + var(--toolbar-btn-size, 3rem) + 0.35rem)'))
                         : (widgetPos === 'bottom' ? 'calc(4.5rem)' : undefined)
                     }}
                     className={cn(
@@ -9120,10 +9278,13 @@ function App() {
                         style.left = '0';
                         style.right = '0';
                         style.margin = '0 auto';
-                        // When fullscreen, only keyboard offset. When not fullscreen, add 4rem for bottom nav bar.
-                        style.bottom = isEditorFullScreen 
-                           ? `calc(${keyboardOffset > 0 ? keyboardOffset : 0}px + 0.5rem)` 
-                           : `calc(${keyboardOffset > 0 ? keyboardOffset : 0}px + 4rem + 0.5rem)`;
+                        if (isKeyboardOpen) {
+                          style.bottom = `calc(${keyboardOffset > 0 ? keyboardOffset : 0}px + 0.5rem)`;
+                        } else if (isEditorFullScreen || isFullScreen) {
+                          style.bottom = 'calc(env(safe-area-inset-bottom, 0px) + 0.5rem)';
+                        } else {
+                          style.bottom = 'calc(4rem + env(safe-area-inset-bottom, 0px) + 0.5rem)';
+                        }
                       }
                       
                       return style;
@@ -11361,7 +11522,7 @@ function App() {
                     <div className="pt-4 space-y-3">
                       <div className="flex justify-between text-xs items-center">
                         <span className="text-slate-500">{t('version')}</span>
-                        <span className="bg-cyan-500/10 text-cyan-400 px-2 py-1 rounded-md font-mono font-bold">4.5.9</span>
+                        <span className="bg-cyan-500/10 text-cyan-400 px-2 py-1 rounded-md font-mono font-bold">4.6.0</span>
                       </div>
                       <div className="flex justify-between text-xs items-center">
                         <span className="text-slate-500">{t('license')}</span>
@@ -12309,11 +12470,11 @@ function App() {
                        <div className="w-16 h-16 bg-cyan-500/10 rounded-2xl mx-auto flex items-center justify-center text-cyan-400 font-black text-2xl shadow-xl shadow-cyan-500/10">S</div>
                        <div>
                          <h3 className="text-xl font-black tracking-tight">SteemEditor <span className="text-cyan-400">Pro</span></h3>
-                         <p className="text-[10px] text-slate-500 uppercase font-black tracking-[0.2em] pt-1">Version 4.5.9 "Quantum"</p>
+                         <p className="text-[10px] text-slate-500 uppercase font-black tracking-[0.2em] pt-1">Version 4.6.0 "Quantum"</p>
                        </div>
                        <label className="text-[10px] font-black text-slate-500 uppercase tracking-[0.2em] px-1 pt-4 block border-t border-slate-800">Changelog & Updates</label>
                         <div className="mt-2 p-3 bg-slate-950 border border-cyan-500/20 rounded-xl text-left">
-                          <p className="text-xs text-slate-300 font-medium">New in v4.5.9: Mobile Android formatting bar pinned above keyboard & viewport improvements</p>
+                          <p className="text-xs text-slate-300 font-medium">New in v4.6.0: Bidirectional Cursor & Spacing Sync & multi-line block cursor stability</p>
                         </div>
                        
                        <div className="space-y-2 max-h-60 overflow-y-auto custom-scrollbar bg-slate-900 border border-slate-800 rounded-xl p-3">
@@ -12412,7 +12573,7 @@ function App() {
                                   localStorage.setItem('steem_app_agent', e.target.value);
                                 }}
                                 className="w-full bg-slate-900 border border-slate-700 rounded-lg p-2.5 text-xs text-slate-200 outline-none focus:ring-1 focus:ring-cyan-500"
-                                placeholder="ultrasteemeditor/4.5.9"
+                                placeholder="ultrasteemeditor/4.6.0"
                               />
                             </div>
                           </motion.div>
@@ -12494,10 +12655,10 @@ function App() {
         <nav 
           className={cn(
             "lg:hidden fixed left-0 right-0 bg-slate-900 border-t border-slate-800 grid grid-cols-5 items-center px-1 z-[70] shadow-[0_-4px_20px_rgba(0,0,0,0.5)] transition-all duration-200",
-            (isKeyboardOpen && isEditorFullScreen) ? "translate-y-full opacity-0 pointer-events-none" : "translate-y-0 opacity-100"
+            (isEditorFullScreen || isFullScreen || isKeyboardOpen) ? "translate-y-full opacity-0 pointer-events-none" : "translate-y-0 opacity-100"
           )}
           style={{
-            bottom: `${(isKeyboardOpen && !isEditorFullScreen) ? keyboardOffset : 0}px`,
+            bottom: 0,
             paddingBottom: 'env(safe-area-inset-bottom, 0px)',
             height: 'calc(4rem + env(safe-area-inset-bottom, 0px))'
           }}

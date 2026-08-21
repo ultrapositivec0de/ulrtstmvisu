@@ -245,13 +245,16 @@ export function htmlToMarkdown(html: string): string {
            }
         }
 
-        if (inner.trim() === '') {
+        // eslint-disable-next-line no-control-regex
+        const textWithoutMarkers = inner.replace(/[\x01\x02]/g, '').trim();
+        if (textWithoutMarkers === '') {
            if (className.includes('table-spacer') && ((el.textContent || '').trim() === '' || el.getAttribute('data-empty') === 'true')) {
              return '';
            }
+           // Return pure newline or marker without inflating surrounding line breaks
            return inner.length > 0 ? inner : '\n';
         }
-        // We do not trim \n here because they might be from <br> tags meant to preserve spacing
+        // We wrap normal paragraph content with newlines
         return `\n${inner}\n`;
       }
       default: return inner;
@@ -266,6 +269,7 @@ export function htmlToMarkdown(html: string): string {
   return md
     .replace(/\u200B/g, '')
     .replace(/\r\n/g, '\n')
+    .replace(/\n{3,}/g, () => '\n\n')
     .replace(/(\|[^\n]+\|)(\n{3,})(\|[^\n]+\|)/g, (match, r1, nl, r2) => {
       const count = nl.length - 1;
       return `${r1}${nl.substring(0, count)}${r2}`;
