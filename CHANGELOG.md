@@ -1,4 +1,8 @@
 # Changelog
+## [2026-08-22] - Version 4.6.3 (ultrasteemeditor/4.6.3)
+### Added & Improved
+- **Release Updates**: Integrated unified automated version bump mechanism across all build targets
+
 ## [2026-08-22] - Version 4.6.2 (ultrasteemeditor/4.6.2)
 ### Added & Improved
 - **PWA Installation Experience & Guidance**: Added floating promotion banner with direct installation triggers and comprehensive step-by-step PWA setup instructions for iOS Safari, Android Chrome/Edge, and Desktop browsers.
