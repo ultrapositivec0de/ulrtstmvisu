@@ -327,6 +327,13 @@ export const translations = {
   "saveAndStart": "Зберегти і Почати",
   "skipForNow": "Пропустити (можна додати пізніше)",
   "installApp": "Встановити додаток",
+  "pwaBannerTitle": "Встановити Ultra Steem Editor",
+  "pwaBannerDesc": "Швидкий доступ з робочого столу та надійна робота офлайн",
+  "pwaHowToInstall": "Інструкція зі встановлення",
+  "pwaIosInstructions": "Натисніть кнопку «Поділитися» 📤 у нижньому меню Safari та виберіть «На початковий екран» ➕",
+  "pwaDesktopInstructions": "У рядку адреси натисніть значок ⊕ «Встановити» або відкрийте Меню браузера ➔ «Встановити додаток»",
+  "pwaAndroidInstructions": "Натисніть кнопку «Встановити» або відкрийте меню Chrome ⋮ ➔ «Додати на головний екран»",
+  "pwaDismiss": "Пізніше",
   "pwaInstallDesc": "Встановіть Steem Editor як швидкий і легкий додаток на свій пристрій з підтримкою офлайн-роботи.",
   "pwaInstalled": "Додаток успішно встановлено!",
   "pwaAlreadyInstalled": "Додаток уже встановлено",
@@ -545,6 +552,13 @@ export const translations = {
   "miniGallery": "Міні-галерея",
   "tapToInsert": "Натисніть для вставки",
   "close": "Закрити",
+  "pwaBannerInstall": "Встановити",
+  "pwaBannerDismiss": "Пізніше",
+  "pwaIosStep1": "1. Натисніть кнопку «Поділитися» 📤 у нижньому меню Safari.",
+  "pwaIosStep2": "2. Прокрутіть список вниз і виберіть «На початковий екран» ➕.",
+  "pwaAndroidStep1": "1. Натисніть меню браузера ⋮ у кутку екрана.",
+  "pwaAndroidStep2": "2. Виберіть пункт «Встановити додаток» або «Додати на головний екран».",
+  "pwaDesktopStep1": "Натисніть значок встановлення ⊕ в правому кутку адресного рядка.",
 } as const;
 
 export default { meta, translations };

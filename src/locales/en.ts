@@ -279,6 +279,13 @@ export const translations = {
   "keysCleared": "Cleared!",
   "clearApiKeys": "Clear Keys",
   "installApp": "Install App",
+  "pwaBannerTitle": "Install Ultra Steem Editor",
+  "pwaBannerDesc": "Quick access from your desktop/home screen with full offline capability",
+  "pwaHowToInstall": "How to Install",
+  "pwaIosInstructions": "Tap the Share button 📤 in Safari toolbar and choose 'Add to Home Screen' ➕",
+  "pwaDesktopInstructions": "Click the install icon ⊕ in your browser address bar or open Menu ➔ Install App",
+  "pwaAndroidInstructions": "Tap 'Install App' or open Chrome menu ⋮ ➔ 'Add to Home screen'",
+  "pwaDismiss": "Later",
   "pwaInstallDesc": "Install Steem Editor as a fast, lightweight app on your device with offline support.",
   "pwaInstalled": "App successfully installed!",
   "pwaAlreadyInstalled": "App is already installed",
@@ -499,6 +506,13 @@ export const translations = {
   "miniGallery": "Mini Gallery",
   "tapToInsert": "Tap to insert",
   "close": "Close",
+  "pwaBannerInstall": "Install",
+  "pwaBannerDismiss": "Later",
+  "pwaIosStep1": "1. Tap the Share button (square with arrow) at the top or bottom of Safari.",
+  "pwaIosStep2": "2. Scroll down and tap 'Add to Home Screen'.",
+  "pwaAndroidStep1": "1. Tap the browser menu (three dots ⋮ icon in the corner).",
+  "pwaAndroidStep2": "2. Tap 'Install app' or 'Add to Home screen'.",
+  "pwaDesktopStep1": "Click the install icon ⊕ on the right side of the address bar.",
 } as const;
 
 export default { meta, translations };

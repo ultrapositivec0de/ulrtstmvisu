@@ -263,6 +263,13 @@ export const translations = {
   "keysCleared": "API 키가 삭제되었습니다!",
   "clearApiKeys": "API 키 삭제",
   "installApp": "앱 설치",
+  "pwaBannerTitle": "Ultra Steem Editor 설치",
+  "pwaBannerDesc": "홈 화면 바로가기 및 완벽한 오프라인 작성 지원",
+  "pwaHowToInstall": "설치 방법",
+  "pwaIosInstructions": "Safari 하단 도구 모음에서 공유 📤 버튼을 누르고 '홈 화면에 추가' ➕를 선택하세요",
+  "pwaDesktopInstructions": "브라우저 주소창에서 설치 ⊕ 아이콘을 클릭하거나 메뉴 ➔ '앱 설치'를 클릭하세요",
+  "pwaAndroidInstructions": "'앱 설치'를 누르거나 Chrome 메뉴 ⋮ ➔ '홈 화면에 추가'를 선택하세요",
+  "pwaDismiss": "나중에",
   "pwaInstallDesc": "오프라인 지원을 제공하는 빠르고 가벼운 앱으로 Steem Editor를 기기에 설치하세요.",
   "pwaInstalled": "앱이 성공적으로 설치되었습니다!",
   "pwaAlreadyInstalled": "앱이 이미 설치되어 있습니다",
@@ -482,6 +489,13 @@ export const translations = {
   "miniGallery": "미니 갤러리",
   "tapToInsert": "탭하여 커서에 삽입",
   "close": "닫기",
+  "pwaBannerInstall": "설치",
+  "pwaBannerDismiss": "나중에",
+  "pwaIosStep1": "1. Safari 상단 또는 하단의 공유 버튼(위쪽 화살표 사각형)을 누릅니다.",
+  "pwaIosStep2": "2. 아래로 스크롤하여 '홈 화면에 추가'를 선택합니다.",
+  "pwaAndroidStep1": "1. 브라우저 메뉴(우측 상단 ⋮ 아이콘)를 누릅니다.",
+  "pwaAndroidStep2": "2. '앱 설치' 또는 '홈 화면에 추가'를 선택합니다.",
+  "pwaDesktopStep1": "주소창 오른쪽의 설치 아이콘 ⊕을 클릭합니다.",
 } as const;
 
 export default { meta, translations };

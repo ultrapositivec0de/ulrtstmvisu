@@ -915,6 +915,7 @@ function App() {
   const previewRef = useRef<HTMLDivElement>(null);
 
   const isTauriEnv = () => typeof window !== 'undefined' && (!!(window as any).__TAURI_INTERNALS__ || !!(window as any).__TAURI__);
+  const isNeutralinoEnv = () => typeof window !== 'undefined' && ('Neutralino' in window || !!(window as any).Neutralino);
 
   const toggleFullScreen = () => {
     setIsFullScreen(prev => {
@@ -923,6 +924,19 @@ function App() {
         import('@tauri-apps/api/window').then(({ getCurrentWindow }) => {
           getCurrentWindow().setFullscreen(next).catch(() => {});
         }).catch(() => {});
+      } else if (isNeutralinoEnv()) {
+        try {
+          const neu = (window as any).Neutralino;
+          if (neu?.window) {
+            if (next) {
+              neu.window.setFullScreen().catch(() => {});
+            } else {
+              neu.window.exitFullScreen().catch(() => {});
+            }
+          }
+        } catch (e) {
+          console.warn('[Neutralino Fullscreen error]', e);
+        }
       } else {
         // Only in standard web browser / PWA use HTML5 Fullscreen
         if (next) {
@@ -940,32 +954,14 @@ function App() {
   };
 
   const toggleEditorFullScreen = () => {
-    setIsEditorFullScreen(prev => {
-      const next = !prev;
-      if (isTauriEnv()) {
-        import('@tauri-apps/api/window').then(({ getCurrentWindow }) => {
-          getCurrentWindow().setFullscreen(next).catch(() => {});
-        }).catch(() => {});
-      } else {
-        // Only in standard web browser / PWA use HTML5 Fullscreen
-        if (next) {
-          if (!document.fullscreenElement && document.documentElement.requestFullscreen) {
-            document.documentElement.requestFullscreen().catch(() => {});
-          }
-        } else {
-          if (document.fullscreenElement && document.exitFullscreen) {
-            document.exitFullscreen().catch(() => {});
-          }
-        }
-      }
-      return next;
-    });
+    // Pure in-app distraction-free editor mode: toggle internal state without interfering with OS window
+    setIsEditorFullScreen(prev => !prev);
   };
 
   useEffect(() => {
     // Only listen to HTML5 fullscreen changes in pure web mode
     const handleFullscreenChange = () => {
-      if (isTauriEnv()) return; // Do not let webkit HTML5 events interfere with Tauri native window state
+      if (isTauriEnv() || isNeutralinoEnv()) return; // Do not let webkit HTML5 events interfere with native desktop window state
       const isNativeFs = !!(
         document.fullscreenElement ||
         (document as any).webkitFullscreenElement ||
@@ -974,7 +970,7 @@ function App() {
       );
       if (!isNativeFs) {
         setIsFullScreen(false);
-        setIsEditorFullScreen(false);
+        // Do not arbitrarily close in-app editor fullscreen
       }
     };
 
@@ -1000,12 +996,14 @@ function App() {
       if (e.key === 'F11') {
         e.preventDefault();
         const isTauri = isTauriEnv();
+        const isNeu = isNeutralinoEnv();
         
-        if (isEditorFullScreen || isFullScreen) {
-          setIsEditorFullScreen(false);
+        if (isFullScreen) {
           setIsFullScreen(false);
           if (isTauri) {
              import('@tauri-apps/api/window').then(({ getCurrentWindow }) => getCurrentWindow().setFullscreen(false).catch(() => {}));
+          } else if (isNeu) {
+             try { (window as any).Neutralino?.window?.exitFullScreen().catch(() => {}); } catch { /* ignore neutralino error */ }
           } else if (document.fullscreenElement && document.exitFullscreen) {
             document.exitFullscreen().catch(() => {});
           }
@@ -1013,6 +1011,8 @@ function App() {
           setIsFullScreen(true);
           if (isTauri) {
              import('@tauri-apps/api/window').then(({ getCurrentWindow }) => getCurrentWindow().setFullscreen(true).catch(() => {}));
+          } else if (isNeu) {
+             try { (window as any).Neutralino?.window?.setFullScreen().catch(() => {}); } catch { /* ignore neutralino error */ }
           } else if (!document.fullscreenElement && document.documentElement.requestFullscreen) {
             document.documentElement.requestFullscreen().catch(() => {});
           }
@@ -1034,21 +1034,16 @@ function App() {
           return;
         }
         
-        const isTauri = isTauriEnv();
-        
         if (isEditorFullScreen) {
           setIsEditorFullScreen(false);
-          if (isTauri) {
-             import('@tauri-apps/api/window').then(({ getCurrentWindow }) => getCurrentWindow().setFullscreen(false).catch(() => {}));
-          } else if (document.fullscreenElement && document.exitFullscreen) {
-            document.exitFullscreen().catch(() => {});
-          }
           return;
         }
         if (isFullScreen) {
           setIsFullScreen(false);
-          if (isTauri) {
+          if (isTauriEnv()) {
              import('@tauri-apps/api/window').then(({ getCurrentWindow }) => getCurrentWindow().setFullscreen(false).catch(() => {}));
+          } else if (isNeutralinoEnv()) {
+             try { (window as any).Neutralino?.window?.exitFullScreen().catch(() => {}); } catch { /* ignore neutralino error */ }
           } else if (document.fullscreenElement && document.exitFullscreen) {
             document.exitFullscreen().catch(() => {});
           }
@@ -1819,15 +1814,31 @@ function App() {
 
   // --- PWA States ---
   const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
-  const [isPwaInstallable, setIsPwaInstallable] = useState(false);
   const [isPwaInstalled, setIsPwaInstalled] = useState(() => {
     if (typeof window !== 'undefined') {
       return window.matchMedia('(display-mode: standalone)').matches || (navigator as any).standalone === true;
     }
     return false;
   });
+  const [showPwaBanner, setShowPwaBanner] = useState(() => {
+    try {
+      return localStorage.getItem('steem_pwa_banner_dismissed') !== 'true';
+    } catch {
+      return true;
+    }
+  });
+  const [showPwaInstructionsModal, setShowPwaInstructionsModal] = useState(false);
 
   useEffect(() => {
+    // Check standalone mode dynamically
+    const checkStandalone = () => {
+      const isStandalone = window.matchMedia('(display-mode: standalone)').matches || (navigator as any).standalone === true;
+      if (isStandalone) {
+        setIsPwaInstalled(true);
+      }
+    };
+    checkStandalone();
+
     // Register Service Worker
     if (typeof window !== 'undefined' && 'serviceWorker' in navigator) {
       navigator.serviceWorker.register('/sw.js')
@@ -1842,13 +1853,12 @@ function App() {
     const handleBeforeInstallPrompt = (e: Event) => {
       e.preventDefault();
       setDeferredPrompt(e);
-      setIsPwaInstallable(true);
     };
 
     const handleAppInstalled = () => {
       setIsPwaInstalled(true);
-      setIsPwaInstallable(false);
       setDeferredPrompt(null);
+      setShowPwaBanner(false);
       notify(t('pwaInstalled'), 'success');
     };
 
@@ -1866,7 +1876,7 @@ function App() {
       if (isPwaInstalled) {
         notify(t('pwaAlreadyInstalled'), 'success');
       } else {
-        notify(t('pwaInstallFailed'), 'error');
+        setShowPwaInstructionsModal(true);
       }
       return;
     }
@@ -1876,12 +1886,12 @@ function App() {
       console.log(`PWA installation user outcome: ${outcome}`);
       if (outcome === 'accepted') {
         setIsPwaInstalled(true);
-        setIsPwaInstallable(false);
         setDeferredPrompt(null);
+        setShowPwaBanner(false);
       }
     } catch (err) {
       console.error('Failed to trigger PWA installation:', err);
-      notify(t('pwaInstallFailed'), 'error');
+      setShowPwaInstructionsModal(true);
     }
   };
   const [isUnlocked, setIsUnlocked] = useState(!SecurityService.isLocked());
@@ -3260,20 +3270,9 @@ function App() {
       }
 
       if (range && wysiwygRef.current) {
-        // Create a temporary clone to safely insert marker elements
+        // Create an exact temporary clone to insert marker elements BEFORE any modifications
         const clonedWysiwyg = wysiwygRef.current.cloneNode(true) as HTMLElement;
 
-        // Clean any auxiliary elements or indicators from the clone before inserting markers
-        clonedWysiwyg.querySelectorAll('.table-controls, .col-resizer, .row-resizer, [data-ignore-sync]').forEach(el => el.remove());
-        
-        clonedWysiwyg.querySelectorAll('.table-spacer, [data-placeholder]').forEach(spacer => {
-          if ((spacer.textContent || '').trim() === '' && (!spacer.children.length || (spacer.children.length === 1 && spacer.firstElementChild?.tagName === 'BR'))) {
-            spacer.className = '';
-            spacer.removeAttribute('data-placeholder');
-            spacer.removeAttribute('data-empty');
-          }
-        });
-        
         const pathStart = getNodePath(wysiwygRef.current, range.startContainer);
         const pathEnd = getNodePath(wysiwygRef.current, range.endContainer);
         
@@ -3308,6 +3307,17 @@ function App() {
                   }
               }
               
+              // Clean any auxiliary elements or indicators from the clone ONLY after markers are securely inserted
+              clonedWysiwyg.querySelectorAll('.table-controls, .col-resizer, .row-resizer, [data-ignore-sync]').forEach(el => el.remove());
+              
+              clonedWysiwyg.querySelectorAll('.table-spacer, [data-placeholder]').forEach(spacer => {
+                if ((spacer.textContent || '').trim() === '' && (!spacer.children.length || (spacer.children.length === 1 && spacer.firstElementChild?.tagName === 'BR'))) {
+                  spacer.className = '';
+                  spacer.removeAttribute('data-placeholder');
+                  spacer.removeAttribute('data-empty');
+                }
+              });
+
               const htmlWithMarkers = clonedWysiwyg.innerHTML;
               const rawMd = htmlToMarkdown(htmlWithMarkers);
               
@@ -3466,10 +3476,11 @@ function App() {
       }
       setEditorMode('markdown');
 
-      setTimeout(() => {
-        restoreMarkdownCursorAndScroll();
-        saveCursorPosition();
-      }, 60);
+      requestAnimationFrame(() => {
+        setTimeout(() => {
+          restoreMarkdownCursorAndScroll();
+        }, 50);
+      });
     }
   }, [editorMode, saveCursorPosition, syncCursorMarkdownToVisual, syncCursorVisualToMarkdown, saveVisualSelection, setContent, restoreMarkdownCursorAndScroll]);
 
@@ -8007,12 +8018,12 @@ function App() {
 
           {activeView === 'editor' && (
             <div className="flex items-center gap-1 bg-slate-800/30 p-1 rounded-xl border border-slate-700/30 shrink-0">
-               {isPwaInstallable && !isPwaInstalled && (
+               {!isPwaInstalled && !isTauriEnv() && !isNeutralinoEnv() && (
                  <IconButton 
                    icon={Download} 
                    onClick={handleInstallPwa} 
                    title={t('installApp')} 
-                   className="shrink-0 size-8 flex text-cyan-400 bg-cyan-950/20 border border-cyan-800/30" 
+                   className="shrink-0 size-8 flex text-cyan-400 bg-cyan-950/40 border border-cyan-800/40 hover:bg-cyan-900/60" 
                  />
                )}
                <IconButton icon={ShieldUserIcon} onClick={() => setActiveModal('keys')} title={t('keys')} className="shrink-0 size-8 flex" />
@@ -12701,19 +12712,21 @@ function App() {
                             {t('pwaAlreadyInstalled')}
                           </div>
                         ) : (
-                          <button
-                            onClick={handleInstallPwa}
-                            disabled={!isPwaInstallable}
-                            className={cn(
-                              "w-full py-3 px-4 rounded-xl font-black text-xs uppercase tracking-wider transition-all flex items-center justify-center gap-2 shadow-lg",
-                              isPwaInstallable
-                                ? "bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-white shadow-cyan-500/20 active:scale-95"
-                                : "bg-slate-800 text-slate-500 cursor-not-allowed border border-slate-700/50"
-                            )}
-                          >
-                            <Download size={16} />
-                            {t('installApp')}
-                          </button>
+                          <div className="space-y-3">
+                            <button
+                              onClick={handleInstallPwa}
+                              className="w-full py-3 px-4 rounded-xl font-black text-xs uppercase tracking-wider transition-all flex items-center justify-center gap-2 shadow-lg bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-white shadow-cyan-500/20 active:scale-95 cursor-pointer"
+                            >
+                              <Download size={16} />
+                              {t('installApp')}
+                            </button>
+                            <button
+                              onClick={() => setShowPwaInstructionsModal(true)}
+                              className="w-full py-2 px-3 rounded-lg font-bold text-[11px] text-slate-400 hover:text-cyan-400 bg-slate-950 border border-slate-800/80 transition-colors cursor-pointer"
+                            >
+                              {t('pwaHowToInstall') || "Інструкція зі встановлення"}
+                            </button>
+                          </div>
                         )}
                       </div>
                     </div>
@@ -12747,6 +12760,132 @@ function App() {
               </div>
             </motion.div>
           )}
+      </AnimatePresence>
+
+      {/* Floating PWA Promotion Banner */}
+      <AnimatePresence>
+        {showPwaBanner && !isPwaInstalled && !isTauriEnv() && !isNeutralinoEnv() && !isEditorFullScreen && !isFullScreen && (
+          <motion.div
+            initial={{ opacity: 0, y: 50 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: 50 }}
+            className="fixed bottom-20 lg:bottom-6 left-4 right-4 lg:left-auto lg:right-6 z-[65] max-w-sm"
+          >
+            <div className="p-4 bg-slate-900/95 backdrop-blur-md border border-cyan-500/30 rounded-2xl shadow-2xl shadow-cyan-950/50 flex flex-col gap-3">
+              <div className="flex items-start gap-3">
+                <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-cyan-500 to-blue-600 flex items-center justify-center text-white font-black text-lg shrink-0 shadow-md shadow-cyan-500/20">
+                  S
+                </div>
+                <div className="flex-1 min-w-0">
+                  <h4 className="text-xs font-bold text-white leading-tight">{t('pwaBannerTitle') || "Встановити Steem Editor"}</h4>
+                  <p className="text-[11px] text-slate-400 mt-0.5 leading-snug">{t('pwaBannerDesc') || "Швидкий запуск з робочого столу та підтримка офлайн"}</p>
+                </div>
+                <button
+                  onClick={() => {
+                    setShowPwaBanner(false);
+                    try { localStorage.setItem('steem_pwa_banner_dismissed', 'true'); } catch { /* ignore storage error */ }
+                  }}
+                  className="text-slate-500 hover:text-slate-300 p-1 -mr-1 -mt-1 transition-colors"
+                  title={t('pwaBannerDismiss') || "Закрити"}
+                >
+                  <X size={16} />
+                </button>
+              </div>
+              <div className="flex items-center gap-2 pt-1">
+                <button
+                  onClick={handleInstallPwa}
+                  className="flex-1 py-2 px-3 bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-white text-xs font-black uppercase tracking-wider rounded-xl shadow-md shadow-cyan-500/20 active:scale-95 transition-all flex items-center justify-center gap-1.5"
+                >
+                  <Download size={14} />
+                  {t('pwaBannerInstall') || "Встановити"}
+                </button>
+                <button
+                  onClick={() => {
+                    setShowPwaBanner(false);
+                    try { localStorage.setItem('steem_pwa_banner_dismissed', 'true'); } catch { /* ignore storage error */ }
+                  }}
+                  className="py-2 px-3 bg-slate-800/80 hover:bg-slate-800 text-slate-300 text-xs font-bold rounded-xl transition-colors"
+                >
+                  {t('pwaBannerDismiss') || "Пізніше"}
+                </button>
+              </div>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* PWA Step-by-Step Installation Instructions Modal */}
+      <AnimatePresence>
+        {showPwaInstructionsModal && (
+          <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setShowPwaInstructionsModal(false)}
+              className="absolute inset-0 bg-black/80 backdrop-blur-sm"
+            />
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 20 }}
+              className="relative w-full max-w-md bg-slate-900 border border-slate-800 rounded-3xl p-6 shadow-2xl z-10 overflow-hidden space-y-5"
+            >
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 bg-cyan-500/10 border border-cyan-500/30 rounded-xl flex items-center justify-center text-cyan-400">
+                    <Download size={20} />
+                  </div>
+                  <div>
+                    <h3 className="text-base font-bold text-white">{t('pwaHowToInstall') || "Як встановити додаток (PWA)"}</h3>
+                    <p className="text-xs text-slate-400">{t('pwaPlatformSupport') || "Інструкції для всіх пристроїв"}</p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => setShowPwaInstructionsModal(false)}
+                  className="w-8 h-8 rounded-full bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white flex items-center justify-center transition-colors"
+                >
+                  <X size={16} />
+                </button>
+              </div>
+
+              <div className="space-y-3.5 text-xs text-slate-300">
+                {/* iOS / Safari */}
+                <div className="p-3.5 bg-slate-950/70 rounded-2xl border border-slate-800/80 space-y-1.5">
+                  <div className="font-bold text-cyan-400 flex items-center gap-1.5">
+                    <span>📱 Apple iOS / Safari</span>
+                  </div>
+                  <p className="text-slate-400 pl-1">{t('pwaIosStep1') || "1. Натисніть кнопку 'Поділитися' (іконка зі стрілкою вгору) внизу або вгорі Safari."}</p>
+                  <p className="text-slate-400 pl-1">{t('pwaIosStep2') || "2. Прокрутіть список вниз і виберіть 'На екран «Додому»'."}</p>
+                </div>
+
+                {/* Android / Chrome */}
+                <div className="p-3.5 bg-slate-950/70 rounded-2xl border border-slate-800/80 space-y-1.5">
+                  <div className="font-bold text-cyan-400 flex items-center gap-1.5">
+                    <span>🤖 Android / Chrome / Edge</span>
+                  </div>
+                  <p className="text-slate-400 pl-1">{t('pwaAndroidStep1') || "1. Натисніть меню браузера (іконка трьох крапок ⋮ у кутку)."}</p>
+                  <p className="text-slate-400 pl-1">{t('pwaAndroidStep2') || "2. Виберіть пункт 'Встановити додаток' або 'Додати на головний екран'."}</p>
+                </div>
+
+                {/* Desktop */}
+                <div className="p-3.5 bg-slate-950/70 rounded-2xl border border-slate-800/80 space-y-1.5">
+                  <div className="font-bold text-cyan-400 flex items-center gap-1.5">
+                    <span>💻 Комп'ютер (Chrome / Edge / Brave)</span>
+                  </div>
+                  <p className="text-slate-400 pl-1">{t('pwaDesktopStep1') || "Натисніть значок встановлення ⊕ в правому кутку адресного рядка браузера."}</p>
+                </div>
+              </div>
+
+              <button
+                onClick={() => setShowPwaInstructionsModal(false)}
+                className="w-full py-2.5 bg-slate-800 hover:bg-slate-700 text-white font-bold text-xs rounded-xl transition-colors"
+              >
+                {t('close') || "Зрозуміло"}
+              </button>
+            </motion.div>
+          </div>
+        )}
       </AnimatePresence>
 
       {/* Mobile Bottom Navigation */}

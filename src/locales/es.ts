@@ -263,6 +263,13 @@ export const translations = {
   "keysCleared": "¡Claves limpias!",
   "clearApiKeys": "Limpiar claves API",
   "installApp": "Instalar App",
+  "pwaBannerTitle": "Instalar Ultra Steem Editor",
+  "pwaBannerDesc": "Acceso rápido desde tu pantalla de inicio y trabajo sin conexión",
+  "pwaHowToInstall": "Cómo instalar",
+  "pwaIosInstructions": "Toca el botón Compartir 📤 en Safari y selecciona 'Añadir a pantalla de inicio' ➕",
+  "pwaDesktopInstructions": "Haz clic en el icono de instalación ⊕ en la barra del navegador o en Menú ➔ Instalar app",
+  "pwaAndroidInstructions": "Toca 'Instalar' o abre el menú de Chrome ⋮ ➔ 'Añadir a pantalla principal'",
+  "pwaDismiss": "Más tarde",
   "pwaInstallDesc": "Instale Steem Editor como una aplicación rápida y ligera en su dispositivo con soporte sin conexión.",
   "pwaInstalled": "¡Aplicación instalada con éxito!",
   "pwaAlreadyInstalled": "La aplicación ya está instalada",
@@ -482,6 +489,13 @@ export const translations = {
   "miniGallery": "Mini Galería",
   "tapToInsert": "Toca para insertar",
   "close": "Cerrar",
+  "pwaBannerInstall": "Instalar",
+  "pwaBannerDismiss": "Más tarde",
+  "pwaIosStep1": "1. Pulsa el botón Compartir (cuadrado con flecha) en Safari.",
+  "pwaIosStep2": "2. Desplázate hacia abajo y selecciona 'Añadir a pantalla de inicio'.",
+  "pwaAndroidStep1": "1. Pulsa el menú del navegador (tres puntos ⋮ en la esquina).",
+  "pwaAndroidStep2": "2. Selecciona 'Instalar aplicación' o 'Añadir a la pantalla de inicio'.",
+  "pwaDesktopStep1": "Haz clic en el icono de instalación ⊕ en la barra de direcciones.",
 } as const;
 
 export default { meta, translations };

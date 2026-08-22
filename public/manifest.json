@@ -1,8 +1,10 @@
 {
-  "name": "Steem Editor Pro",
-  "short_name": "Steem Editor",
+  "name": "Ultra Steem Editor",
+  "short_name": "Ultra Steem",
   "description": "Професійний редактор для Steem з підтримкою Markdown та галереєю",
+  "id": "/",
   "start_url": "/",
+  "scope": "/",
   "display": "standalone",
   "background_color": "#020617",
   "theme_color": "#06b6d4",
