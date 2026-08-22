@@ -2,7 +2,7 @@ import type { LocaleMeta, LocaleModule } from './types';
 import { translations as ukTranslations, meta as ukMeta } from './uk';
 
 // Vite eager glob imports all language files in the folder (excluding index and types)
-const modules = import.meta.glob<LocaleModule>(['./*.ts', '!./index.ts', '!./types.ts'], { eager: true });
+const modules = ((import.meta as any).glob?.(['./*.ts', '!./index.ts', '!./types.ts'], { eager: true }) || {}) as Record<string, LocaleModule>;
 
 export const translations: Record<string, Record<string, string>> = {};
 export const AVAILABLE_LANGUAGES: LocaleMeta[] = [];
