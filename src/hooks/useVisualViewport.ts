@@ -80,22 +80,24 @@ export function useVisualViewport(): VisualViewportState {
       document.documentElement.style.setProperty('--viewport-bottom-offset', `${effectiveKeyboardOffset}px`);
     }
 
-    // When virtual keyboard collapses, prevent viewport displacement anomalies
-    if (wasKeyboardOpenRef.current && !isKeyboardOpen) {
-      if (resetScrollTimerRef.current) clearTimeout(resetScrollTimerRef.current);
-      
-      const resetScrollOffsets = () => {
-        if (window.scrollY !== 0 || window.scrollX !== 0) {
-          window.scrollTo({ top: 0, left: 0, behavior: 'instant' as ScrollBehavior });
-        }
-        if (document.documentElement && document.documentElement.scrollTop !== 0) {
-          document.documentElement.scrollTop = 0;
-        }
-        if (document.body && document.body.scrollTop !== 0) {
-          document.body.scrollTop = 0;
-        }
-      };
+    // When virtual keyboard is open or collapsing, prevent layout viewport displacement anomalies (header shifting)
+    const resetScrollOffsets = () => {
+      if (typeof window === 'undefined') return;
+      if (window.scrollY !== 0 || window.scrollX !== 0) {
+        window.scrollTo({ top: 0, left: 0, behavior: 'instant' as ScrollBehavior });
+      }
+      if (document.documentElement && document.documentElement.scrollTop !== 0) {
+        document.documentElement.scrollTop = 0;
+      }
+      if (document.body && document.body.scrollTop !== 0) {
+        document.body.scrollTop = 0;
+      }
+    };
 
+    if (isInputFocused || isKeyboardOpen) {
+      resetScrollOffsets();
+    } else if (wasKeyboardOpenRef.current && !isKeyboardOpen) {
+      if (resetScrollTimerRef.current) clearTimeout(resetScrollTimerRef.current);
       resetScrollOffsets();
       resetScrollTimerRef.current = setTimeout(resetScrollOffsets, 120);
     }

@@ -1,4 +1,10 @@
 # Changelog
+## [2026-08-22] - Version 4.6.1 (ultrasteemeditor/4.6.1)
+### Added & Improved
+- **Production Cursor Synchronization & Unclosed Tag Stability**: Hardened markdown-to-visual cursor restoration across production builds and WebView environments. Optimized zero-width sentinel tracking and positional distance scoring to seamlessly handle unclosed formatting tags (`**`, `__`, `*`) amidst repetitive blocks.
+- **Android Viewport & Floating Toolbar Clearance**: Expanded bottom scrolling padding in mobile visual and code modes to ensure continuous typing visibility without obstruction from the floating formatting widget.
+- **Cross-Platform Version Synchronization**: Synchronized application version to `4.6.1` across Web, Tauri, Neutralino, and Steem blockchain broadcasting metadata.
+
 ## [2026-08-20] - Version 4.6.0 (ultrasteemeditor/4.6.0)
 ### Added & Improved
 - **Bidirectional Cursor & Spacing Synchronization**: Fixed multi-line formatting offset calculations so that the caret retains its precise line and character position within continuous styled blocks (`**1**`, `**2**`, `**3**`) during Visual ↔ Markdown mode toggles without jumping to the top of the block.

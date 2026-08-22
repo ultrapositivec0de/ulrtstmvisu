@@ -218,6 +218,15 @@ const IconButton = ({
 
 const APP_CHANGELOG = [
   {
+    version: "v4.6.1",
+    date: "2026-08-22",
+    changes: [
+      "Production Cursor Sync & Tag Stability: Hardened markdown-to-visual cursor restoration across production builds and WebViews. Optimized zero-width sentinel tracking and positional distance scoring to seamlessly handle unclosed formatting tags (**1**, **2**) amidst repetitive blocks.",
+      "Android Viewport & Toolbar Clearance: Expanded bottom scrolling padding in mobile visual and code modes to ensure continuous typing visibility above the floating widget.",
+      "Cross-Platform Release Sync: Synchronized application version to v4.6.1 across Web, Tauri, Neutralino, and Steem blockchain broadcasting metadata."
+    ]
+  },
+  {
     version: "v4.6.0",
     date: "2026-08-20",
     changes: [
@@ -1630,7 +1639,7 @@ function App() {
   const [pubTitle, setPubTitle] = useState('');
   const [removeTitleLine, setRemoveTitleLine] = useState(() => localStorage.getItem('steem_remove_title_line') !== 'false');
   const [pubTags, setPubTags] = useState('');
-  const [appAgent, setAppAgent] = useState(localStorage.getItem('steem_app_agent') || 'ultrasteemeditor/4.6.0');
+  const [appAgent, setAppAgent] = useState(localStorage.getItem('steem_app_agent') || 'ultrasteemeditor/4.6.1');
   const [rewardType, setRewardType] = useState<'SP' | '50' | '0'>( (localStorage.getItem('steem_reward_type') as any) || '50');
   const [beneficiaries, setBeneficiaries] = useState<{account: string, weight: number}[]>([]);
   const [benName, setBenName] = useState('');
@@ -2550,38 +2559,36 @@ function App() {
     const prefixMatch = rawLine.match(/^(#{1,6}\s+|[-*+]\s+(\[[ xX]\]\s+)?|\d+\.\s+|>\s*)/);
     const prefixLen = prefixMatch ? prefixMatch[0].length : 0;
     
+    const stripPairedMarkdown = (str: string): string => {
+      return str
+        .replace(/(\*\*\*|___)(.*?)\1/g, '$2')
+        .replace(/(\*\*|__)(.*?)\1/g, '$2')
+        .replace(/(\*|_)(.*?)\1/g, '$2')
+        .replace(/(~~)(.*?)\1/g, '$2')
+        .replace(/(`)(.*?)\1/g, '$2')
+        .replace(/\[([^\]]*)\]\([^)]*\)/g, '$1')
+        .replace(/\[([^\]]*)\]\(.*$/g, '$1')
+        .replace(/[[\]]/g, '')
+        .replace(/!\[([^\]]*)\]\([^)]*\)/g, '$1')
+        .replace(/<[/]?[^>]+>/g, '');
+    };
+
     // Calculate exact offset within the multi-line paragraph block in DOM
     let targetOffsetInBlock = 0;
     for (let l = blockStartLine; l < lineIdx; l++) {
       const curL = lines[l];
       const pMatch = curL.match(/^(#{1,6}\s+|[-*+]\s+(\[[ xX]\]\s+)?|\d+\.\s+|>\s*)/);
       const pLen = pMatch ? pMatch[0].length : 0;
-      const strippedL = curL.substring(pLen)
-        .replace(/\[([^\]]*)\]\([^)]*\)/g, '$1')
-        .replace(/\[([^\]]*)\]\(.*$/g, '$1')
-        .replace(/[[\]]/g, '')
-        .replace(/!\[([^\]]*)\]\([^)]*\)/g, '$1')
-        .replace(/(\*\*|__|\*|_|~~|`)/g, '')
-        .replace(/<[/]?[^>]+>/g, '');
+      const strippedL = stripPairedMarkdown(curL.substring(pLen));
       targetOffsetInBlock += strippedL.length + 1; // +1 for the <br> or soft line break
     }
 
     const rawBeforeCursor = rawLine.substring(prefixLen, colIdx);
-    const inLineOffset = rawBeforeCursor
-      .replace(/\[([^\]]*)\]\([^)]*\)/g, '$1')
-      .replace(/\[([^\]]*)\]\(.*$/g, '$1')
-      .replace(/[[\]]/g, '')
-      .replace(/!\[([^\]]*)\]\([^)]*\)/g, '$1')
-      .replace(/(\*\*|__|\*|_|~~|`)/g, '')
-      .replace(/<[/]?[^>]+>/g, '').length;
+    const inLineOffset = stripPairedMarkdown(rawBeforeCursor).length;
 
     targetOffsetInBlock += inLineOffset;
     
-    const cleanLineText = rawLine.substring(prefixLen)
-      .replace(/(\*\*|__|\*|_|~~|`)/g, '')
-      .replace(/\[([^\]]*)\]\([^)]*\)/g, '$1')
-      .replace(/<[/]?[^>]+>/g, '')
-      .trim();
+    const cleanLineText = stripPairedMarkdown(rawLine.substring(prefixLen)).trim();
     
     const blocks = Array.from(container.querySelectorAll('h1, h2, h3, h4, h5, h6, li, p, blockquote, td, th, pre'));
     if (blocks.length === 0) {
@@ -2615,7 +2622,10 @@ function App() {
       blocks.forEach((b, idx) => {
         const bText = (b.textContent || '').trim();
         if (bText && (bText.includes(cleanLineText) || cleanLineText.includes(bText))) {
-          const score = Math.abs(idx - idealIdx);
+          // Weighted score: heavily prioritize position proximity to avoid false positives with repetitive tags
+          const posDiff = Math.abs(idx - idealIdx);
+          const lenDiff = Math.abs(bText.length - cleanLineText.length);
+          const score = (posDiff * 10) + lenDiff;
           candidates.push({ block: b, index: idx, score });
         }
       });
@@ -2682,112 +2692,168 @@ function App() {
       }
       
       const m = getMarked();
-      const processed = processContentForSteem(textContent);
-      if (m) {
-        let rawHtml = await m.parse(processed);
-        
-        const tempDiv = document.createElement('div');
-        tempDiv.innerHTML = rawHtml;
+      if (!m) return;
 
-        // Convert inline-intended divs back to spans for the visual editor
-        tempDiv.querySelectorAll('div.phishy, div.text-blue, div.text-green').forEach(div => {
-           const span = document.createElement('span');
-           span.className = div.className;
-           span.innerHTML = div.innerHTML;
-           if (div.parentNode) div.parentNode.replaceChild(span, div);
-        });
+      const MARKER_START = '\uE000';
+      const MARKER_END = '\uE001';
+      let textWithMarkers = textContent;
 
-        // Normalize any loose paragraphs inside list items
-        tempDiv.querySelectorAll('li > p:only-child').forEach(p => {
-           const parent = p.parentNode;
-           if (parent) {
-              while (p.firstChild) {
-                 parent.insertBefore(p.firstChild, p);
-              }
-              parent.removeChild(p);
-           }
-        });
+      if (pos) {
+        const safeStart = Math.max(0, Math.min(pos.start, textContent.length));
+        const safeEnd = Math.max(0, Math.min(pos.end, textContent.length));
+        if (safeStart === safeEnd) {
+          textWithMarkers = textContent.slice(0, safeStart) + MARKER_START + textContent.slice(safeStart);
+        } else {
+          const first = Math.min(safeStart, safeEnd);
+          const second = Math.max(safeStart, safeEnd);
+          textWithMarkers = textContent.slice(0, first) + MARKER_START + textContent.slice(first, second) + MARKER_END + textContent.slice(second);
+        }
+      }
 
-        // Normalize bare <br> tags at root level into paragraphs
-        Array.from(tempDiv.childNodes).forEach(node => {
-           if (node.nodeType === Node.ELEMENT_NODE && (node as HTMLElement).tagName === 'BR') {
-              const p = document.createElement('p');
-              p.innerHTML = '<br>';
-              tempDiv.replaceChild(p, node);
-           }
-        });
+      const processed = processContentForSteem(textWithMarkers);
+      let rawHtml = await m.parse(processed);
+      
+      const tempDiv = document.createElement('div');
+      tempDiv.innerHTML = rawHtml;
 
-        // Clean up formatting whitespace text nodes inside lists and tables so they do not create phantom gaps
-        tempDiv.querySelectorAll('ul, ol, table, thead, tbody, tr').forEach(parent => {
-          Array.from(parent.childNodes).forEach(child => {
-            if (child.nodeType === Node.TEXT_NODE && !child.nodeValue?.trim()) {
-              parent.removeChild(child);
+      // Convert inline-intended divs back to spans for the visual editor
+      tempDiv.querySelectorAll('div.phishy, div.text-blue, div.text-green').forEach(div => {
+         const span = document.createElement('span');
+         span.className = div.className;
+         span.innerHTML = div.innerHTML;
+         if (div.parentNode) div.parentNode.replaceChild(span, div);
+      });
+
+      // Normalize any loose paragraphs inside list items
+      tempDiv.querySelectorAll('li > p:only-child').forEach(p => {
+         const parent = p.parentNode;
+         if (parent) {
+            while (p.firstChild) {
+               parent.insertBefore(p.firstChild, p);
             }
-          });
-        });
-        
-        const blockTags = ['TABLE'];
+            parent.removeChild(p);
+         }
+      });
 
-        // Clean up any orphan or non-boundary spacers
-        tempDiv.querySelectorAll('.table-spacer, [data-placeholder], [data-empty]').forEach((spacerEl) => {
-           const isTop = spacerEl === tempDiv.firstElementChild && spacerEl.classList.contains('top-spacer');
-           const isBottom = spacerEl === tempDiv.lastElementChild && spacerEl.classList.contains('bottom-spacer');
-           const text = spacerEl.textContent || '';
-           const hasContent = text.trim() !== '' || spacerEl.children.length > 1 || (spacerEl.children.length === 1 && spacerEl.firstElementChild?.tagName !== 'BR');
-           if (!isTop && !isBottom) {
-              spacerEl.removeAttribute('data-empty');
-              spacerEl.removeAttribute('data-placeholder');
-              spacerEl.classList.remove('table-spacer', 'top-spacer', 'bottom-spacer');
-           } else if (hasContent) {
-              spacerEl.removeAttribute('data-empty');
-              spacerEl.removeAttribute('data-placeholder');
-              spacerEl.classList.remove('table-spacer', 'top-spacer', 'bottom-spacer');
-           }
-        });
+      // Normalize bare <br> tags at root level into paragraphs
+      Array.from(tempDiv.childNodes).forEach(node => {
+         if (node.nodeType === Node.ELEMENT_NODE && (node as HTMLElement).tagName === 'BR') {
+            const p = document.createElement('p');
+            p.innerHTML = '<br>';
+            tempDiv.replaceChild(p, node);
+         }
+      });
 
-        // 1. One Top Spacer at the very top of the editor if the first element is a table
-        const firstEl = tempDiv.firstElementChild;
-        if (firstEl && blockTags.includes(firstEl.tagName) && !firstEl.classList.contains('top-spacer')) {
-           if (!tempDiv.querySelector('.top-spacer')) {
-              const pBefore = document.createElement('p');
-              pBefore.className = 'table-spacer top-spacer';
-              pBefore.setAttribute('data-empty', 'true');
-              pBefore.setAttribute('data-placeholder', t('newParagraphPlaceholder'));
-              pBefore.innerHTML = '<br>';
-              tempDiv.insertBefore(pBefore, firstEl);
-           }
+      // Clean up formatting whitespace text nodes inside lists and tables so they do not create phantom gaps
+      tempDiv.querySelectorAll('ul, ol, table, thead, tbody, tr').forEach(parent => {
+        Array.from(parent.childNodes).forEach(child => {
+          if (child.nodeType === Node.TEXT_NODE && !child.nodeValue?.trim()) {
+            parent.removeChild(child);
+          }
+        });
+      });
+      
+      const blockTags = ['TABLE'];
+
+      // Clean up any orphan or non-boundary spacers
+      tempDiv.querySelectorAll('.table-spacer, [data-placeholder], [data-empty]').forEach((spacerEl) => {
+         const isTop = spacerEl === tempDiv.firstElementChild && spacerEl.classList.contains('top-spacer');
+         const isBottom = spacerEl === tempDiv.lastElementChild && spacerEl.classList.contains('bottom-spacer');
+         const text = spacerEl.textContent || '';
+         const hasContent = text.trim() !== '' || spacerEl.children.length > 1 || (spacerEl.children.length === 1 && spacerEl.firstElementChild?.tagName !== 'BR');
+         if (!isTop && !isBottom) {
+            spacerEl.removeAttribute('data-empty');
+            spacerEl.removeAttribute('data-placeholder');
+            spacerEl.classList.remove('table-spacer', 'top-spacer', 'bottom-spacer');
+         } else if (hasContent) {
+            spacerEl.removeAttribute('data-empty');
+            spacerEl.removeAttribute('data-placeholder');
+            spacerEl.classList.remove('table-spacer', 'top-spacer', 'bottom-spacer');
+         }
+      });
+
+      // 1. One Top Spacer at the very top of the editor if the first element is a table
+      const firstEl = tempDiv.firstElementChild;
+      if (firstEl && blockTags.includes(firstEl.tagName) && !firstEl.classList.contains('top-spacer')) {
+         if (!tempDiv.querySelector('.top-spacer')) {
+            const pBefore = document.createElement('p');
+            pBefore.className = 'table-spacer top-spacer';
+            pBefore.setAttribute('data-empty', 'true');
+            pBefore.setAttribute('data-placeholder', t('newParagraphPlaceholder'));
+            pBefore.innerHTML = '<br>';
+            tempDiv.insertBefore(pBefore, firstEl);
+         }
+      }
+      
+      // 2. One Bottom Spacer at the very bottom of the editor ONLY if last element is a table
+      const lastEl = tempDiv.lastElementChild;
+      if (lastEl && blockTags.includes(lastEl.tagName) && !lastEl.classList.contains('bottom-spacer')) {
+         if (!tempDiv.querySelector('.bottom-spacer')) {
+            const pAfter = document.createElement('p');
+            pAfter.className = 'table-spacer bottom-spacer';
+            pAfter.setAttribute('data-empty', 'true');
+            pAfter.setAttribute('data-placeholder', t('newParagraphPlaceholder'));
+            pAfter.innerHTML = '<br>';
+            tempDiv.appendChild(pAfter);
+         }
+      }
+      
+      rawHtml = tempDiv.innerHTML;
+      
+      // We rely on CSS padding instead of inserting <p><br></p> after block elements
+      const trimmedRaw = rawHtml.trim();
+      if (trimmedRaw === '') {
+        rawHtml = '<p><br></p>';
+      }
+      
+      isSyncingRef.current = true;
+      wysiwygRef.current.innerHTML = rawHtml;
+      lastSyncContentRef.current = useEditorStore.getState().content;
+      isSyncingRef.current = false;
+      
+      if (pos) {
+        const range = document.createRange();
+        let rangeSet = false;
+
+        let foundStartNode: Node | null = null;
+        let foundStartOffset = 0;
+        let foundEndNode: Node | null = null;
+        let foundEndOffset = 0;
+
+        const walker = document.createTreeWalker(wysiwygRef.current, NodeFilter.SHOW_TEXT);
+        let currentNode = walker.nextNode();
+        while (currentNode) {
+          const val = currentNode.nodeValue || '';
+          const sIdx = val.indexOf(MARKER_START);
+          const eIdx = val.indexOf(MARKER_END);
+
+          if (sIdx !== -1 || eIdx !== -1) {
+            let cleanVal = val;
+            if (sIdx !== -1) {
+              foundStartNode = currentNode;
+              foundStartOffset = sIdx;
+              cleanVal = cleanVal.replace(MARKER_START, '');
+            }
+            if (eIdx !== -1) {
+              foundEndNode = currentNode;
+              foundEndOffset = (sIdx !== -1 && sIdx < eIdx) ? eIdx - 1 : eIdx;
+              cleanVal = cleanVal.replace(MARKER_END, '');
+            }
+            currentNode.nodeValue = cleanVal;
+          }
+          currentNode = walker.nextNode();
         }
-        
-        // 2. One Bottom Spacer at the very bottom of the editor ONLY if last element is a table
-        const lastEl = tempDiv.lastElementChild;
-        if (lastEl && blockTags.includes(lastEl.tagName) && !lastEl.classList.contains('bottom-spacer')) {
-           if (!tempDiv.querySelector('.bottom-spacer')) {
-              const pAfter = document.createElement('p');
-              pAfter.className = 'table-spacer bottom-spacer';
-              pAfter.setAttribute('data-empty', 'true');
-              pAfter.setAttribute('data-placeholder', t('newParagraphPlaceholder'));
-              pAfter.innerHTML = '<br>';
-              tempDiv.appendChild(pAfter);
-           }
-        }
-        
-        rawHtml = tempDiv.innerHTML;
-        
-        // We rely on CSS padding instead of inserting <p><br></p> after block elements
-        const trimmedRaw = rawHtml.trim();
-        if (trimmedRaw === '') {
-          rawHtml = '<p><br></p>';
-        }
-        
-        isSyncingRef.current = true;
-        wysiwygRef.current.innerHTML = rawHtml;
-        lastSyncContentRef.current = useEditorStore.getState().content;
-        isSyncingRef.current = false;
-        
-        if (pos) {
-          const range = document.createRange();
-          let rangeSet = false;
-          
+
+        if (foundStartNode) {
+          range.setStart(foundStartNode, foundStartOffset);
+          if (foundEndNode) {
+            range.setEnd(foundEndNode, foundEndOffset);
+          } else {
+            range.collapse(true);
+          }
+          rangeSet = true;
+        } else {
+          // Fallback if marker was inside a stripped tag
           const startTarget = findDomPositionForMarkdownOffset(wysiwygRef.current, textContent, pos.start);
           const endTarget = pos.start !== pos.end ? findDomPositionForMarkdownOffset(wysiwygRef.current, textContent, pos.end) : startTarget;
           
@@ -2800,43 +2866,61 @@ function App() {
             range.collapse(true);
             rangeSet = true;
           }
-          
-          if (rangeSet) {
-            wysiwygRef.current.focus();
-            const sel = window.getSelection();
-            if (sel) {
-              sel.removeAllRanges();
-              sel.addRange(range);
-              savedVisualRangeRef.current = range.cloneRange();
-              
-              if (pos) {
-                useEditorStore.getState().setSelection(pos.start, pos.end);
-                const rowColPos = getRowColFromOffset(useEditorStore.getState().content, pos.start);
-                useEditorStore.getState().setCursor(rowColPos);
-              }
-
-              // Ensure element has active blinking cursor
-              wysiwygRef.current.focus();
-
-              if (startTarget) {
-                 scrollCaretIntoView('center');
-                 
-                 const images = wysiwygRef.current.querySelectorAll('img');
-                 images.forEach(img => {
-                   if (!img.complete) {
-                     img.addEventListener('load', () => scrollCaretIntoView('center'), { once: true });
-                   }
-                 });
-                 
-                 setTimeout(() => scrollCaretIntoView('center'), 100);
-                 setTimeout(() => scrollCaretIntoView('center'), 300);
-                 setTimeout(() => scrollCaretIntoView('center'), 600);
-              }
-            }
-          }
-        } else {
-          wysiwygRef.current.focus();
         }
+        
+        if (rangeSet) {
+          wysiwygRef.current.focus();
+          const sel = window.getSelection();
+          if (sel) {
+            sel.removeAllRanges();
+            sel.addRange(range);
+            savedVisualRangeRef.current = range.cloneRange();
+            
+            if (pos) {
+              useEditorStore.getState().setSelection(pos.start, pos.end);
+              const rowColPos = getRowColFromOffset(useEditorStore.getState().content, pos.start);
+              useEditorStore.getState().setCursor(rowColPos);
+            }
+
+            // Ensure element has active blinking cursor
+            wysiwygRef.current.focus({ preventScroll: true });
+
+            scrollCaretIntoView('center');
+            
+            const images = wysiwygRef.current.querySelectorAll('img');
+            images.forEach(img => {
+              if (!img.complete) {
+                img.addEventListener('load', () => scrollCaretIntoView('center'), { once: true });
+              }
+            });
+            
+            const restoreSel = () => {
+              if (wysiwygRef.current && savedVisualRangeRef.current) {
+                const curSel = window.getSelection();
+                if (curSel) {
+                  curSel.removeAllRanges();
+                  curSel.addRange(savedVisualRangeRef.current);
+                }
+              }
+            };
+
+            setTimeout(() => {
+              restoreSel();
+              scrollCaretIntoView('center');
+            }, 50);
+            setTimeout(() => {
+              restoreSel();
+              scrollCaretIntoView('center');
+            }, 150);
+            setTimeout(() => {
+              restoreSel();
+              scrollCaretIntoView('center');
+            }, 350);
+            setTimeout(() => scrollCaretIntoView('center'), 600);
+          }
+        }
+      } else {
+        wysiwygRef.current.focus();
       }
     } catch (e) {
       console.warn('syncCursorMarkdownToVisual error:', e);
@@ -3335,11 +3419,15 @@ function App() {
     if (mode === 'visual') {
       if (editorRef.current) {
         const val = editorRef.current.value;
-        const start = editorRef.current.selectionStart;
-        const end = editorRef.current.selectionEnd;
+        const start = editorRef.current.selectionStart ?? 0;
+        const end = editorRef.current.selectionEnd ?? start;
         const pos = getRowColFromOffset(val, start);
         cursorPositionRef.current = { start, end };
-        localStorage.setItem('steem_editor_cursor', JSON.stringify({ start, end }));
+        try {
+          localStorage.setItem('steem_editor_cursor', JSON.stringify({ start, end }));
+        } catch {
+          /* ignore storage error */
+        }
         useEditorStore.setState({
           content: val,
           cursor: pos,
@@ -3349,7 +3437,8 @@ function App() {
       }
       saveCursorPosition();
       
-      lastSyncContentRef.current = 'FORCE_SYNC_INITIAL_VALUE_THAT_WILL_NEVER_MATCH';
+      // Update lastSyncContentRef so background useEffect won't trigger another innerHTML wipe
+      lastSyncContentRef.current = useEditorStore.getState().content;
       setEditorMode('visual');
       
       setTimeout(async () => {
@@ -3358,7 +3447,7 @@ function App() {
           wysiwygRef.current.focus({ preventScroll: true });
           saveVisualSelection();
         }
-      }, 60);
+      }, 50);
     } else {
       saveVisualSelection();
       isSyncingRef.current = true;
@@ -6488,7 +6577,7 @@ function App() {
 
   const saveFileNatively = async (blob: Blob, defaultFilename: string, mimeType: string = 'text/plain') => {
     try {
-      // 0. UNIVERSAL NATIVE HOOKS FOR TAURI / NEUROLINO / ANDROID / LINUX WEBVIEW INTERCEPTION
+      // 0. UNIVERSAL NATIVE HOOKS FOR TAURI / NEUTRALINO / ANDROID / LINUX WEBVIEW INTERCEPTION
       if (typeof window !== 'undefined') {
         const isText = mimeType.startsWith('text/') || mimeType.includes('json');
         let textData = '';
@@ -6507,7 +6596,7 @@ function App() {
           });
         }
 
-        // Dispatch CustomEvent for native webview listeners (Tauri, NeuroLino, etc.)
+        // Dispatch CustomEvent for native webview listeners (Tauri, Neutralino, etc.)
         const nativeSaveEvent = new CustomEvent('nativeSaveFile', {
           detail: {
             filename: defaultFilename,
@@ -6635,8 +6724,8 @@ function App() {
       }
 
       // 4. MODERN WEB FILE SYSTEM ACCESS API (showSaveFilePicker)
-      // This is extremely powerful for Android, Linux, Windows, macOS, allowing real "Save As" file dialogs
-      if (typeof window !== 'undefined' && (window as any).showSaveFilePicker) {
+      // Works on modern desktop Chromium, allows direct file writing
+      if (typeof window !== 'undefined' && typeof (window as any).showSaveFilePicker === 'function') {
         try {
           const ext = defaultFilename.split('.').pop() || 'md';
           const fileHandle = await (window as any).showSaveFilePicker({
@@ -6656,63 +6745,72 @@ function App() {
           if (pickerErr.name === 'AbortError') {
             return false;
           }
-          console.warn("showSaveFilePicker failed or cancelled, falling back to legacy download:", pickerErr);
+          console.warn("showSaveFilePicker failed or unsupported on this platform, falling back to download:", pickerErr);
         }
       }
 
       // 5. NATIVE SHARE FALLBACK FOR MOBILE (Android/iOS)
-      // This allows the user to choose where to save the file using the OS Share sheet
-      if (typeof navigator !== 'undefined' && navigator.canShare) {
-        const file = new File([blob], defaultFilename, { type: mimeType });
-        if (navigator.canShare({ files: [file] })) {
-          try {
-            await navigator.share({
-              files: [file],
-              title: defaultFilename
-            });
-            return true;
-          } catch (shareErr: any) {
-            if (shareErr.name === 'AbortError') return false; // User cancelled
-            console.warn("Share API failed, falling back to download:", shareErr);
+      if (typeof navigator !== 'undefined' && typeof (navigator as any).share === 'function') {
+        try {
+          const file = new File([blob], defaultFilename, { type: mimeType });
+          if ((navigator as any).canShare && (navigator as any).canShare({ files: [file] })) {
+            try {
+              await (navigator as any).share({
+                files: [file],
+                title: defaultFilename
+              });
+              return true;
+            } catch (shareErr: any) {
+              if (shareErr.name === 'AbortError') return false; // User cancelled
+              console.warn("Share API failed, falling back to direct download:", shareErr);
+            }
           }
+        } catch (canShareErr) {
+          console.debug("canShare error:", canShareErr);
         }
       }
 
-      // 6. STANDARD WEB DOWNLOAD FALLBACK (Anchor element tag)
+      // 6. STANDARD WEB / MOBILE DOWNLOAD FALLBACK (Anchor element tag with deferred revoke)
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
       a.download = defaultFilename;
+      a.rel = 'noopener noreferrer';
+      a.target = '_self';
       document.body.appendChild(a);
       a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
+      setTimeout(() => {
+        try {
+          if (a.parentNode) document.body.removeChild(a);
+          URL.revokeObjectURL(url);
+        } catch {
+          /* ignore cleanup error */
+        }
+      }, 60000);
       return true;
     } catch (err: any) {
       console.error("All save operations failed, using fallback:", err);
-      if (typeof navigator !== 'undefined' && navigator.canShare) {
-        const file = new File([blob], defaultFilename, { type: mimeType });
-        if (navigator.canShare({ files: [file] })) {
+      try {
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = defaultFilename;
+        a.rel = 'noopener noreferrer';
+        document.body.appendChild(a);
+        a.click();
+        setTimeout(() => {
           try {
-            await navigator.share({
-              files: [file],
-              title: defaultFilename
-            });
-            return true;
-          } catch (shareErr: any) {
-            console.warn("Share API failed in catch:", shareErr);
+            if (a.parentNode) document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+          } catch {
+            /* ignore cleanup error */
           }
-        }
+        }, 60000);
+        return true;
+      } catch (finalErr) {
+        console.error("Critical download error:", finalErr);
+        return false;
       }
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = defaultFilename;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
-      return true;
     }
   };
 
@@ -8869,10 +8967,10 @@ function App() {
                     (visualStyle === 'neon' && neonTextColored) ? "text-cyan-400 font-normal" : "text-slate-300",
                     beautifyEnabled ? "px-4 lg:px-8 pt-4 lg:pt-6 max-w-[clamp(40rem,60vw,80rem)] mx-auto selection:bg-[rgb(var(--accent-color)/0.3)]" : "px-3 pt-3 lg:px-6 lg:pt-6",
                     isKeyboardOpen 
-                      ? "pb-6 mb-[4.5rem] lg:pb-6 lg:mb-[5rem]" 
+                      ? "pb-32 mb-[4.5rem] lg:pb-24 lg:mb-[5rem]" 
                       : (isEditorFullScreen || isFullScreen
-                          ? "pb-6 mb-[4.5rem] lg:pb-6 lg:mb-[5rem]"
-                          : "pb-6 mb-[8.5rem] lg:pb-6 lg:mb-[5rem]")
+                          ? "pb-32 mb-[4.5rem] lg:pb-24 lg:mb-[5rem]"
+                          : "pb-36 mb-[4.5rem] lg:pb-24 lg:mb-[5rem]")
                   )}
                   placeholder={`${t('placeholder')}\n\n\n\n\nОМ АХ ХУМ СО ХА\n♡`}
                 />
@@ -9088,10 +9186,10 @@ function App() {
                     (visualStyle === 'neon' && neonTextColored) ? "text-cyan-400 font-normal" : "text-slate-300",
                     beautifyEnabled ? "px-4 lg:px-8 pt-4 lg:pt-6 max-w-4xl mx-auto selection:bg-[rgb(var(--accent-color)/0.3)]" : "px-4 pt-4 lg:px-6 lg:pt-6",
                     isKeyboardOpen 
-                      ? "pb-6 mb-[4.5rem] lg:pb-6 lg:mb-[5rem]" 
+                      ? "pb-32 mb-[4.5rem] lg:pb-24 lg:mb-[5rem]" 
                       : (isEditorFullScreen || isFullScreen
-                          ? "pb-6 mb-[4.5rem] lg:pb-6 lg:mb-[5rem]"
-                          : "pb-6 mb-[8.5rem] lg:pb-6 lg:mb-[5rem]")
+                          ? "pb-32 mb-[4.5rem] lg:pb-24 lg:mb-[5rem]"
+                          : "pb-36 mb-[4.5rem] lg:pb-24 lg:mb-[5rem]")
                   )}
                   style={{ minHeight: '200px' }}
                 />
@@ -11522,7 +11620,7 @@ function App() {
                     <div className="pt-4 space-y-3">
                       <div className="flex justify-between text-xs items-center">
                         <span className="text-slate-500">{t('version')}</span>
-                        <span className="bg-cyan-500/10 text-cyan-400 px-2 py-1 rounded-md font-mono font-bold">4.6.0</span>
+                        <span className="bg-cyan-500/10 text-cyan-400 px-2 py-1 rounded-md font-mono font-bold">4.6.1</span>
                       </div>
                       <div className="flex justify-between text-xs items-center">
                         <span className="text-slate-500">{t('license')}</span>
@@ -12470,11 +12568,11 @@ function App() {
                        <div className="w-16 h-16 bg-cyan-500/10 rounded-2xl mx-auto flex items-center justify-center text-cyan-400 font-black text-2xl shadow-xl shadow-cyan-500/10">S</div>
                        <div>
                          <h3 className="text-xl font-black tracking-tight">SteemEditor <span className="text-cyan-400">Pro</span></h3>
-                         <p className="text-[10px] text-slate-500 uppercase font-black tracking-[0.2em] pt-1">Version 4.6.0 "Quantum"</p>
+                         <p className="text-[10px] text-slate-500 uppercase font-black tracking-[0.2em] pt-1">Version 4.6.1 "Quantum"</p>
                        </div>
                        <label className="text-[10px] font-black text-slate-500 uppercase tracking-[0.2em] px-1 pt-4 block border-t border-slate-800">Changelog & Updates</label>
                         <div className="mt-2 p-3 bg-slate-950 border border-cyan-500/20 rounded-xl text-left">
-                          <p className="text-xs text-slate-300 font-medium">New in v4.6.0: Bidirectional Cursor & Spacing Sync & multi-line block cursor stability</p>
+                          <p className="text-xs text-slate-300 font-medium">New in v4.6.1: Production Cursor & Spacing Sync, Unclosed Tag Resilience & Mobile Layout Clearance</p>
                         </div>
                        
                        <div className="space-y-2 max-h-60 overflow-y-auto custom-scrollbar bg-slate-900 border border-slate-800 rounded-xl p-3">
@@ -12573,7 +12671,7 @@ function App() {
                                   localStorage.setItem('steem_app_agent', e.target.value);
                                 }}
                                 className="w-full bg-slate-900 border border-slate-700 rounded-lg p-2.5 text-xs text-slate-200 outline-none focus:ring-1 focus:ring-cyan-500"
-                                placeholder="ultrasteemeditor/4.6.0"
+                                placeholder="ultrasteemeditor/4.6.1"
                               />
                             </div>
                           </motion.div>
