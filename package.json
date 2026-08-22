@@ -11,6 +11,7 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc && vite build",
+    "build:neu": "node scripts/build-neu.js",
     "lint": "eslint .",
     "preview": "vite preview",
     "tauri": "tauri",

@@ -1,0 +1,654 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Steem Editor: v26 HR + & Div Fix + Keychain Auth</title>
+
+    <script src="https://cdn.jsdelivr.net/npm/marked@17.0.5/lib/marked.umd.js"></script>
+    <script src="marked.umd.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/steem/dist/steem.min.js"></script>
+    <script src="steem.min.js"></script>
+
+    <style>
+        :root {
+            --bg-body: #0f172a; --bg-panel: #1e293b; --bg-input: #334155;
+            --border: #475569; --primary: #06b6d4; --success: #22c55e;
+            --warning: #f59e0b; --danger: #ef4444; --purple: #8b5cf6;
+            --text-main: #f1f5f9; --text-muted: #94a3b8;
+            --nav-height: 55px;
+        }
+        * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+
+        body {
+            margin: 0; font-family: 'Segoe UI', Roboto, sans-serif;
+            background: var(--bg-body); color: var(--text-main);
+            height: 100dvh; display: flex; flex-direction: column; overflow: hidden;
+        }
+
+        .layout { display: flex; flex: 1; overflow: hidden; position: relative; }
+
+        /* SIDEBAR */
+        .sidebar {
+            width: 300px; background: var(--bg-panel); border-right: 1px solid var(--border);
+            display: flex; flex-direction: column; padding: 10px; flex-shrink: 0;
+            z-index: 30; transition: transform 0.3s ease;
+        }
+        .sidebar-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.7); z-index: 1500; display: none; backdrop-filter: blur(2px); }
+        .header-label { font-size: 11px; font-weight: 700; text-transform: uppercase; color: var(--text-muted); margin-bottom: 5px; display: flex; justify-content: space-between; }
+
+        /* MAIN AREA */
+        .main-area { flex: 1; display: flex; flex-direction: column; min-width: 0; position: relative; }
+
+        /* TOOLBAR */
+        .toolbar {
+            padding: 8px; background: var(--bg-panel); border-bottom: 1px solid var(--border);
+            display: flex; flex-wrap: wrap;
+            gap: 4px; align-items: center; justify-content: flex-start;
+            flex-shrink: 0;
+        }
+
+        .tb-btn {
+            background: var(--bg-input); border: 1px solid var(--border);
+            padding: 0 8px; height: 30px; border-radius: 4px; color: var(--text-muted);
+            cursor: pointer; font-size: 13px; display: inline-flex; align-items: center; justify-content: center;
+            min-width: 30px; flex-shrink: 0; font-family: monospace; font-weight: 500;
+        }
+        .tb-btn:active { background: var(--primary); color: white; border-color: var(--primary); }
+        .tb-sep { width: 1px; height: 20px; background: var(--border); margin: 0 2px; }
+
+        .btn-gallery { color: var(--primary); border-color: var(--primary); }
+        .btn-pub { background: var(--primary); color: white; border: none; font-weight: bold; }
+        .btn-action { color: var(--warning); border-color: var(--warning); font-weight: bold; }
+
+        /* EDITOR / PREVIEW */
+        .editor-wrap { flex: 1; position: relative; overflow: hidden; display: flex; }
+        #editor, #preview { width: 50%; height: 100%; padding: 15px; border: none; outline: none; overflow-y: auto; }
+        #editor { background: var(--bg-body); color: var(--text-main); font-family: monospace; font-size: 15px; line-height: 1.5; border-right: 1px solid var(--border); }
+        #preview { background: var(--bg-body); color: #cbd5e1; }
+
+        /* PREVIEW STYLES */
+        .pull-left { float: left; margin-right: 15px; margin-bottom: 5px; max-width: 50%; }
+        .pull-right { float: right; margin-left: 15px; margin-bottom: 5px; max-width: 50%; }
+        .text-justify { text-align: justify; } .text-center { text-align: center; }
+        .clearfix::after { content: ""; clear: both; display: table; }
+        .pull-left img, .pull-right img, .text-center img { max-width: 100%; height: auto; border-radius: 4px; }
+        #preview p { margin-top: 0; margin-bottom: 1em; line-height: 1.6; clear: none; }
+        #preview h1, #preview h2 { border-bottom: 1px solid var(--border); padding-bottom: 5px; color: #fff; margin-top: 1.5em; clear: both; }
+        #preview blockquote { border-left: 3px solid var(--primary); margin: 1em 0; padding-left: 10px; color: #94a3b8; clear: both; }
+        #preview table { width: 100%; border-collapse: collapse; margin: 15px 0; clear: both; }
+        #preview th, #preview td { border: 1px solid var(--border); padding: 6px; vertical-align: top; }
+        #preview code { background: var(--bg-input); padding: 2px 5px; border-radius: 4px; font-family: monospace; color: #93c5fd; }
+        #preview pre { background: #111; padding: 10px; border-radius: 6px; overflow-x: auto; clear: both; }
+
+        /* FLOATING WIDGET */
+        #floatWidget {
+            position: absolute; display: none;
+            background: #1e293b; padding: 8px 12px;
+            border: 1px solid var(--primary); border-radius: 50px;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.8);
+            z-index: 2000; gap: 8px; align-items: center;
+            transform: translateX(-50%);
+        }
+        #floatWidget::after { content: ""; position: absolute; bottom: -6px; left: 50%; transform: translateX(-50%); border-width: 6px 6px 0; border-style: solid; border-color: var(--primary) transparent transparent transparent; }
+        .fw-btn { background: transparent; border: none; color: #fff; padding: 4px; cursor: pointer; font-size: 15px; font-weight: bold; min-width: 24px; text-align: center; }
+        .fw-btn:active { color: var(--primary); transform: scale(1.1); }
+
+        /* UI ELEMENTS */
+        #sourceInput { width: 100%; height: 60px; padding: 8px; border-radius: 4px; background: var(--bg-input); border: 1px solid var(--border); color: #fff; margin-bottom: 8px; }
+        #gridBtn { background: var(--primary); color: white; border: none; padding: 10px; border-radius: 4px; width: 100%; margin-bottom: 10px; font-weight: bold; }
+        #gallery { flex: 1; overflow-y: auto; display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+        .img-card { position: relative; background: var(--bg-input); border-radius: 6px; overflow: hidden; aspect-ratio: 16/10; }
+        .img-card.selected { border: 2px solid var(--success); }
+        .img-card img { width: 100%; height: 100%; object-fit: cover; }
+        .overlay-actions { position: absolute; bottom: 0; left: 0; right: 0; background: rgba(0,0,0,0.85); display: flex; justify-content: space-evenly; padding: 8px; }
+        .act-btn { background: rgba(255,255,255,0.2); border: 1px solid rgba(255,255,255,0.4); color: #fff; width: 32px; height: 32px; border-radius: 4px; font-size: 16px; }
+
+        .mobile-nav { display: none; height: var(--nav-height); background: var(--bg-panel); border-top: 1px solid var(--border); flex-shrink: 0; justify-content: space-around; align-items: center; z-index: 50; }
+        .nav-item { flex: 1; text-align: center; padding: 5px; color: var(--text-muted); cursor: pointer; font-size: 11px; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100%; }
+        .nav-item.active { color: var(--primary); font-weight: bold; background: rgba(255,255,255,0.03); }
+
+        .modal-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.95); z-index: 2100; display: none; align-items: center; justify-content: center; }
+        .modal-content { background: var(--bg-panel); width: 95%; max-width: 500px; max-height: 90vh; border-radius: 8px; display: flex; flex-direction: column; border: 1px solid var(--border); }
+        .modal-header { padding: 15px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; font-weight: bold; background: rgba(0,0,0,0.2); }
+        .modal-body { flex: 1; overflow-y: auto; padding: 15px; }
+        .close-btn { background: none; border: none; color: #fff; font-size: 24px; padding: 0 10px; }
+        .form-group { margin-bottom: 15px; }
+        .form-label { display: block; margin-bottom: 5px; color: var(--text-muted); font-size: 12px; }
+        .form-input { width: 100%; padding: 12px; background: var(--bg-input); border: 1px solid var(--border); border-radius: 6px; color: #fff; font-size: 16px; }
+        .pub-submit-btn { width: 100%; padding: 14px; background: var(--primary); color: white; border: none; border-radius: 6px; font-size: 16px; font-weight: bold; margin-top: 10px; cursor: pointer; }
+
+        .list-item { background: var(--bg-input); padding: 12px; border-radius: 6px; margin-bottom: 8px; display: flex; justify-content: space-between; align-items: center; border: 1px solid transparent; }
+        .list-text { flex: 1; color: #fff; font-size: 14px; cursor: pointer; }
+        .list-del { background: rgba(239, 68, 68, 0.2); color: var(--danger); border: 1px solid var(--danger); padding: 6px 10px; border-radius: 4px; margin-left: 10px; }
+        .settings-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+        .settings-item { display: flex; align-items: center; padding: 10px; background: var(--bg-input); border-radius: 4px; }
+        .settings-item input { margin-right: 10px; transform: scale(1.3); accent-color: var(--primary); }
+        .settings-item label { color: #fff; flex: 1; font-size: 14px; }
+
+        .tags-cloud { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+        .tag-chip { background: var(--bg-input); border: 1px solid var(--border); padding: 6px 10px; border-radius: 20px; font-size: 12px; color: var(--text-muted); }
+        .content-preview { background: rgba(0,0,0,0.2); border: 1px solid var(--border); padding: 10px; border-radius: 4px; font-size: 12px; color: var(--text-muted); margin-bottom: 15px; }
+        .draft-item { background: var(--bg-input); padding: 12px; border-radius: 6px; margin-bottom: 8px; display: flex; justify-content: space-between; align-items: center; }
+        .draft-info { flex: 1; }
+        .draft-title { font-weight: bold; margin-bottom: 4px; font-size: 15px; color: #fff; }
+        .draft-del { background: rgba(239, 68, 68, 0.2); color: var(--danger); border: 1px solid var(--danger); padding: 8px 12px; border-radius: 4px; margin-left: 10px; }
+
+        .pub-log { margin-top: 15px; padding: 10px; border-radius: 4px; font-size: 14px; display: none; line-height: 1.4; }
+        .pub-log.success { background: rgba(34, 197, 94, 0.1); border: 1px solid var(--success); color: var(--success); }
+        .pub-log.error { background: rgba(239, 68, 68, 0.1); border: 1px solid var(--danger); color: var(--danger); }
+        .pub-log.loading { background: rgba(6, 182, 212, 0.1); border: 1px solid var(--primary); color: var(--primary); }
+        .pub-log a { color: #fff; text-decoration: underline; font-weight: bold; }
+
+        #statusBar { position: absolute; bottom: 0; right: 20px; background: rgba(30, 41, 59, 0.9); border: 1px solid var(--border); border-bottom: none; border-radius: 6px 6px 0 0; padding: 4px 10px; font-size: 11px; color: var(--text-muted); z-index: 20; pointer-events: none; }
+
+        .format-switch { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; background: var(--bg-input); padding: 8px; border-radius: 6px; }
+        .switch-label { font-size: 12px; color: #fff; flex: 1; }
+        input[type=checkbox] { transform: scale(1.2); accent-color: var(--primary); }
+
+        @media (max-width: 900px) {
+            .mobile-nav { display: flex; }
+            .sidebar { position: fixed; top: 0; left: 0; width: 85%; max-width: 320px; height: 100%; transform: translateX(-100%); z-index: 3000; box-shadow: 2px 0 20px #000; }
+            .sidebar.active { transform: translateX(0); }
+            #editor, #preview { width: 100%; border-right: none; display: none; }
+            #editor.active-tab { display: block; }
+            #preview.active-tab { display: block; padding-bottom: 80px; }
+            #statusBar { bottom: 0; right: 0; border-radius: 4px 0 0 0; }
+            #floatWidget { position: fixed; bottom: calc(var(--nav-height) + 15px); left: 50%; transform: translateX(-50%); width:auto; max-width:95%; }
+        }
+    </style>
+</head>
+<body>
+
+<div class="sidebar-overlay" id="sidebarOverlay" onclick="toggleSidebar()"></div>
+
+<div class="layout">
+    <!-- SIDEBAR -->
+    <div class="sidebar" id="sidebar">
+        <div class="header-label"><span>1. Галерея</span><button class="close-btn" onclick="toggleSidebar()" style="font-size:18px">✕</button></div>
+        <div class="format-switch"><span class="switch-label">Steemit HTML</span><input type="checkbox" id="steemFormatToggle" checked></div>
+        <div class="format-switch"><span class="switch-label">Фікс. текст (Div)</span><input type="checkbox" id="tableModeToggle"></div>
+        <textarea id="sourceInput" placeholder="URL..."></textarea>
+        <button id="gridBtn" onclick="insertGrid()">▦ Грід</button>
+        <div class="header-label">2. Галерея</div>
+        <div id="gallery"></div>
+    </div>
+
+    <!-- MAIN -->
+    <div class="main-area">
+        <div class="toolbar">
+            <button class="tb-btn btn-gallery" onclick="toggleSidebar()" title="Галерея">🖼️</button>
+            <button class="tb-btn" onclick="openSettingsModal()" title="Меню">⚙️</button>
+
+            <button class="tb-btn" onclick="saveDraft()" title="Save">💾</button>
+            <button class="tb-btn" onclick="toggleDrafts()" title="Drafts">📂</button>
+            <button class="tb-btn btn-action" onclick="toggleTemplates()" title="Шаблони">📝</button>
+            <button class="tb-btn btn-action" onclick="toggleMentions()" title="@ Люди">@</button>
+            <button class="tb-btn" onclick="nativeShare()" title="Share">📡</button>
+
+            <div class="tb-sep"></div>
+            <button class="tb-btn btn-pub" onclick="openPublishModal()" title="Publish">🚀</button>
+            <div class="tb-sep"></div>
+
+            <button class="tb-btn" onclick="exportFile()">Exp</button>
+            <button class="tb-btn" onclick="undo()">↩</button>
+            <button class="tb-btn" onclick="redo()">↪</button>
+            <button class="tb-btn" onclick="window.open('https://github.com/ultrapositivecode/steem-editor-pro-react', '_blank')" title="GitHub">🐙</button>
+
+            <div class="tb-sep"></div>
+            <!-- ALL TOOLS (Multi-row) -->
+            <button class="tb-btn" onclick="fmt('**')"><b>B</b></button>
+            <button class="tb-btn" onclick="fmt('*')"><i>I</i></button>
+            <button class="tb-btn" onclick="fmt('~~')"><s>S</s></button>
+            <button class="tb-btn" onclick="fmt('<sub>', '</sub>')">x₂</button>
+            <button class="tb-btn" onclick="fmt('<sup>', '</sup>')">x²</button>
+            <div class="tb-sep"></div>
+            <button class="tb-btn" onclick="fmtLine('# ')">H1</button>
+            <button class="tb-btn" onclick="fmtLine('## ')">H2</button>
+            <button class="tb-btn" onclick="fmtLine('### ')">H3</button>
+            <div class="tb-sep"></div>
+            <button class="tb-btn" onclick="fmtLine('- ')">• List</button>
+            <button class="tb-btn" onclick="fmtLine('1. ')">1. List</button>
+            <button class="tb-btn" onclick="fmtLine('- [ ] ')">☑</button>
+            <button class="tb-btn" onclick="fmtLine('> ')">”</button>
+            <div class="tb-sep"></div>
+            <button class="tb-btn" onclick="smartLink()">🔗</button>
+            <button class="tb-btn" onclick="addTable()">📅</button>
+            <button class="tb-btn" onclick="blockCode4Spaces()">{}</button>
+            <button class="tb-btn" onclick="fmt('`')">`c`</button>
+            <button class="tb-btn" onclick="fmtHR()">—</button>
+
+            <div class="tb-sep"></div>
+            <button class="tb-btn" onclick="fmtLeft()">⬅</button>
+            <button class="tb-btn" onclick="fmtCenter()">Cnt</button>
+            <button class="tb-btn" onclick="fmtRight()">➡</button>
+            <button class="tb-btn" onclick="fmtJustify()">Just</button>
+        </div>
+
+        <div class="editor-wrap">
+            <textarea id="editor" class="active-tab" placeholder="Пишіть текст..."></textarea>
+            <div id="preview" class="">
+                <div id="refreshBtn" onclick="update()" title="Оновити прев'ю">🔄</div>
+            </div>
+            <div id="statusBar">W: 0 | C: 0</div>
+        </div>
+
+        <div id="floatWidget"></div>
+    </div>
+</div>
+
+<div class="mobile-nav">
+    <div class="nav-item active" onclick="switchMobileTab('editor', this)"><span style="font-size:20px">✏️</span><span>Editor</span></div>
+    <div class="nav-item" onclick="switchMobileTab('preview', this)"><span style="font-size:20px">👁️</span><span>Preview</span></div>
+</div>
+
+<div id="settingsModal" class="modal-overlay">
+    <div class="modal-content">
+        <div class="modal-header"><span>⚙️ Налаштування меню</span><button class="close-btn" onclick="toggleSettings()">×</button></div>
+        <div class="modal-body">
+            <p style="font-size:12px;color:#888;margin-bottom:10px;">Оберіть кнопки для швидкого меню:</p>
+            <div class="settings-grid" id="settingsGrid"></div>
+            <button class="pub-submit-btn" onclick="saveSettings()">Зберегти</button>
+        </div>
+    </div>
+</div>
+
+<div id="templatesModal" class="modal-overlay"><div class="modal-content"><div class="modal-header"><span>📝 Шаблони</span><button class="close-btn" onclick="toggleTemplates()">×</button></div><div class="modal-body"><div style="display:flex;gap:10px;margin-bottom:10px;"><input type="text" id="tplName" class="form-input" placeholder="Назва"><button class="tb-btn" onclick="addTemplate()">+</button></div><div id="templatesList"></div></div></div></div>
+<div id="mentionsModal" class="modal-overlay"><div class="modal-content"><div class="modal-header"><span>@ Люди</span><button class="close-btn" onclick="toggleMentions()">×</button></div><div class="modal-body"><div style="display:flex;gap:10px;margin-bottom:10px;"><input type="text" id="mentionName" class="form-input" placeholder="username"><button class="tb-btn" onclick="addMention()">+</button></div><div id="mentionsList"></div></div></div></div>
+
+<div id="publishModal" class="modal-overlay">
+    <div class="modal-content">
+        <div class="modal-header"><span>🚀 Публікація</span><button class="close-btn" onclick="closePublishModal()">×</button></div>
+        <div class="modal-body">
+            <div class="form-group"><div class="content-preview"><div style="color:var(--primary);font-weight:bold;">Перевірка</div><div id="previewSnippet" style="white-space:nowrap;overflow:hidden;"></div></div></div>
+            <div class="form-group"><label class="form-label">Вхід</label><div style="display:flex; gap:10px;"><button class="tb-btn" id="btnKey" style="flex:1;" onclick="showAuth('KEY')">🔑 Key</button><button class="tb-btn" id="btnKeychain" style="flex:1;" onclick="showAuth('KEYCHAIN')">🛡️ Keychain</button></div></div>
+
+            <div class="key-input-container" id="keyContainer" style="margin-bottom:15px;"><label class="form-label" style="color:var(--warning)">Posting Key</label><input type="password" id="pubWif" class="form-input"></div>
+
+            <!-- АВТОРИЗАЦІЯ ЧЕРЕЗ KEYCHAIN (Новий блок) -->
+            <div class="form-group" id="keychainAuthContainer" style="display:none; margin-bottom:15px;">
+                <button class="tb-btn" onclick="verifyKeychain()" style="width:100%; padding:12px; background:var(--bg-input); color:var(--primary); border:1px solid var(--primary); font-weight:bold; cursor:pointer;">🛡️ Авторизуватися (перевірити нікнейм)</button>
+            </div>
+
+            <div class="form-group"><label class="form-label">User</label><input type="text" id="pubUsername" class="form-input"></div>
+            <div class="form-group"><label class="form-label">Title</label><input type="text" id="pubTitle" class="form-input"></div>
+            <div class="form-group"><label class="form-label">App</label><input type="text" id="pubApp" class="form-input" placeholder="steem-editor/26.0"></div>
+            <div class="form-group"><label class="form-label">Tags</label><input type="text" id="pubTags" class="form-input" placeholder="tag..."><div id="quickTags" class="tags-cloud"></div></div>
+            <button id="btnSubmitPub" class="pub-submit-btn" onclick="submitToSteem()">Опублікувати</button>
+            <div id="pubLog" class="pub-log"></div>
+        </div>
+    </div>
+</div>
+<div id="draftsModal" class="modal-overlay"><div class="modal-content"><div class="modal-header"><span>📂 Чернетки</span><button class="close-btn" onclick="toggleDrafts()">×</button></div><div class="modal-body" id="draftsList"></div></div></div>
+
+<script>
+    const editor = document.getElementById('editor');
+    const preview = document.getElementById('preview');
+    const sidebar = document.getElementById('sidebar');
+    const sidebarOverlay = document.getElementById('sidebarOverlay');
+    const sourceInput = document.getElementById('sourceInput');
+    const gallery = document.getElementById('gallery');
+    const gridBtn = document.getElementById('gridBtn');
+    const floatWidget = document.getElementById('floatWidget');
+    const steemFormatToggle = document.getElementById('steemFormatToggle');
+    const tableModeToggle = document.getElementById('tableModeToggle');
+    const statusBar = document.getElementById('statusBar');
+
+    // Modals
+    const draftsModal = document.getElementById('draftsModal');
+    const draftsList = document.getElementById('draftsList');
+    const publishModal = document.getElementById('publishModal');
+    const templatesModal = document.getElementById('templatesModal');
+    const mentionsModal = document.getElementById('mentionsModal');
+    const settingsModal = document.getElementById('settingsModal');
+    const settingsGrid = document.getElementById('settingsGrid');
+
+    const pubTitle = document.getElementById('pubTitle');
+    const pubTags = document.getElementById('pubTags');
+    const pubUsername = document.getElementById('pubUsername');
+    const pubWif = document.getElementById('pubWif');
+    const pubApp = document.getElementById('pubApp');
+    const keyContainer = document.getElementById('keyContainer');
+    const quickTagsContainer = document.getElementById('quickTags');
+    const pubLog = document.getElementById('pubLog');
+    const btnSubmitPub = document.getElementById('btnSubmitPub');
+
+    let selectedAuth = 'KEY';
+    marked.use({ breaks: true, gfm: true });
+    let imagesData =[];
+
+    // --- CONFIG ---
+    const TOOLS_MAP = {
+        'B': { label: 'B', action: "fmt('**')" },
+        'I': { label: 'I', action: "fmt('*')" },
+        'S': { label: 'S', action: "fmt('~~')" },
+        'sub': { label: 'sub', action: "fmt('<sub>', '</sub>')" },
+        'sup': { label: 'sup', action: "fmt('<sup>', '</sup>')" },
+        'H1': { label: 'H1', action: "fmtLine('# ')" },
+        'H2': { label: 'H2', action: "fmtLine('## ')" },
+        'H3': { label: 'H3', action: "fmtLine('### ')" },
+        'Link': { label: '🔗', action: "smartLink()" },
+        'Quote': { label: '”', action: "fmtLine('> ')" },
+        'List': { label: '•', action: "fmtLine('- ')" },
+        'Num': { label: '1.', action: "fmtLine('1. ')" },
+        'Task': { label: '☑', action: "fmtLine('- [ ] ')" },
+        'Table': { label: '📅', action: "addTable()" },
+        'Code': { label: '{}', action: "blockCode4Spaces()" },
+        'Inline': { label: '`', action: "fmt('`')" },
+        'HR': { label: '—', action: "fmtHR()" },
+        'Left': { label: '⬅', action: "fmtLeft()" },
+        'Center': { label: 'Cnt', action: "fmtCenter()" },
+        'Right': { label: '➡', action: "fmtRight()" },
+        'Justify': { label: 'Jst', action: "fmtJustify()" },
+        'Grid': { label: '▦', action: "insertGrid()" }
+    };
+    const CONFIG_KEY = 'steem_float_config';
+    const DEFAULT_TOOLS =['B', 'I', 'sub', 'Link', 'H2'];
+
+    function getEnabledTools() { return JSON.parse(localStorage.getItem(CONFIG_KEY) || JSON.stringify(DEFAULT_TOOLS)); }
+    function renderFloatWidget() {
+        const enabled = getEnabledTools();
+        floatWidget.innerHTML = '';
+        enabled.forEach(key => {
+            const tool = TOOLS_MAP[key];
+            if(tool) {
+                const btn = document.createElement('button');
+                btn.className = 'fw-btn'; btn.innerHTML = tool.label;
+                btn.setAttribute('onclick', tool.action);
+                btn.onmousedown = (e) => e.preventDefault();
+                floatWidget.appendChild(btn);
+            }
+        });
+    }
+    function openSettingsModal() {
+        const enabled = getEnabledTools();
+        settingsGrid.innerHTML = '';
+        Object.keys(TOOLS_MAP).forEach(key => {
+            const div = document.createElement('div'); div.className = 'settings-item';
+            const checked = enabled.includes(key) ? 'checked' : '';
+            div.innerHTML = `<input type="checkbox" id="chk_${key}" ${checked}><label for="chk_${key}">${key}</label>`;
+            settingsGrid.appendChild(div);
+        });
+        settingsModal.style.display = 'flex';
+    }
+    function toggleSettings() { settingsModal.style.display = 'none'; }
+    function saveSettings() {
+        const newEnabled =[];
+        Object.keys(TOOLS_MAP).forEach(key => { if(document.getElementById(`chk_${key}`).checked) newEnabled.push(key); });
+        localStorage.setItem(CONFIG_KEY, JSON.stringify(newEnabled));
+        renderFloatWidget(); toggleSettings();
+    }
+
+    // --- SMART SELECTION ---
+    function getSelectionOrWord() {
+        const s = editor.selectionStart; const e = editor.selectionEnd;
+        if (s !== e) return { s, e, text: editor.value.substring(s, e) };
+        const text = editor.value;
+        let start = s; let end = e;
+        while (start > 0 && !/[\s\n]/.test(text[start - 1])) start--;
+        while (end < text.length && !/[\s\n]/.test(text[end])) end++;
+        return { s: start, e: end, text: text.substring(start, end) };
+    }
+    window.fmt = (p, s = p) => {
+        const range = getSelectionOrWord();
+        if (range.text.length === 0) {
+            editor.setRangeText(p + s, range.s, range.e, 'end');
+            editor.selectionStart = range.s + p.length; editor.selectionEnd = range.s + p.length;
+        } else { editor.setRangeText(p + range.text + s, range.s, range.e, 'select'); }
+        update();
+    }
+
+    // --- TEMPLATES & MENTIONS ---
+    const TPL_KEY = 'steem_templates'; const USERS_KEY = 'steem_users';
+    window.toggleTemplates = () => { templatesModal.style.display = (templatesModal.style.display==='flex')?'none':'flex'; if(templatesModal.style.display==='flex') renderTemplates(); }
+    window.addTemplate = () => {
+        const name = document.getElementById('tplName').value.trim(); const content = editor.value;
+        if(!name || !content) return alert("Error");
+        let tpls = JSON.parse(localStorage.getItem(TPL_KEY) || "[]"); tpls.push({ id:Date.now(), name, content });
+        localStorage.setItem(TPL_KEY, JSON.stringify(tpls)); renderTemplates();
+    }
+    function renderTemplates() {
+        const list = document.getElementById('templatesList'); list.innerHTML = '';
+        JSON.parse(localStorage.getItem(TPL_KEY) || "[]").forEach(t => { list.innerHTML += `<div class="list-item"><div class="list-text" onclick="insertTpl('${encodeURIComponent(t.content)}')">${t.name}</div><button class="draft-del" onclick="delTpl(${t.id})">x</button></div>`; });
+    }
+    window.insertTpl = (enc) => { editor.setRangeText('\n' + decodeURIComponent(enc), editor.selectionEnd, editor.selectionEnd, 'end'); update(); toggleTemplates(); }
+    window.delTpl = (id) => { let t = JSON.parse(localStorage.getItem(TPL_KEY)|| "[]"); localStorage.setItem(TPL_KEY, JSON.stringify(t.filter(x=>x.id!==id))); renderTemplates(); }
+
+    window.toggleMentions = () => { mentionsModal.style.display = (mentionsModal.style.display==='flex')?'none':'flex'; if(mentionsModal.style.display==='flex') renderMentions(); }
+    window.addMention = () => {
+        const name = document.getElementById('mentionName').value.trim().replace('@',''); if(!name) return;
+        let u = JSON.parse(localStorage.getItem(USERS_KEY) || "[]"); if(!u.includes(name)) u.push(name);
+        localStorage.setItem(USERS_KEY, JSON.stringify(u)); renderMentions();
+    }
+    function renderMentions() {
+        const list = document.getElementById('mentionsList'); list.innerHTML = '';
+        JSON.parse(localStorage.getItem(USERS_KEY) || "[]").forEach(u => { list.innerHTML += `<div class="list-item"><div class="list-text" onclick="insUser('${u}')">@${u}</div><button class="draft-del" onclick="delUser('${u}')">x</button></div>`; });
+    }
+    window.insUser = (u) => { editor.setRangeText(`@${u} `, editor.selectionStart, editor.selectionEnd, 'end'); update(); toggleMentions(); }
+    window.delUser = (u) => { let users = JSON.parse(localStorage.getItem(USERS_KEY)||"[]"); localStorage.setItem(USERS_KEY, JSON.stringify(users.filter(x=>x!==u))); renderMentions(); }
+
+    window.nativeShare = async () => { if(navigator.share) { try { await navigator.share({title: "Steem Draft", text: editor.value}); } catch(e){} } else alert("No share API"); }
+
+    // --- FLOAT WIDGET ---
+    let floatTimer;
+    function showFloat(x, y) {
+        floatWidget.style.display = 'flex';
+        const top = Math.max(10, y - 75);
+        floatWidget.style.top = top + 'px';
+        const left = Math.max(10, Math.min(window.innerWidth - floatWidget.offsetWidth - 10, x));
+        floatWidget.style.left = left + 'px';
+        floatWidget.style.transform = 'translateX(-50%)';
+        clearTimeout(floatTimer);
+        floatTimer = setTimeout(() => { floatWidget.style.display = 'none'; }, 4000);
+    }
+    document.addEventListener('selectionchange', () => {
+        if(document.activeElement !== editor) return;
+        if(window.innerWidth < 900) { floatWidget.style.display = 'flex'; clearTimeout(floatTimer); floatTimer = setTimeout(() => floatWidget.style.display='none', 4000); }
+    });
+    editor.addEventListener('mouseup', (e) => {
+        if(window.innerWidth < 900) return;
+        showFloat(e.clientX, e.clientY);
+    });
+    editor.addEventListener('keyup', () => {
+        if(window.innerWidth < 900) { floatWidget.style.display = 'flex'; clearTimeout(floatTimer); floatTimer = setTimeout(() => floatWidget.style.display='none', 4000); }
+    });
+
+    // --- STANDARD LOGIC ---
+    function isMobile() { return window.innerWidth < 900; }
+    function toggleSidebar() {
+        if(isMobile()) {
+            if(sidebar.classList.contains('active')) { sidebar.classList.remove('active'); sidebarOverlay.style.display='none'; }
+            else { sidebar.classList.add('active'); sidebarOverlay.style.display='block'; }
+        } else sidebar.classList.toggle('collapsed');
+    }
+    window.switchMobileTab = (tab, nav) => {
+        document.querySelectorAll('.nav-item').forEach(e => e.classList.remove('active')); nav.classList.add('active');
+        if(tab==='editor'){ editor.classList.add('active-tab'); editor.style.display='block'; preview.classList.remove('active-tab'); preview.style.display='none'; }
+        else { update(); editor.classList.remove('active-tab'); editor.style.display='none'; preview.classList.add('active-tab'); preview.style.display='block'; }
+    }
+
+    // Images
+    function parseImages() {
+        let text = sourceInput.value.replace(/%5B/gi, '[').replace(/%5D/gi, ']').replace(/%20/gi, ' ');
+        const seen = new Set(); imagesData =[];
+        const urlPattern = /(https?:\/\/[^\[\]\s<>"'()]+?\.(?:jpg|jpeg|png|webp|gif|svg))/gi;
+        let match; while ((match = urlPattern.exec(text)) !== null) { const url = match[0].trim(); if (!seen.has(url)) { seen.add(url); let name = url.split('/').pop().split('?')[0]; try { name = decodeURIComponent(name); } catch(e){} imagesData.push({ url, name, selected: false }); } }
+        renderGallery();
+    }
+    function renderGallery() {
+        gallery.innerHTML = '';
+        imagesData.forEach((img, idx) => {
+            const card = document.createElement('div'); card.className = `img-card ${img.selected ? 'selected' : ''}`;
+            card.onclick = (e) => { if(!e.target.classList.contains('act-btn')) { imagesData[idx].selected = !imagesData[idx].selected; renderGallery(); } };
+            card.innerHTML = `<img src="${img.url}"><div class="overlay-actions"><button class="act-btn" onclick="insertLeft('${img.url}', '${img.name}')">⬅</button><button class="act-btn" onclick="insertPlain('${img.url}', '${img.name}')">📄</button><button class="act-btn" onclick="insertRight('${img.url}', '${img.name}')">➡</button></div>`;
+            gallery.appendChild(card);
+        });
+        document.getElementById('gridBtn').innerText = `▦ Грід (${imagesData.filter(i=>i.selected).length})`;
+    }
+    function isSteemFmt() { return steemFormatToggle.checked; }
+    function isTableMode() { return tableModeToggle.checked; }
+    function afterInsert() { if(isMobile()) { sidebar.classList.remove('active'); sidebarOverlay.style.display='none'; } editor.focus(); }
+
+    // --- INSERT LOGIC ---
+    window.insertLeft = (u, a) => {
+        let html;
+        if(isTableMode()) {
+            html = `<div class="pull-left"><img src="${u}" alt="${a}"></div><div class="pull-right">TEXT</div><div class="clearfix"></div>`;
+        } else {
+            html = isSteemFmt() ? `<div class="pull-left"><img src="${u}" alt="${a}"></div>` : `<img src="${u}" alt="${a}" align="left" style="width:40%;margin:0 15px 5px 0;">`;
+        }
+        insertText(html); afterInsert();
+    };
+    window.insertRight = (u, a) => {
+        let html;
+        if(isTableMode()) {
+            html = `<div class="pull-left">TEXT</div><div class="pull-right"><img src="${u}" alt="${a}"></div><div class="clearfix"></div>`;
+        } else {
+            html = isSteemFmt() ? `<div class="pull-right"><img src="${u}" alt="${a}"></div>` : `<img src="${u}" alt="${a}" align="right" style="width:40%;margin:0 0 5px 15px;">`;
+        }
+        insertText(html); afterInsert();
+    };
+    window.insertGrid = () => {
+        const sel = imagesData.filter(i => i.selected); if(!sel.length) return;
+        let html = isSteemFmt() ? `<table style="width:100%"><tr>` : `<div style="display: flex; gap: 10px; margin-bottom: 15px;">\n`;
+        if(isSteemFmt()) { sel.forEach(img => html += `<td><img src="${img.url}" style="width:100%"></td>`); html += `</tr></table>\n`; }
+        else { sel.forEach(img => html += `<img src="${img.url}" style="flex: 1; min-width: 0;">\n`); html += `</div>\n`; }
+        insertText(html); imagesData.forEach(i => i.selected = false); renderGallery(); afterInsert();
+    }
+    window.insertPlain = (u, a) => { insertText(`![${a}](${u})`); afterInsert(); };
+    function insertText(txt) { const s=editor.selectionStart, e=editor.selectionEnd; editor.setRangeText(txt, s, e, 'end'); update(); }
+
+    window.fmtLine = (p) => { const s=editor.selectionStart, l=editor.value.lastIndexOf('\n', s-1)+1; editor.setRangeText(p, l, l, 'end'); update(); }
+    window.fmtCenter = () => { const s=editor.selectionStart, e=editor.selectionEnd; editor.setRangeText(`<div class="text-center">\n${editor.value.substring(s, e) || "Content"}\n</div>`, s, e, 'select'); update(); }
+    window.fmtJustify = () => { const s=editor.selectionStart, e=editor.selectionEnd; editor.setRangeText(`<div class="text-justify">\n${editor.value.substring(s, e) || "Text"}\n</div>`, s, e, 'select'); update(); }
+    window.fmtLeft = () => insertText(`<div class="pull-left">...</div>`);
+    window.fmtRight = () => insertText(`<div class="pull-right">...</div>`);
+    window.fmtHR = () => { const s=editor.selectionStart,e=editor.selectionEnd; editor.setRangeText(`\n\n---\n\n`,s,e,'end'); editor.selectionStart=editor.selectionEnd; update(); }
+
+    window.smartLink = () => {
+        const r=getSelectionOrWord(); const txt=r.text.trim();
+        if(/^https?:\/\//i.test(txt)) { const d=prompt("Desc:", "Link"); if(d) editor.setRangeText(`[${d}](${txt})`, r.s, r.e, 'end'); }
+        else { const u=prompt("URL:", "https://"); if(u) editor.setRangeText(`[${txt||'Text'}](${u})`, r.s, r.e, 'end'); }
+        update();
+    }
+    window.addTable = () => insertText(`\n| H1 | H2 |\n|---|---|\n| D1 | D2 |\n`);
+    window.blockCode4Spaces = () => { const s=editor.selectionStart, e=editor.selectionEnd, txt=editor.value.substring(s, e); const indented = txt.split('\n').map(l => '    ' + l).join('\n'); editor.setRangeText('\n' + indented + '\n', s, e, 'select'); update(); };
+    window.undo = () => document.execCommand('undo'); window.redo = () => document.execCommand('redo');
+
+    const STORAGE_KEY = 'steem_drafts_v1';
+    window.saveDraft = () => {
+        const content = editor.value.trim(); if(!content) return alert("Empty!");
+        const lines = content.split('\n'); let title = lines[0].replace(/[#*`]/g, '').trim().substring(0, 50) || "Untitled";
+        const draft = { id: Date.now(), title: title, body: content, date: new Date().toLocaleString() };
+        let drafts = JSON.parse(localStorage.getItem(STORAGE_KEY) || "[]"); drafts.unshift(draft);
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(drafts)); alert("Saved!");
+    }
+    window.toggleDrafts = () => { if(draftsModal.style.display==='flex') draftsModal.style.display='none'; else { renderDraftsList(); draftsModal.style.display='flex'; } }
+    function renderDraftsList() {
+        const drafts = JSON.parse(localStorage.getItem(STORAGE_KEY) || "[]"); draftsList.innerHTML = '';
+        if(!drafts.length) { draftsList.innerHTML = '<div style="color:#666; text-align:center;">Empty</div>'; return; }
+        drafts.forEach(d => {
+            const el = document.createElement('div'); el.className = 'draft-item';
+            el.innerHTML = `<div class="draft-info" onclick="loadDraft(${d.id})"><div class="draft-title">${d.title}</div><div class="draft-date">${d.date}</div></div><button class="draft-del" onclick="deleteDraft(${d.id})">Del</button>`;
+            draftsList.appendChild(el);
+        });
+    }
+    window.loadDraft = (id) => { const drafts = JSON.parse(localStorage.getItem(STORAGE_KEY)||"[]"); const d=drafts.find(x=>x.id===id); if(d && confirm("Load?")) { editor.value=d.body; update(); toggleDrafts(); } }
+    window.deleteDraft = (id) => { if(!confirm("Delete?")) return; let ds=JSON.parse(localStorage.getItem(STORAGE_KEY)||"[]"); ds=ds.filter(x=>x.id!==id); localStorage.setItem(STORAGE_KEY, JSON.stringify(ds)); renderDraftsList(); }
+
+    const TAGS_KEY = 'steem_tags';
+    const DEFAULT_TAGS =["hive-145157", "ukraine", "steemexclusive", "club5050", "poetry", "ua", "art", "photography", "life", "blog"];
+    window.openPublishModal = () => {
+        const content = editor.value.trim(); if(!content) return alert("Write something!");
+        let titleGuess = content.split('\n')[0].replace(/[#]/g, '').trim().substring(0, 100);
+        pubTitle.value = titleGuess; pubUsername.value = localStorage.getItem('steem_username') || '';
+        pubApp.value = localStorage.getItem('steem_app_name') || 'steem-editor/26.0';
+        document.getElementById('previewSnippet').innerText = content.substring(0, 50) + "...";
+        pubLog.style.display = 'none'; btnSubmitPub.disabled = false;
+        const savedTags = JSON.parse(localStorage.getItem(TAGS_KEY) || "[]");
+        const allTags = [...new Set([...DEFAULT_TAGS, ...savedTags])];
+        quickTagsContainer.innerHTML = '';
+        allTags.forEach(t => { const chip = document.createElement('div'); chip.className = 'tag-chip'; chip.innerText = t; chip.onclick = () => addTag(t); quickTagsContainer.appendChild(chip); });
+        publishModal.style.display = 'flex';
+    }
+    window.addTag = (t) => { let curr = pubTags.value.trim(); if(!curr.includes(t)) pubTags.value = curr ? curr + " " + t : t; }
+    window.closePublishModal = () => publishModal.style.display = 'none';
+
+    // --- АВТОРИЗАЦІЯ ---
+    window.showAuth = (type) => {
+        selectedAuth = type;
+        document.getElementById('btnKey').style.borderColor = type==='KEY'?'var(--primary)':'var(--border)';
+        document.getElementById('btnKeychain').style.borderColor = type==='KEYCHAIN'?'var(--primary)':'var(--border)';
+        keyContainer.style.display = type==='KEY'?'block':'none';
+
+        const authContainer = document.getElementById('keychainAuthContainer');
+        if (authContainer) authContainer.style.display = type==='KEYCHAIN'?'block':'none';
+    }
+
+    // НОВА ФУНКЦІЯ ПЕРЕВІРКИ АКАУНТА ЧЕРЕЗ KEYCHAIN
+    window.verifyKeychain = () => {
+        const user = String(pubUsername.value).trim();
+        if(!user) return alert("Будь ласка, спочатку введіть ваш нікнейм у поле 'User'!");
+        if(!window.steem_keychain) return alert("Розширення Steem Keychain не знайдено у вашому браузері!");
+
+        // Формуємо простий запит (повідомлення) на підпис від застосунка для перевірки нікнейму
+        const message = "Авторизація в Steem Editor\nКористувач: " + user + "\nЧас: " + new Date().toLocaleString();
+
+        window.steem_keychain.requestSignBuffer(user, message, "Posting", (res) => {
+            if(res.success) {
+                showLog(`✅ Успішна авторизація для @${user}! Ви є власником акаунта.`, "success");
+            } else {
+                showLog(`❌ Відмовлено: ${res.message}`, "error");
+            }
+        });
+    }
+
+    function showLog(msg, type) { pubLog.style.display = 'block'; pubLog.className = 'pub-log ' + type; pubLog.innerHTML = msg; }
+
+    // --- ПУБЛІКАЦІЯ ---
+    window.submitToSteem = () => {
+        const user = String(pubUsername.value).trim(); const title = String(pubTitle.value).trim(); const tagsRaw = String(pubTags.value).trim(); const wif = String(pubWif.value).trim(); const body = String(editor.value); const appName = String(pubApp.value).trim() || 'steem-editor/26.0';
+        if(!user || !title || !tagsRaw) return alert("Fields required!"); if(selectedAuth === 'KEY' && !wif) return alert("Key required!");
+        showLog("⏳ Starting...", "loading"); btnSubmitPub.disabled = true;
+        localStorage.setItem('steem_username', user); localStorage.setItem('steem_app_name', appName);
+        let tagsArray = tagsRaw.split(' ').map(t => t.trim()).filter(t => t); if (tagsArray.length === 0) tagsArray = ['blog'];
+        const savedTags = JSON.parse(localStorage.getItem(TAGS_KEY) || "[]"); tagsArray.forEach(t => { if(!savedTags.includes(t) && !DEFAULT_TAGS.includes(t)) savedTags.push(t); }); localStorage.setItem(TAGS_KEY, JSON.stringify(savedTags));
+        const parentPermlink = tagsArray[0]; const permlink = title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').substring(0, 200) + '-' + Date.now();
+        const meta = JSON.stringify({ tags: tagsArray, app: appName, format: 'markdown' });
+
+        if(selectedAuth === 'KEYCHAIN') {
+            if(!window.steem_keychain) { showLog("❌ Keychain not found.", "error"); btnSubmitPub.disabled = false; return; }
+            showLog("⏳ Очікування підтвердження транзакції у розширенні Keychain...", "loading");
+            const timeout = setTimeout(() => { showLog("❌ Час очікування вичерпано.", "error"); btnSubmitPub.disabled = false; }, 60000); // Збільшено до 60 секунд
+
+            // ВИПРАВЛЕНО: додано порожній рядок '' перед колбеком, щоб колбек став 9-м аргументом!
+            window.steem_keychain.requestPost(user, title, body, parentPermlink, '', meta, permlink, '', (res) => {
+                clearTimeout(timeout);
+                if(res.success) {
+                    showLog(`✅ <a href="https://steemit.com/${parentPermlink}/@${user}/${permlink}" target="_blank">Опубліковано! View Post</a>`, "success");
+                } else {
+                    showLog("❌ " + res.message, "error");
+                    btnSubmitPub.disabled = false;
+                }
+            });
+        } else {
+            try {
+                steem.api.setOptions({ url: 'https://api.steemit.com' });
+                steem.broadcast.comment(wif, '', parentPermlink, user, permlink, title, body, meta, function(err, result) { if(err) { showLog("❌ " + err.message, "error"); btnSubmitPub.disabled = false; } else { showLog(`✅ Published!`, "success"); pubWif.value=''; } });
+            } catch(e) { showLog("❌ " + e.message, "error"); btnSubmitPub.disabled = false; }
+        }
+    }
+    window.exportFile = () => { let text = editor.value.replace(/([^\n])\n(?!\n)/g, '$1  \n'); const a = document.createElement("a"); a.href = URL.createObjectURL(new Blob([text], {type: "text/markdown"})); a.download = `post_${new Date().toISOString().slice(0,10)}.md`; a.click(); }
+
+    function updateStats() { const txt = editor.value.trim(); const w = txt ? txt.split(/\s+/).length : 0; const c = txt.length; statusBar.innerText = `W: ${w} | C: ${c}`; }
+    function update() { try { preview.innerHTML = marked.parse(editor.value); } catch(e){} updateStats(); }
+    const AUTOSAVE_KEY = 'steem_autosave_temp';
+    if(localStorage.getItem(AUTOSAVE_KEY)) editor.value = localStorage.getItem(AUTOSAVE_KEY);
+    editor.addEventListener('input', () => { localStorage.setItem(AUTOSAVE_KEY, editor.value); update(); });
+    sourceInput.addEventListener('input', parseImages);
+    editor.addEventListener('drop', () => setTimeout(update, 50));
+
+    renderFloatWidget(); parseImages(); showAuth('KEY'); updateStats();
+</script>
+</body>
+</html>
