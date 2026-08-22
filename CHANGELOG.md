@@ -1,4 +1,10 @@
 # Changelog
+## [2026-08-22] - Version 4.6.2 (ultrasteemeditor/4.6.2)
+### Added & Improved
+- **PWA Installation Experience & Guidance**: Added floating promotion banner with direct installation triggers and comprehensive step-by-step PWA setup instructions for iOS Safari, Android Chrome/Edge, and Desktop browsers.
+- **Native Desktop & Neutralino Safeguards**: Implemented safe fullscreen guards for Neutralino.js and Tauri runtime environments, preventing webkit HTML5 event interference.
+- **Cross-Platform Version Release Sync**: Updated version references across Web app manifests, Tauri, Neutralino, App Agent strings, and Steem metadata to `4.6.2`.
+
 ## [2026-08-22] - Version 4.6.1 (ultrasteemeditor/4.6.1)
 ### Added & Improved
 - **Production Cursor Synchronization & Unclosed Tag Stability**: Hardened markdown-to-visual cursor restoration across production builds and WebView environments. Optimized zero-width sentinel tracking and positional distance scoring to seamlessly handle unclosed formatting tags (`**`, `__`, `*`) amidst repetitive blocks.
