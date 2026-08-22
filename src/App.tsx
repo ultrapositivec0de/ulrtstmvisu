@@ -1923,6 +1923,7 @@ function App() {
 
   const editorRef = useRef<HTMLTextAreaElement>(null);
   const cursorPositionRef = useRef<{start: number, end: number} | null>(null);
+  const isTransitioningModeRef = useRef<boolean>(false);
   const previewPaneRef = useRef<HTMLDivElement>(null);
 
   const [onDemandSyncEnabled, setOnDemandSyncEnabled] = useState<boolean>(() => {
@@ -2948,6 +2949,7 @@ function App() {
 
   // Bidirectional sync: sync content to visual editor unless visual editor currently has focus
   useEffect(() => {
+    if (isTransitioningModeRef.current) return;
     if (editorMode === 'visual' && wysiwygRef.current && !isEditorFocused && !wysiwygRef.current.contains(document.activeElement) && useEditorStore.getState().content !== lastSyncContentRef.current) {
       if (isInitialLoadRef.current) {
         isInitialLoadRef.current = false;
@@ -3422,6 +3424,8 @@ function App() {
   const handleSetEditorMode = useCallback((mode: 'visual' | 'markdown') => {
     if (editorMode === mode) return;
 
+    isTransitioningModeRef.current = true;
+    hasRestoredInitialCursorRef.current = true;
     localStorage.setItem('steem_editor_mode', mode);
 
     // Immediately reset active formats to prevent phantom button highlighting during transition
@@ -3436,42 +3440,59 @@ function App() {
     });
 
     if (mode === 'visual') {
+      let start = 0;
+      let end = 0;
+      let val = useEditorStore.getState().content;
+
       if (editorRef.current) {
-        const val = editorRef.current.value;
-        const start = editorRef.current.selectionStart ?? 0;
-        const end = editorRef.current.selectionEnd ?? start;
-        const pos = getRowColFromOffset(val, start);
-        cursorPositionRef.current = { start, end };
-        try {
-          localStorage.setItem('steem_editor_cursor', JSON.stringify({ start, end }));
-        } catch {
-          /* ignore storage error */
-        }
-        useEditorStore.setState({
-          content: val,
-          cursor: pos,
-          selectionStart: start,
-          selectionEnd: end
-        });
+        val = editorRef.current.value;
+        start = editorRef.current.selectionStart ?? 0;
+        end = editorRef.current.selectionEnd ?? start;
+      } else if (cursorPositionRef.current) {
+        start = cursorPositionRef.current.start;
+        end = cursorPositionRef.current.end;
       }
+
+      const pos = getRowColFromOffset(val, start);
+      const cursorObj = { start, end };
+      cursorPositionRef.current = cursorObj;
+      try {
+        localStorage.setItem('steem_editor_cursor', JSON.stringify(cursorObj));
+      } catch {
+        /* ignore storage error */
+      }
+
+      useEditorStore.setState({
+        content: val,
+        cursor: pos,
+        selectionStart: start,
+        selectionEnd: end
+      });
+
       saveCursorPosition();
-      
+
       // Update lastSyncContentRef so background useEffect won't trigger another innerHTML wipe
-      lastSyncContentRef.current = useEditorStore.getState().content;
+      lastSyncContentRef.current = val;
       setEditorMode('visual');
-      
+
       setTimeout(async () => {
-        await syncCursorMarkdownToVisual();
-        if (wysiwygRef.current) {
-          wysiwygRef.current.focus({ preventScroll: true });
-          saveVisualSelection();
+        try {
+          await syncCursorMarkdownToVisual();
+          if (wysiwygRef.current) {
+            wysiwygRef.current.focus({ preventScroll: true });
+            saveVisualSelection();
+          }
+        } finally {
+          setTimeout(() => {
+            isTransitioningModeRef.current = false;
+          }, 300);
         }
       }, 50);
     } else {
       saveVisualSelection();
       isSyncingRef.current = true;
       const syncResult = syncCursorVisualToMarkdown();
-      
+
       // Always synchronize when switching from visual to markdown code
       if (syncResult && syncResult.md) {
         if (syncResult.md !== useEditorStore.getState().content) {
@@ -3487,7 +3508,13 @@ function App() {
 
       requestAnimationFrame(() => {
         setTimeout(() => {
-          restoreMarkdownCursorAndScroll();
+          try {
+            restoreMarkdownCursorAndScroll();
+          } finally {
+            setTimeout(() => {
+              isTransitioningModeRef.current = false;
+            }, 200);
+          }
         }, 50);
       });
     }
