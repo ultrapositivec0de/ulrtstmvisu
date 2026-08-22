@@ -37,7 +37,7 @@ jobs:
           VERSION=$(node -p "require('./package.json').version")
           echo "version=$VERSION" >> $GITHUB_OUTPUT
 
-      - name: Verify and Tag Neutralino Artifacts
+      - name: Prepare Neutralino Release Artifact
         shell: bash
         run: |
           VERSION="${{ steps.package-version.outputs.version }}"
@@ -45,10 +45,10 @@ jobs:
           if [ -d "$DIST_DIR" ]; then
             cd "$DIST_DIR"
             if [ -f "ultra-steem-editor-release.zip" ]; then
-              cp -f "ultra-steem-editor-release.zip" "ultra-steem-editor-v${VERSION}-neutralino.zip"
-              cp -f "ultra-steem-editor-release.zip" "ultra-steem-editor-v${VERSION}-neutralino-release.zip"
-              echo "Created versioned Neutralino release artifacts:"
-              ls -la ultra-steem-editor-v*.zip
+              mv -f "ultra-steem-editor-release.zip" "ultra-steem-editor-v${VERSION}-neutralino.zip"
+              rm -f ultra-steem-editor-*-release.zip
+              echo "Created versioned Neutralino release artifact:"
+              ls -la "ultra-steem-editor-v${VERSION}-neutralino.zip"
             fi
           fi
 
@@ -60,7 +60,5 @@ jobs:
           draft: true
           files: |
             neutralino-build/dist/ultra-steem-editor-v${{ steps.package-version.outputs.version }}-neutralino.zip
-            neutralino-build/dist/ultra-steem-editor-v${{ steps.package-version.outputs.version }}-neutralino-release.zip
-            neutralino-build/dist/*
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

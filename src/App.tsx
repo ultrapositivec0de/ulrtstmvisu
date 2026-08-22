@@ -218,19 +218,26 @@ const IconButton = ({
 
 const APP_CHANGELOG = [
   {
-    version: "v4.6.3",
+    version: "v4.6.4",
+    date: "2026-08-22",
+    changes: [
+      "Cross-platform release synchronization and system improvements."
+    ]
+  },
+  {
+    version: "v4.6.4",
     date: "2026-08-22",
     changes: [
       "Integrated unified automated version bump mechanism across all build targets"
     ]
   },
   {
-    version: "v4.6.3",
+    version: "v4.6.4",
     date: "2026-08-22",
     changes: [
       "PWA Installation Guidance: Added floating promotion banner with direct installation triggers and step-by-step PWA setup instructions for iOS, Android, and Desktop.",
       "Native Desktop & Neutralino Safeguards: Implemented safe fullscreen guards for Neutralino.js and Tauri desktop runtimes, preventing HTML5 event conflicts.",
-      "Cross-Platform Release Sync: Synchronized application version to v4.6.3 across Web, Tauri, Neutralino, and Steem blockchain broadcasting metadata."
+      "Cross-Platform Release Sync: Synchronized application version to v4.6.4 across Web, Tauri, Neutralino, and Steem blockchain broadcasting metadata."
     ]
   },
   {
@@ -1650,7 +1657,7 @@ function App() {
   const [pubTitle, setPubTitle] = useState('');
   const [removeTitleLine, setRemoveTitleLine] = useState(() => localStorage.getItem('steem_remove_title_line') !== 'false');
   const [pubTags, setPubTags] = useState('');
-  const [appAgent, setAppAgent] = useState(localStorage.getItem('steem_app_agent') || 'ultrasteemeditor/4.6.3');
+  const [appAgent, setAppAgent] = useState(localStorage.getItem('steem_app_agent') || 'ultrasteemeditor/4.6.4');
   const [rewardType, setRewardType] = useState<'SP' | '50' | '0'>( (localStorage.getItem('steem_reward_type') as any) || '50');
   const [beneficiaries, setBeneficiaries] = useState<{account: string, weight: number}[]>([]);
   const [benName, setBenName] = useState('');
@@ -2369,8 +2376,18 @@ function App() {
           const targetNode = cursorNode || lastNode;
           if (targetNode) {
             const el = targetNode.nodeType === Node.TEXT_NODE ? targetNode.parentElement : targetNode as HTMLElement;
-            if (el && el.scrollIntoView && el !== wysiwygRef.current) {
-              el.scrollIntoView({ behavior: 'auto', block: 'center' });
+            if (el && el !== wysiwygRef.current) {
+              const scrollElIntoEditor = (targetEl: HTMLElement) => {
+                if (!wysiwygRef.current) return;
+                const container = wysiwygRef.current;
+                const elRect = targetEl.getBoundingClientRect();
+                const containerRect = container.getBoundingClientRect();
+                if (elRect.top < containerRect.top || elRect.bottom > containerRect.bottom) {
+                  container.scrollTop += (elRect.top - containerRect.top) - (containerRect.height / 2) + (elRect.height / 2);
+                }
+              };
+              
+              scrollElIntoEditor(el);
 
               // Keep cursor aligned if there are loading images that shift layout heights
               const images = wysiwygRef.current.querySelectorAll('img');
@@ -2378,7 +2395,7 @@ function App() {
                 if (!img.complete) {
                   img.addEventListener('load', () => {
                     if (wysiwygRef.current && wysiwygRef.current.contains(el)) {
-                      el.scrollIntoView({ behavior: 'auto', block: 'center' });
+                      scrollElIntoEditor(el);
                     }
                   }, { once: true });
                 }
@@ -2387,13 +2404,13 @@ function App() {
               // Fallbacks for deferred loading or style calculations
               setTimeout(() => {
                 if (wysiwygRef.current && wysiwygRef.current.contains(el)) {
-                  el.scrollIntoView({ behavior: 'auto', block: 'center' });
+                  scrollElIntoEditor(el);
                   wysiwygRef.current.focus({ preventScroll: true });
                 }
               }, 100);
               setTimeout(() => {
                 if (wysiwygRef.current && wysiwygRef.current.contains(el)) {
-                  el.scrollIntoView({ behavior: 'auto', block: 'center' });
+                  scrollElIntoEditor(el);
                   wysiwygRef.current.focus({ preventScroll: true });
                 }
               }, 300);
@@ -9011,14 +9028,14 @@ function App() {
                     showWidget(e.clientX, e.clientY);
                   }}
                   className={cn(
-                    "flex-1 w-full bg-transparent text-base outline-none resize-none custom-scrollbar transition-all duration-700 editor-font",
+                    "flex-1 w-full bg-transparent text-base outline-none resize-none custom-scrollbar transition-all duration-700 editor-font overscroll-contain",
                     (visualStyle === 'neon' && neonTextColored) ? "text-cyan-400 font-normal" : "text-slate-300",
                     beautifyEnabled ? "px-4 lg:px-8 pt-4 lg:pt-6 max-w-[clamp(40rem,60vw,80rem)] mx-auto selection:bg-[rgb(var(--accent-color)/0.3)]" : "px-3 pt-3 lg:px-6 lg:pt-6",
                     isKeyboardOpen 
-                      ? "pb-32 mb-[4.5rem] lg:pb-24 lg:mb-[5rem]" 
+                      ? "pb-24 mb-2 lg:pb-20 lg:mb-4" 
                       : (isEditorFullScreen || isFullScreen
-                          ? "pb-32 mb-[4.5rem] lg:pb-24 lg:mb-[5rem]"
-                          : "pb-36 mb-[4.5rem] lg:pb-24 lg:mb-[5rem]")
+                          ? "pb-24 mb-2 lg:pb-20 lg:mb-4"
+                          : "pb-24 mb-[5rem] lg:pb-20 lg:mb-4")
                   )}
                   placeholder={`${t('placeholder')}\n\n\n\n\nОМ АХ ХУМ СО ХА\n♡`}
                 />
@@ -9230,14 +9247,14 @@ function App() {
                     saveVisualSelection();
                   }}
                   className={cn(
-                    "flex-1 w-full bg-transparent text-base outline-none overflow-y-auto custom-scrollbar transition-colors duration-700 editor-font prose prose-invert prose-cyan max-w-none wysiwyg-editor break-words",
+                    "flex-1 w-full bg-transparent text-base outline-none overflow-y-auto custom-scrollbar transition-colors duration-700 editor-font prose prose-invert prose-cyan max-w-none wysiwyg-editor break-words overscroll-contain",
                     (visualStyle === 'neon' && neonTextColored) ? "text-cyan-400 font-normal" : "text-slate-300",
                     beautifyEnabled ? "px-4 lg:px-8 pt-4 lg:pt-6 max-w-4xl mx-auto selection:bg-[rgb(var(--accent-color)/0.3)]" : "px-4 pt-4 lg:px-6 lg:pt-6",
                     isKeyboardOpen 
-                      ? "pb-32 mb-[4.5rem] lg:pb-24 lg:mb-[5rem]" 
+                      ? "pb-24 mb-2 lg:pb-20 lg:mb-4" 
                       : (isEditorFullScreen || isFullScreen
-                          ? "pb-32 mb-[4.5rem] lg:pb-24 lg:mb-[5rem]"
-                          : "pb-36 mb-[4.5rem] lg:pb-24 lg:mb-[5rem]")
+                          ? "pb-24 mb-2 lg:pb-20 lg:mb-4"
+                          : "pb-24 mb-[5rem] lg:pb-20 lg:mb-4")
                   )}
                   style={{ minHeight: '200px' }}
                 />
@@ -11668,7 +11685,7 @@ function App() {
                     <div className="pt-4 space-y-3">
                       <div className="flex justify-between text-xs items-center">
                         <span className="text-slate-500">{t('version')}</span>
-                        <span className="bg-cyan-500/10 text-cyan-400 px-2 py-1 rounded-md font-mono font-bold">4.6.3</span>
+                        <span className="bg-cyan-500/10 text-cyan-400 px-2 py-1 rounded-md font-mono font-bold">4.6.4</span>
                       </div>
                       <div className="flex justify-between text-xs items-center">
                         <span className="text-slate-500">{t('license')}</span>
@@ -12616,11 +12633,11 @@ function App() {
                        <div className="w-16 h-16 bg-cyan-500/10 rounded-2xl mx-auto flex items-center justify-center text-cyan-400 font-black text-2xl shadow-xl shadow-cyan-500/10">S</div>
                        <div>
                          <h3 className="text-xl font-black tracking-tight">SteemEditor <span className="text-cyan-400">Pro</span></h3>
-                         <p className="text-[10px] text-slate-500 uppercase font-black tracking-[0.2em] pt-1">Version 4.6.3 "Quantum"</p>
+                         <p className="text-[10px] text-slate-500 uppercase font-black tracking-[0.2em] pt-1">Version 4.6.4 "Quantum"</p>
                        </div>
                        <label className="text-[10px] font-black text-slate-500 uppercase tracking-[0.2em] px-1 pt-4 block border-t border-slate-800">Changelog & Updates</label>
                         <div className="mt-2 p-3 bg-slate-950 border border-cyan-500/20 rounded-xl text-left">
-                          <p className="text-xs text-slate-300 font-medium">New in v4.6.3: Enhanced PWA Installation Guidance, Desktop Safeguards & Universal Cross-Platform Version Sync</p>
+                          <p className="text-xs text-slate-300 font-medium">New in v4.6.4: Enhanced PWA Installation Guidance, Desktop Safeguards & Universal Cross-Platform Version Sync</p>
                         </div>
                        
                        <div className="space-y-2 max-h-60 overflow-y-auto custom-scrollbar bg-slate-900 border border-slate-800 rounded-xl p-3">
@@ -12719,7 +12736,7 @@ function App() {
                                   localStorage.setItem('steem_app_agent', e.target.value);
                                 }}
                                 className="w-full bg-slate-900 border border-slate-700 rounded-lg p-2.5 text-xs text-slate-200 outline-none focus:ring-1 focus:ring-cyan-500"
-                                placeholder="ultrasteemeditor/4.6.3"
+                                placeholder="ultrasteemeditor/4.6.4"
                               />
                             </div>
                           </motion.div>

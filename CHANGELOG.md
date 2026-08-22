@@ -1,4 +1,8 @@
 # Changelog
+## [2026-08-22] - Version 4.6.4 (ultrasteemeditor/4.6.4)
+### Added & Improved
+- **Release Updates**: Cross-platform release synchronization and system improvements.
+
 ## [2026-08-22] - Version 4.6.3 (ultrasteemeditor/4.6.3)
 ### Added & Improved
 - **Release Updates**: Integrated unified automated version bump mechanism across all build targets
