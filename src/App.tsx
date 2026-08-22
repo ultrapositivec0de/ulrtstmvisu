@@ -9,7 +9,7 @@ import {
   Trash2, X, ChevronLeft, ChevronRight, ChevronUp, ChevronDown,
   Eye, EyeOff, Edit3, Plus, ShieldCheck, Key,
   Search, List as ListIcon, Lock, LayoutGrid, Maximize2, Minimize2, Calendar, Tags, Shield, Bell, ArrowRight, Clock,
-  Code, Terminal, Indent, Layers, CheckCircle, PlusCircle, Check, AlignLeft, AlignRight, Rows, Columns, PanelLeft, PanelRight, PanelLeftClose, PanelLeftOpen, Moon, Sun, FilePlus, Zap, MoveVertical, Info, Globe, FileUp, FileDown, Copy, SplitSquareHorizontal, Type, Download, Sparkles, Images
+  Code, Terminal, Indent, Layers, CheckCircle, PlusCircle, Check, AlignLeft, AlignRight, Rows, Columns, PanelLeft, PanelRight, PanelLeftClose, PanelLeftOpen, Moon, Sun, FilePlus, Zap, MoveVertical, Info, Globe, FileUp, FileDown, Copy, SplitSquareHorizontal, Type, Download, Sparkles, Images, ExternalLink
 } from 'lucide-react';
 import { motion, AnimatePresence, Reorder } from 'motion/react';
 import { marked } from 'marked';
@@ -2471,7 +2471,7 @@ function App() {
       const targetTable = allDomTables[tableIndex - 1] || allDomTables[0];
       if (targetTable) {
         const allTrs = Array.from(targetTable.querySelectorAll('tr'));
-        let targetTrIdx = 0;
+        let targetTrIdx: number;
         if (isHeaderDivider) {
           targetTrIdx = 0;
         } else if (rowInTable >= 2) {
@@ -2618,7 +2618,7 @@ function App() {
       return { node: container, offset: 0 };
     }
     
-    let targetBlock: Element | null = null;
+    let targetBlock: Element;
     
     if (cleanLineText === '') {
       const idealIdx = Math.min(blocks.length - 1, Math.floor((lineIdx / Math.max(1, lines.length)) * blocks.length));
@@ -4307,7 +4307,7 @@ function App() {
         }
 
         if (activeElement) {
-          let isAtEnd = false;
+          let isAtEnd: boolean;
           if (range.startContainer.nodeType === Node.TEXT_NODE) {
             const textContent = range.startContainer.textContent || '';
             const offset = range.startOffset;
@@ -6869,7 +6869,7 @@ function App() {
     );
     if (!confirmed) return;
 
-    let cleared = false;
+    const cleared = true;
     
     // Clear Web LocalStorage caches (safe temporary keys only)
     localStorage.removeItem('steem_gallery_cache_results');
@@ -6878,14 +6878,12 @@ function App() {
     
     // Clear session storage
     sessionStorage.clear();
-    cleared = true;
 
     // Clear Service Worker / CacheStorage API caches if present (Web & PWA & WebView)
     if (typeof caches !== 'undefined') {
       try {
         const cacheKeys = await caches.keys();
         await Promise.all(cacheKeys.map(k => caches.delete(k)));
-        cleared = true;
       } catch (cErr) {
         console.debug("CacheStorage clear skipped:", cErr);
       }
@@ -6930,7 +6928,6 @@ function App() {
                     const targetPath = await pathModule.join(dirToScan, entry.name);
                     try {
                       await fsModule.remove(targetPath, { recursive: true });
-                      cleared = true;
                     } catch (err: any) {
                       console.debug("Failed to remove cache path:", err);
                     }
@@ -6943,7 +6940,6 @@ function App() {
                           const targetPath = await pathModule.join(defaultPath, defEntry.name);
                           try {
                             await fsModule.remove(targetPath, { recursive: true });
-                            cleared = true;
                           } catch (err: any) {
                             console.debug("Failed to remove webview cache path:", err);
                           }
@@ -6956,7 +6952,6 @@ function App() {
                     const targetPath = await pathModule.join(dirToScan, entry.name);
                     try {
                       await fsModule.remove(targetPath, { recursive: true });
-                      cleared = true;
                     } catch (err: any) {
                       console.debug("Failed to remove webkit dir:", err);
                     }
@@ -8052,22 +8047,22 @@ function App() {
 
           <div className="h-6 w-px bg-slate-800 mx-0.5 xs:mx-1 shrink-0" />
 
-          {activeView === 'editor' && (
-            <div className="flex items-center gap-1 bg-slate-800/30 p-1 rounded-xl border border-slate-700/30 shrink-0">
-               {!isPwaInstalled && !isTauriEnv() && !isNeutralinoEnv() && (
-                 <IconButton 
-                   icon={Download} 
-                   onClick={handleInstallPwa} 
-                   title={t('installApp')} 
-                   className="shrink-0 size-8 flex text-cyan-400 bg-cyan-950/40 border border-cyan-800/40 hover:bg-cyan-900/60" 
-                 />
-               )}
-               <IconButton icon={ShieldUserIcon} onClick={() => setActiveModal('keys')} title={t('keys')} className="shrink-0 size-8 flex" />
-               <IconButton icon={Settings} onClick={() => { setSettingsTab('general'); setActiveModal('settings'); }} title={t('settings')} className="shrink-0 size-8 flex" />
+          <div className="flex items-center gap-1 bg-slate-800/30 p-1 rounded-xl border border-slate-700/30 shrink-0">
+            {!isPwaInstalled && !isTauriEnv() && !isNeutralinoEnv() && (
+              <IconButton 
+                icon={Download} 
+                onClick={handleInstallPwa} 
+                title={t('installApp') || "Встановити PWA"} 
+                className="shrink-0 size-8 flex text-cyan-400 bg-cyan-950/60 border border-cyan-800/60 hover:bg-cyan-900/80 active:scale-95 transition-transform" 
+              />
+            )}
+            <IconButton icon={ShieldUserIcon} onClick={() => setActiveModal('keys')} title={t('keys')} className="shrink-0 size-8 flex" />
+            <IconButton icon={Settings} onClick={() => { setSettingsTab('general'); setActiveModal('settings'); }} title={t('settings')} className="shrink-0 size-8 flex" />
 
-                <IconButton icon={Rocket} onClick={() => setActiveModal('publish')} title={t('publish')} className={cn("shrink-0 size-8 bg-cyan-600 text-white hover:bg-cyan-500 border border-cyan-500/30 transition-all", performanceMode ? "shadow-none" : "shadow-lg shadow-cyan-500/30 hover:scale-105 active:scale-95")} />
-            </div>
-          )}
+            {activeView === 'editor' && (
+              <IconButton icon={Rocket} onClick={() => setActiveModal('publish')} title={t('publish')} className={cn("shrink-0 size-8 bg-cyan-600 text-white hover:bg-cyan-500 border border-cyan-500/30 transition-all", performanceMode ? "shadow-none" : "shadow-lg shadow-cyan-500/30 hover:scale-105 active:scale-95")} />
+            )}
+          </div>
         </div>
       </header>
 
@@ -12749,6 +12744,17 @@ function App() {
                           </div>
                         ) : (
                           <div className="space-y-3">
+                            {typeof window !== 'undefined' && window.self !== window.top && (
+                              <a
+                                href={window.location.href}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="w-full py-2.5 px-3 rounded-xl font-bold text-xs text-amber-300 hover:text-amber-200 bg-amber-500/10 border border-amber-500/30 transition-colors flex items-center justify-center gap-2"
+                              >
+                                <ExternalLink size={14} />
+                                Відкрити в окремій вкладці для PWA
+                              </a>
+                            )}
                             <button
                               onClick={handleInstallPwa}
                               className="w-full py-3 px-4 rounded-xl font-black text-xs uppercase tracking-wider transition-all flex items-center justify-center gap-2 shadow-lg bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-white shadow-cyan-500/20 active:scale-95 cursor-pointer"
@@ -12886,6 +12892,38 @@ function App() {
               </div>
 
               <div className="space-y-3.5 text-xs text-slate-300">
+                {/* Direct Action Button if browser prompt is available */}
+                {deferredPrompt && (
+                  <button
+                    onClick={() => {
+                      setShowPwaInstructionsModal(false);
+                      handleInstallPwa();
+                    }}
+                    className="w-full py-3 px-4 bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-white font-black text-xs uppercase tracking-wider rounded-2xl shadow-lg shadow-cyan-500/25 transition-all flex items-center justify-center gap-2 cursor-pointer active:scale-95"
+                  >
+                    <Download size={18} />
+                    {t('installApp') || "Встановити додаток зараз"}
+                  </button>
+                )}
+
+                {/* If inside iframe preview */}
+                {typeof window !== 'undefined' && window.self !== window.top && (
+                  <div className="p-3 bg-amber-500/10 border border-amber-500/30 rounded-2xl space-y-2">
+                    <p className="text-[11px] text-amber-300 leading-relaxed font-medium">
+                      ℹ️ У режимі іфрейму (попереднього перегляду) браузери блокують прямий виклик встановлення. Відкрийте застосунок у новій вкладці для прямого встановлення на пристрій:
+                    </p>
+                    <a
+                      href={window.location.href}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="w-full py-2 px-3 bg-amber-500/20 hover:bg-amber-500/30 border border-amber-500/40 text-amber-200 font-bold text-xs rounded-xl transition-colors flex items-center justify-center gap-2 text-center"
+                    >
+                      <ExternalLink size={14} />
+                      Відкрити в окремій вкладці
+                    </a>
+                  </div>
+                )}
+
                 {/* iOS / Safari */}
                 <div className="p-3.5 bg-slate-950/70 rounded-2xl border border-slate-800/80 space-y-1.5">
                   <div className="font-bold text-cyan-400 flex items-center gap-1.5">

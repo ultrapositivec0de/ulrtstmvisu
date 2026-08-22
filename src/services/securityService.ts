@@ -274,7 +274,7 @@ export class SecurityService {
       }
     } catch(e: any) {
       if(e.message && e.message.includes('missing required posting authority')) {
-         throw new Error("Invalid Posting Key or unauthorized.");
+         throw new Error("Invalid Posting Key or unauthorized.", { cause: e });
       }
       throw e;
     }
@@ -297,7 +297,7 @@ export class SecurityService {
       return await client.broadcast.sendOperations([op], privateKey);
     } catch(err: any) {
       console.error(err);
-      throw new Error(`Broadcast logic failed: ${err.message || 'Unknown network error'}`);
+      throw new Error(`Broadcast logic failed: ${err.message || 'Unknown network error'}`, { cause: err });
     }
   }
 

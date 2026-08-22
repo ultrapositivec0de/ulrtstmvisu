@@ -7,11 +7,15 @@ const ASSETS_TO_CACHE = [
   '/lite.html'
 ];
 
-// On install, pre-cache core shell assets
+// On install, pre-cache core shell assets safely
 self.addEventListener('install', (event) => {
   event.waitUntil(
     caches.open(CACHE_NAME).then((cache) => {
-      return cache.addAll(ASSETS_TO_CACHE);
+      return Promise.allSettled(
+        ASSETS_TO_CACHE.map((url) =>
+          cache.add(url).catch((err) => console.warn('Failed to cache asset on SW install:', url, err))
+        )
+      );
     }).then(() => self.skipWaiting())
   );
 });

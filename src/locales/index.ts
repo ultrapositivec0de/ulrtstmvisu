@@ -1,27 +1,22 @@
-import type { LocaleMeta, LocaleModule } from './types';
-import { translations as ukTranslations, meta as ukMeta } from './uk';
+import type { LocaleMeta } from './types';
+import { meta as ukMeta, translations as ukTranslations } from './uk';
+import { meta as enMeta, translations as enTranslations } from './en';
+import { meta as esMeta, translations as esTranslations } from './es';
+import { meta as koMeta, translations as koTranslations } from './ko';
 
-// Vite eager glob imports all language files in the folder (excluding index and types)
-const modules = ((import.meta as any).glob?.(['./*.ts', '!./index.ts', '!./types.ts'], { eager: true }) || {}) as Record<string, LocaleModule>;
+export const translations: Record<string, Record<string, string>> = {
+  uk: ukTranslations as Record<string, string>,
+  en: enTranslations as Record<string, string>,
+  es: esTranslations as Record<string, string>,
+  ko: koTranslations as Record<string, string>,
+};
 
-export const translations: Record<string, Record<string, string>> = {};
-export const AVAILABLE_LANGUAGES: LocaleMeta[] = [];
-
-for (const path in modules) {
-  const mod = modules[path];
-  const meta = mod.meta || mod.default?.meta;
-  const trans = mod.translations || mod.default?.translations;
-  if (meta && trans) {
-    translations[meta.code] = trans;
-    AVAILABLE_LANGUAGES.push(meta);
-  }
-}
-
-// Fallback to uk if glob is empty
-if (AVAILABLE_LANGUAGES.length === 0) {
-  translations['uk'] = ukTranslations;
-  AVAILABLE_LANGUAGES.push(ukMeta);
-}
+export const AVAILABLE_LANGUAGES: LocaleMeta[] = [
+  ukMeta,
+  enMeta,
+  esMeta,
+  koMeta,
+];
 
 // Sort languages: Ukrainian (uk) first, then alphabetical by label
 AVAILABLE_LANGUAGES.sort((a, b) => {
