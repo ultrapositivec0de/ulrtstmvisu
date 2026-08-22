@@ -66,4 +66,23 @@ if (fs.existsSync(indexHtmlPath)) {
 console.log('⚡ [Neutralino Build] Running Neutralino binary bundler (neu build --release)...');
 execSync('npx --yes @neutralinojs/neu build --release', { cwd: neuBuildDir, stdio: 'inherit' });
 
+// 8. Tag and version release zip files
+const pkgPath = path.join(rootDir, 'package.json');
+if (fs.existsSync(pkgPath)) {
+  const pkgVersion = JSON.parse(fs.readFileSync(pkgPath, 'utf8')).version;
+  const distOutDir = path.join(neuBuildDir, 'dist');
+  if (fs.existsSync(distOutDir)) {
+    const defaultZip = path.join(distOutDir, 'ultra-steem-editor-release.zip');
+    const versionedZip = path.join(distOutDir, `ultra-steem-editor-v${pkgVersion}-neutralino.zip`);
+    const versionedReleaseZip = path.join(distOutDir, `ultra-steem-editor-v${pkgVersion}-neutralino-release.zip`);
+    
+    if (fs.existsSync(defaultZip)) {
+      fs.copyFileSync(defaultZip, versionedZip);
+      fs.copyFileSync(defaultZip, versionedReleaseZip);
+      console.log(`🏷️ [Neutralino Build] Created versioned release artifact: ${path.basename(versionedZip)}`);
+      console.log(`🏷️ [Neutralino Build] Created versioned release artifact: ${path.basename(versionedReleaseZip)}`);
+    }
+  }
+}
+
 console.log('✅ [Neutralino Build] Neutralino binaries generated successfully in neutralino-build/dist/');
