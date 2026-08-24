@@ -508,12 +508,27 @@ body {
   background-color: rgba(8, 145, 178, 0.04);
 }
 
+.wysiwyg-editor[data-is-empty="true"]::before,
 .wysiwyg-editor:empty::before {
-  content: "Почніть вводити текст тут... (✍️ Можна вставляти картинки й таблиці з підписами)";
+  content: attr(data-placeholder-title) "\A\A" attr(data-placeholder-body);
+  white-space: pre-wrap;
   color: #64748b;
   pointer-events: none;
-  font-style: italic;
-  font-size: 0.95rem;
+  font-style: normal;
+  font-size: inherit;
+  line-height: 1.6;
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  padding: inherit;
+  user-select: none;
+  z-index: 1;
+}
+
+.theme-light .wysiwyg-editor[data-is-empty="true"]::before,
+.theme-light .wysiwyg-editor:empty::before {
+  color: #94a3b8;
 }
 
 

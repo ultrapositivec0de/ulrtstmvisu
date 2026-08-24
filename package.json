@@ -1,7 +1,7 @@
 {
   "name": "ultra-steem-editor",
   "private": true,
-  "version": "4.6.4",
+  "version": "4.6.5",
   "type": "module",
   "license": "Apache-2.0",
   "engines": {
@@ -87,9 +87,9 @@
     "vite": "^8.2.2"
   },
   "allowScripts": {
-    "esbuild@0.28.2": true,
-    "exifreader@4.44.0": true,
-    "protobufjs@7.6.5": true,
-    "@google/genai@2.18.0": true
+    "esbuild": true,
+    "exifreader": true,
+    "protobufjs": true,
+    "@google/genai": true
   }
 }

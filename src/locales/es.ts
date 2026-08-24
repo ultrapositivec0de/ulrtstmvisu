@@ -66,6 +66,8 @@ export const translations = {
   "published": "Publicado",
   "error": "Error",
   "placeholder": "Comience a escribir su obra maestra aquí...",
+  "visualTitlePlaceholder": "La primera línea se convertirá automáticamente en el título al publicar",
+  "visualBodyPlaceholder": "Contenido principal de la publicación",
   "fillRequired": "Por favor complete todos los campos requeridos.",
   "publishing": "⏳ Publicando...",
   "publishedSuccess": "✅ ¡Publicado!",

@@ -138,6 +138,8 @@ export const translations = {
   "error": "Помилка",
   "gridWithCaptions": "Додати підписи до сітки",
   "placeholder": "Почніть писати свій шедевр тут...",
+  "visualTitlePlaceholder": "Перший рядок автоматично стає заголовком при публікації",
+  "visualBodyPlaceholder": "Основний текст допису",
   "fillRequired": "Будь ласка, заповніть усі обов'язкові поля.",
   "publishing": "⏳ Початок публікації...",
   "publishedSuccess": "✅ Опубліковано!",

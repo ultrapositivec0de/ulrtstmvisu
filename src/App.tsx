@@ -218,17 +218,12 @@ const IconButton = ({
 
 const APP_CHANGELOG = [
   {
-    version: "v4.6.4",
-    date: "2026-08-22",
+    version: "v4.6.5",
+    date: "2026-08-24",
     changes: [
-      "Cross-platform release synchronization and system improvements."
-    ]
-  },
-  {
-    version: "v4.6.4",
-    date: "2026-08-22",
-    changes: [
-      "Integrated unified automated version bump mechanism across all build targets"
+      "Visual Editor Guide Placeholders: Added multilingual informative placeholders for the visual editor (title on first line auto-detection & main body content guidance).",
+      "Build & Packaging Enhancements: Updated allowScripts security policy format and enhanced web release archive naming with dynamic semver tagging.",
+      "Cross-Platform Release Sync: Synchronized application version to v4.6.5 across Web, Tauri, Neutralino, and Steem blockchain broadcasting metadata."
     ]
   },
   {
@@ -1657,7 +1652,7 @@ function App() {
   const [pubTitle, setPubTitle] = useState('');
   const [removeTitleLine, setRemoveTitleLine] = useState(() => localStorage.getItem('steem_remove_title_line') !== 'false');
   const [pubTags, setPubTags] = useState('');
-  const [appAgent, setAppAgent] = useState(localStorage.getItem('steem_app_agent') || 'ultrasteemeditor/4.6.4');
+  const [appAgent, setAppAgent] = useState(localStorage.getItem('steem_app_agent') || 'ultrasteemeditor/4.6.5');
   const [rewardType, setRewardType] = useState<'SP' | '50' | '0'>( (localStorage.getItem('steem_reward_type') as any) || '50');
   const [beneficiaries, setBeneficiaries] = useState<{account: string, weight: number}[]>([]);
   const [benName, setBenName] = useState('');
@@ -2149,15 +2144,17 @@ function App() {
       if (hasValidRect) {
           const editorRect = editor.getBoundingClientRect();
           const caretTop = rect.top - editorRect.top;
+          const bottomReserved = (window.innerWidth < 1024) ? 75 : 30;
+          const visibleHeight = Math.max(100, editorRect.height - bottomReserved);
           
           if (block === 'center') {
-              const targetY = editor.scrollTop + caretTop - (editorRect.height / 2) + (rect.height / 2);
-              editor.scrollTo({ top: targetY, behavior: 'auto' });
+              const targetY = editor.scrollTop + caretTop - (visibleHeight / 2) + (rect.height / 2);
+              editor.scrollTo({ top: Math.max(0, targetY), behavior: 'auto' });
           } else if (block === 'nearest') {
-              if (caretTop < 0) {
+              if (caretTop < 10) {
                   editor.scrollBy({ top: caretTop - 20, behavior: 'auto' });
-              } else if (caretTop + rect.height > editorRect.height) {
-                  editor.scrollBy({ top: caretTop + rect.height - editorRect.height + 20, behavior: 'auto' });
+              } else if (caretTop + rect.height > visibleHeight) {
+                  editor.scrollBy({ top: caretTop + rect.height - visibleHeight + 20, behavior: 'auto' });
               }
           }
       }
@@ -2242,10 +2239,36 @@ function App() {
     }
   }, []);
 
+  const isWysiwygContentEmpty = (el: HTMLElement | null): boolean => {
+    if (!el) return true;
+    if (el.querySelector('img, table, iframe, hr, pre, blockquote, ul, ol, video, audio')) {
+      return false;
+    }
+    const rawText = el.textContent || '';
+    const cleanText = rawText.replace(/[\u200B-\u200D\uFEFF\r\n\t\s\u00A0]/g, '');
+    return cleanText.length === 0;
+  };
+
+  const updateWysiwygEmptyStatus = useCallback((targetEl?: HTMLElement | null) => {
+    const el = targetEl || wysiwygRef.current;
+    if (!el) return;
+    const empty = isWysiwygContentEmpty(el);
+    if (empty) {
+      if (el.getAttribute('data-is-empty') !== 'true') {
+        el.setAttribute('data-is-empty', 'true');
+      }
+    } else {
+      if (el.hasAttribute('data-is-empty')) {
+        el.removeAttribute('data-is-empty');
+      }
+    }
+  }, []);
+
   const lastSyncContentRef = useRef<string>(useEditorStore.getState().content);
 
   const updateContentFromWysiwyg = useCallback((forceImmediate = false) => {
     if (!wysiwygRef.current) return;
+    updateWysiwygEmptyStatus(wysiwygRef.current);
     const html = wysiwygRef.current.innerHTML;
     
     if (onDemandSyncEnabled && !forceImmediate) {
@@ -2269,7 +2292,7 @@ function App() {
       lastSyncContentRef.current = md;
       setContent(md);
     }
-  }, [onDemandSyncEnabled, saveVisualSelection, setContent]);
+  }, [onDemandSyncEnabled, saveVisualSelection, setContent, updateWysiwygEmptyStatus]);
 
   const syncWysiwygToContentIfVisual = useCallback(() => {
     if (editorMode === 'visual' && wysiwygRef.current) {
@@ -3111,6 +3134,28 @@ function App() {
     }
   }, [ editorMode, isEditorFocused, syncCursorMarkdownToVisual, lang, onDemandSyncEnabled]);
 
+  // Keep visual editor empty placeholder state dynamically synchronized
+  useEffect(() => {
+    if (editorMode !== 'visual' || !wysiwygRef.current) return;
+    const el = wysiwygRef.current;
+
+    updateWysiwygEmptyStatus(el);
+
+    const observer = new MutationObserver(() => {
+      updateWysiwygEmptyStatus(el);
+    });
+
+    observer.observe(el, {
+      childList: true,
+      subtree: true,
+      characterData: true,
+    });
+
+    return () => {
+      observer.disconnect();
+    };
+  }, [editorMode, updateWysiwygEmptyStatus]);
+
   // Load cursor position on start
   useEffect(() => {
      try {
@@ -3133,9 +3178,11 @@ function App() {
   const hasRestoredInitialCursorRef = useRef(false);
 
   const saveCursorPosition = useCallback(() => {
+     if (isTransitioningModeRef.current || isSyncingRef.current) return;
      if (editorRef.current) {
         const start = editorRef.current.selectionStart;
         const end = editorRef.current.selectionEnd;
+        if (start === null || end === null || start === undefined || end === undefined) return;
         const pos = {
            start,
            end
@@ -3193,10 +3240,10 @@ function App() {
      }
   }, [editorMode]);
 
-  const restoreMarkdownCursorAndScroll = useCallback((retryCount = 0) => {
+  const restoreMarkdownCursorAndScroll = useCallback((retryCount = 0, forceScrollToCaret = false) => {
     if (!editorRef.current) {
       if (retryCount < 15) {
-        setTimeout(() => restoreMarkdownCursorAndScroll(retryCount + 1), 30);
+        setTimeout(() => restoreMarkdownCursorAndScroll(retryCount + 1, forceScrollToCaret), 30);
       }
       return;
     }
@@ -3242,7 +3289,7 @@ function App() {
 
       // Restore scroll position
       const savedScroll = localStorage.getItem('steem_editor_scroll');
-      if (savedScroll !== null) {
+      if (!forceScrollToCaret && savedScroll !== null) {
         const scrollTop = Number(savedScroll);
         if (!isNaN(scrollTop) && scrollTop > 0) {
           ta.scrollTop = scrollTop;
@@ -3264,7 +3311,9 @@ function App() {
           
           const caretY = clone.scrollHeight;
           document.body.removeChild(clone);
-          ta.scrollTop = Math.max(0, caretY - (ta.clientHeight / 2));
+          const bottomReserved = (window.innerWidth < 1024) ? 75 : 30;
+          const visH = Math.max(100, ta.clientHeight - bottomReserved);
+          ta.scrollTop = Math.max(0, caretY - (visH / 2));
         }
       } else {
         // Compute from caretY
@@ -3284,7 +3333,9 @@ function App() {
         
         const caretY = clone.scrollHeight;
         document.body.removeChild(clone);
-        ta.scrollTop = Math.max(0, caretY - (ta.clientHeight / 2));
+        const bottomReserved = (window.innerWidth < 1024) ? 75 : 30;
+        const visH = Math.max(100, ta.clientHeight - bottomReserved);
+        ta.scrollTop = Math.max(0, caretY - (visH / 2));
       }
 
       setTimeout(() => {
@@ -3530,16 +3581,18 @@ function App() {
           setContent(md);
         }
       }
+      localStorage.removeItem('steem_editor_scroll');
       setEditorMode('markdown');
 
       requestAnimationFrame(() => {
         setTimeout(() => {
           try {
-            restoreMarkdownCursorAndScroll();
+            restoreMarkdownCursorAndScroll(0, true);
           } finally {
             setTimeout(() => {
               isTransitioningModeRef.current = false;
-            }, 200);
+              isSyncingRef.current = false;
+            }, 250);
           }
         }, 50);
       });
@@ -3553,7 +3606,9 @@ function App() {
 
   useEffect(() => {
     if (activeView === 'editor' && activeMobileTab === 'editor') {
+       if (isTransitioningModeRef.current) return;
        setTimeout(() => {
+          if (isTransitioningModeRef.current) return;
           if (editorMode === 'visual') {
              restoreVisualSelection();
           } else {
@@ -5431,10 +5486,20 @@ function App() {
         e.preventDefault();
         document.execCommand('insertLineBreak');
         updateContentFromWysiwyg();
+        if (window.scrollY !== 0 || window.scrollX !== 0) {
+          window.scrollTo({ top: 0, left: 0, behavior: 'instant' as ScrollBehavior });
+        }
+        scrollCaretIntoView('nearest');
+        requestAnimationFrame(() => {
+          if (window.scrollY !== 0 || window.scrollX !== 0) {
+            window.scrollTo({ top: 0, left: 0, behavior: 'instant' as ScrollBehavior });
+          }
+          scrollCaretIntoView('nearest');
+        });
         return;
       }
     }
-  }, [fmt, handleLink, insertHtmlAtCursor, widgetPos, isWidgetVisible, isWidgetMenuOpen, setIsWidgetVisible, updateContentFromWysiwyg, activeFormats, handleIndent, tryHeadingEnterBreakout]);
+  }, [fmt, handleLink, insertHtmlAtCursor, widgetPos, isWidgetVisible, isWidgetMenuOpen, setIsWidgetVisible, updateContentFromWysiwyg, activeFormats, handleIndent, tryHeadingEnterBreakout, scrollCaretIntoView]);
 
   const importTable = useCallback(() => {
     setActiveModal('tableImport');
@@ -8048,7 +8113,10 @@ function App() {
                     }
                     setPubTitle(''); setContent(''); setPubTags(''); setCurrentDraftId(null);
                     localStorage.removeItem('steem_autosave_temp_visual_html');
-                    if (wysiwygRef.current) wysiwygRef.current.innerHTML = '<p><br></p>';
+                    if (wysiwygRef.current) {
+                      wysiwygRef.current.innerHTML = '<p><br></p>';
+                      updateWysiwygEmptyStatus(wysiwygRef.current);
+                    }
                   }} 
                   title={t('newPost')} 
                   className="shrink-0 size-10 flex mx-auto" 
@@ -9032,10 +9100,10 @@ function App() {
                     (visualStyle === 'neon' && neonTextColored) ? "text-cyan-400 font-normal" : "text-slate-300",
                     beautifyEnabled ? "px-4 lg:px-8 pt-4 lg:pt-6 max-w-[clamp(40rem,60vw,80rem)] mx-auto selection:bg-[rgb(var(--accent-color)/0.3)]" : "px-3 pt-3 lg:px-6 lg:pt-6",
                     isKeyboardOpen 
-                      ? "pb-24 mb-2 lg:pb-20 lg:mb-4" 
+                      ? "pb-36 mb-2 lg:pb-24 lg:mb-4" 
                       : (isEditorFullScreen || isFullScreen
-                          ? "pb-24 mb-2 lg:pb-20 lg:mb-4"
-                          : "pb-24 mb-[5rem] lg:pb-20 lg:mb-4")
+                          ? "pb-36 mb-2 lg:pb-24 lg:mb-4"
+                          : "pb-36 mb-[5rem] lg:pb-24 lg:mb-4")
                   )}
                   placeholder={`${t('placeholder')}\n\n\n\n\nОМ АХ ХУМ СО ХА\n♡`}
                 />
@@ -9126,6 +9194,7 @@ function App() {
                   onInput={(e) => {
                     if (isSyncingRef.current) return;
                     const target = e.target as HTMLDivElement;
+                    updateWysiwygEmptyStatus(target);
 
                     // Clean up non-boundary or filled spacers
                     target.querySelectorAll('.table-spacer, [data-placeholder], [data-empty]').forEach((spacerEl) => {
@@ -9219,6 +9288,7 @@ function App() {
                     saveVisualSelection();
                   }}
                   onKeyUp={() => {
+                    updateWysiwygEmptyStatus(wysiwygRef.current);
                     saveVisualSelection();
                   }}
                   onClick={(e) => {
@@ -9244,18 +9314,22 @@ function App() {
                       return;
                     }
 
+                    updateWysiwygEmptyStatus(wysiwygRef.current);
                     saveVisualSelection();
                   }}
                   className={cn(
-                    "flex-1 w-full bg-transparent text-base outline-none overflow-y-auto custom-scrollbar transition-colors duration-700 editor-font prose prose-invert prose-cyan max-w-none wysiwyg-editor break-words overscroll-contain",
+                    "relative flex-1 w-full bg-transparent text-base outline-none overflow-y-auto custom-scrollbar transition-colors duration-700 editor-font prose prose-invert prose-cyan max-w-none wysiwyg-editor break-words overscroll-contain",
                     (visualStyle === 'neon' && neonTextColored) ? "text-cyan-400 font-normal" : "text-slate-300",
                     beautifyEnabled ? "px-4 lg:px-8 pt-4 lg:pt-6 max-w-4xl mx-auto selection:bg-[rgb(var(--accent-color)/0.3)]" : "px-4 pt-4 lg:px-6 lg:pt-6",
                     isKeyboardOpen 
-                      ? "pb-24 mb-2 lg:pb-20 lg:mb-4" 
+                      ? "pb-36 mb-2 lg:pb-24 lg:mb-4" 
                       : (isEditorFullScreen || isFullScreen
-                          ? "pb-24 mb-2 lg:pb-20 lg:mb-4"
-                          : "pb-24 mb-[5rem] lg:pb-20 lg:mb-4")
+                          ? "pb-36 mb-2 lg:pb-24 lg:mb-4"
+                          : "pb-36 mb-[5rem] lg:pb-24 lg:mb-4")
                   )}
+                  data-is-empty={useEditorStore.getState().content.trim() === '' ? 'true' : undefined}
+                  data-placeholder-title={t('visualTitlePlaceholder')}
+                  data-placeholder-body={t('visualBodyPlaceholder')}
                   style={{ minHeight: '200px' }}
                 />
               )}
@@ -11685,7 +11759,7 @@ function App() {
                     <div className="pt-4 space-y-3">
                       <div className="flex justify-between text-xs items-center">
                         <span className="text-slate-500">{t('version')}</span>
-                        <span className="bg-cyan-500/10 text-cyan-400 px-2 py-1 rounded-md font-mono font-bold">4.6.4</span>
+                        <span className="bg-cyan-500/10 text-cyan-400 px-2 py-1 rounded-md font-mono font-bold">4.6.5</span>
                       </div>
                       <div className="flex justify-between text-xs items-center">
                         <span className="text-slate-500">{t('license')}</span>
@@ -12633,11 +12707,11 @@ function App() {
                        <div className="w-16 h-16 bg-cyan-500/10 rounded-2xl mx-auto flex items-center justify-center text-cyan-400 font-black text-2xl shadow-xl shadow-cyan-500/10">S</div>
                        <div>
                          <h3 className="text-xl font-black tracking-tight">SteemEditor <span className="text-cyan-400">Pro</span></h3>
-                         <p className="text-[10px] text-slate-500 uppercase font-black tracking-[0.2em] pt-1">Version 4.6.4 "Quantum"</p>
+                         <p className="text-[10px] text-slate-500 uppercase font-black tracking-[0.2em] pt-1">Version 4.6.5 "Quantum"</p>
                        </div>
                        <label className="text-[10px] font-black text-slate-500 uppercase tracking-[0.2em] px-1 pt-4 block border-t border-slate-800">Changelog & Updates</label>
                         <div className="mt-2 p-3 bg-slate-950 border border-cyan-500/20 rounded-xl text-left">
-                          <p className="text-xs text-slate-300 font-medium">New in v4.6.4: Enhanced PWA Installation Guidance, Desktop Safeguards & Universal Cross-Platform Version Sync</p>
+                          <p className="text-xs text-slate-300 font-medium">New in v4.6.5: Visual Editor Informative Placeholders, Dynamic Semver Web Release & allowScripts Policy Update</p>
                         </div>
                        
                        <div className="space-y-2 max-h-60 overflow-y-auto custom-scrollbar bg-slate-900 border border-slate-800 rounded-xl p-3">
@@ -12736,7 +12810,7 @@ function App() {
                                   localStorage.setItem('steem_app_agent', e.target.value);
                                 }}
                                 className="w-full bg-slate-900 border border-slate-700 rounded-lg p-2.5 text-xs text-slate-200 outline-none focus:ring-1 focus:ring-cyan-500"
-                                placeholder="ultrasteemeditor/4.6.4"
+                                placeholder="ultrasteemeditor/4.6.5"
                               />
                             </div>
                           </motion.div>

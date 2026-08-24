@@ -66,6 +66,8 @@ export const translations = {
   "published": "게시됨",
   "error": "오류",
   "placeholder": "여기에 당신의 걸작을 작성해 보세요...",
+  "visualTitlePlaceholder": "첫 번째 줄은 발행 시 자동으로 제목이 됩니다",
+  "visualBodyPlaceholder": "본문 내용",
   "fillRequired": "모든 필수 항목을 입력해 주세요.",
   "publishing": "⏳ 게시 중...",
   "publishedSuccess": "✅ 게시 완료!",

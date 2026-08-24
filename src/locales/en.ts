@@ -160,6 +160,8 @@ export const translations = {
   "published": "Published",
   "gridWithCaptions": "Captions",
   "placeholder": "Start typing...",
+  "visualTitlePlaceholder": "The first line automatically becomes the title upon publishing",
+  "visualBodyPlaceholder": "Main post content",
   "fillRequired": "Fill required fields.",
   "publishing": "⏳ Publishing...",
   "publishedSuccess": "✅ Published!",

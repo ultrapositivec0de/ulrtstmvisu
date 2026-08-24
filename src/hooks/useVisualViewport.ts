@@ -86,11 +86,13 @@ export function useVisualViewport(): VisualViewportState {
       if (window.scrollY !== 0 || window.scrollX !== 0) {
         window.scrollTo({ top: 0, left: 0, behavior: 'instant' as ScrollBehavior });
       }
-      if (document.documentElement && document.documentElement.scrollTop !== 0) {
+      if (document.documentElement && (document.documentElement.scrollTop !== 0 || document.documentElement.scrollLeft !== 0)) {
         document.documentElement.scrollTop = 0;
+        document.documentElement.scrollLeft = 0;
       }
-      if (document.body && document.body.scrollTop !== 0) {
+      if (document.body && (document.body.scrollTop !== 0 || document.body.scrollLeft !== 0)) {
         document.body.scrollTop = 0;
+        document.body.scrollLeft = 0;
       }
     };
 
@@ -129,12 +131,25 @@ export function useVisualViewport(): VisualViewportState {
 
     updateMetrics();
 
+    const onWindowScroll = () => {
+      if (window.scrollY !== 0 || window.scrollX !== 0) {
+        window.scrollTo({ top: 0, left: 0, behavior: 'instant' as ScrollBehavior });
+      }
+      if (document.documentElement && document.documentElement.scrollTop !== 0) {
+        document.documentElement.scrollTop = 0;
+      }
+      if (document.body && document.body.scrollTop !== 0) {
+        document.body.scrollTop = 0;
+      }
+    };
+
     const vv = window.visualViewport;
     if (vv) {
       vv.addEventListener('resize', updateMetrics);
       vv.addEventListener('scroll', updateMetrics);
     }
 
+    window.addEventListener('scroll', onWindowScroll, { passive: true });
     window.addEventListener('resize', updateMetrics);
     window.addEventListener('orientationchange', updateMetrics);
     window.addEventListener('focusin', updateMetrics);
@@ -148,6 +163,7 @@ export function useVisualViewport(): VisualViewportState {
         vv.removeEventListener('resize', updateMetrics);
         vv.removeEventListener('scroll', updateMetrics);
       }
+      window.removeEventListener('scroll', onWindowScroll);
       window.removeEventListener('resize', updateMetrics);
       window.removeEventListener('orientationchange', updateMetrics);
       window.removeEventListener('focusin', updateMetrics);

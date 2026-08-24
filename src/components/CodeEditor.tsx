@@ -48,6 +48,18 @@ export const CodeEditor = forwardRef<HTMLTextAreaElement, CodeEditorProps>((prop
   
   const handleRef = (el: HTMLTextAreaElement | null) => {
     localRef.current = el;
+    if (el) {
+      const storeState = useEditorStore.getState();
+      const sStart = storeState.selectionStart;
+      const sEnd = storeState.selectionEnd;
+      if (typeof sStart === 'number' && typeof sEnd === 'number') {
+        try {
+          el.setSelectionRange(sStart, sEnd);
+        } catch {
+          // ignore
+        }
+      }
+    }
     if (typeof ref === 'function') {
       ref(el);
     } else if (ref) {
