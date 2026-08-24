@@ -1,4 +1,12 @@
 # Changelog
+## [2026-08-24] - Version 4.6.8 (ultrasteemeditor/4.6.8)
+### Added & Improved
+- **Release Updates**: Cross-platform release synchronization and version update to v4.6.8 +
+
+## [2026-08-24] - Version 4.6.6 (ultrasteemeditor/4.6.6)
+### Added & Improved
+- **Release Updates**: Cross-platform release synchronization and system improvements.
+
 ## [2026-08-22] - Version 4.6.4 (ultrasteemeditor/4.6.4)
 ### Added & Improved
 - **Release Updates**: Cross-platform release synchronization and system improvements.

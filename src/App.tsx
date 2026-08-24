@@ -218,12 +218,19 @@ const IconButton = ({
 
 const APP_CHANGELOG = [
   {
-    version: "v4.6.5",
+    version: "v4.6.8",
     date: "2026-08-24",
     changes: [
       "Visual Editor Guide Placeholders: Added multilingual informative placeholders for the visual editor (title on first line auto-detection & main body content guidance).",
       "Build & Packaging Enhancements: Updated allowScripts security policy format and enhanced web release archive naming with dynamic semver tagging.",
-      "Cross-Platform Release Sync: Synchronized application version to v4.6.5 across Web, Tauri, Neutralino, and Steem blockchain broadcasting metadata."
+      "Cross-Platform Release Sync: Synchronized application version to v4.6.8 across Web, Tauri, Neutralino, and Steem blockchain broadcasting metadata."
+    ]
+  },
+  {
+    version: "v4.6.6",
+    date: "2026-08-24",
+    changes: [
+      "Cross-platform release synchronization and system improvements."
     ]
   },
   {
@@ -1652,7 +1659,7 @@ function App() {
   const [pubTitle, setPubTitle] = useState('');
   const [removeTitleLine, setRemoveTitleLine] = useState(() => localStorage.getItem('steem_remove_title_line') !== 'false');
   const [pubTags, setPubTags] = useState('');
-  const [appAgent, setAppAgent] = useState(localStorage.getItem('steem_app_agent') || 'ultrasteemeditor/4.6.5');
+  const [appAgent, setAppAgent] = useState(localStorage.getItem('steem_app_agent') || 'ultrasteemeditor/4.6.8');
   const [rewardType, setRewardType] = useState<'SP' | '50' | '0'>( (localStorage.getItem('steem_reward_type') as any) || '50');
   const [beneficiaries, setBeneficiaries] = useState<{account: string, weight: number}[]>([]);
   const [benName, setBenName] = useState('');
@@ -11759,7 +11766,7 @@ function App() {
                     <div className="pt-4 space-y-3">
                       <div className="flex justify-between text-xs items-center">
                         <span className="text-slate-500">{t('version')}</span>
-                        <span className="bg-cyan-500/10 text-cyan-400 px-2 py-1 rounded-md font-mono font-bold">4.6.5</span>
+                        <span className="bg-cyan-500/10 text-cyan-400 px-2 py-1 rounded-md font-mono font-bold">4.6.8</span>
                       </div>
                       <div className="flex justify-between text-xs items-center">
                         <span className="text-slate-500">{t('license')}</span>
@@ -11850,7 +11857,7 @@ function App() {
                     
                     <div className="space-y-4 max-h-48 overflow-y-auto custom-scrollbar bg-slate-900 border border-slate-800 rounded-xl p-4">
                        {APP_CHANGELOG.map((log, index) => (
-                         <div key={log.version} className={cn("space-y-2", index > 0 && "pt-3 border-t border-slate-800/50")}>
+                         <div key={`${log.version}-${index}`} className={cn("space-y-2", index > 0 && "pt-3 border-t border-slate-800/50")}>
                            <div className="flex items-center gap-2">
                              <span className={cn("text-xs font-bold px-2 py-0.5 rounded", index === 0 ? "text-cyan-400 bg-cyan-500/10" : "text-slate-400 bg-slate-800")}>{log.version}</span>
                              <span className="text-[10px] text-slate-500">{log.date}</span>
@@ -12707,16 +12714,16 @@ function App() {
                        <div className="w-16 h-16 bg-cyan-500/10 rounded-2xl mx-auto flex items-center justify-center text-cyan-400 font-black text-2xl shadow-xl shadow-cyan-500/10">S</div>
                        <div>
                          <h3 className="text-xl font-black tracking-tight">SteemEditor <span className="text-cyan-400">Pro</span></h3>
-                         <p className="text-[10px] text-slate-500 uppercase font-black tracking-[0.2em] pt-1">Version 4.6.5 "Quantum"</p>
+                         <p className="text-[10px] text-slate-500 uppercase font-black tracking-[0.2em] pt-1">Version 4.6.8 "Quantum"</p>
                        </div>
                        <label className="text-[10px] font-black text-slate-500 uppercase tracking-[0.2em] px-1 pt-4 block border-t border-slate-800">Changelog & Updates</label>
                         <div className="mt-2 p-3 bg-slate-950 border border-cyan-500/20 rounded-xl text-left">
-                          <p className="text-xs text-slate-300 font-medium">New in v4.6.5: Visual Editor Informative Placeholders, Dynamic Semver Web Release & allowScripts Policy Update</p>
+                          <p className="text-xs text-slate-300 font-medium">New in v4.6.8: Visual Editor Informative Placeholders, Dynamic Semver Web Release & allowScripts Policy Update</p>
                         </div>
                        
                        <div className="space-y-2 max-h-60 overflow-y-auto custom-scrollbar bg-slate-900 border border-slate-800 rounded-xl p-3">
                          {APP_CHANGELOG.map((log, index) => (
-                           <div key={log.version} className={cn("space-y-1", index > 0 && "pt-2 border-t border-slate-800/50")}>
+                           <div key={`${log.version}-${index}`} className={cn("space-y-1", index > 0 && "pt-2 border-t border-slate-800/50")}>
                              <div className="flex items-center gap-2">
                                <span className={cn("text-[10px] font-bold px-1.5 py-0.5 rounded", index === 0 ? "text-cyan-400 bg-cyan-500/10" : "text-slate-400 bg-slate-800")}>{log.version}</span>
                                <span className="text-[9px] text-slate-500">{log.date}</span>
@@ -12810,7 +12817,7 @@ function App() {
                                   localStorage.setItem('steem_app_agent', e.target.value);
                                 }}
                                 className="w-full bg-slate-900 border border-slate-700 rounded-lg p-2.5 text-xs text-slate-200 outline-none focus:ring-1 focus:ring-cyan-500"
-                                placeholder="ultrasteemeditor/4.6.5"
+                                placeholder="ultrasteemeditor/4.6.8"
                               />
                             </div>
                           </motion.div>

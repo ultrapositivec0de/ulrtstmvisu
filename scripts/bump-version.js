@@ -79,8 +79,9 @@ if (fs.existsSync(tauriConfPath)) {
 const cargoPath = path.join(rootDir, 'src-tauri', 'Cargo.toml');
 if (fs.existsSync(cargoPath)) {
   let cargoContent = fs.readFileSync(cargoPath, 'utf8');
+  // Robustly replace [package] version = "..." regardless of previous version string
   cargoContent = cargoContent.replace(
-    new RegExp(`version = "${oldVersion.replace(/\./g, '\\.')}"`, 'g'),
+    /^version\s*=\s*"[^"]+"/m,
     `version = "${newVersion}"`
   );
   fs.writeFileSync(cargoPath, cargoContent, 'utf8');
@@ -92,8 +93,9 @@ const metaPath = path.join(rootDir, 'metadata.json');
 if (fs.existsSync(metaPath)) {
   const meta = readJson(metaPath);
   if (meta.description) {
+    // Robustly replace vX.Y.Z in description
     meta.description = meta.description.replace(
-      new RegExp(`v?${oldVersion.replace(/\./g, '\\.')}`, 'g'),
+      /v\d+\.\d+\.\d+/g,
       `v${newVersion}`
     );
   }
@@ -133,9 +135,11 @@ if (fs.existsSync(appTsxPath)) {
   // Replace version literals
   const oldVerEsc = oldVersion.replace(/\./g, '\\.');
   
-  // Replace APP_CHANGELOG array insertion
-  const changelogObjStr = `const APP_CHANGELOG = [\n  {\n    version: "v${newVersion}",\n    date: "${today}",\n    changes: [\n      "${customNote.replace(/"/g, '\\"')}"\n    ]\n  },`;
-  appTsx = appTsx.replace('const APP_CHANGELOG = [', changelogObjStr);
+  // Replace APP_CHANGELOG array insertion (avoid duplicate if already present)
+  if (!appTsx.includes(`version: "v${newVersion}"`)) {
+    const changelogObjStr = `const APP_CHANGELOG = [\n  {\n    version: "v${newVersion}",\n    date: "${today}",\n    changes: [\n      "${customNote.replace(/"/g, '\\"')}"\n    ]\n  },`;
+    appTsx = appTsx.replace('const APP_CHANGELOG = [', changelogObjStr);
+  }
 
   // Replace agent string default references
   appTsx = appTsx.replace(
