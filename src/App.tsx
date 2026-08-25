@@ -1209,9 +1209,10 @@ function App() {
   const scrollRef = useRef<HTMLDivElement>(null);
   const editorPaneRef = useRef<HTMLDivElement>(null);
   const lastWidth = useRef(window.innerWidth);
-  const [widgetPos, setWidgetPos] = useState<'floating' | 'bottom'>(() => {
+  const [widgetPos, setWidgetPos] = useState<'floating' | 'bottom' | 'hidden'>(() => {
     const saved = localStorage.getItem('steem_widget_pos');
-    return (saved === 'bottom' ? 'bottom' : 'floating');
+    if (saved === 'bottom' || saved === 'hidden' || saved === 'floating') return saved;
+    return 'bottom';
   });
   const [enabledTools, setEnabledTools] = useState<string[]>(() => {
     const saved = localStorage.getItem(STORAGE_KEY_FLOAT_CONFIG);
@@ -1417,20 +1418,29 @@ function App() {
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
       const target = e.target as HTMLElement;
-      if (!target.closest('.mobile-tools-container') && !target.closest('.font-size-popover-container')) {
+      if (
+        !target.closest('.mobile-tools-container') && 
+        !target.closest('.font-size-popover-container') &&
+        !target.closest('.notification-container') &&
+        !target.closest('.lang-menu-container') &&
+        !target.closest('.widget-settings-container') &&
+        !target.closest('.steem-widget-container')
+      ) {
         setShowMobileTools1(false);
         setShowMobileTools2(false);
         setShowMobileToolsOpen(false);
         setShowQuickFontSizePopover(false);
+        setShowNotificationList(false);
+        setShowLangMenu(false);
       }
     };
-    if (showMobileTools1 || showMobileTools2 || showMobileToolsOpen || showQuickFontSizePopover) {
+    if (showMobileTools1 || showMobileTools2 || showMobileToolsOpen || showQuickFontSizePopover || showNotificationList || showLangMenu) {
       document.addEventListener('mousedown', handleClickOutside);
     }
     return () => {
       document.removeEventListener('mousedown', handleClickOutside);
     };
-  }, [showMobileTools1, showMobileTools2, showMobileToolsOpen, showQuickFontSizePopover]);
+  }, [showMobileTools1, showMobileTools2, showMobileToolsOpen, showQuickFontSizePopover, showNotificationList, showLangMenu]);
 
   const [targetReaderPost, setTargetReaderPost] = useState<{ author: string, permlink: string, commentAuthor?: string, commentPermlink?: string } | null>(null);
   const [mutedUsers, setMutedUsers] = useState<string[]>(() => {
@@ -4007,6 +4017,7 @@ function App() {
   }, [isWidgetMenuOpen]);
 
   const showWidget = useCallback((x: number, y: number) => {
+    if (widgetPos === 'hidden') return;
     if (widgetPos !== 'floating') {
       if (!isWidgetVisible) setIsWidgetVisible(true);
       return;
@@ -7805,10 +7816,13 @@ function App() {
                 onMouseDown={(e) => e.preventDefault()}
                 onClick={(e) => {
                   e.stopPropagation();
-                  setShowMobileToolsOpen(!showMobileToolsOpen);
-                  if (!showMobileToolsOpen) {
+                  const nextState = !showMobileToolsOpen;
+                  setShowMobileToolsOpen(nextState);
+                  if (nextState) {
                     setShowMobileTools1(false);
                     setShowMobileTools2(false);
+                    setShowNotificationList(false);
+                    setShowLangMenu(false);
                   }
                 }}
                 className="flex shrink-0 items-center justify-center bg-slate-800/30 px-2 sm:px-3 py-1.5 rounded-xl border border-slate-700/30 text-slate-400 hover:text-white hover:bg-slate-700/50 transition-all gap-1.5 h-9"
@@ -7916,19 +7930,29 @@ function App() {
         <div className="h-6 w-px bg-slate-800 mx-2 hidden md:block shrink-0" />
 
         {/* Right side: Notifications, Pub, etc */}
-        <div className="flex items-center gap-1 xs:gap-2 shrink-0 ml-auto">
-          <div className="relative">
+        <div className="flex items-center gap-1 xs:gap-1.5 shrink-0 ml-auto">
+          <div className="relative notification-container shrink-0">
             <button 
-              onClick={() => setShowNotificationList(!showNotificationList)}
+              onClick={(e) => {
+                e.stopPropagation();
+                const nextState = !showNotificationList;
+                setShowNotificationList(nextState);
+                if (nextState) {
+                  setShowMobileToolsOpen(false);
+                  setShowMobileTools1(false);
+                  setShowMobileTools2(false);
+                  setShowLangMenu(false);
+                }
+              }}
               className={cn(
-                "p-1.5 xs:p-2 rounded-xl transition-all relative",
+                "size-8 xs:size-9 flex items-center justify-center rounded-xl transition-all relative",
                 notifEnabled ? "bg-[rgb(var(--accent-color)/0.1)] text-[rgb(var(--accent-color))]" : "text-slate-500 hover:text-white"
               )}
             >
-              <Bell size={20} className={cn("xs:size-[18px]", visibleNotifications.some(n => !n.isRead) ? "animate-swing" : "")} />
+              <Bell size={18} className={cn(visibleNotifications.some(n => !n.isRead) ? "animate-swing" : "")} />
               {visibleNotifications.some(n => !n.isRead) && (
                 <span className={cn(
-                  "absolute -top-0.5 -right-0.5 xs:-top-1 xs:-right-1 w-3.5 h-3.5 xs:w-4 xs:h-4 rounded-full border border-slate-950 flex items-center justify-center animate-pulse z-10 text-[7px] xs:text-[8px] text-black font-black bg-[rgb(var(--accent-color))]"
+                  "absolute top-0 right-0 w-3.5 h-3.5 rounded-full border border-slate-950 flex items-center justify-center animate-pulse z-10 text-[7px] text-black font-black bg-[rgb(var(--accent-color))]"
                 )}>
                   {visibleNotifications.filter(n => !n.isRead).length}
                 </span>
@@ -8005,9 +8029,19 @@ function App() {
                 {isDarkMode ? <Sun size={18} /> : <Moon size={18} />}
               </button>
               <div className="h-4 w-px bg-slate-700 mx-1" />
-              <div className="relative shrink-0">
+              <div className="relative shrink-0 lang-menu-container">
                  <button 
-                    onClick={() => setShowLangMenu(!showLangMenu)}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      const nextState = !showLangMenu;
+                      setShowLangMenu(nextState);
+                      if (nextState) {
+                        setShowMobileToolsOpen(false);
+                        setShowMobileTools1(false);
+                        setShowMobileTools2(false);
+                        setShowNotificationList(false);
+                      }
+                    }}
                     className="flex items-center gap-1 bg-slate-900/50 px-1.5 py-1 rounded-lg text-[9px] font-black uppercase text-slate-400 hover:text-white transition-all"
                  >
                     {lang}
@@ -8050,13 +8084,19 @@ function App() {
                 onMouseDown={(e) => e.preventDefault()}
                 onClick={(e) => {
                   e.stopPropagation();
-                  setShowMobileTools1(!showMobileTools1);
-                  if (!showMobileTools1) setShowMobileTools2(false);
+                  const nextState = !showMobileTools1;
+                  setShowMobileTools1(nextState);
+                  if (nextState) {
+                    setShowMobileTools2(false);
+                    setShowMobileToolsOpen(false);
+                    setShowNotificationList(false);
+                    setShowLangMenu(false);
+                  }
                 }}
-                className="lg:hidden flex items-center justify-center bg-slate-800/30 p-2 rounded-xl border border-slate-700/30 text-slate-400 hover:text-white hover:bg-slate-700/50 transition-all min-w-[2.5rem] min-h-[2.5rem]"
+                className="lg:hidden flex items-center justify-center bg-slate-800/30 rounded-xl border border-slate-700/30 text-slate-400 hover:text-white hover:bg-slate-700/50 transition-all size-8 xs:size-9"
                 title="Tools"
              >
-                <Layers size={20} />
+                <Layers size={18} />
              </button>
              <div className={cn(
                 "absolute lg:static top-full right-0 mt-2 lg:mt-0 bg-slate-800 lg:bg-slate-800/30 border border-slate-700 lg:border-slate-700/30 p-2 lg:p-1 rounded-xl shadow-2xl lg:shadow-none min-w-max flex-col lg:flex-row items-center gap-1 lg:gap-1.5 z-50",
@@ -8119,13 +8159,19 @@ function App() {
                 onMouseDown={(e) => e.preventDefault()}
                 onClick={(e) => {
                   e.stopPropagation();
-                  setShowMobileTools2(!showMobileTools2);
-                  if (!showMobileTools2) setShowMobileTools1(false);
+                  const nextState = !showMobileTools2;
+                  setShowMobileTools2(nextState);
+                  if (nextState) {
+                    setShowMobileTools1(false);
+                    setShowMobileToolsOpen(false);
+                    setShowNotificationList(false);
+                    setShowLangMenu(false);
+                  }
                 }}
-                className="lg:hidden flex items-center justify-center bg-slate-800/30 p-2 rounded-xl border border-slate-700/30 text-slate-400 hover:text-white hover:bg-slate-700/50 transition-all min-w-[2.5rem] min-h-[2.5rem]"
+                className="lg:hidden flex items-center justify-center bg-slate-800/30 rounded-xl border border-slate-700/30 text-slate-400 hover:text-white hover:bg-slate-700/50 transition-all size-8 xs:size-9"
                 title="Files"
              >
-                <FilePlus size={20} />
+                <FilePlus size={18} />
              </button>
              <div className={cn(
                 "absolute lg:static top-full right-0 mt-2 lg:mt-0 bg-slate-800 lg:bg-slate-800/30 border border-slate-700 lg:border-slate-700/30 p-2 lg:p-1 rounded-xl shadow-2xl lg:shadow-none min-w-max flex-col lg:flex-row items-stretch lg:items-center gap-1.5 z-40",
@@ -8173,11 +8219,11 @@ function App() {
                 icon={Download} 
                 onClick={handleInstallPwa} 
                 title={t('installApp') || "Встановити PWA"} 
-                className="shrink-0 size-8 flex text-cyan-400 bg-cyan-950/60 border border-cyan-800/60 hover:bg-cyan-900/80 active:scale-95 transition-transform" 
+                className="shrink-0 size-8 hidden lg:flex text-cyan-400 bg-cyan-950/60 border border-cyan-800/60 hover:bg-cyan-900/80 active:scale-95 transition-transform" 
               />
             )}
             <IconButton icon={ShieldUserIcon} onClick={() => setActiveModal('keys')} title={t('keys')} className="shrink-0 size-8 flex" />
-            <IconButton icon={Settings} onClick={() => { setSettingsTab('general'); setActiveModal('settings'); }} title={t('settings')} className="shrink-0 size-8 flex" />
+            <IconButton icon={Settings} onClick={() => { setSettingsTab('general'); setActiveModal('settings'); }} title={t('settings')} className="shrink-0 size-8 hidden lg:flex" />
 
             {activeView === 'editor' && (
               <IconButton icon={Rocket} onClick={() => setActiveModal('publish')} title={t('publish')} className={cn("shrink-0 size-8 bg-cyan-600 text-white hover:bg-cyan-500 border border-cyan-500/30 transition-all", performanceMode ? "shadow-none" : "shadow-lg shadow-cyan-500/30 hover:scale-105 active:scale-95")} />
@@ -9515,8 +9561,8 @@ function App() {
                 )}
               </AnimatePresence>
 
-              {/* Tamed Widget - Now with arrow navigation and smart positioning */}
-              {isWidgetVisible && !activeModal && (window.innerWidth >= 1024 || !isSidebarOpen) && (
+              {/* Tamed Widget - With 3 distinct modes (hidden, bottom, floating) and fixed mobile positioning */}
+              {isWidgetVisible && widgetPos !== 'hidden' && !activeModal && (window.innerWidth >= 1024 || !isSidebarOpen) && (
                   <div 
                     key="steem-widget"
                     ref={widgetRef}
@@ -9539,10 +9585,9 @@ function App() {
                         style.top = floatingPos.y < 150 ? floatingPos.y + 40 : floatingPos.y - 80;
                       } else if (window.innerWidth < 1024) {
                         style.position = 'fixed';
-                        // Keep widget inside the viewport explicitly on mobile
                         style.top = 'auto';
-                        style.left = '0';
-                        style.right = '0';
+                        style.left = '0.5rem';
+                        style.right = '0.5rem';
                         style.margin = '0 auto';
                         if (isKeyboardOpen) {
                           style.bottom = `calc(${keyboardOffset > 0 ? keyboardOffset : 0}px + var(--browser-bottom-inset, 0px) + 0.5rem)`;
@@ -9556,15 +9601,13 @@ function App() {
                       return style;
                     })()}
                     className={cn(
-                      "z-[150] p-1 flex items-center gap-1",
+                      "steem-widget-container z-[150] p-1 flex items-center gap-1",
                       widgetNoBorder 
                         ? "shadow-none border-none border-transparent py-0 px-0 bg-slate-900"
                         : "bg-slate-900 border border-white/10 rounded-3xl p-1 shadow-none",
-                      widgetPos === 'floating' ? (
-                        "absolute " + (window.innerWidth < 1024 ? "left-4 right-4 rounded-3xl" : "")
-                      ) : (
-                        "absolute bottom-4 left-4 right-4 rounded-3xl mx-auto max-w-2xl"
-                      )
+                      widgetPos === 'floating' && window.innerWidth >= 1024 
+                        ? "fixed" 
+                        : "fixed sm:absolute bottom-4 left-2 right-2 sm:left-4 sm:right-4 rounded-3xl mx-auto max-w-2xl"
                     )}
                   >
                     <button 
@@ -9637,16 +9680,23 @@ function App() {
 
                     <div className="hidden lg:block w-px h-[calc(var(--toolbar-btn-size,3rem)-8px)] bg-slate-700/50 mx-1 flex-shrink-0" />
                     
-                    <div className="relative">
+                    <div className="relative widget-settings-container">
                       <button 
-                        onMouseDown={(e) => e.preventDefault()}
-                        onClick={() => {
+                        type="button"
+                        onPointerDown={(e) => e.stopPropagation()}
+                        onMouseDown={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                        }}
+                        onClick={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
                           if (!isWidgetMenuOpen && scrollRef.current) {
                             setLockedToolsWidth(scrollRef.current.offsetWidth);
                           } else {
                             setTimeout(() => setLockedToolsWidth(null), 300); // Wait for transition
                           }
-                          setIsWidgetMenuOpen(!isWidgetMenuOpen);
+                          setIsWidgetMenuOpen(prev => !prev);
                         }} 
                         className={cn(
                           "toolbar-btn flex-shrink-0 flex items-center justify-center rounded-xl transition-all",
@@ -9681,10 +9731,20 @@ function App() {
                                 <h3 className="text-[10px] font-bold text-slate-400 uppercase tracking-widest flex items-center gap-2">
                                   <Zap size={16} className="text-cyan-400" /> {t('widgetSettings')}
                                 </h3>
-                                <button onClick={() => {
-                                  setTimeout(() => setLockedToolsWidth(null), 300);
-                                  setIsWidgetMenuOpen(false);
-                                }} className="p-1.5 hover:bg-white/5 rounded-full text-slate-500 hover:text-white transition-colors">
+                                <button 
+                                  type="button"
+                                  onMouseDown={(e) => {
+                                    e.preventDefault();
+                                    e.stopPropagation();
+                                  }}
+                                  onClick={(e) => {
+                                    e.preventDefault();
+                                    e.stopPropagation();
+                                    setTimeout(() => setLockedToolsWidth(null), 300);
+                                    setIsWidgetMenuOpen(false);
+                                  }} 
+                                  className="p-1.5 hover:bg-white/5 rounded-full text-slate-500 hover:text-white transition-colors"
+                                >
                                   <X size={18} />
                                 </button>
                             </div>
@@ -9732,19 +9792,22 @@ function App() {
 
                                 <div className="space-y-3">
                                   <label className="text-[10px] font-bold text-slate-500 uppercase block tracking-wider">{t('widgetPos')}</label>
-                                  <div className="grid grid-cols-2 gap-1.5">
+                                  <div className="grid grid-cols-3 gap-1.5">
                                     {[
-                                      { id: 'floating', label: 'FLOAT' },
-                                      { id: 'bottom', label: 'BOTTOM' }
+                                      { id: 'bottom', label: lang === 'uk' ? 'ВНИЗУ' : 'BOTTOM' },
+                                      { id: 'floating', label: lang === 'uk' ? 'ПЛАВАЮЧИЙ' : 'FLOAT' },
+                                      { id: 'hidden', label: lang === 'uk' ? 'ВИМКН' : 'OFF' }
                                     ].map(pos => (
                                       <button
                                         key={pos.id}
+                                        type="button"
+                                        onMouseDown={(e) => e.preventDefault()}
                                         onClick={() => {
                                           setWidgetPos(pos.id as any);
                                           localStorage.setItem('steem_widget_pos', pos.id);
                                         }}
                                         className={cn(
-                                          "text-[9px] py-2 rounded-xl border transition-all duration-300 text-center font-bold tracking-tighter",
+                                          "text-[9px] py-2 px-1 rounded-xl border transition-all duration-300 text-center font-bold tracking-tighter truncate",
                                           widgetPos === pos.id ? "bg-cyan-600 text-white border-cyan-500 shadow-lg shadow-cyan-900/20" : "bg-white/5 border-white/5 text-slate-500 hover:border-white/10"
                                         )}
                                       >
@@ -9838,8 +9901,17 @@ function App() {
                       </AnimatePresence>
                     </div>
                     <button 
-                      onMouseDown={(e) => e.preventDefault()}
-                      onClick={() => setIsWidgetVisible(false)} 
+                      type="button"
+                      onPointerDown={(e) => e.stopPropagation()}
+                      onMouseDown={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                      }}
+                      onClick={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        setIsWidgetVisible(false);
+                      }} 
                       className={cn(
                         "w-10 h-10 flex-shrink-0 flex items-center justify-center rounded-xl transition-all lg:hidden",
                         !widgetNoBorder ? (performanceMode ? "bg-slate-700 hover:bg-red-600 hover:text-white border border-slate-600/50" : "bg-slate-700/50 hover:bg-red-600 hover:text-white border border-slate-600/50") : "bg-transparent text-slate-400 hover:bg-red-600/20 hover:text-red-400"
@@ -11699,6 +11771,17 @@ function App() {
                         </button>
                       </div>
                       <div className="pt-2 flex flex-col gap-2">
+                        {!isPwaInstalled && !isTauriEnv() && !isNeutralinoEnv() && (
+                          <button 
+                            onClick={() => {
+                              setIsSMenuOpen(false);
+                              handleInstallPwa();
+                            }}
+                            className="w-full py-4 bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 rounded-3xl text-sm font-black text-white flex items-center justify-center gap-3 transition-all shadow-xl shadow-cyan-600/20 text-center cursor-pointer"
+                          >
+                            <Download size={18} /> {t('installApp') || "Встановити додаток (PWA)"}
+                          </button>
+                        )}
                         <button 
                           onClick={() => {
                             setIsSMenuOpen(false);
@@ -12332,6 +12415,34 @@ function App() {
 
                     {/* Editor Options */}
                     <div className="space-y-4 pt-4 border-t border-slate-800">
+                      {/* Widget Mode Selector */}
+                      <div>
+                        <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest block mb-2">{t('widgetPos') || 'Режим плаваючого віджета'}</label>
+                        <div className="grid grid-cols-3 gap-2">
+                          {[
+                            { id: 'bottom', label: lang === 'uk' ? '🔒 Внизу' : '🔒 Bottom' },
+                            { id: 'floating', label: lang === 'uk' ? '🎈 Плаваючий' : '🎈 Floating' },
+                            { id: 'hidden', label: lang === 'uk' ? '🚫 Вимкнено' : '🚫 Hidden' }
+                          ].map(pos => (
+                            <button
+                              key={pos.id}
+                              onClick={() => {
+                                setWidgetPos(pos.id as any);
+                                localStorage.setItem('steem_widget_pos', pos.id);
+                              }}
+                              className={cn(
+                                "py-2 px-1 rounded-xl border text-[10px] font-bold uppercase transition-all text-center truncate",
+                                widgetPos === pos.id 
+                                  ? "bg-slate-800 border-cyan-500/30 text-cyan-400 shadow-lg shadow-cyan-900/10" 
+                                  : "bg-slate-900 border-slate-800 text-slate-500 hover:border-slate-700"
+                              )}
+                            >
+                              {pos.label}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+
                       <div className="flex items-center justify-between">
                         <span className="text-xs font-bold text-slate-200">
                           {t('syncScroll')}
