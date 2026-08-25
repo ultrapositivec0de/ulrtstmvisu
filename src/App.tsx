@@ -3355,7 +3355,7 @@ function App() {
         const dynamicWidgetHeight = toolbarIconSize + 24;
         const bottomReserved = isMobileScreen 
             ? (isKeyboardOpen ? (dynamicWidgetHeight + 45) : (dynamicWidgetHeight + 90)) 
-            : (widgetPos === 'bottom' ? (dynamicWidgetHeight + 32) : 35);
+            : (widgetPos === 'bottom' ? (dynamicWidgetHeight + 60) : 40);
         const visH = Math.max(100, ta.clientHeight - bottomReserved);
         ta.scrollTop = Math.max(0, caretY - (visH / 2));
       }
@@ -9128,10 +9128,10 @@ function App() {
                     (visualStyle === 'neon' && neonTextColored) ? "text-cyan-400 font-normal" : "text-slate-300",
                     beautifyEnabled ? "px-4 lg:px-8 pt-4 lg:pt-6 max-w-[clamp(40rem,60vw,80rem)] mx-auto selection:bg-[rgb(var(--accent-color)/0.3)]" : "px-3 pt-3 lg:px-6 lg:pt-6",
                     isKeyboardOpen 
-                      ? "pb-44 mb-2 lg:pb-36 lg:mb-4" 
+                      ? "pb-44 mb-2 lg:pb-48 lg:mb-4" 
                       : (isEditorFullScreen || isFullScreen
-                          ? "pb-44 mb-2 lg:pb-36 lg:mb-4"
-                          : "pb-44 mb-[5rem] lg:pb-36 lg:mb-4")
+                          ? "pb-44 mb-2 lg:pb-48 lg:mb-4"
+                          : (widgetPos === 'bottom' ? "pb-44 mb-[5rem] lg:pb-48 lg:mb-20" : "pb-44 mb-[5rem] lg:pb-36 lg:mb-4"))
                   )}
                   placeholder={`${t('placeholder')}\n\n\n\n\nОМ АХ ХУМ СО ХА\n♡`}
                 />
@@ -9350,10 +9350,10 @@ function App() {
                     (visualStyle === 'neon' && neonTextColored) ? "text-cyan-400 font-normal" : "text-slate-300",
                     beautifyEnabled ? "px-4 lg:px-8 pt-4 lg:pt-6 max-w-4xl mx-auto selection:bg-[rgb(var(--accent-color)/0.3)]" : "px-4 pt-4 lg:px-6 lg:pt-6",
                     isKeyboardOpen 
-                      ? "pb-44 mb-2 lg:pb-36 lg:mb-4" 
+                      ? "pb-44 mb-2 lg:pb-48 lg:mb-4" 
                       : (isEditorFullScreen || isFullScreen
-                          ? "pb-44 mb-2 lg:pb-36 lg:mb-4"
-                          : "pb-44 mb-[5rem] lg:pb-36 lg:mb-4")
+                          ? "pb-44 mb-2 lg:pb-48 lg:mb-4"
+                          : (widgetPos === 'bottom' ? "pb-44 mb-[5rem] lg:pb-48 lg:mb-20" : "pb-44 mb-[5rem] lg:pb-36 lg:mb-4"))
                   )}
                   data-is-empty={useEditorStore.getState().content.trim() === '' ? 'true' : undefined}
                   data-placeholder-title={t('visualTitlePlaceholder')}
@@ -13171,6 +13171,11 @@ function App() {
         .wysiwyg-editor h4,
         .wysiwyg-editor h5,
         .wysiwyg-editor h6,
+        .wysiwyg-editor,
+        #main-editor textarea,
+        .markdown-body {
+          scroll-padding-bottom: 7rem !important;
+        }
         .wysiwyg-editor blockquote,
         .wysiwyg-editor pre {
           margin-top: var(--wysiwyg-spacing, 18px) !important;
