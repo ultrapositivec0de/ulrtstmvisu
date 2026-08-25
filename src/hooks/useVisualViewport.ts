@@ -4,6 +4,7 @@ export interface VisualViewportState {
   viewportHeight: number;
   viewportWidth: number;
   keyboardOffset: number;
+  browserBottomInset: number;
   isKeyboardOpen: boolean;
   isMobile: boolean;
 }
@@ -21,6 +22,7 @@ export function useVisualViewport(): VisualViewportState {
       viewportHeight: initH,
       viewportWidth: initW,
       keyboardOffset: 0,
+      browserBottomInset: 0,
       isKeyboardOpen: false,
       isMobile: isClient ? initW < 1024 : false,
     };
@@ -66,18 +68,23 @@ export function useVisualViewport(): VisualViewportState {
     // Detect virtual keyboard presence
     const isKeyboardOpen = isMobile && (
       (isInputFocused && heightShrinkDiff > 130) ||
-      rawOverlayDiff > 60 ||
+      rawOverlayDiff > 130 ||
       (isInputFocused && visualH < baselineH * 0.82)
     );
 
     // Calculate effective offset to lift fixed elements above overlaid virtual keyboards
-    const effectiveKeyboardOffset = isKeyboardOpen && rawOverlayDiff > 40 ? rawOverlayDiff : 0;
+    const effectiveKeyboardOffset = isKeyboardOpen ? Math.max(rawOverlayDiff, heightShrinkDiff) : 0;
+
+    // Browser bottom address bar / navigation bar inset (when keyboard is closed)
+    const browserBottomInset = !isKeyboardOpen && rawOverlayDiff > 0 ? rawOverlayDiff : 0;
 
     // Synchronize global CSS custom properties for hardware-accelerated layouts
     if (typeof document !== 'undefined' && document.documentElement) {
       document.documentElement.style.setProperty('--vv-height', `${visualH}px`);
       document.documentElement.style.setProperty('--keyboard-offset', `${effectiveKeyboardOffset}px`);
-      document.documentElement.style.setProperty('--viewport-bottom-offset', `${effectiveKeyboardOffset}px`);
+      document.documentElement.style.setProperty('--browser-bottom-inset', `${browserBottomInset}px`);
+      document.documentElement.style.setProperty('--viewport-bottom-offset', `${isKeyboardOpen ? effectiveKeyboardOffset : browserBottomInset}px`);
+      document.documentElement.style.setProperty('--safe-bottom-total', `calc(env(safe-area-inset-bottom, 0px) + ${browserBottomInset}px)`);
     }
 
     // When virtual keyboard is open or collapsing, prevent layout viewport displacement anomalies (header shifting)
@@ -111,6 +118,7 @@ export function useVisualViewport(): VisualViewportState {
         prev.viewportHeight === visualH &&
         prev.viewportWidth === visualW &&
         prev.keyboardOffset === effectiveKeyboardOffset &&
+        prev.browserBottomInset === browserBottomInset &&
         prev.isKeyboardOpen === isKeyboardOpen &&
         prev.isMobile === isMobile
       ) {
@@ -120,6 +128,7 @@ export function useVisualViewport(): VisualViewportState {
         viewportHeight: visualH,
         viewportWidth: visualW,
         keyboardOffset: effectiveKeyboardOffset,
+        browserBottomInset,
         isKeyboardOpen,
         isMobile,
       };

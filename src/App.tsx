@@ -9,7 +9,7 @@ import {
   Trash2, X, ChevronLeft, ChevronRight, ChevronUp, ChevronDown,
   Eye, EyeOff, Edit3, Plus, ShieldCheck, Key,
   Search, List as ListIcon, Lock, LayoutGrid, Maximize2, Minimize2, Calendar, Tags, Shield, Bell, ArrowRight, Clock,
-  Code, Terminal, Indent, Layers, CheckCircle, PlusCircle, Check, AlignLeft, AlignRight, Rows, Columns, PanelLeft, PanelRight, PanelLeftClose, PanelLeftOpen, Moon, Sun, FilePlus, Zap, MoveVertical, Info, Globe, FileUp, FileDown, Copy, SplitSquareHorizontal, Type, Download, Sparkles, Images, ExternalLink
+  Code, Terminal, Indent, Layers, CheckCircle, PlusCircle, Check, AlignLeft, AlignRight, Rows, Columns, PanelLeft, PanelRight, PanelLeftClose, PanelLeftOpen, Moon, Sun, FilePlus, Zap, MoveVertical, Info, Globe, FileUp, FileDown, Copy, SplitSquareHorizontal, Type, Download, Sparkles, Images
 } from 'lucide-react';
 import { motion, AnimatePresence, Reorder } from 'motion/react';
 import { marked } from 'marked';
@@ -1900,25 +1900,26 @@ function App() {
   }, [t, notify]);
 
   const handleInstallPwa = async () => {
-    if (!deferredPrompt) {
-      if (isPwaInstalled) {
-        notify(t('pwaAlreadyInstalled'), 'success');
-      } else {
-        setShowPwaInstructionsModal(true);
+    if (deferredPrompt) {
+      try {
+        await deferredPrompt.prompt();
+        const { outcome } = await deferredPrompt.userChoice;
+        console.log(`PWA installation user outcome: ${outcome}`);
+        if (outcome === 'accepted') {
+          setIsPwaInstalled(true);
+          setDeferredPrompt(null);
+          setShowPwaBanner(false);
+          notify(t('pwaInstalled'), 'success');
+        }
+        return;
+      } catch (err) {
+        console.error('Failed to trigger PWA installation:', err);
       }
-      return;
     }
-    try {
-      deferredPrompt.prompt();
-      const { outcome } = await deferredPrompt.userChoice;
-      console.log(`PWA installation user outcome: ${outcome}`);
-      if (outcome === 'accepted') {
-        setIsPwaInstalled(true);
-        setDeferredPrompt(null);
-        setShowPwaBanner(false);
-      }
-    } catch (err) {
-      console.error('Failed to trigger PWA installation:', err);
+
+    if (isPwaInstalled) {
+      notify(t('pwaAlreadyInstalled'), 'success');
+    } else {
       setShowPwaInstructionsModal(true);
     }
   };
@@ -8649,7 +8650,7 @@ function App() {
         {/* Main Content */}
         <main className={cn(
           "flex-1 flex flex-col min-w-0 bg-slate-950 relative transition-all",
-          (isEditorFullScreen || isFullScreen || isKeyboardOpen) ? "pb-0 lg:pb-0" : "pb-[calc(4rem+env(safe-area-inset-bottom,0px))] lg:pb-0"
+          (isEditorFullScreen || isFullScreen || isKeyboardOpen) ? "pb-0 lg:pb-0" : "pb-[calc(4rem+env(safe-area-inset-bottom,0px)+var(--browser-bottom-inset,0px))] lg:pb-0"
         )}>
           <div className="flex-1 flex overflow-hidden">
             {/* Editor Pane */}
@@ -9544,11 +9545,11 @@ function App() {
                         style.right = '0';
                         style.margin = '0 auto';
                         if (isKeyboardOpen) {
-                          style.bottom = `calc(${keyboardOffset > 0 ? keyboardOffset : 0}px + 0.5rem)`;
+                          style.bottom = `calc(${keyboardOffset > 0 ? keyboardOffset : 0}px + var(--browser-bottom-inset, 0px) + 0.5rem)`;
                         } else if (isEditorFullScreen || isFullScreen) {
-                          style.bottom = 'calc(env(safe-area-inset-bottom, 0px) + 0.5rem)';
+                          style.bottom = 'calc(env(safe-area-inset-bottom, 0px) + var(--browser-bottom-inset, 0px) + 0.5rem)';
                         } else {
-                          style.bottom = 'calc(4rem + env(safe-area-inset-bottom, 0px) + 0.5rem)';
+                          style.bottom = 'calc(4rem + env(safe-area-inset-bottom, 0px) + var(--browser-bottom-inset, 0px) + 0.5rem)';
                         }
                       }
                       
@@ -12869,17 +12870,7 @@ function App() {
                           </div>
                         ) : (
                           <div className="space-y-3">
-                            {typeof window !== 'undefined' && window.self !== window.top && (
-                              <a
-                                href={window.location.href}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="w-full py-2.5 px-3 rounded-xl font-bold text-xs text-amber-300 hover:text-amber-200 bg-amber-500/10 border border-amber-500/30 transition-colors flex items-center justify-center gap-2"
-                              >
-                                <ExternalLink size={14} />
-                                Відкрити в окремій вкладці для PWA
-                              </a>
-                            )}
+
                             <button
                               onClick={handleInstallPwa}
                               className="w-full py-3 px-4 rounded-xl font-black text-xs uppercase tracking-wider transition-all flex items-center justify-center gap-2 shadow-lg bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-white shadow-cyan-500/20 active:scale-95 cursor-pointer"
@@ -12936,7 +12927,7 @@ function App() {
             initial={{ opacity: 0, y: 50 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: 50 }}
-            className="fixed bottom-20 lg:bottom-6 left-4 right-4 lg:left-auto lg:right-6 z-[65] max-w-sm"
+            className="fixed bottom-[calc(5rem+var(--browser-bottom-inset,0px))] lg:bottom-6 left-4 right-4 lg:left-auto lg:right-6 z-[65] max-w-sm"
           >
             <div className="p-4 bg-slate-900/95 backdrop-blur-md border border-cyan-500/30 rounded-2xl shadow-2xl shadow-cyan-950/50 flex flex-col gap-3">
               <div className="flex items-start gap-3">
@@ -13031,23 +13022,7 @@ function App() {
                   </button>
                 )}
 
-                {/* If inside iframe preview */}
-                {typeof window !== 'undefined' && window.self !== window.top && (
-                  <div className="p-3 bg-amber-500/10 border border-amber-500/30 rounded-2xl space-y-2">
-                    <p className="text-[11px] text-amber-300 leading-relaxed font-medium">
-                      ℹ️ У режимі іфрейму (попереднього перегляду) браузери блокують прямий виклик встановлення. Відкрийте застосунок у новій вкладці для прямого встановлення на пристрій:
-                    </p>
-                    <a
-                      href={window.location.href}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="w-full py-2 px-3 bg-amber-500/20 hover:bg-amber-500/30 border border-amber-500/40 text-amber-200 font-bold text-xs rounded-xl transition-colors flex items-center justify-center gap-2 text-center"
-                    >
-                      <ExternalLink size={14} />
-                      Відкрити в окремій вкладці
-                    </a>
-                  </div>
-                )}
+
 
                 {/* iOS / Safari */}
                 <div className="p-3.5 bg-slate-950/70 rounded-2xl border border-slate-800/80 space-y-1.5">
@@ -13094,7 +13069,7 @@ function App() {
             (isEditorFullScreen || isFullScreen || isKeyboardOpen) ? "translate-y-full opacity-0 pointer-events-none" : "translate-y-0 opacity-100"
           )}
           style={{
-            bottom: 0,
+            bottom: 'var(--browser-bottom-inset, 0px)',
             paddingBottom: 'env(safe-area-inset-bottom, 0px)',
             height: 'calc(4rem + env(safe-area-inset-bottom, 0px))'
           }}

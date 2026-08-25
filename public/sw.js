@@ -1,8 +1,13 @@
-const CACHE_NAME = 'steem-editor-pro-v1';
+const CACHE_NAME = 'steem-editor-pro-v2';
 const ASSETS_TO_CACHE = [
   '/',
   '/index.html',
   '/manifest.json',
+  '/favicon.png',
+  '/icon-192.png',
+  '/icon-512.png',
+  '/apple-touch-icon.png',
+  '/icon.png',
   '/icon.svg',
   '/lite.html'
 ];

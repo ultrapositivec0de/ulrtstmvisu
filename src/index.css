@@ -23,10 +23,12 @@
   --safe-left: env(safe-area-inset-left, 0px);
   --safe-right: env(safe-area-inset-right, 0px);
 
-  /* Visual Viewport & Virtual Keyboard Dynamics */
+  /* Visual Viewport & Virtual Keyboard & Browser Toolbar Dynamics */
   --vv-height: 100dvh;
   --keyboard-offset: 0px;
+  --browser-bottom-inset: 0px;
   --viewport-bottom-offset: 0px;
+  --safe-bottom-total: calc(env(safe-area-inset-bottom, 0px) + var(--browser-bottom-inset, 0px));
 }
 
 html, body, #root {
@@ -41,7 +43,10 @@ html, body, #root {
   -webkit-overflow-scrolling: auto !important;
   touch-action: manipulation;
   position: fixed;
-  inset: 0;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: auto;
 }
 
 .editor-font,
