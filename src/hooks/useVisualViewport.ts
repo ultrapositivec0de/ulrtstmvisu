@@ -3,6 +3,8 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 export interface VisualViewportState {
   viewportHeight: number;
   viewportWidth: number;
+  offsetTop: number;
+  pageTop: number;
   keyboardOffset: number;
   browserBottomInset: number;
   isKeyboardOpen: boolean;
@@ -21,6 +23,8 @@ export function useVisualViewport(): VisualViewportState {
     return {
       viewportHeight: initH,
       viewportWidth: initW,
+      offsetTop: 0,
+      pageTop: 0,
       keyboardOffset: 0,
       browserBottomInset: 0,
       isKeyboardOpen: false,
@@ -117,6 +121,8 @@ export function useVisualViewport(): VisualViewportState {
       if (
         prev.viewportHeight === visualH &&
         prev.viewportWidth === visualW &&
+        prev.offsetTop === offsetTop &&
+        prev.pageTop === (vv ? vv.pageTop : 0) &&
         prev.keyboardOffset === effectiveKeyboardOffset &&
         prev.browserBottomInset === browserBottomInset &&
         prev.isKeyboardOpen === isKeyboardOpen &&
@@ -127,6 +133,8 @@ export function useVisualViewport(): VisualViewportState {
       return {
         viewportHeight: visualH,
         viewportWidth: visualW,
+        offsetTop: offsetTop,
+        pageTop: vv ? vv.pageTop : 0,
         keyboardOffset: effectiveKeyboardOffset,
         browserBottomInset,
         isKeyboardOpen,
