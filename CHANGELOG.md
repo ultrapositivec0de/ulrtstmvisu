@@ -1,7 +1,12 @@
 # Changelog
-## [2026-08-24] - Version 4.6.8 (ultrasteemeditor/4.6.8)
+## [2026-08-25] - Version 4.6.8 (ultrasteemeditor/4.6.8)
 ### Added & Improved
-- **Release Updates**: Cross-platform release synchronization and version update to v4.6.8 +
+- **Android & Mobile Viewport Precision**: Enhanced caret positioning and viewport scroll bounding (`scrollCaretIntoView`, `restoreMarkdownCursorAndScroll`, `syncCursorVisualToMarkdown`) to ensure text and active caret always remain fully visible above the floating toolbar widget.
+- **Dynamic Widget Sizing Support**: Implemented real-time dynamic bottom offset calculations adjusting directly to customized toolbar icon sizes (`toolbarIconSize`), virtual keyboard states (`isKeyboardOpen`), and safe area insets.
+- **Editor Padding & Experience**: Adjusted bottom padding across Markdown and WYSIWYG modes to `pb-44` for seamless document scrolling and barrier-free editing on mobile devices and Android packaging.
+- **Visual Editor Guide Placeholders**: Added multilingual informative placeholders for the visual editor (title on first line auto-detection & main body content guidance).
+- **Build & Packaging Enhancements**: Updated allowScripts security policy format and enhanced web release archive naming with dynamic semver tagging.
+- **Cross-Platform Release Sync**: Synchronized application version to v4.6.8 across Web, Tauri, Neutralino, and Steem blockchain broadcasting metadata.
 
 ## [2026-08-24] - Version 4.6.6 (ultrasteemeditor/4.6.6)
 ### Added & Improved

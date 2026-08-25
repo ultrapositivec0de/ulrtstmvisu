@@ -219,8 +219,11 @@ const IconButton = ({
 const APP_CHANGELOG = [
   {
     version: "v4.6.8",
-    date: "2026-08-24",
+    date: "2026-08-25",
     changes: [
+      "Android & Mobile Viewport Precision: Enhanced caret positioning and scroll boundary calculation to ensure text and caret always stay clearly visible above the floating toolbar widget.",
+      "Dynamic Widget Sizing Support: Implemented dynamic bottom offset calculations adjusting automatically to customizable toolbar icon sizes, virtual keyboard states, and safe area insets.",
+      "Editor Scroll & Padding: Optimized bottom padding across Markdown and WYSIWYG editors for seamless scrolling on mobile and Android app packaging.",
       "Visual Editor Guide Placeholders: Added multilingual informative placeholders for the visual editor (title on first line auto-detection & main body content guidance).",
       "Build & Packaging Enhancements: Updated allowScripts security policy format and enhanced web release archive naming with dynamic semver tagging.",
       "Cross-Platform Release Sync: Synchronized application version to v4.6.8 across Web, Tauri, Neutralino, and Steem blockchain broadcasting metadata."
@@ -2151,7 +2154,11 @@ function App() {
       if (hasValidRect) {
           const editorRect = editor.getBoundingClientRect();
           const caretTop = rect.top - editorRect.top;
-          const bottomReserved = (window.innerWidth < 1024) ? 75 : 30;
+          const isMobileScreen = window.innerWidth < 1024;
+          const dynamicWidgetHeight = toolbarIconSize + 24; // dynamically scales with icon size (12-32px -> 36-56px + padding)
+          const bottomReserved = isMobileScreen 
+              ? (isKeyboardOpen ? (dynamicWidgetHeight + 45) : (dynamicWidgetHeight + 90)) 
+              : (widgetPos === 'bottom' ? (dynamicWidgetHeight + 32) : 35);
           const visibleHeight = Math.max(100, editorRect.height - bottomReserved);
           
           if (block === 'center') {
@@ -2165,7 +2172,7 @@ function App() {
               }
           }
       }
-  }, []);
+  }, [isKeyboardOpen, widgetPos, toolbarIconSize]);
 
   const restoreVisualSelection = useCallback((shouldExpandWord = false) => {
     if (savedVisualRangeRef.current && wysiwygRef.current) {
@@ -3318,7 +3325,11 @@ function App() {
           
           const caretY = clone.scrollHeight;
           document.body.removeChild(clone);
-          const bottomReserved = (window.innerWidth < 1024) ? 75 : 30;
+          const isMobileScreen = window.innerWidth < 1024;
+          const dynamicWidgetHeight = toolbarIconSize + 24;
+          const bottomReserved = isMobileScreen 
+              ? (isKeyboardOpen ? (dynamicWidgetHeight + 45) : (dynamicWidgetHeight + 90)) 
+              : (widgetPos === 'bottom' ? (dynamicWidgetHeight + 32) : 35);
           const visH = Math.max(100, ta.clientHeight - bottomReserved);
           ta.scrollTop = Math.max(0, caretY - (visH / 2));
         }
@@ -3340,7 +3351,11 @@ function App() {
         
         const caretY = clone.scrollHeight;
         document.body.removeChild(clone);
-        const bottomReserved = (window.innerWidth < 1024) ? 75 : 30;
+        const isMobileScreen = window.innerWidth < 1024;
+        const dynamicWidgetHeight = toolbarIconSize + 24;
+        const bottomReserved = isMobileScreen 
+            ? (isKeyboardOpen ? (dynamicWidgetHeight + 45) : (dynamicWidgetHeight + 90)) 
+            : (widgetPos === 'bottom' ? (dynamicWidgetHeight + 32) : 35);
         const visH = Math.max(100, ta.clientHeight - bottomReserved);
         ta.scrollTop = Math.max(0, caretY - (visH / 2));
       }
@@ -3352,7 +3367,7 @@ function App() {
       console.warn('restoreMarkdownCursorAndScroll failed:', e);
       isSyncingRef.current = false;
     }
-  }, []);
+  }, [isKeyboardOpen, widgetPos, toolbarIconSize]);
 
   const syncCursorVisualToMarkdown = useCallback(() => {
     try {
@@ -3654,8 +3669,14 @@ function App() {
                 const caretY = clone.scrollHeight;
                 document.body.removeChild(clone);
                 
-                // Scroll so the caret is exactly in the middle of the screen
-                ta.scrollTop = Math.max(0, caretY - (ta.clientHeight / 2));
+                // Scroll so the caret is in the upper-middle of the visible screen above widget
+                const isMobileScreen = window.innerWidth < 1024;
+                const dynamicWidgetHeight = toolbarIconSize + 24;
+                const bottomReserved = isMobileScreen 
+                    ? (isKeyboardOpen ? (dynamicWidgetHeight + 45) : (dynamicWidgetHeight + 90)) 
+                    : (widgetPos === 'bottom' ? (dynamicWidgetHeight + 32) : 35);
+                const visH = Math.max(100, ta.clientHeight - bottomReserved);
+                ta.scrollTop = Math.max(0, caretY - (visH / 2));
                 
                 // Reset sync flag after a brief timeout so that user actions are once again captured
                 setTimeout(() => {
@@ -3673,7 +3694,7 @@ function App() {
        saveCursorPosition();
        isSyncingRef.current = false;
     }
-  }, [activeView, activeMobileTab, editorMode, saveCursorPosition, restoreVisualSelection, saveVisualSelection, restoreMarkdownCursorAndScroll]);
+  }, [activeView, activeMobileTab, editorMode, saveCursorPosition, restoreVisualSelection, saveVisualSelection, restoreMarkdownCursorAndScroll, isKeyboardOpen, widgetPos, toolbarIconSize]);
 
   useEffect(() => {
     if (isImagesLoaded.current) {
@@ -9107,10 +9128,10 @@ function App() {
                     (visualStyle === 'neon' && neonTextColored) ? "text-cyan-400 font-normal" : "text-slate-300",
                     beautifyEnabled ? "px-4 lg:px-8 pt-4 lg:pt-6 max-w-[clamp(40rem,60vw,80rem)] mx-auto selection:bg-[rgb(var(--accent-color)/0.3)]" : "px-3 pt-3 lg:px-6 lg:pt-6",
                     isKeyboardOpen 
-                      ? "pb-36 mb-2 lg:pb-24 lg:mb-4" 
+                      ? "pb-44 mb-2 lg:pb-24 lg:mb-4" 
                       : (isEditorFullScreen || isFullScreen
-                          ? "pb-36 mb-2 lg:pb-24 lg:mb-4"
-                          : "pb-36 mb-[5rem] lg:pb-24 lg:mb-4")
+                          ? "pb-44 mb-2 lg:pb-24 lg:mb-4"
+                          : "pb-44 mb-[5rem] lg:pb-24 lg:mb-4")
                   )}
                   placeholder={`${t('placeholder')}\n\n\n\n\nОМ АХ ХУМ СО ХА\n♡`}
                 />
@@ -9329,10 +9350,10 @@ function App() {
                     (visualStyle === 'neon' && neonTextColored) ? "text-cyan-400 font-normal" : "text-slate-300",
                     beautifyEnabled ? "px-4 lg:px-8 pt-4 lg:pt-6 max-w-4xl mx-auto selection:bg-[rgb(var(--accent-color)/0.3)]" : "px-4 pt-4 lg:px-6 lg:pt-6",
                     isKeyboardOpen 
-                      ? "pb-36 mb-2 lg:pb-24 lg:mb-4" 
+                      ? "pb-44 mb-2 lg:pb-24 lg:mb-4" 
                       : (isEditorFullScreen || isFullScreen
-                          ? "pb-36 mb-2 lg:pb-24 lg:mb-4"
-                          : "pb-36 mb-[5rem] lg:pb-24 lg:mb-4")
+                          ? "pb-44 mb-2 lg:pb-24 lg:mb-4"
+                          : "pb-44 mb-[5rem] lg:pb-24 lg:mb-4")
                   )}
                   data-is-empty={useEditorStore.getState().content.trim() === '' ? 'true' : undefined}
                   data-placeholder-title={t('visualTitlePlaceholder')}
