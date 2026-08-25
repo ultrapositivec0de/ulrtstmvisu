@@ -2158,7 +2158,7 @@ function App() {
           const dynamicWidgetHeight = toolbarIconSize + 24; // dynamically scales with icon size (12-32px -> 36-56px + padding)
           const bottomReserved = isMobileScreen 
               ? (isKeyboardOpen ? (dynamicWidgetHeight + 45) : (dynamicWidgetHeight + 90)) 
-              : (widgetPos === 'bottom' ? (dynamicWidgetHeight + 32) : 35);
+              : (widgetPos === 'bottom' ? (dynamicWidgetHeight + 60) : 40);
           const visibleHeight = Math.max(100, editorRect.height - bottomReserved);
           
           if (block === 'center') {
@@ -3329,7 +3329,7 @@ function App() {
           const dynamicWidgetHeight = toolbarIconSize + 24;
           const bottomReserved = isMobileScreen 
               ? (isKeyboardOpen ? (dynamicWidgetHeight + 45) : (dynamicWidgetHeight + 90)) 
-              : (widgetPos === 'bottom' ? (dynamicWidgetHeight + 32) : 35);
+              : (widgetPos === 'bottom' ? (dynamicWidgetHeight + 60) : 40);
           const visH = Math.max(100, ta.clientHeight - bottomReserved);
           ta.scrollTop = Math.max(0, caretY - (visH / 2));
         }
@@ -3674,7 +3674,7 @@ function App() {
                 const dynamicWidgetHeight = toolbarIconSize + 24;
                 const bottomReserved = isMobileScreen 
                     ? (isKeyboardOpen ? (dynamicWidgetHeight + 45) : (dynamicWidgetHeight + 90)) 
-                    : (widgetPos === 'bottom' ? (dynamicWidgetHeight + 32) : 35);
+                    : (widgetPos === 'bottom' ? (dynamicWidgetHeight + 60) : 40);
                 const visH = Math.max(100, ta.clientHeight - bottomReserved);
                 ta.scrollTop = Math.max(0, caretY - (visH / 2));
                 
@@ -9128,10 +9128,10 @@ function App() {
                     (visualStyle === 'neon' && neonTextColored) ? "text-cyan-400 font-normal" : "text-slate-300",
                     beautifyEnabled ? "px-4 lg:px-8 pt-4 lg:pt-6 max-w-[clamp(40rem,60vw,80rem)] mx-auto selection:bg-[rgb(var(--accent-color)/0.3)]" : "px-3 pt-3 lg:px-6 lg:pt-6",
                     isKeyboardOpen 
-                      ? "pb-44 mb-2 lg:pb-24 lg:mb-4" 
+                      ? "pb-44 mb-2 lg:pb-36 lg:mb-4" 
                       : (isEditorFullScreen || isFullScreen
-                          ? "pb-44 mb-2 lg:pb-24 lg:mb-4"
-                          : "pb-44 mb-[5rem] lg:pb-24 lg:mb-4")
+                          ? "pb-44 mb-2 lg:pb-36 lg:mb-4"
+                          : "pb-44 mb-[5rem] lg:pb-36 lg:mb-4")
                   )}
                   placeholder={`${t('placeholder')}\n\n\n\n\nОМ АХ ХУМ СО ХА\n♡`}
                 />
@@ -9350,10 +9350,10 @@ function App() {
                     (visualStyle === 'neon' && neonTextColored) ? "text-cyan-400 font-normal" : "text-slate-300",
                     beautifyEnabled ? "px-4 lg:px-8 pt-4 lg:pt-6 max-w-4xl mx-auto selection:bg-[rgb(var(--accent-color)/0.3)]" : "px-4 pt-4 lg:px-6 lg:pt-6",
                     isKeyboardOpen 
-                      ? "pb-44 mb-2 lg:pb-24 lg:mb-4" 
+                      ? "pb-44 mb-2 lg:pb-36 lg:mb-4" 
                       : (isEditorFullScreen || isFullScreen
-                          ? "pb-44 mb-2 lg:pb-24 lg:mb-4"
-                          : "pb-44 mb-[5rem] lg:pb-24 lg:mb-4")
+                          ? "pb-44 mb-2 lg:pb-36 lg:mb-4"
+                          : "pb-44 mb-[5rem] lg:pb-36 lg:mb-4")
                   )}
                   data-is-empty={useEditorStore.getState().content.trim() === '' ? 'true' : undefined}
                   data-placeholder-title={t('visualTitlePlaceholder')}
@@ -9897,7 +9897,7 @@ function App() {
               <div 
                 className={cn(
                   "flex-1 p-8 overflow-y-auto prose prose-invert prose-cyan max-w-none custom-scrollbar markdown-body",
-                  widgetPos === 'bottom' ? "mb-20 lg:mb-16 pb-12" : "pb-24 lg:pb-8",
+                  widgetPos === 'bottom' ? "mb-20 lg:mb-16 pb-24 lg:pb-28" : "pb-24 lg:pb-12",
                   isFullScreen && "max-w-4xl mx-auto"
                 )}
                 ref={previewPaneRef}
