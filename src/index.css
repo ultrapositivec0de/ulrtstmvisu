@@ -32,21 +32,18 @@
 }
 
 html, body, #root {
-  height: 100%;
-  height: var(--vv-height, 100dvh);
-  max-height: var(--vv-height, 100dvh);
-  width: 100%;
-  margin: 0;
-  padding: 0;
+  height: 100% !important;
+  width: 100% !important;
+  margin: 0 !important;
+  padding: 0 !important;
   overflow: hidden !important;
   overscroll-behavior: none !important;
-  -webkit-overflow-scrolling: auto !important;
   touch-action: manipulation;
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: auto;
+  position: fixed !important;
+  top: 0 !important;
+  left: 0 !important;
+  right: 0 !important;
+  bottom: 0 !important;
 }
 
 .editor-font,
