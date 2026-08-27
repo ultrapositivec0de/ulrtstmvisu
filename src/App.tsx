@@ -31,6 +31,7 @@ import { zipSync, unzipSync, strToU8, strFromU8 } from 'fflate';
 import { htmlToMarkdown, convertBareImageUrlsToMarkdown, isImageAndProxyUrl } from './lib/editorSync';
 import { useEditorWorker } from './hooks/useEditorWorker';
 import { useVisualViewport } from './hooks/useVisualViewport';
+import { useWidgetViewportLayout, getEditorBottomPadding, getMiniGalleryStyle } from './hooks/useWidgetViewportLayout';
 import { translations, AVAILABLE_LANGUAGES, getTranslation, type TranslationKey } from './locales';
 import { COMMUNITIES, COMMON_TAGS } from './data/communities';
 
@@ -2168,7 +2169,7 @@ function App() {
           const isMobileScreen = window.innerWidth < 1024;
           const dynamicWidgetHeight = toolbarIconSize + 24; // dynamically scales with icon size (12-32px -> 36-56px + padding)
           const bottomReserved = isMobileScreen 
-              ? (isKeyboardOpen ? (dynamicWidgetHeight + 45) : (dynamicWidgetHeight + 90)) 
+              ? getEditorBottomPadding(isMobileScreen, isKeyboardOpen, widgetPos, dynamicWidgetHeight) 
               : (widgetPos === 'bottom' ? (dynamicWidgetHeight + 60) : 40);
           const visibleHeight = Math.max(100, editorRect.height - bottomReserved);
           
@@ -3339,7 +3340,7 @@ function App() {
           const isMobileScreen = window.innerWidth < 1024;
           const dynamicWidgetHeight = toolbarIconSize + 24;
           const bottomReserved = isMobileScreen 
-              ? (isKeyboardOpen ? (dynamicWidgetHeight + 45) : (dynamicWidgetHeight + 90)) 
+              ? getEditorBottomPadding(isMobileScreen, isKeyboardOpen, widgetPos, dynamicWidgetHeight) 
               : (widgetPos === 'bottom' ? (dynamicWidgetHeight + 60) : 40);
           const visH = Math.max(100, ta.clientHeight - bottomReserved);
           ta.scrollTop = Math.max(0, caretY - (visH / 2));
@@ -3365,7 +3366,7 @@ function App() {
         const isMobileScreen = window.innerWidth < 1024;
         const dynamicWidgetHeight = toolbarIconSize + 24;
         const bottomReserved = isMobileScreen 
-            ? (isKeyboardOpen ? (dynamicWidgetHeight + 45) : (dynamicWidgetHeight + 90)) 
+            ? getEditorBottomPadding(isMobileScreen, isKeyboardOpen, widgetPos, dynamicWidgetHeight) 
             : (widgetPos === 'bottom' ? (dynamicWidgetHeight + 60) : 40);
         const visH = Math.max(100, ta.clientHeight - bottomReserved);
         ta.scrollTop = Math.max(0, caretY - (visH / 2));
@@ -3684,7 +3685,7 @@ function App() {
                 const isMobileScreen = window.innerWidth < 1024;
                 const dynamicWidgetHeight = toolbarIconSize + 24;
                 const bottomReserved = isMobileScreen 
-                    ? (isKeyboardOpen ? (dynamicWidgetHeight + 45) : (dynamicWidgetHeight + 90)) 
+                    ? getEditorBottomPadding(isMobileScreen, isKeyboardOpen, widgetPos, dynamicWidgetHeight) 
                     : (widgetPos === 'bottom' ? (dynamicWidgetHeight + 60) : 40);
                 const visH = Math.max(100, ta.clientHeight - bottomReserved);
                 ta.scrollTop = Math.max(0, caretY - (visH / 2));
@@ -4006,18 +4007,19 @@ function App() {
   }, [isEditorFocused, isWidgetVisible]);
 
   const widgetRef = useRef<HTMLDivElement>(null);
-  const lastKeyboardToggleTimeRef = useRef<number>(0);
-
-  useEffect(() => {
-    lastKeyboardToggleTimeRef.current = Date.now();
-  }, [isKeyboardOpen]);
-
-  const handleWidgetAction = useCallback((actionFn: () => void) => {
-    if (Date.now() - lastKeyboardToggleTimeRef.current < 250) {
-      return;
-    }
-    actionFn();
-  }, []);
+  const { widgetStyle, handleWidgetAction } = useWidgetViewportLayout({
+    widgetPos,
+    floatingPos,
+    editorPaneRef,
+    widgetRef,
+    toolbarIconSize,
+    offsetTop,
+    viewportHeight,
+    isKeyboardOpen,
+    isEditorFullScreen,
+    isFullScreen,
+  });
+  
   const [menuDirection, setMenuDirection] = useState<'up' | 'down'>('up');
   const [lockedToolsWidth, setLockedToolsWidth] = useState<number | null>(null);
 
@@ -9580,51 +9582,7 @@ function App() {
                   <div 
                     key="steem-widget"
                     ref={widgetRef}
-                    style={(() => {
-                      const style: React.CSSProperties = { 
-                        opacity: 1.0 
-                      };
-                      
-                      if (widgetPos === 'floating' && window.innerWidth >= 1024 && floatingPos && editorPaneRef.current) {
-                        const rect = editorPaneRef.current.getBoundingClientRect();
-                        style.position = 'fixed';
-                        
-                        // Width estimation for 8 tools + navigation + settings + paddings (~420px)
-                        const widgetWidth = 400; 
-
-                        // Standard floating
-                        const leftBound = rect.left + 10;
-                        const rightBound = rect.right - widgetWidth - 10;
-                        style.left = Math.min(rightBound, Math.max(leftBound, floatingPos.x));
-                        style.top = floatingPos.y < 150 ? floatingPos.y + 40 : floatingPos.y - 80;
-                      } else if (window.innerWidth < 1024) {
-                        style.position = 'fixed';
-                        style.left = '0.5rem';
-                        style.right = '0.5rem';
-                        style.margin = '0 auto';
-                        style.zIndex = 150;
-                        
-                        // Position relative to dynamic visual viewport metrics
-                        style.transition = 'top 0.15s cubic-bezier(0.2, 0, 0.2, 1)';
-                        const actualWidgetHeight = widgetRef.current?.offsetHeight || (toolbarIconSize + 28);
-                        const visualBottom = offsetTop + viewportHeight;
-
-                        if (isKeyboardOpen) {
-                          // Place exactly 8px above virtual keyboard top edge
-                          const targetTop = visualBottom - actualWidgetHeight - 8;
-                          style.top = `${targetTop}px`;
-                          style.bottom = 'auto';
-                        } else {
-                          // Place above bottom navigation bar or screen bottom
-                          const bottomNavOffset = (isEditorFullScreen || isFullScreen) ? 12 : 72;
-                          const targetTop = visualBottom - actualWidgetHeight - bottomNavOffset;
-                          style.top = `${targetTop}px`;
-                          style.bottom = 'auto';
-                        }
-                      }
-                      
-                      return style;
-                    })()}
+                    style={widgetStyle}
                     className={cn(
                       "steem-widget-container z-[150] p-1 flex items-center gap-1",
                       widgetNoBorder 
@@ -11054,2674 +11012,93 @@ function App() {
                             onClick={() => setNewTemplateType('snippet')}
                             className={`p-3 rounded-xl border text-left flex flex-col justify-between transition-all ${
                               newTemplateType === 'snippet'
-                                ? 'bg-amber-500/10 border-amber-500/60 text-amber-400'
-                                : 'bg-slate-950 border-slate-800 hover:border-slate-700 text-slate-500'
-                            }`}
-                          >
-                            <div className="flex items-center gap-1.5 font-bold text-xs">
-                              <Edit3 size={13} />
-                              <span>Ğ’ÑÑ‚Ğ°Ğ²ĞºĞ° / Ğ¡Ğ½Ñ–Ğ¿Ğ¿ĞµÑ‚</span>
-                            </div>
-                            <p className="text-[9px] text-slate-450 mt-1.5 leading-relaxed">
-                              Ğ’ÑÑ‚Ğ°Ğ²Ğ»ÑÑ” Ğ·Ğ°Ğ³Ğ¾Ñ‚Ğ¾Ğ²Ğ»ĞµĞ½Ğ¸Ğ¹ Ñ‚ĞµĞºÑÑ‚ Ñƒ Ğ¿Ğ¾Ñ‚Ğ¾Ñ‡Ğ½Ğµ Ğ¼Ñ–ÑÑ†Ğµ ĞºÑƒÑ€ÑĞ¾Ñ€Ñƒ.
-                            </p>
-                          </button>
-                        </div>
-                      </div>
-
-                      <div className="flex gap-2 pt-2">
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setIsAddingTemplate(false);
-                            setNewTemplateName('');
-                          }}
-                          className="flex-1 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold rounded-xl text-xs transition-colors"
-                        >
-                          Ğ¡ĞºĞ°ÑÑƒĞ²Ğ°Ñ‚Ğ¸
-                        </button>
-                        <button
-                          type="button"
-                          disabled={!newTemplateName.trim()}
-                          onClick={() => {
-                            if (!newTemplateName.trim()) {
-                              notify('Ğ’ĞºĞ°Ğ¶Ñ–Ñ‚ÑŒ Ğ½Ğ°Ğ·Ğ²Ñƒ ÑˆĞ°Ğ±Ğ»Ğ¾Ğ½Ñƒ!');
-                              return;
-                            }
-                            const newT: Template = {
-                              id: Date.now().toString(),
-                              name: newTemplateName.trim(),
-                              content: useEditorStore.getState().content,
-                              tags: pubTags,
-                              title: pubTitle,
-                              type: newTemplateType
-                            };
-                            const updated = [...templates, newT];
-                            setTemplates(updated);
-                            localStorage.setItem(STORAGE_KEY_TEMPLATES, JSON.stringify(updated));
-                            notify(t('templateSaved'));
-                            setIsAddingTemplate(false);
-                            setNewTemplateName('');
-                          }}
-                          className={cn(
-                            "flex-1 py-2 font-extrabold rounded-xl text-xs transition-all flex items-center justify-center gap-1.5",
-                            newTemplateName.trim()
-                              ? "bg-cyan-600 hover:bg-cyan-500 text-white cursor-pointer border border-cyan-500/20"
-                              : "bg-slate-800 text-slate-500 cursor-not-allowed opacity-40",
-                            newTemplateName.trim() && !performanceMode ? "shadow-xl shadow-cyan-500/20 active:scale-98" : "shadow-none"
-                          )}
-                        >
-                          Ğ—Ğ±ĞµÑ€ĞµĞ³Ñ‚Ğ¸
-                        </button>
-                      </div>
-                    </div>
-                  ) : (
-                    <div className="flex gap-2 mb-4">
-                      <button 
-                        onClick={() => {
-                          setIsAddingTemplate(true);
-                          setNewTemplateName('');
-                          setNewTemplateType('snippet');
-                        }}
-                        className={cn(
-                          "flex-1 py-3 bg-cyan-600 hover:bg-cyan-500 text-white rounded-xl font-black transition-all flex items-center justify-center gap-2 border border-cyan-500/20",
-                          performanceMode ? "shadow-none" : "shadow-xl shadow-cyan-500/20 hover:scale-[1.01] active:scale-95"
-                        )}
-                      >
-                        <Plus size={18} className="stroke-[2.5px]" />
-                        {t('saveAsTemplate')}
-                      </button>
-                    </div>
-                  )}
-
-                  {!isAddingTemplate && templates.length > 0 && (
-                    <div className="flex border-b border-slate-800 mb-4 p-1 bg-slate-950/40 rounded-xl shrink-0">
-                      <button
-                        onClick={() => setTemplateFilter('all')}
-                        className={`flex-1 py-1.5 text-[10px] font-bold rounded-lg transition-all ${
-                          templateFilter === 'all'
-                            ? 'bg-slate-800 text-cyan-400'
-                            : 'text-slate-400 hover:text-slate-200'
-                        }`}
-                      >
-                        Ğ’ÑÑ– ({templates.length})
-                      </button>
-                      <button
-                        onClick={() => setTemplateFilter('post')}
-                        className={`flex-1 py-1.5 text-[10px] font-bold rounded-lg transition-all ${
-                          templateFilter === 'post'
-                            ? 'bg-slate-800 text-cyan-400'
-                            : 'text-slate-400 hover:text-slate-200'
-                        }`}
-                      >
-                        Ğ¨Ğ°Ğ±Ğ»Ğ¾Ğ½Ğ¸ Ğ´Ğ¾Ğ¿Ğ¸ÑÑƒ ({templates.filter(t => t.type === 'post' || !t.type).length})
-                      </button>
-                      <button
-                        onClick={() => setTemplateFilter('snippet')}
-                        className={`flex-1 py-1.5 text-[10px] font-bold rounded-lg transition-all ${
-                          templateFilter === 'snippet'
-                            ? 'bg-slate-800 text-cyan-400'
-                            : 'text-slate-400 hover:text-slate-200'
-                        }`}
-                      >
-                        Ğ¤Ñ€Ğ°Ğ³Ğ¼ĞµĞ½Ñ‚Ğ¸ ({templates.filter(t => t.type === 'snippet').length})
-                      </button>
-                    </div>
-                  )}
-
-                  <div className="space-y-3">
-                    {templates.length === 0 ? (
-                      <div className="text-center py-10 text-slate-500">
-                        <FileText size={40} className="mx-auto mb-4 opacity-20" />
-                        <p>{t('templatesEmpty')}</p>
-                      </div>
-                    ) : (() => {
-                      const filtered = templates.filter(tmp => {
-                        if (templateFilter === 'post') return tmp.type === 'post' || !tmp.type;
-                        if (templateFilter === 'snippet') return tmp.type === 'snippet';
-                        return true;
-                      });
-
-                      if (filtered.length === 0) {
-                        return (
-                          <div className="text-center py-10 text-slate-500 border border-dashed border-slate-800 rounded-2xl">
-                            <p className="text-xs">ĞĞµĞ¼Ğ°Ñ” ÑˆĞ°Ğ±Ğ»Ğ¾Ğ½Ñ–Ğ² Ñƒ Ñ†Ñ–Ğ¹ ĞºĞ°Ñ‚ĞµĞ³Ğ¾Ñ€Ñ–Ñ—</p>
-                          </div>
-                        );
-                      }
-
-                      return filtered.map(tmp => {
-                        const isSnippet = tmp.type === 'snippet';
-                        return (
-                          <div key={tmp.id} className="group p-4 bg-slate-800/30 border border-slate-700/50 rounded-2xl hover:border-cyan-500/50 transition-all">
-                            <div className="flex items-start justify-between mb-2">
-                              <div>
-                                <h4 className="font-bold text-slate-200 text-xs sm:text-sm">{tmp.name}</h4>
-                                <span className={`inline-block text-[8px] font-extrabold uppercase tracking-wider px-1.5 py-0.5 rounded-md mt-1 ${
-                                  isSnippet 
-                                    ? 'bg-amber-500/10 text-amber-400 border border-amber-500/20' 
-                                    : 'bg-cyan-500/10 text-cyan-400 border border-cyan-500/20'
-                                }`}>
-                                  {isSnippet ? 'Ğ¤Ñ€Ğ°Ğ³Ğ¼ĞµĞ½Ñ‚ / Ğ’ÑÑ‚Ğ°Ğ²ĞºĞ°' : 'Ğ¨Ğ°Ğ±Ğ»Ğ¾Ğ½ Ğ´Ğ¾Ğ¿Ğ¸ÑÑƒ'}
-                                </span>
-                              </div>
-                              <div className="flex gap-4 items-center pl-2">
-                                <button 
-                                  onClick={async () => {
-                                    if (isSnippet) {
-                                      insertAtCursor(tmp.content);
-                                      notify('Ğ¤Ñ€Ğ°Ğ³Ğ¼ĞµĞ½Ñ‚ Ğ²ÑÑ‚Ğ°Ğ²Ğ»ĞµĞ½Ğ¾ Ñƒ Ğ¼Ñ–ÑÑ†Ğµ ĞºÑƒÑ€ÑĞ¾Ñ€Ñƒ!');
-                                      setActiveModal(null);
-                                    } else {
-                                      if (await confirmDialog('Ğ—Ğ°Ğ¼Ñ–Ğ½Ğ¸Ñ‚Ğ¸ Ğ²ĞµÑÑŒ Ğ¿Ğ¾Ñ‚Ğ¾Ñ‡Ğ½Ğ¸Ğ¹ Ğ´Ğ¾Ğ¿Ğ¸Ñ Ñ†Ğ¸Ğ¼ ÑˆĞ°Ğ±Ğ»Ğ¾Ğ½Ğ¾Ğ¼? ĞŸĞ¾Ñ‚Ğ¾Ñ‡Ğ½Ñ– Ğ´Ğ°Ğ½Ñ– (Ğ·Ğ°Ğ³Ğ¾Ğ»Ğ¾Ğ²Ğ¾Ğº, Ñ‚ĞµĞºÑÑ‚, Ñ‚ĞµĞ³Ğ¸) Ğ±ÑƒĞ´Ğµ Ğ²Ñ‚Ñ€Ğ°Ñ‡ĞµĞ½Ğ¾.')) {
-                                        setContent(tmp.content);
-                                        if (tmp.tags) setPubTags(tmp.tags);
-                                        if (tmp.title) setPubTitle(tmp.title);
-                                        notify('Ğ¨Ğ°Ğ±Ğ»Ğ¾Ğ½ Ğ´Ğ¾Ğ¿Ğ¸ÑÑƒ Ğ·Ğ°ÑÑ‚Ğ¾ÑĞ¾Ğ²Ğ°Ğ½Ğ¾!');
-                                        setActiveModal(null);
-                                      }
-                                    }
-                                  }}
-                                  className={`p-1.5 border rounded-lg transition-colors flex items-center justify-center ${
-                                    isSnippet 
-                                      ? 'hover:bg-amber-500/10 text-amber-500 border-amber-500/30' 
-                                      : 'hover:bg-cyan-500/10 text-cyan-400 border-cyan-500/50'
-                                  }`}
-                                  title={isSnippet ? 'Ğ’ÑÑ‚Ğ°Ğ²Ğ¸Ñ‚Ğ¸ Ñƒ ĞºÑƒÑ€ÑĞ¾Ñ€' : 'Ğ—Ğ°ÑÑ‚Ğ¾ÑÑƒĞ²Ğ°Ñ‚Ğ¸ ÑˆĞ°Ğ±Ğ»Ğ¾Ğ½'}
-                                >
-                                  {isSnippet ? <PlusCircle size={16} /> : <CheckCircle size={16} />}
-                                </button>
-                                <button 
-                                  onClick={async () => {
-                                    if (await confirmDialog(t('confirmDeleteTemplate').replace('{name}', tmp.name))) {
-                                      const updated = templates.filter(t => t.id !== tmp.id);
-                                      setTemplates(updated);
-                                      localStorage.setItem(STORAGE_KEY_TEMPLATES, JSON.stringify(updated));
-                                      notify(t('templateDeleted'));
-                                    }
-                                  }}
-                                  className="p-1.5 hover:bg-red-600/20 text-red-400 border border-red-500/20 rounded-lg transition-colors flex items-center justify-center"
-                                  title="Ğ’Ğ¸Ğ´Ğ°Ğ»Ğ¸Ñ‚Ğ¸"
-                                >
-                                  <Trash2 size={16} />
-                                </button>
-                              </div>
-                            </div>
-                            <div className="bg-slate-950/40 p-2 rounded-xl border border-slate-800/40 mt-1 select-all font-mono text-[10px] leading-relaxed text-slate-400 max-h-24 overflow-y-auto custom-scrollbar whitespace-pre-wrap break-all">
-                              {tmp.content}
-                            </div>
-                          </div>
-                        );
-                      });
-                    })()}
-                  </div>
-                </div>
-              </motion.div>
-            </div>
-          )}
-
-        {activeModal === 'tagPresets' && (
-          <div key="modal-tag-presets" className="fixed inset-0 z-[200] flex items-center justify-center p-4">
-            <motion.div 
-              initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-              className="absolute inset-0 bg-slate-950/90"
-              onClick={() => setActiveModal('publish')}
-            />
-            <motion.div 
-              initial={{ scale: 0.9, opacity: 0, y: 20 }}
-              animate={{ scale: 1, opacity: 1, y: 0 }}
-              exit={{ scale: 0.9, opacity: 0, y: 20 }}
-              className="relative w-full sm:max-w-2xl bg-slate-900 border border-slate-800 rounded-2xl shadow-none overflow-hidden flex flex-col max-h-[90vh] sm:max-h-[80vh]"
-            >
-              <div className="p-4 sm:p-6 border-b border-slate-800 flex justify-between items-center bg-slate-800/30 shrink-0">
-                <h2 className="text-lg sm:text-xl font-bold flex items-center gap-2">
-                  <Tags className="text-cyan-400" /> {t('tagPresets')}
-                </h2>
-                <button onClick={() => setActiveModal('publish')} className="text-slate-500 hover:text-white"><X /></button>
-              </div>
-              
-              <div className="p-6 overflow-y-auto custom-scrollbar space-y-8">
-                <section>
-                  <h3 className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-4 flex items-center gap-2">
-                    <LayoutGrid size={18} /> {t('communities')}
-                  </h3>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    {COMMUNITIES.map(comm => (
-                      <div 
-                        key={comm.id}
-                        onClick={() => {
-                          const allSelected = comm.tags.every(t => pubTags.includes(t));
-                          if (allSelected) {
-                            setPubTags(prev => {
-                              const tags = prev.split(' ').filter(t => t.trim());
-                              return tags.filter(t => !comm.tags.includes(t)).join(' ');
-                            });
-                          } else {
-                            setPubTags(prev => {
-                              const tags = prev.split(' ').filter(t => t.trim());
-                              comm.tags.forEach(t => {
-                                if (!tags.includes(t)) tags.push(t);
-                              });
-                              return tags.join(' ');
-                            });
-                          }
-                        }}
-                        className={cn(
-                          "flex flex-col items-start p-4 border rounded-xl transition-all bg-slate-800/50 border-slate-700 cursor-pointer hover:border-cyan-500/50",
-                          comm.tags.every(t => pubTags.includes(t)) ? "border-cyan-500 bg-cyan-500/10" : (comm.tags.some(t => pubTags.includes(t)) && "border-cyan-500/50 bg-cyan-500/5")
-                        )}
-                      >
-                        <span className="font-bold text-sm text-slate-200 mb-2">{comm.name}</span>
-                        <div className="flex flex-wrap gap-1">
-                          {comm.tags.map(tag => (
-                            <button
-                              key={tag}
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                toggleTag(tag);
-                              }}
-                              className={cn(
-                                "text-[9px] px-2 py-0.5 rounded-full border transition-all",
-                                pubTags.includes(tag)
-                                  ? "bg-cyan-600 border-cyan-500 text-white"
-                                  : "bg-slate-900 border-slate-800 text-slate-500 hover:border-slate-600"
-                              )}
-                            >
-                              #{tag}
-                            </button>
-                          ))}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </section>
-
-                <section>
-                  <h3 className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-4 flex items-center gap-2">
-                    <Plus size={18} /> {t('commonTags')}
-                  </h3>
-                  <div className="flex flex-wrap gap-2">
-                    {COMMON_TAGS.map(tag => (
-                      <button 
-                        key={tag}
-                        onClick={() => toggleTag(tag)}
-                        className={cn(
-                          "px-3 py-1.5 rounded-full text-xs font-medium border transition-all",
-                          pubTags.includes(tag) 
-                            ? "bg-cyan-600 border-cyan-500 text-white" 
-                            : "bg-slate-800 border-slate-700 text-slate-400 hover:border-slate-500"
-                        )}
-                      >
-                        #{tag}
-                      </button>
-                    ))}
-                  </div>
-                </section>
-              </div>
-
-              <div className="p-6 bg-slate-800/30 border-t border-slate-800 flex justify-between items-center">
-                <button 
-                  onClick={() => setPubTags('')}
-                  className="px-4 py-2 text-xs font-bold text-red-400 hover:text-red-300 transition-colors"
-                >
-                  {t('clear')}
-                </button>
-                <button 
-                  onClick={() => setActiveModal('publish')}
-                  className="px-6 py-2 bg-cyan-600 hover:bg-cyan-500 text-white font-bold rounded-lg text-sm transition-all"
-                >
-                  {t('done')}
-                </button>
-              </div>
-            </motion.div>
-          </div>
-        )}
-
-        {activeModal === 'splitPost' && (
-          <div key="modal-split" className="fixed inset-0 z-[200] flex items-center justify-center p-4">
-            <motion.div 
-              initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-              className="absolute inset-0 bg-slate-950/90"
-              onClick={() => setActiveModal(null)}
-            />
-            <motion.div 
-              initial={{ scale: 0.9, opacity: 0, y: 20 }}
-              animate={{ scale: 1, opacity: 1, y: 0 }}
-              exit={{ scale: 0.9, opacity: 0, y: 20 }}
-              className="relative w-full sm:max-w-md bg-slate-900 border border-slate-800 rounded-2xl shadow-none overflow-hidden"
-            >
-              <div className="p-4 sm:p-6 border-b border-slate-800 flex justify-between items-center bg-slate-800/30">
-                <h2 className="text-lg sm:text-xl font-bold flex items-center gap-2">
-                  <Layers className="text-cyan-400" /> {t('splitPost')}
-                </h2>
-                <button onClick={() => setActiveModal(null)} className="text-slate-500 hover:text-white"><X /></button>
-              </div>
-              <div className="p-4 sm:p-6 space-y-4">
-                <p className="text-xs sm:text-sm text-slate-400 leading-relaxed">
-                  {t('splitPostDesc')}
-                </p>
-                <div className="bg-slate-800/50 p-4 rounded-xl border border-slate-700">
-                  <div className="flex justify-between items-center text-[10px] sm:text-xs font-bold text-slate-500 uppercase mb-3">
-                    <span>{t('minWordsPerPart') || 'Words per part'}</span>
-                    <input 
-                      type="number" 
-                      value={splitWords} 
-                      onChange={(e) => setSplitWords(Number(e.target.value))}
-                      className="w-16 sm:w-20 bg-slate-900 border border-slate-700 rounded px-2 py-1 text-cyan-400 focus:outline-none focus:border-cyan-500"
-                    />
-                  </div>
-                  <div className="text-xl sm:text-2xl font-bold text-white flex items-baseline gap-2">
-                    {Math.ceil(stats.words / (splitWords || 300))}
-                    <span className="text-xs text-slate-500 font-medium">{t('parts')}</span>
-                  </div>
-                </div>
-              </div>
-              <div className="p-4 sm:p-6 bg-slate-800/30 border-t border-slate-800 flex gap-3">
-                <button 
-                  onClick={() => setActiveModal(null)}
-                  className="flex-1 py-3 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs sm:text-sm font-bold rounded-xl transition-all"
-                >
-                  {t('cancel')}
-                </button>
-                <button 
-                  onClick={handleSplitPost}
-                  className="flex-1 py-3 bg-cyan-600 hover:bg-cyan-500 text-white text-xs sm:text-sm font-bold rounded-xl shadow-lg shadow-cyan-900/20 transition-all active:scale-[0.98]"
-                >
-                  {t('splitBtn')}
-                </button>
-              </div>
-            </motion.div>
-          </div>
-        )}
-
-        {activeModal === 'drafts' && (
-          <div key="modal-drafts" className="fixed inset-0 z-[200] flex items-center justify-center p-4">
-            <motion.div 
-              initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-              className="absolute inset-0 bg-slate-950/90"
-              onClick={() => setActiveModal(null)}
-            />
-            <motion.div 
-              initial={{ scale: 0.9, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              exit={{ scale: 0.9, opacity: 0 }}
-              className="relative w-full sm:max-w-md bg-slate-900 border border-slate-800 rounded-2xl shadow-none overflow-hidden"
-            >
-              <div className="p-4 sm:p-6 border-b border-slate-800 flex justify-between items-center bg-slate-800/30">
-                <div className="flex flex-col">
-                  <h2 className="text-lg sm:text-xl font-bold flex items-center gap-2">
-                    <FolderOpen className="text-cyan-400" /> {t('drafts')}
-                  </h2>
-                  <div className="flex gap-2 mt-2">
-                    {(['all', 'working', 'ready'] as const).map(f => (
-                      <button
-                        key={f}
-                        onClick={() => setDraftFilter(f)}
-                        className={cn(
-                          "text-[9px] sm:text-[10px] px-2 py-0.5 rounded-full border transition-all",
-                          draftFilter === f ? "bg-cyan-600 border-cyan-500 text-white" : "bg-slate-800 border-slate-700 text-slate-500 hover:border-slate-500"
-                        )}
-                      >
-                        {t(f as any)}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-                <div className="flex items-center gap-2">
-                  <label 
-                    className="p-1 sm:p-1.5 text-slate-500 hover:text-cyan-400 bg-slate-800/50 hover:bg-cyan-900/30 rounded border border-slate-700 hover:border-cyan-500/50 transition-colors flex items-center justify-center group cursor-pointer"
-                    title="Ğ†Ğ¼Ğ¿Ğ¾Ñ€Ñ‚ÑƒĞ²Ğ°Ñ‚Ğ¸ Ğ±ĞµĞºĞ°Ğ¿ Ñ‡ĞµÑ€Ğ½ĞµÑ‚Ğ¾Ğº"
-                  >
-                    <FileDown size={18} className="sm:size-[16px]" />
-                    <input type="file" accept=".zip" className="hidden" onChange={importBackup} />
-                  </label>
-                  <button 
-                    onClick={exportBackup}
-                    className="p-1 sm:p-1.5 text-slate-500 hover:text-cyan-400 bg-slate-800/50 hover:bg-cyan-900/30 rounded border border-slate-700 hover:border-cyan-500/50 transition-colors flex items-center justify-center group"
-                    title="Ğ•ĞºÑĞ¿Ğ¾Ñ€Ñ‚ÑƒĞ²Ğ°Ñ‚Ğ¸ Ğ±ĞµĞºĞ°Ğ¿ Ñ‡ĞµÑ€Ğ½ĞµÑ‚Ğ¾Ğº"
-                  >
-                    <FileUp size={18} className="sm:size-[16px]" />
-                  </button>
-                  <button onClick={() => setActiveModal(null)} className="text-slate-500 hover:text-white p-1"><X size={18} className="sm:size-[20px]" /></button>
-                </div>
-              </div>
-              <div className="p-4 max-h-[60vh] overflow-y-auto custom-scrollbar space-y-2">
-                {(() => {
-                  const allDrafts = JSON.parse(localStorage.getItem(STORAGE_KEY_DRAFTS) || "[]");
-                  const filtered = allDrafts.filter((d: Draft) => draftFilter === 'all' || d.status === draftFilter);
-                  
-                  if (filtered.length === 0) {
-                    return (
-                      <div className="text-center py-12 text-slate-500">
-                        <FileText size={48} className="mx-auto mb-4 opacity-20" />
-                        <p>{t('noDrafts')}</p>
-                      </div>
-                    );
-                  }
-
-                  return filtered.map((draft: Draft) => (
-                    <div 
-                      key={draft.id}
-                      className="group p-4 bg-slate-800/50 hover:bg-slate-800 border border-slate-700/50 rounded-xl transition-all cursor-pointer flex justify-between items-center"
-                      onClick={async () => {
-                        if (await confirmDialog(t('loadDraftConfirm'))) {
-                          setContent(draft.body);
-                          setPubTitle(draft.title);
-                          setCurrentDraftId(draft.id);
-                          localStorage.removeItem('steem_autosave_temp_visual_html');
-                          
-                          if (editorMode === 'visual' && wysiwygRef.current) {
-                            isSyncingRef.current = true;
-                            const m = getMarked();
-                            if (m) {
-                              const parsed = await m.parse(draft.body);
-                              if (wysiwygRef.current) {
-                                wysiwygRef.current.innerHTML = parsed;
-                                localStorage.setItem('steem_autosave_temp_visual_html', parsed);
-                                localStorage.setItem('steem_visual_html_is_stale', 'false');
-                              }
-                            }
-                            isSyncingRef.current = false;
-                          }
-                          
-                          setActiveModal(null);
-                        }
-                      }}
-                    >
-                      <div className="min-w-0 flex-1">
-                        <div className="flex items-center gap-2">
-                          <h4 className="font-bold text-slate-200 truncate">{draft.title}</h4>
-                          {draft.status === 'ready' && (
-                            <span className="text-[8px] bg-green-500/20 text-green-400 px-1 rounded border border-green-500/30 uppercase font-bold tracking-tighter">
-                              {t('ready')}
-                            </span>
-                          )}
-                        </div>
-                        <p className="text-[10px] text-slate-500 mt-1">{draft.date}</p>
-                      </div>
-                      <div className="flex gap-1 items-center">
-                        <button 
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setContent(draft.body);
-                            setPubTitle(draft.title);
-                            setActiveModal('publish');
-                          }}
-                          title={t('publish')}
-                          className="p-2 text-cyan-500 hover:bg-cyan-500/10 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity"
-                        >
-                          <Rocket size={20} />
-                        </button>
-                        <button 
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            toggleDraftStatus(draft.id);
-                          }}
-                          title={draft.status === 'ready' ? t('working') : t('ready')}
-                          className={cn(
-                            "p-2 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity",
-                            draft.status === 'ready' ? "text-green-400 hover:bg-green-400/10" : "text-slate-500 hover:bg-slate-500/10"
-                          )}
-                        >
-                          <CheckCircle size={20} />
-                        </button>
-                        <button 
-                          onClick={async (e) => {
-                            e.stopPropagation();
-                            if (await confirmDialog(t('delete') + '?')) {
-                              const drafts = JSON.parse(localStorage.getItem(STORAGE_KEY_DRAFTS) || "[]");
-                              localStorage.setItem(STORAGE_KEY_DRAFTS, JSON.stringify(drafts.filter((d: Draft) => d.id !== draft.id)));
-                              setActiveModal('drafts_refresh'); // Hack to re-render
-                              setTimeout(() => setActiveModal('drafts'), 0);
-                            }
-                          }}
-                          className="p-2 text-slate-500 hover:text-red-400 opacity-0 group-hover:opacity-100 transition-opacity"
-                        >
-                          <Trash2 size={20} />
-                        </button>
-                      </div>
-                    </div>
-                  ));
-                })()}
-              </div>
-            </motion.div>
-          </div>
-        )}
-
-        {activeModal === 'mentions' && (
-          <div key="modal-mentions" className="fixed inset-0 z-[200] flex items-center justify-center p-4">
-            <motion.div 
-              initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-              className="absolute inset-0 bg-slate-950/90"
-              onClick={() => setActiveModal(null)}
-            />
-            <motion.div 
-              initial={{ scale: 0.9, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              exit={{ scale: 0.9, opacity: 0 }}
-              className="relative w-full sm:max-w-md bg-slate-900 border border-slate-800 rounded-2xl shadow-none overflow-hidden"
-            >
-              <div className="p-4 sm:p-6 border-b border-slate-800 flex justify-between items-center bg-slate-800/30">
-                <h2 className="text-lg sm:text-xl font-bold flex items-center gap-2">
-                  <AtSign className="text-cyan-400" /> {t('mentions')}
-                </h2>
-                <button onClick={() => setActiveModal(null)} className="text-slate-500 hover:text-white"><X /></button>
-              </div>
-              <div className="p-4 sm:p-6 space-y-4">
-                <div className="flex gap-2">
-                  <input 
-                    type="text" 
-                    value={newMention}
-                    onChange={e => setNewMention(e.target.value)}
-                    className="flex-1 bg-slate-800 border border-slate-700 rounded-lg p-2 text-sm outline-none focus:ring-1 focus:ring-cyan-500"
-                    placeholder={t('username')}
-                  />
-                  <button 
-                    onClick={addMention}
-                    className="p-2 bg-cyan-600 rounded-lg hover:bg-cyan-500 transition-colors"
-                  >
-                    <Plus size={20} />
-                  </button>
-                </div>
-                <div className="flex flex-wrap gap-2 max-h-[60vh] sm:max-h-[50vh] overflow-y-auto custom-scrollbar pr-1">
-                  {mentions.map(user => (
-                    <div key={user} className="flex items-center gap-1 bg-slate-800 px-3 py-1.5 rounded-full border border-slate-700 group">
-                      <button 
-                        onClick={() => { insertAtCursor(`@${user} `); setActiveModal(null); }}
-                        className="text-sm font-bold hover:text-cyan-400 transition-colors"
-                      >
-                        @{user}
-                      </button>
-                      <button 
-                        onClick={async () => {
-                          if (await confirmDialog(t('delete') + '?')) {
-                            const updated = mentions.filter(u => u !== user);
-                            setMentions(updated);
-                            localStorage.setItem(STORAGE_KEY_USERS, JSON.stringify(updated));
-                          }
-                        }}
-                        className="text-slate-500 hover:text-red-400 opacity-0 group-hover:opacity-100 transition-opacity"
-                      >
-                        <X size={16} />
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </motion.div>
-          </div>
-        )}
-
-          <AnimatePresence>
-            {isSMenuOpen && (
-              <div className="fixed inset-0 z-[200] flex items-center justify-center p-4">
-                <motion.div 
-                  initial={{ opacity: 0 }} 
-                  animate={{ opacity: 1 }} 
-                  exit={{ opacity: 0 }}
-                  className="absolute inset-0 bg-slate-950/90"
-                  onClick={() => setIsSMenuOpen(false)}
-                />
-                <motion.div 
-                  initial={{ scale: 0.9, opacity: 0, y: 20 }} 
-                  animate={{ scale: 1, opacity: 1, y: 0 }} 
-                  exit={{ scale: 0.9, opacity: 0, y: 20 }}
-                  className="relative bg-slate-900 border border-white/5 rounded-[2rem] shadow-none max-w-sm w-full overflow-hidden flex flex-col max-h-[90vh]"
-                >
-                  <div className="p-6 sm:p-8 overflow-y-auto custom-scrollbar">
-                    <div className="absolute top-0 right-0 p-4 z-10">
-                      <button onClick={() => setIsSMenuOpen(false)} className="text-slate-500 hover:text-white p-2 hover:bg-white/5 rounded-full transition-all">
-                        <X size={20} />
-                      </button>
-                    </div>
-
-                    <div className="flex items-center gap-4 mb-6">
-                      <div className="w-12 h-12 bg-gradient-to-br from-cyan-500 to-blue-600 rounded-2xl flex items-center justify-center text-white text-2xl font-black shadow-none">
-                        <span className={cn("logo-s", visualStyle === 'neon' && "neon-icon-glow")}>S</span>
-                      </div>
-                      <div>
-                        <h2 className="text-xl font-black tracking-tight text-white leading-none">Settings <span className="text-cyan-400">Hub</span></h2>
-                        <p className="text-slate-500 text-[10px] font-medium mt-1 uppercase tracking-widest">Personalize experience</p>
-                      </div>
-                    </div>
-
-                    <div className="space-y-6">
-                      {/* Theme Assortment */}
-                      <div className="space-y-2">
-                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-2">
-                          <Zap size={14} className="text-yellow-400" /> Interface Accent
-                        </label>
-                        <div className="flex flex-wrap gap-1.5">
-                          {activeAssortment.map(t => (
-                            <button
-                              key={t.name}
-                              onClick={() => {
-                                setThemeColor(t.name);
-                                localStorage.setItem('steem_theme_color', t.name);
-                              }}
-                              className={cn(
-                                "w-6 h-6 rounded-lg transition-all border flex items-center justify-center",
-                                themeColor === t.name ? "border-[rgb(var(--accent-color))] scale-110 shadow-lg" : "border-transparent opacity-60 hover:opacity-100"
-                              )}
-                            >
-                              <div className="w-3 h-3 rounded-md" style={{ backgroundColor: t.hex }} />
-                            </button>
-                          ))}
-                        </div>
-                      </div>
-
-                      {/* Font Configuration */}
-                      <div className="space-y-2">
-                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-2">
-                          <Edit3 size={14} className="text-cyan-400" /> Typography
-                        </label>
-                        <div className="flex flex-wrap gap-1.5">
-                          {fontOptions.map(f => (
-                            <button
-                              key={f.id}
-                              onClick={() => {
-                                setEditorFont(f.id);
-                                localStorage.setItem('steem_editor_font', f.id);
-                              }}
-                              className={cn(
-                                "px-2 py-1 rounded-lg border text-center transition-all flex items-center gap-1.5",
-                                editorFont === f.id ? "bg-[rgb(var(--accent-color)/0.1)] border-[rgb(var(--accent-color)/0.5)] text-[rgb(var(--accent-color))]" : "bg-white/5 border-white/5 text-slate-400 hover:bg-white/[0.08]"
-                              )}
-                              style={{ fontFamily: f.family }}
-                            >
-                              <span className="text-sm font-bold">Aa</span>
-                              <span className="text-[9px] font-black uppercase tracking-widest">{f.label.split(' ')[0]}</span>
-                            </button>
-                          ))}
-                        </div>
-                      </div>
-
-                      {/* Beautification */}
-                      <div className="flex items-center justify-between bg-white/5 p-3 rounded-2xl border border-white/5">
-                        <div className="flex items-center gap-3">
-                          <div className="w-8 h-8 bg-indigo-500/10 rounded-xl flex items-center justify-center text-indigo-400">
-                            <Eye size={20} />
-                          </div>
-                          <div>
-                            <span className="text-xs font-black text-slate-200 block">Beautification</span>
-                            <span className="text-[9px] text-slate-500 font-bold uppercase tracking-wider">Enhanced styling</span>
-                          </div>
-                        </div>
-                        <button 
-                          onClick={() => {
-                            const next = !beautifyEnabled;
-                            setBeautifyEnabled(next);
-                            localStorage.setItem('steem_beautify', next.toString());
-                          }}
-                          className={cn(
-                            "w-12 h-6 rounded-full transition-all duration-500 relative",
-                            beautifyEnabled ? "bg-[rgb(var(--accent-color))]" : "bg-slate-700"
-                          )}
-                        >
-                          <div className={cn(
-                            "absolute top-1 w-4 h-4 rounded-full bg-white shadow-xl transition-all duration-500",
-                            beautifyEnabled ? "left-7" : "left-1"
-                          )} />
-                        </button>
-                      </div>
-
-                      <div className="grid grid-cols-2 gap-4 pt-4 border-t border-white/5">
-                        <button 
-                          onClick={() => {
-                            setIsDarkMode(!isDarkMode);
-                            localStorage.setItem('steem_dark_mode', (!isDarkMode).toString());
-                            setVisualStyle('standard');
-                            localStorage.setItem('steem_visual_style', 'standard');
-                          }}
-                          className={cn(
-                            "py-4 rounded-3xl text-sm font-black flex items-center justify-center gap-3 transition-all",
-                            visualStyle === 'standard' ? "bg-white/10 text-white" : "bg-white/5 text-slate-400 hover:bg-white/10"
-                          )}
-                        >
-                          {isDarkMode ? <Sun size={18} className="text-yellow-400" /> : <Moon size={18} className="text-indigo-400" />} 
-                          {isDarkMode ? "Light" : "Dark"}
-                        </button>
-                        <button 
-                          onClick={() => {
-                            const next = visualStyle === 'neon' ? 'standard' : 'neon';
-                            setVisualStyle(next);
-                            localStorage.setItem('steem_visual_style', next);
-                          }}
-                          className={cn(
-                            "py-4 rounded-3xl text-sm font-black flex items-center justify-center gap-3 transition-all",
-                            visualStyle === 'neon' ? "bg-purple-600/20 text-purple-400 border border-purple-500/50" : "bg-white/5 text-slate-400 hover:bg-white/10"
-                          )}
-                        >
-                          <Zap size={18} className={visualStyle === 'neon' ? "text-purple-400" : "text-slate-500"} /> Neon
-                        </button>
-                      </div>
-                      <div className="pt-2 flex flex-col gap-2">
-                        {!isPwaInstalled && !isTauriEnv() && !isNeutralinoEnv() && (
-                          <button 
-                            onClick={() => {
-                              setIsSMenuOpen(false);
-                              handleInstallPwa();
-                            }}
-                            className="w-full py-4 bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 rounded-3xl text-sm font-black text-white flex items-center justify-center gap-3 transition-all shadow-xl shadow-cyan-600/20 text-center cursor-pointer"
-                          >
-                            <Download size={18} /> {t('installApp') || "Ğ’ÑÑ‚Ğ°Ğ½Ğ¾Ğ²Ğ¸Ñ‚Ğ¸ Ğ´Ğ¾Ğ´Ğ°Ñ‚Ğ¾Ğº (PWA)"}
-                          </button>
-                        )}
-                        <button 
-                          onClick={() => {
-                            setIsSMenuOpen(false);
-                            setSettingsTab('general');
-                            setActiveModal('settings');
-                          }}
-                          className="w-full py-4 bg-cyan-600 hover:bg-cyan-500 rounded-3xl text-sm font-black text-white flex items-center justify-center gap-3 transition-all shadow-xl shadow-cyan-600/20 text-center"
-                        >
-                          <Settings size={18} /> {t('advancedSettings')}
-                        </button>
-                        <a 
-                          href="/"
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="w-full py-4 bg-gradient-to-r from-emerald-600 to-teal-500 hover:from-emerald-500 hover:to-teal-400 rounded-3xl text-sm font-black text-white flex items-center justify-center gap-3 transition-all shadow-xl shadow-emerald-600/20 text-center"
-                        >
-                          <Maximize2 size={18} /> {t('fullPreviewTesting')}
-                        </a>
-                        <button 
-                          onClick={() => {
-                            setIsSMenuOpen(false);
-                            setActiveModal('about');
-                          }}
-                          className="w-full py-4 bg-slate-800 hover:bg-slate-700 border border-slate-700/50 rounded-3xl text-sm font-black text-slate-300 flex items-center justify-center gap-3 transition-all"
-                        >
-                          <Info size={18} /> {t('about')}
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                </motion.div>
-              </div>
-            )}
-          </AnimatePresence>
-
-          {/* About Modal */}
-          {activeModal === 'about' && (
-            <div key="modal-about" className="fixed inset-0 z-[300] flex items-center justify-center p-4">
-              <motion.div 
-                initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-                className="absolute inset-0 bg-slate-950/90"
-                onClick={() => setActiveModal(null)}
-              />
-              <motion.div 
-                initial={{ scale: 0.9, opacity: 0, y: 20 }} 
-                animate={{ scale: 1, opacity: 1, y: 0 }} 
-                exit={{ scale: 0.9, opacity: 0, y: 20 }}
-                className="relative bg-slate-900 border border-slate-800 rounded-3xl shadow-none p-8 max-w-2xl w-full max-h-[90vh] overflow-y-auto custom-scrollbar"
-              >
-                <button 
-                  onClick={() => setActiveModal(null)}
-                  className="absolute top-6 right-6 text-slate-500 hover:text-white"
-                >
-                  <X size={24} />
-                </button>
-
-                <div className="text-center mb-8">
-                  <div className="w-20 h-20 bg-cyan-500 rounded-2xl flex items-center justify-center text-white text-4xl font-bold mx-auto mb-6 shadow-none">U</div>
-                  <h2 className="text-3xl font-bold mb-2 tracking-tight">Ultra Steem <span className="text-cyan-400">Editor</span></h2>
-                  <p className="text-slate-400 text-sm max-w-sm mx-auto leading-relaxed mb-4">{t('aboutDesc')}</p>
-                  <div className="inline-flex items-center gap-2 px-3 py-1 bg-cyan-500/10 border border-cyan-500/20 rounded-full text-[10px] font-bold text-cyan-400 uppercase tracking-widest">
-                    <Shield size={14} /> Web Crypto AES-GCM Secured
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-8 text-left">
-                  {/* Credits Section */}
-                  <div className="space-y-6">
-                    <h3 className="text-xs font-bold text-cyan-400 uppercase tracking-widest flex items-center gap-2">
-                       <CheckCircle size={18} /> {t('credits')}
-                    </h3>
-                    <div className="space-y-4">
-                      <div className="bg-slate-800/50 p-4 rounded-2xl border border-slate-700/50">
-                        <div className="font-bold text-slate-200 mb-1 flex items-center gap-2">
-                          <Zap size={18} className="text-yellow-400" /> {t('aiCredits')}
-                        </div>
-                        <p className="text-[11px] text-slate-400 leading-relaxed font-medium">{t('aiTasks')}</p>
-                      </div>
-                      <div className="bg-slate-800/50 p-4 rounded-2xl border border-slate-700/50">
-                        <div className="font-bold text-slate-200 mb-1 flex items-center gap-2">
-                          <AtSign size={18} className="text-cyan-400" /> {t('humanCredits')}
-                        </div>
-                        <p className="text-[11px] text-slate-400 leading-relaxed font-medium">{t('humanTasks')}</p>
-                      </div>
-                    </div>
-
-                    <div className="pt-4 space-y-3">
-                      <div className="flex justify-between text-xs items-center">
-                        <span className="text-slate-500">{t('version')}</span>
-                        <span className="bg-cyan-500/10 text-cyan-400 px-2 py-1 rounded-md font-mono font-bold">4.6.8</span>
-                      </div>
-                      <div className="flex justify-between text-xs items-center">
-                        <span className="text-slate-500">{t('license')}</span>
-                        <span className="text-slate-300 font-bold">Apache 2.0</span>
-                      </div>
-                      <div className="space-y-1.5 pt-2">
-                        <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">{t('appAgent')}</label>
-                        <div className="flex gap-2">
-                          <input 
-                            type="text" 
-                            value={appAgent} 
-                            onChange={(e) => {
-                              setAppAgent(e.target.value);
-                              localStorage.setItem('steem_app_agent', e.target.value);
-                            }}
-                            className="flex-1 bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-xs font-mono text-cyan-400 focus:outline-none focus:border-cyan-500/50"
-                          />
-                        </div>
-                        <p className="text-[9px] text-slate-600 italic">{t('appAgentDesc')}</p>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Tech Stack Section */}
-                  <div className="space-y-6">
-                    <div>
-                      <h3 className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-3 flex items-center gap-2">
-                         <Terminal size={18} /> {t('packagesUsed')}
-                      </h3>
-                      <div className="mt-2 space-y-2 max-h-48 overflow-y-auto custom-scrollbar pr-1">
-                        {[
-                          { n: 'react', v: '19.0.0', d: 'Ğ¯Ğ´Ñ€Ğ¾ Ñ–Ğ½Ñ‚ĞµÑ€Ñ„ĞµĞ¹ÑÑƒ, Ñ€ĞµĞ°ĞºÑ‚Ğ¸Ğ²Ğ½Ñ–ÑÑ‚ÑŒ Ñ‚Ğ° ĞºĞµÑ€ÑƒĞ²Ğ°Ğ½Ğ½Ñ ÑÑ‚Ğ°Ğ½Ğ¾Ğ¼ ĞºĞ¾Ğ¼Ğ¿Ğ¾Ğ½ĞµĞ½Ñ‚Ñ–Ğ².' },
-                          { n: '@blazeapps/dsteem', v: '0.12.2', d: 'ĞŸĞ¾Ğ²Ğ½Ğ¾Ñ†Ñ–Ğ½Ğ½Ğ° ĞºĞ»Ñ–Ñ”Ğ½Ñ‚ÑÑŒĞºĞ° Ñ–Ğ½Ñ‚ĞµĞ³Ñ€Ğ°Ñ†Ñ–Ñ Ğ· Ğ±Ğ»Ğ¾ĞºÑ‡ĞµĞ¹Ğ½Ğ¾Ğ¼ Steem (Ñ‚Ñ€Ğ°Ğ½Ğ·Ğ°ĞºÑ†Ñ–Ñ—, Ğ¿Ñ–Ğ´Ğ¿Ğ¸ÑĞ¸, Ğ°Ğ¿Ğ²Ğ¾ÑƒÑ‚Ğ¸).' },
-                          { n: 'motion', v: '13.1.0', d: 'ĞŸÑ€Ğ¾Ñ„ĞµÑÑ–Ğ¹Ğ½Ñ– Ñ‚Ğ° Ğ¿Ğ»Ğ°Ğ²Ğ½Ñ– Ğ°Ğ½Ñ–Ğ¼Ğ°Ñ†Ñ–Ñ— Ñ–Ğ½Ñ‚ĞµÑ€Ñ„ĞµĞ¹ÑÑƒ Ğ´Ğ»Ñ Ğ²Ñ–Ğ´Ğ¼Ñ–Ğ½Ğ½Ğ¾Ğ³Ğ¾ UX.' },
-                          { n: 'marked', v: '18.0.7', d: 'Ğ¨Ğ²Ğ¸Ğ´ĞºÑ–ÑĞ½Ğ¸Ğ¹ Ñ– Ğ±ĞµĞ·Ğ¿ĞµÑ‡Ğ½Ğ¸Ğ¹ Ğ¿Ğ°Ñ€ÑĞµÑ€ Markdown Ñ€Ğ¾Ğ·Ğ¼Ñ–Ñ‚ĞºĞ¸ Ğ² Ñ‡Ğ¸ÑÑ‚Ğ¸Ğ¹ HTML.' },
-                          { n: 'dompurify', v: '3.4.13', d: 'ĞĞ°Ğ´Ñ–Ğ¹Ğ½Ğµ Ğ¾Ñ‡Ğ¸Ñ‰ĞµĞ½Ğ½Ñ HTML Ğ²Ñ–Ğ´ XSS-Ğ·Ğ°Ğ³Ñ€Ğ¾Ğ· Ğ¿Ñ€Ğ¸ Ñ‡Ğ¸Ñ‚Ğ°Ğ½Ğ½Ñ– ÑÑ‚Ñ€Ñ–Ñ‡ĞºĞ¸ Ğ´Ğ¾Ğ¿Ğ¸ÑÑ–Ğ².' },
-                          { n: 'lucide-react', v: '1.31.0', d: 'ĞĞ°Ğ±Ñ–Ñ€ ÑÑƒÑ‡Ğ°ÑĞ½Ğ¸Ñ… Ñ‚Ğ° Ğ»Ğ°ĞºĞ¾Ğ½Ñ–Ñ‡Ğ½Ğ¸Ñ… Ğ²ĞµĞºÑ‚Ğ¾Ñ€Ğ½Ğ¸Ñ… Ñ–ĞºĞ¾Ğ½Ğ¾Ğº Ğ´Ğ»Ñ UI.' },
-                          { n: 'buffer', v: '6.0.3', d: 'ĞŸĞ¾Ğ»Ñ–Ñ„Ñ–Ğ» Ğ±ÑƒÑ„ĞµÑ€Ğ° Ğ´Ğ»Ñ ĞºÑ€Ğ¸Ğ¿Ñ‚Ğ¾Ğ³Ñ€Ğ°Ñ„Ñ–Ñ‡Ğ½Ğ¸Ñ… Ğ¿Ñ–Ğ´Ğ¿Ğ¸ÑÑ–Ğ² Ñƒ Ğ±Ñ€Ğ°ÑƒĞ·ĞµÑ€Ğ½Ğ¾Ğ¼Ñƒ Ğ¾Ñ‚Ğ¾Ñ‡ĞµĞ½Ğ½Ñ–.' },
-                          { n: 'fflate', v: '0.8.3', d: 'Ğ£Ğ»ÑŒÑ‚Ñ€Ğ°-ÑˆĞ²Ğ¸Ğ´ĞºĞµ Ñ‚Ğ° Ğ»ĞµĞ³ĞºĞ¾Ğ²Ğ°Ğ¶Ğ½Ğµ ÑÑ‚Ğ¸ÑĞ½ĞµĞ½Ğ½Ñ Ğ¹ Ñ€Ğ¾Ğ·Ğ°Ñ€Ñ…Ñ–Ğ²ÑƒĞ²Ğ°Ğ½Ğ½Ñ Ñ‡ĞµÑ€Ğ½ĞµÑ‚Ğ¾Ğº Ñƒ ZIP.' },
-                          { n: 'exifreader', v: '4.38.1', d: 'Ğ—Ñ‡Ğ¸Ñ‚ÑƒĞ²Ğ°Ğ½Ğ½Ñ Ñ‚Ğ° Ğ°Ğ½Ğ°Ğ»Ñ–Ğ· Ğ¼ĞµÑ‚Ğ°Ğ´Ğ°Ğ½Ğ¸Ñ… EXIF Ğ· Ñ„Ğ¾Ñ‚Ğ¾Ğ³Ñ€Ğ°Ñ„Ñ–Ğ¹ Ğ´Ğ»Ñ Ğ¿Ğ°Ñ€Ğ°Ğ¼ĞµÑ‚Ñ€Ñ–Ğ² Ğ·Ğ¹Ğ¾Ğ¼ĞºĞ¸.' },
-                          { n: 'idb-keyval', v: '6.2.2', d: 'ĞĞ°Ğ´ÑˆĞ²Ğ¸Ğ´ĞºĞµ ÑÑ…Ğ¾Ğ²Ğ¸Ñ‰Ğµ Ğ°Ğ²Ñ‚Ğ¾Ğ·Ğ±ĞµÑ€ĞµĞ¶ĞµĞ½Ğ½Ñ Ñ‡ĞµÑ€Ğ½ĞµÑ‚Ğ¾Ğº Ğ² IndexedDB Ğ±Ñ€Ğ°ÑƒĞ·ĞµÑ€Ğ°.' },
-                          { n: 'idiomorph', v: '0.7.4', d: 'Ğ†Ğ½Ñ‚ĞµĞ»ĞµĞºÑ‚ÑƒĞ°Ğ»ÑŒĞ½Ğµ Ğ·Ñ–ÑÑ‚Ğ°Ğ²Ğ»ĞµĞ½Ğ½Ñ (morphing) DOM Ğ´Ğ»Ñ Ğ±ĞµĞ·ÑˆĞ¾Ğ²Ğ½Ğ¾Ñ— ÑĞ¸Ğ½Ñ…Ñ€Ğ¾Ğ½Ñ–Ğ·Ğ°Ñ†Ñ–Ñ— Ğ±ĞµĞ· Ğ²Ñ‚Ñ€Ğ°Ñ‚Ğ¸ Ñ„Ğ¾ĞºÑƒÑÑƒ Ğ¹ ĞºÑƒÑ€ÑĞ¾Ñ€Ñƒ.' },
-                          { n: 'zustand', v: '5.0.14', d: 'Ğ›ĞµĞ³ĞºĞ¾Ğ²Ğ°Ğ¶Ğ½Ğµ ĞºĞµÑ€ÑƒĞ²Ğ°Ğ½Ğ½Ñ Ğ³Ğ»Ğ¾Ğ±Ğ°Ğ»ÑŒĞ½Ğ¸Ğ¼ ÑÑ‚Ğ°Ğ½Ğ¾Ğ¼ Ğ·Ğ°ÑÑ‚Ğ¾ÑÑƒĞ½ĞºÑƒ.' }
-                        ].map(pkg => (
-                          <div key={pkg.n} className="p-2 bg-slate-950/60 border border-slate-800/80 rounded-xl flex flex-col gap-0.5">
-                            <div className="flex justify-between items-center">
-                              <span className="text-[10px] font-black text-cyan-400 font-mono leading-none">{pkg.n}</span>
-                              <span className="text-[8px] text-slate-500 font-mono font-bold">v.{pkg.v}</span>
-                            </div>
-                            <p className="text-[9px] text-slate-400 leading-normal">{pkg.d}</p>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-
-                    <div className="pt-2">
-                      <button 
-                        onClick={() => window.open('https://github.com/ultrapositivecode/steem-editor-pro-react', '_blank')}
-                        className="w-full py-3 bg-slate-800 hover:bg-slate-700 text-white rounded-2xl font-bold transition-all flex items-center justify-center gap-2 border border-slate-700/50 group"
-                      >
-                         GitHub <ChevronRight size={18} className="group-hover:translate-x-1 transition-transform" />
-                      </button>
-                    </div>
-                  </div>
-                  
-                  {/* Changelog Section */}
-                  <div className="col-span-1 md:col-span-2 space-y-4 pt-6 mt-2 border-t border-slate-800">
-                    <div className="flex items-center justify-between">
-                       <h3 className="text-xs font-bold text-cyan-400 uppercase tracking-widest flex items-center gap-2">
-                         <FileText size={18} /> Changelog & Updates
-                       </h3>
-                       <button 
-                         onClick={() => {
-                           navigator.clipboard.writeText(getChangelogText());
-                           const btn = document.getElementById('copy-log-btn');
-                           if (btn) {
-                             const orig = btn.innerText;
-                             btn.innerText = "COPIED!";
-                             setTimeout(() => btn.innerText = orig, 2000);
-                           }
-                         }}
-                         id="copy-log-btn"
-                         className="text-[9px] font-bold text-slate-400 hover:text-cyan-400 transition-colors uppercase tracking-widest px-2 py-1 bg-slate-800/50 rounded flex gap-1 items-center"
-                       >
-                         <Copy size={10} /> COPY LOG
-                       </button>
-                    </div>
-                    
-                    <div className="space-y-4 max-h-48 overflow-y-auto custom-scrollbar bg-slate-900 border border-slate-800 rounded-xl p-4">
-                       {APP_CHANGELOG.map((log, index) => (
-                         <div key={`${log.version}-${index}`} className={cn("space-y-2", index > 0 && "pt-3 border-t border-slate-800/50")}>
-                           <div className="flex items-center gap-2">
-                             <span className={cn("text-xs font-bold px-2 py-0.5 rounded", index === 0 ? "text-cyan-400 bg-cyan-500/10" : "text-slate-400 bg-slate-800")}>{log.version}</span>
-                             <span className="text-[10px] text-slate-500">{log.date}</span>
-                           </div>
-                           <ul className={cn("text-sm list-inside list-disc space-y-2 pl-1", index === 0 ? "text-slate-300" : "text-slate-400 space-y-1")}>
-                             {log.changes.map((change, i) => (
-                               <li key={i}>{change}</li>
-                             ))}
-                           </ul>
-                         </div>
-                       ))}
-                     </div>
-                  </div>
-                </div>
-              </motion.div>
-            </div>
-          )}
-
-        {activeModal === 'tagGroups' && (
-          <div key="modal-tag-groups" className="fixed inset-0 z-[200] flex items-center justify-center p-4">
-            <motion.div 
-              initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-              className="absolute inset-0 bg-slate-950/90"
-              onClick={() => setActiveModal('publish')}
-            />
-            <motion.div 
-              initial={{ scale: 0.9, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              exit={{ scale: 0.9, opacity: 0 }}
-              className="relative w-full sm:max-w-md bg-slate-900 border border-slate-800 rounded-2xl shadow-none overflow-hidden"
-            >
-              <div className="p-4 sm:p-6 border-b border-slate-800 flex justify-between items-center bg-slate-800/30">
-                <h2 className="text-lg sm:text-xl font-bold flex items-center gap-2">
-                  <Tags className="text-cyan-400" /> {t('tagGroups')}
-                </h2>
-                <button onClick={() => setActiveModal('publish')} className="text-slate-500 hover:text-white"><X /></button>
-              </div>
-              <div className="p-4 sm:p-6 space-y-4">
-                <button 
-                  onClick={async () => {
-                    const name = await promptDialog(t('addTagGroup'));
-                    if (!name) return;
-                    const tags = await promptDialog(t('tagsPlaceholder'));
-                    if (!tags) return;
-                    const newGroup: TagGroup = {
-                      id: Date.now().toString(),
-                      name,
-                      tags: tags.split(/\s+/).filter(Boolean)
-                    };
-                    setTagGroups([...tagGroups, newGroup]);
-                  }}
-                  className="w-full py-2 bg-cyan-600 rounded-lg hover:bg-cyan-500 transition-colors font-bold text-sm"
-                >
-                  {t('addTagGroup')}
-                </button>
-                <div className="space-y-2 max-h-[60vh] sm:max-h-[50vh] overflow-y-auto custom-scrollbar pr-1">
-                  {tagGroups.map(group => (
-                    <div key={group.id} className="p-3 bg-slate-800 rounded-lg group">
-                      <div className="flex justify-between items-center mb-1">
-                        <button 
-                          onClick={() => {
-                            const currentTags = pubTags.split(/\s+/).filter(Boolean);
-                            const nextTags = [...currentTags];
-                            group.tags.forEach(tag => {
-                              if (!nextTags.includes(tag)) nextTags.push(tag);
-                            });
-                            setPubTags(nextTags.join(' '));
-                          }}
-                          className="font-bold text-sm hover:text-cyan-400 transition-colors"
-                        >
-                          {group.name} ({t('applyGroup')})
-                        </button>
-                        <button 
-                          onClick={async () => {
-                          if (await confirmDialog(t('delete') + '?')) {
-                            setTagGroups(tagGroups.filter(g => g.id !== group.id));
-                          }
-                        }}
-                          className="text-slate-500 hover:text-red-400 opacity-0 group-hover:opacity-100 transition-opacity"
-                        >
-                          <Trash2 size={18} />
-                        </button>
-                      </div>
-                      <div className="flex flex-wrap gap-1">
-                        {group.tags.map(tag => (
-                          <button 
-                            key={tag}
-                            onClick={() => {
-                              const currentTags = pubTags.split(/\s+/).filter(Boolean);
-                              if (currentTags.includes(tag)) {
-                                setPubTags(currentTags.filter(t => t !== tag).join(' '));
-                              } else {
-                                setPubTags([...currentTags, tag].join(' '));
-                              }
-                            }}
-                            className={cn(
-                              "text-[10px] px-2 py-0.5 rounded transition-colors",
-                              pubTags.includes(tag) ? "bg-cyan-600 text-white" : "bg-slate-700 text-slate-300 hover:bg-slate-600"
-                            )}
-                          >
-                            #{tag}
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </motion.div>
-          </div>
-        )}
-
-        {activeModal === 'queue' && (
-          <div key="modal-queue" className="fixed inset-0 z-[200] flex items-center justify-center p-4">
-            <motion.div 
-              initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-              className="absolute inset-0 bg-slate-950/90"
-              onClick={() => setActiveModal(null)}
-            />
-            <motion.div 
-              initial={{ scale: 0.9, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              exit={{ scale: 0.9, opacity: 0 }}
-              className="relative w-full max-w-lg bg-slate-900 border border-slate-800 rounded-2xl shadow-none overflow-hidden"
-            >
-              <div className="p-6 border-b border-slate-800 flex justify-between items-center bg-slate-800/30">
-                <h2 className="text-xl font-bold flex items-center gap-2">
-                  <ListIcon className="text-cyan-400" /> {t('queue')}
-                </h2>
-                <button onClick={() => setActiveModal(null)} className="text-slate-500 hover:text-white"><X /></button>
-              </div>
-              <div className="p-6 space-y-4">
-                {queue.length === 0 ? (
-                  <div className="text-center py-12 text-slate-500 italic">{t('queueEmpty')}</div>
-                ) : (
-                  <div className="space-y-3 max-h-[60vh] overflow-y-auto custom-scrollbar pr-2">
-                    {queue.map((item) => (
-                      <div key={item.id} className="p-4 bg-slate-800/50 border border-slate-700 rounded-xl group hover:border-cyan-500/30 transition-all">
-                        <div className="flex justify-between items-start mb-2">
-                          <div>
-                            <h3 className="font-bold text-slate-200 line-clamp-1">{item.title}</h3>
-                            <div className="flex items-center gap-2 mt-1">
-                              <span className="text-[10px] bg-slate-700 px-2 py-0.5 rounded text-slate-400">@{item.authType === 'VAULT' ? item.selectedVaultUser : item.username}</span>
-                              {item.scheduledTime && (
-                                <span className="text-[10px] text-cyan-400 flex items-center gap-1">
-                                  <Calendar size={14} /> {new Date(item.scheduledTime).toLocaleString()}
-                                </span>
-                              )}
-                            </div>
-                          </div>
-                          <div className="flex items-center gap-1">
-                            <button 
-                          onClick={async () => {
-                            if (await confirmDialog(t('delete') + '?')) {
-                              const updated = queue.filter(i => i.id !== item.id);
-                              setQueue(updated);
-                              localStorage.setItem(STORAGE_KEY_QUEUE, JSON.stringify(updated));
-                            }
-                          }}
-                              className="p-1.5 text-slate-500 hover:text-red-400 transition-colors"
-                            >
-                              <Trash2 size={20} />
-                            </button>
-                          </div>
-                        </div>
-                        <div className="flex items-center justify-between mt-4">
-                          <div className="flex items-center gap-2">
-                            <span className={cn(
-                              "text-[10px] font-bold px-2 py-0.5 rounded uppercase",
-                              item.status === 'pending' ? "bg-yellow-500/10 text-yellow-500" :
-                              item.status === 'published' ? "bg-green-500/10 text-green-500" :
-                              "bg-red-500/10 text-red-500"
-                            )}>
-                              {t(item.status)}
-                            </span>
-                          </div>
-                          {item.status !== 'published' && (
-                            <button 
-                              onClick={() => publishFromQueue(item.id)}
-                              className="text-xs font-bold text-cyan-400 hover:text-cyan-300 flex items-center gap-1"
-                            >
-                              <Rocket size={18} /> {t('publish')}
-                            </button>
-                          )}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-            </motion.div>
-          </div>
-        )}
-      </AnimatePresence>
-
-      <AnimatePresence>
-        {activeModal === 'tableImport' && (
-        <div key="modal-table" className="fixed inset-0 z-[200] flex items-center justify-center p-4">
-          <motion.div 
-            initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-            className="absolute inset-0 bg-slate-950/90"
-            onClick={() => setActiveModal(null)}
-          />
-          <motion.div 
-            initial={{ scale: 0.9, opacity: 0, y: 20 }}
-            animate={{ scale: 1, opacity: 1, y: 0 }}
-            exit={{ scale: 0.9, opacity: 0, y: 20 }}
-            className="relative w-full max-w-lg bg-slate-900 border border-slate-800 rounded-2xl shadow-none overflow-hidden flex flex-col"
-          >
-              <div className="p-6 border-b border-slate-800 flex justify-between items-center bg-slate-800/30">
-                <h2 className="text-xl font-bold flex items-center gap-2">
-                  <TableIcon className="text-cyan-400" /> {t('importTableTitle')}
-                </h2>
-                <div className="flex items-center gap-2">
-                  {tableImportText && (
-                    <button 
-                      onClick={() => setTableImportText('')}
-                      className="text-xs text-red-400 hover:text-red-300 transition-colors flex items-center gap-1 px-2 py-1"
-                    >
-                      <Trash2 size={16} /> {t('clear')}
-                    </button>
-                  )}
-                  <button onClick={() => setActiveModal(null)} className="text-slate-500 hover:text-white"><X /></button>
-                </div>
-              </div>
-            <div className="p-6 space-y-4">
-              <p className="text-sm text-slate-400">{t('importTableDesc')}</p>
-              <textarea 
-                className="w-full h-48 bg-slate-950 border border-slate-800 rounded-xl p-4 text-sm text-slate-300 outline-none focus:ring-1 focus:ring-cyan-500 custom-scrollbar resize-none"
-                placeholder={t('importTablePlaceholder')}
-                value={tableImportText}
-                onChange={e => setTableImportText(e.target.value)}
-                autoFocus
-              />
-
-              <div className="flex items-center justify-between bg-slate-950/50 p-2 rounded-lg border border-slate-800">
-                <span className="text-xs font-bold text-slate-500 uppercase ml-2">{t('tableFormat')}</span>
-                <div className="flex bg-slate-900 p-1 rounded-md gap-1">
-                  <button 
-                    onClick={() => setTableImportFormat('markdown')}
-                    className={cn(
-                      "px-3 py-1.5 text-xs font-bold rounded transition-all", 
-                      tableImportFormat === 'markdown' ? "bg-cyan-600 text-white shadow-sm" : "text-slate-400 hover:text-slate-200"
-                    )}
-                  >
-                    Markdown
-                  </button>
-                  <button 
-                    onClick={() => setTableImportFormat('html')}
-                    className={cn(
-                      "px-3 py-1.5 text-xs font-bold rounded transition-all", 
-                      tableImportFormat === 'html' ? "bg-cyan-600 text-white shadow-sm" : "text-slate-400 hover:text-slate-200"
-                    )}
-                  >
-                    HTML
-                  </button>
-                </div>
-              </div>
-
-              <button 
-                onClick={processTableImport}
-                className="w-full py-3 bg-cyan-600 hover:bg-cyan-500 text-white rounded-xl font-bold transition-all shadow-lg shadow-cyan-900/20"
-              >
-                {t('importBtn')}
-              </button>
-            </div>
-          </motion.div>
-        </div>
-      )}
-
-      </AnimatePresence>
-
-      <AnimatePresence>
-        {activeModal === 'settings' && (
-        <div key="modal-settings" className="fixed inset-0 z-[200] flex items-center justify-center p-4">
-          <motion.div 
-            initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-            className="absolute inset-0 bg-slate-950/90"
-            onClick={() => setActiveModal(null)}
-          />
-          <motion.div 
-            initial={{ scale: 0.9, opacity: 0 }}
-            animate={{ scale: 1, opacity: 1 }}
-            exit={{ scale: 0.9, opacity: 0 }}
-            className="relative w-full max-w-lg bg-[var(--bg-sidebar)] border-[var(--border-color)] rounded-2xl shadow-none overflow-hidden container-theme"
-          >
-            <div className="p-6 border-b border-[var(--border-color)] flex justify-between items-center bg-slate-800/10">
-              <h2 className="text-xl font-bold flex items-center gap-2 text-[var(--text-main)]">
-                <Settings className="text-cyan-400" /> {t('settings')}
-              </h2>
-              <button onClick={() => setActiveModal(null)} className="text-slate-500 hover:text-white"><X /></button>
-            </div>
-              <div className="flex border-b border-[var(--border-color)] bg-slate-800/10 overflow-x-auto no-scrollbar shrink-0">
-                {(['general', 'gallery', 'vault', 'keys', 'about', 'pwa'] as const).map(tab => (
-                  <button
-                    key={tab}
-                    onClick={() => setSettingsTab(tab)}
-                    className={cn(
-                      "px-6 py-3 text-sm font-bold border-b-2 transition-all whitespace-nowrap",
-                      settingsTab === tab 
-                        ? "border-cyan-500 text-cyan-400 bg-cyan-500/5" 
-                        : "border-transparent text-slate-500 hover:text-slate-300 hover:bg-slate-800/20"
-                    )}
-                  >
-                    {t(tab)}
-                  </button>
-                ))}
-              </div>
-
-              <div className="p-6 space-y-6 max-h-[70vh] overflow-y-auto custom-scrollbar">
-                {settingsTab === 'general' && (
-                  <section className="space-y-6">
-                    {/* Performance Mode */}
-                    <div className="flex items-center justify-between p-4 bg-slate-800/20 border border-slate-700/50 rounded-2xl">
-                      <div className="flex items-center gap-3">
-                        <div className="p-2 bg-yellow-500/10 text-yellow-500 rounded-lg"><Zap size={18} /></div>
-                        <div>
-                          <p className="text-sm font-bold text-slate-200">{t('performanceMode')}</p>
-                          <p className="text-[10px] text-slate-500 uppercase">{t('performanceDesc') || 'Ğ’Ğ¸Ğ¼Ğ¸ĞºĞ°Ñ” Ğ´ĞµÑĞºÑ– Ğ°Ğ½Ñ–Ğ¼Ğ°Ñ†Ñ–Ñ—'}</p>
-                        </div>
-                      </div>
-                      <button 
-                        onClick={() => setPerformanceMode(!performanceMode)}
-                        className={cn(
-                          "w-10 h-5 rounded-full transition-all relative",
-                          performanceMode ? "bg-cyan-600" : "bg-slate-700"
-                        )}
-                      >
-                        <div className={cn(
-                          "absolute top-1 w-3 h-3 rounded-full bg-white transition-all",
-                          performanceMode ? "left-6" : "left-1"
-                        )} />
-                      </button>
-                    </div>
-
-                    {/* Visual Style Selector */}
-                    <div>
-                      <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest block mb-2">{t('appearance') || 'Style'}</label>
-                      <div className="grid grid-cols-2 gap-2">
-                        <button
-                          onClick={() => {
-                            setVisualStyle('standard');
-                            localStorage.setItem('steem_visual_style', 'standard');
-                          }}
-                          className={cn(
-                            "py-2 px-3 rounded-xl border text-[10px] font-bold uppercase transition-all flex items-center justify-center gap-2",
-                            visualStyle === 'standard' ? "bg-slate-800 border-cyan-500/30 text-cyan-400 shadow-lg" : "bg-slate-900 border-slate-800 text-slate-50"
-                          )}
-                        >
-                          <Sun size={14} /> {isDarkMode ? 'Dark' : 'Light'}
-                        </button>
-                        <button
-                          onClick={() => {
-                            setVisualStyle('neon');
-                            localStorage.setItem('steem_visual_style', 'neon');
-                          }}
-                          className={cn(
-                            "py-2 px-3 rounded-xl border text-[10px] font-bold uppercase transition-all flex items-center justify-center gap-2",
-                            visualStyle === 'neon' ? "bg-purple-900/40 border-purple-500/50 text-purple-400 shadow-[0_0_10px_rgba(168,85,247,0.3)]" : "bg-slate-900 border-slate-800 text-slate-50"
-                          )}
-                        >
-                          <Zap size={14} /> Cyber Neon
-                        </button>
-                      </div>
-                    </div>
-
-                    {/* Neon Editor Text Color Toggle (Active only when Cyber Neon is enabled) */}
-                    {visualStyle === 'neon' && (
-                      <div className="flex items-center justify-between p-4 bg-slate-800/20 border border-slate-700/50 rounded-2xl transition-all duration-300">
-                        <div className="flex items-center gap-3">
-                          <div className="p-2 bg-cyan-500/10 text-cyan-400 rounded-lg"><Type size={18} /></div>
-                          <div>
-                            <p className="text-sm font-bold text-slate-200">
-                              {t('coloredEditorText')}
-                            </p>
-                            <p className="text-[10px] text-slate-500 uppercase tracking-wide leading-normal mt-0.5">
-                              {t('coloredEditorTextDesc')}
-                            </p>
-                          </div>
-                        </div>
-                        <button 
-                          onClick={() => setNeonTextColored(!neonTextColored)}
-                          className={cn(
-                            "w-10 h-5 rounded-full transition-all relative shrink-0",
-                            neonTextColored ? "bg-cyan-600" : "bg-slate-700"
-                          )}
-                        >
-                          <div className={cn(
-                            "absolute top-1 w-3 h-3 rounded-full bg-white transition-all",
-                            neonTextColored ? "left-6" : "left-1"
-                          )} />
-                        </button>
-                      </div>
-                    )}
-
-                    {/* Font Selector */}
-                    <div>
-                      <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest block mb-2">{t('font')}</label>
-                      <div className="grid grid-cols-3 gap-2">
-                         {[
-                           { id: 'sans', label: t('fontSans'), class: 'font-sans' },
-                           { id: 'serif', label: t('fontSerif'), class: 'font-serif' },
-                           { id: 'mono', label: t('fontMono'), class: 'font-mono' }
-                         ].map(f => (
-                           <button 
-                             key={f.id}
-                             onClick={() => {
-                               setEditorFont(f.id);
-                               localStorage.setItem('steem_editor_font', f.id);
-                             }}
-                             className={cn(
-                               "py-2 rounded-xl border text-xs transition-all",
-                               editorFont === f.id ? "bg-slate-800 border-cyan-500/30 text-cyan-400 shadow-lg" : "bg-slate-900 border-slate-800 text-slate-500"
-                             )}
-                           >
-                             <span className={f.class}>Aa</span>
-                             <span className="ml-2">{f.label.split(' ')[0]}</span>
-                           </button>
-                         ))}
-                      </div>
-                    </div>
-
-                    {/* Theme Colors */}
-                    <div>
-                      <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest block mb-2">{t('theme')}</label>
-                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-                        {[
-                          { id: 'cyan', label: t('themeCyan'), color: '#06b6d4' },
-                          { id: 'emerald', label: t('themeEmerald'), color: '#10b981' },
-                          { id: 'orange', label: t('themeOrange'), color: '#f97316' },
-                          { id: 'rose', label: t('themeRose'), color: '#f43f5e' }
-                        ].map(theme => (
-                          <button
-                            key={theme.id}
-                            onClick={() => {
-                              setThemeColor(theme.id);
-                              localStorage.setItem('steem_theme_color', theme.id);
-                            }}
-                            className={cn(
-                              "text-[9px] p-2 rounded-xl border transition-all text-center flex flex-col items-center gap-1.5",
-                              themeColor === theme.id ? "bg-slate-800 border-cyan-500/30 text-cyan-400 shadow-lg shadow-cyan-900/10" : "bg-slate-900 border-slate-800 text-slate-500 hover:border-slate-700"
-                            )}
-                          >
-                            <div className="w-4 h-4 rounded-full" style={{ backgroundColor: theme.color }} />
-                            {theme.label}
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-
-                    {/* Editor Options */}
-                    <div className="space-y-4 pt-4 border-t border-slate-800">
-                      {/* Widget Mode Selector */}
-                      <div>
-                        <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest block mb-2">{t('widgetPos') || 'Ğ ĞµĞ¶Ğ¸Ğ¼ Ğ¿Ğ»Ğ°Ğ²Ğ°ÑÑ‡Ğ¾Ğ³Ğ¾ Ğ²Ñ–Ğ´Ğ¶ĞµÑ‚Ğ°'}</label>
-                        <div className="grid grid-cols-3 gap-2">
-                          {[
-                            { id: 'bottom', label: lang === 'uk' ? 'ğŸ”’ Ğ’Ğ½Ğ¸Ğ·Ñƒ' : 'ğŸ”’ Bottom' },
-                            { id: 'floating', label: lang === 'uk' ? 'ğŸˆ ĞŸĞ»Ğ°Ğ²Ğ°ÑÑ‡Ğ¸Ğ¹' : 'ğŸˆ Floating' },
-                            { id: 'hidden', label: lang === 'uk' ? 'ğŸš« Ğ’Ğ¸Ğ¼ĞºĞ½ĞµĞ½Ğ¾' : 'ğŸš« Hidden' }
-                          ].map(pos => (
-                            <button
-                              key={pos.id}
-                              type="button"
-                              onMouseDown={(e) => e.preventDefault()}
-                              onClick={() => {
-                                setWidgetPos(pos.id as any);
-                                localStorage.setItem('steem_widget_pos', pos.id);
-                              }}
-                              className={cn(
-                                "py-2 px-1 rounded-xl border text-[10px] font-bold uppercase transition-all text-center truncate",
-                                widgetPos === pos.id 
-                                  ? "bg-slate-800 border-cyan-500/30 text-cyan-400 shadow-lg shadow-cyan-900/10" 
-                                  : "bg-slate-900 border-slate-800 text-slate-500 hover:border-slate-700"
-                              )}
-                            >
-                              {pos.label}
-                            </button>
-                          ))}
-                        </div>
-                      </div>
-
-                      <div className="flex items-center justify-between">
-                        <span className="text-xs font-bold text-slate-200">
-                          {t('syncScroll')}
-                        </span>
-                        <button 
-                          onClick={() => {
-                            const next = !syncScrollEnabled;
-                            setSyncScrollEnabled(next);
-                            localStorage.setItem('steem_sync_scroll', next.toString());
-                          }}
-                          className={cn(
-                            "w-9 h-5 rounded-full transition-all relative",
-                            syncScrollEnabled ? "bg-cyan-600" : "bg-slate-700"
-                          )}
-                        >
-                          <div className={cn(
-                            "absolute top-1 w-3 h-3 rounded-full bg-white transition-all",
-                            syncScrollEnabled ? "left-5" : "left-1"
-                          )} />
-                        </button>
-                      </div>
-
-                      {/* Custom Editor Font Size Control */}
-                      <div className="space-y-2 pt-2 border-t border-slate-800/40">
-                        <div className="flex justify-between items-center">
-                          <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
-                            {t('fontSize')}
-                          </label>
-                          <span className="text-xs font-mono font-bold text-cyan-400 bg-cyan-950/40 border border-cyan-800/30 px-2 py-0.5 rounded">
-                            {editorFontSize} px
-                          </span>
-                        </div>
-                        
-                        <div className="grid grid-cols-4 gap-1.5 bg-slate-900/60 p-1 rounded-xl border border-slate-800/60">
-                          {[
-                            { id: 14, label: lang === 'uk' ? "Ğ”Ñ€Ñ–Ğ±Ğ½Ğ¸Ğ¹" : "Small" },
-                            { id: 16, label: lang === 'uk' ? "Ğ¡Ñ‚Ğ°Ğ½Ğ´Ğ°Ñ€Ñ‚" : "Normal" },
-                            { id: 18, label: lang === 'uk' ? "Ğ’ĞµĞ»Ğ¸ĞºĞ¸Ğ¹" : "Large" },
-                            { id: 22, label: lang === 'uk' ? "ĞœĞ°ĞºÑ" : "Max" }
-                          ].map(preset => (
-                            <button
-                              key={preset.id}
-                              onClick={() => {
-                                setEditorFontSize(preset.id);
-                                localStorage.setItem('steem_editor_font_size', String(preset.id));
-                              }}
-                              className={cn(
-                                "py-1.5 px-1 rounded-lg text-[10px] font-semibold uppercase transition-all text-center truncate",
-                                editorFontSize === preset.id 
-                                  ? "bg-cyan-600 text-white shadow" 
-                                  : "text-slate-500 hover:text-slate-300 hover:bg-slate-800/30"
-                              )}
-                            >
-                              {preset.label}
-                            </button>
-                          ))}
-                        </div>
-
-                        <div className="flex items-center gap-3 pt-1">
-                          <span className="text-[10px] text-slate-500 font-mono">12px</span>
-                          <input
-                            type="range"
-                            min="12"
-                            max="32"
-                            value={editorFontSize}
-                            onChange={(e) => {
-                              const val = parseInt(e.target.value, 10);
-                              setEditorFontSize(val);
-                              localStorage.setItem('steem_editor_font_size', String(val));
-                            }}
-                            className="flex-1 accent-cyan-500 bg-slate-800 h-1.5 rounded-lg appearance-none cursor-pointer"
-                          />
-                          <span className="text-[10px] text-slate-500 font-mono">32px</span>
-                        </div>
-                      </div>
-
-                      {/* Custom Toolbar Icon Size Control */}
-                      <div className="space-y-2 pt-2 border-t border-slate-800/40">
-                        <div className="flex justify-between items-center">
-                          <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
-                            {t('iconSize')}
-                          </label>
-                          <span className="text-xs font-mono font-bold text-cyan-400 bg-cyan-950/40 border border-cyan-800/30 px-2 py-0.5 rounded">
-                            {toolbarIconSize} px
-                          </span>
-                        </div>
-                        
-                        <div className="grid grid-cols-3 gap-1.5 bg-slate-900/60 p-1 rounded-xl border border-slate-800/60">
-                          {[
-                            { id: 14, label: lang === 'uk' ? "Ğ”Ñ€Ñ–Ğ±Ğ½Ñ–" : "Small" },
-                            { id: 20, label: lang === 'uk' ? "Ğ¡Ñ‚Ğ°Ğ½Ğ´Ğ°Ñ€Ñ‚" : "Normal" },
-                            { id: 26, label: lang === 'uk' ? "Ğ’ĞµĞ»Ğ¸ĞºÑ–" : "Large" }
-                          ].map(preset => (
-                            <button
-                              key={preset.id}
-                              onClick={() => {
-                                setToolbarIconSize(preset.id);
-                                localStorage.setItem('steem_toolbar_icon_size', String(preset.id));
-                              }}
-                              className={cn(
-                                "py-1.5 px-2 rounded-lg text-[10px] font-semibold uppercase transition-all text-center",
-                                toolbarIconSize === preset.id 
-                                  ? "bg-cyan-600 text-white shadow" 
-                                  : "text-slate-500 hover:text-slate-300 hover:bg-slate-800/30"
-                              )}
-                            >
-                              {preset.label}
-                            </button>
-                          ))}
-                        </div>
-
-                        <div className="flex items-center gap-3 pt-1">
-                          <span className="text-[10px] text-slate-500 font-mono">12px</span>
-                          <input
-                            type="range"
-                            min="12"
-                            max="32"
-                            value={toolbarIconSize}
-                            onChange={(e) => {
-                              const val = parseInt(e.target.value, 10);
-                              setToolbarIconSize(val);
-                              localStorage.setItem('steem_toolbar_icon_size', String(val));
-                            }}
-                            className="flex-1 accent-cyan-500 bg-slate-800 h-1.5 rounded-lg appearance-none cursor-pointer"
-                          />
-                          <span className="text-[10px] text-slate-500 font-mono">32px</span>
-                        </div>
-                      </div>
-
-                      {/* Custom Visual Editor Spacing Control */}
-                      <div className="space-y-2 pt-2 border-t border-slate-800/40">
-                        <div className="flex justify-between items-center">
-                          <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
-                            {t('visualSpacing')}
-                          </label>
-                          <span className="text-xs font-mono font-bold text-cyan-400 bg-cyan-950/40 border border-cyan-800/30 px-2 py-0.5 rounded">
-                            {wysiwygSpacing} px
-                          </span>
-                        </div>
-                        
-                        <div className="grid grid-cols-4 gap-1.5 bg-slate-900/60 p-1 rounded-xl border border-slate-800/60">
-                          {[
-                            { id: 6, label: lang === 'uk' ? "ĞšĞ¾Ğ¼Ğ¿Ğ°ĞºÑ‚" : "Compact" },
-                            { id: 14, label: lang === 'uk' ? "Ğ—Ğ±Ğ°Ğ»Ğ°Ğ½Ñ" : "Balanced" },
-                            { id: 20, label: lang === 'uk' ? "Ğ¡Ñ‚Ğ°Ğ½Ğ´Ğ°Ñ€Ñ‚" : "Normal" },
-                            { id: 28, label: lang === 'uk' ? "ĞŸÑ€Ğ¾ÑÑ‚Ğ¾Ñ€Ñ–" : "Spacious" }
-                          ].map(preset => (
-                            <button
-                              key={preset.id}
-                              onClick={() => {
-                                setWysiwygSpacing(preset.id);
-                                localStorage.setItem('steem_wysiwyg_spacing', String(preset.id));
-                              }}
-                              className={cn(
-                                "py-1.5 px-1 rounded-lg text-[10px] font-semibold uppercase transition-all text-center truncate",
-                                wysiwygSpacing === preset.id 
-                                  ? "bg-cyan-600 text-white shadow" 
-                                  : "text-slate-500 hover:text-slate-300 hover:bg-slate-800/30"
-                              )}
-                            >
-                              {preset.label}
-                            </button>
-                          ))}
-                        </div>
-
-                        <div className="flex items-center gap-3 pt-1">
-                          <span className="text-[10px] text-slate-500 font-mono">0px</span>
-                          <input
-                            type="range"
-                            min="0"
-                            max="40"
-                            value={wysiwygSpacing}
-                            onChange={(e) => {
-                              const val = parseInt(e.target.value, 10);
-                              setWysiwygSpacing(val);
-                              localStorage.setItem('steem_wysiwyg_spacing', String(val));
-                            }}
-                            className="flex-1 accent-cyan-500 bg-slate-800 h-1.5 rounded-lg appearance-none cursor-pointer"
-                          />
-                          <span className="text-[10px] text-slate-500 font-mono">40px</span>
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* CACHE CLEAR (Visible in all platforms: Tauri, Android, PWA, Web) */}
-                    <div className="flex items-center justify-between p-4 bg-rose-500/5 border border-rose-500/20 rounded-2xl">
-                      <div className="flex items-center gap-3">
-                        <div className="p-2 bg-rose-500/10 text-rose-400 rounded-lg"><Trash2 size={18} /></div>
-                        <div>
-                          <h3 className="text-sm font-bold text-white">
-                            {t('clearAppCache')}
-                          </h3>
-                          <p className="text-[10px] text-slate-400 max-w-[200px] sm:max-w-[300px] leading-tight">
-                            {lang === 'uk'
-                              ? 'ĞÑ‡Ğ¸Ñ‰ÑƒÑ” ĞºĞµÑˆ Ğ·Ğ¾Ğ±Ñ€Ğ°Ğ¶ĞµĞ½ÑŒ, Ğ·Ğ°Ğ²Ğ°Ğ½Ñ‚Ğ°Ğ¶ĞµĞ½Ñ– ÑĞ¿Ğ¸ÑĞºĞ¸ Ñ‚Ğ° Ñ‚Ğ¸Ğ¼Ñ‡Ğ°ÑĞ¾Ğ²Ñ– Ñ„Ğ°Ğ¹Ğ»Ğ¸. Ğ§ĞµÑ€Ğ½ĞµÑ‚ĞºĞ¸, ÑˆĞ°Ğ±Ğ»Ğ¾Ğ½Ğ¸ Ñ‚Ğ° ĞºĞ»ÑÑ‡Ñ– ĞĞ• Ğ²Ğ¸Ğ´Ğ°Ğ»ÑÑÑ‚ÑŒÑÑ.'
-                              : 'Clear images, loaded lists & temporary files. Drafts, templates, and keys will NOT be deleted.'}
-                          </p>
-                        </div>
-                      </div>
-                      <button 
-                        onClick={handleClearCache}
-                        className="px-4 py-2 bg-rose-600/80 hover:bg-rose-500 text-white rounded-xl text-xs font-bold transition-all shadow-lg shadow-rose-900/20 shrink-0"
-                      >
-                        {t('clearAction')}
-                      </button>
-                    </div>
-                  </section>
-                )}
-
-                {settingsTab === 'gallery' && (
-                  <section className="space-y-6">
-                    <div className="space-y-4 pt-4">
-                      <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest block">{t('gallerySettings') || "Gallery"}</label>
-                      
-                      <div className="grid grid-cols-2 gap-4">
-                         <div className="space-y-2">
-                           <span className="text-[10px] font-bold text-slate-400 block">{t('imageFormat')}</span>
-                           <div className="grid grid-cols-2 gap-1 bg-slate-900 p-1 rounded-lg">
-                              <button onClick={() => setImageInsertFormat('html')} className={cn("px-2 py-1 text-[9px] rounded", imageInsertFormat === 'html' ? "bg-cyan-600 text-white" : "text-slate-500")}>HTML</button>
-                              <button onClick={() => setImageInsertFormat('markdown')} className={cn("px-2 py-1 text-[9px] rounded", imageInsertFormat === 'markdown' ? "bg-cyan-600 text-white" : "text-slate-500")}>MD</button>
-                           </div>
-                         </div>
-
-                         <div className="space-y-2">
-                           <span className="text-[10px] font-bold text-slate-400 block">{t('trafficOptimization')}</span>
-                           <button 
-                             onClick={() => setIsTrafficOptimized(!isTrafficOptimized)}
-                             className={cn(
-                               "w-full py-1 text-[9px] rounded font-bold border transition-all",
-                               isTrafficOptimized ? "border-cyan-500 text-cyan-400 bg-cyan-400/5" : "border-slate-800 text-slate-600"
-                             )}
-                           >
-                             {isTrafficOptimized ? "ON" : "OFF"}
-                           </button>
-                         </div>
-                      </div>
-
-                      <div className="p-4 bg-slate-900 border border-slate-800 rounded-xl space-y-3">
-                         <div className="flex items-center justify-between">
-                           <span className="text-[10px] font-bold text-slate-400 uppercase tracking-tighter">{t('pexelsAttribution')}</span>
-                           <button 
-                            onClick={() => setPexelsSettings((prev: any) => ({ ...prev, withAttribution: !prev.withAttribution }))}
-                            className={cn("w-8 h-4 rounded-full relative transition-all", pexelsSettings.withAttribution ? "bg-cyan-600" : "bg-slate-700")}
-                           >
-                              <div className={cn("absolute top-0.5 w-3 h-3 rounded-full bg-white transition-all", pexelsSettings.withAttribution ? "left-4.5" : "left-0.5")} />
-                           </button>
-                         </div>
-                         <div className="flex items-center justify-between">
-                           <span className="text-[10px] font-bold text-slate-400 uppercase tracking-tighter">{t('pexelsLink')}</span>
-                           <button 
-                            onClick={() => setPexelsSettings((prev: any) => ({ ...prev, linkEmbedded: !prev.linkEmbedded }))}
-                            className={cn("w-8 h-4 rounded-full relative transition-all", pexelsSettings.linkEmbedded ? "bg-cyan-600" : "bg-slate-700")}
-                           >
-                              <div className={cn("absolute top-0.5 w-3 h-3 rounded-full bg-white transition-all", pexelsSettings.linkEmbedded ? "left-4.5" : "left-0.5")} />
-                           </button>
-                         </div>
-                      </div>
-                    </div>
-                  </section>
-                )}
-
-                {settingsTab === 'vault' && (
-                  <section className="space-y-6">
-                    <div className="p-4 bg-slate-900 border border-slate-800 rounded-xl space-y-4">
-                      <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 bg-cyan-500/10 rounded-full flex items-center justify-center text-cyan-400">
-                           <ShieldCheck size={20} />
-                        </div>
-                        <div>
-                          <h4 className="text-sm font-bold text-white">{t('vaultSecurity')}</h4>
-                          <p className="text-[10px] text-slate-500 uppercase font-black tracking-tighter">
-                            {isUnlocked ? t('sessionActive') : t('vaultClosed')}
-                          </p>
-                        </div>
-                      </div>
-
-                      <div className="grid grid-cols-2 gap-2">
-                        <button 
-                          onClick={async () => {
-                            if (isUnlocked) SecurityService.lock();
-                            else {
-                               const pin = await promptDialog(t('enterPin'), '', undefined, 'password');
-                               if (pin) {
-                                 try {
-                                   await SecurityService.unlock(pin);
-                                   initVault();
-                                 } catch {
-                                   notify(t('error'), 'error');
-                                 }
-                               }
-                            }
-                          }}
-                          className={cn(
-                            "py-2 rounded-lg font-bold text-xs transition-all border",
-                            isUnlocked ? "bg-red-500/10 border-red-500/30 text-red-500" : "bg-green-500/10 border-green-500/30 text-green-500"
-                          )}
-                        >
-                           {isUnlocked ? t('lock') : t('unlock')}
-                        </button>
-                        <button 
-                          onClick={async () => {
-                            if (await confirmDialog(t('confirmResetVault'))) {
-                               await SecurityService.clearAll();
-                               initVault();
-                               notify(t('saveSuccess'));
-                            }
-                          }}
-                          className="py-2 bg-slate-800 border border-slate-700 text-slate-400 rounded-lg font-bold text-xs hover:bg-slate-700"
-                        >
-                           {t('confirmResetVault') || "Reset"}
-                        </button>
-                      </div>
-                    </div>
-
-                    <div className="space-y-2">
-                      <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest px-1">{t('accounts') || "Accounts"}</label>
-                      <div className="space-y-2">
-                        {vaultAccounts.map(acc => (
-                          <div key={acc} className="flex items-center justify-between p-3 bg-slate-900 border border-slate-800 rounded-xl">
-                            <span className="font-bold text-cyan-400">@{acc}</span>
-                            <button 
-                              onClick={async () => {
-                                if (await confirmDialog(t('confirmDeleteAccount').replace('{acc}', acc))) {
-                                   await SecurityService.deleteAccount(acc);
-                                   initVault();
-                                }
-                              }}
-                              className="p-1.5 text-slate-600 hover:text-red-500 transition-colors"
-                            >
-                              <Trash2 size={18} />
-                            </button>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  </section>
-                )}
-
-                {settingsTab === 'keys' && (
-                  <section className="space-y-6">
-                    <div className="space-y-4">
-                       <div className="p-4 bg-slate-900 border border-slate-800 rounded-xl space-y-4">
-                          <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest block">{t('pexelsKey')}</label>
-                          <div className="relative">
-                            <Key size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-cyan-400" />
-                            <input 
-                              type="password"
-                              value={pexelsApiKey || ''}
-                              onChange={async (e) => {
-                                const val = e.target.value;
-                                setPexelsApiKey(val);
-                                if (!isUnlocked) {
-                                   localStorage.setItem('steem_pexels_key_raw', val);
-                                } else {
-                                   await SecurityService.savePexelsKey(val);
-                                }
-                              }}
-                              className="w-full bg-slate-950 border border-slate-800 rounded-lg py-2.5 pl-9 pr-3 text-xs outline-none focus:ring-1 focus:ring-cyan-500"
-                              placeholder="Pexels API Key"
-                            />
-                          </div>
-                          <p className="text-[9px] text-slate-600 leading-tight">
-                            {isUnlocked ? "Stored securely in vault" : "Stored unencrypted in local storage"}
-                          </p>
-                       </div>
-
-                       <div className="grid grid-cols-1 gap-4">
-                          <div className="p-4 bg-slate-900 border border-slate-800 rounded-xl space-y-2">
-                            <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest block">Pixabay</label>
-                            <input 
-                              type="password"
-                              value={pixabayApiKey || ''}
-                              onChange={(e) => {
-                                const val = e.target.value;
-                                setPixabayApiKey(val);
-                                SecurityService.saveApiKey('pixabay', val);
-                              }}
-                              className="w-full bg-slate-950 border border-slate-800 rounded-lg py-2 pl-3 pr-3 text-xs outline-none focus:ring-1 focus:ring-cyan-500"
-                            />
-                          </div>
-                          <div className="p-4 bg-slate-900 border border-slate-800 rounded-xl space-y-2">
-                            <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest block">Unsplash</label>
-                            <input 
-                              type="password"
-                              value={unsplashAccessKey || ''}
-                              onChange={(e) => {
-                                const val = e.target.value;
-                                setUnsplashAccessKey(val);
-                                SecurityService.saveApiKey('unsplashAccess', val);
-                              }}
-                              className="w-full bg-slate-950 border border-slate-800 rounded-lg py-2 pl-3 pr-3 text-xs outline-none focus:ring-1 focus:ring-cyan-500"
-                            />
-                          </div>
-                       </div>
-                    </div>
-                  </section>
-                )}
-
-                {settingsTab === 'about' && (
-                  <section className="space-y-6">
-                    <div className="p-6 bg-slate-900 border border-slate-800 rounded-2xl text-center space-y-4">
-                       <div className="w-16 h-16 bg-cyan-500/10 rounded-2xl mx-auto flex items-center justify-center text-cyan-400 font-black text-2xl shadow-xl shadow-cyan-500/10">S</div>
-                       <div>
-                         <h3 className="text-xl font-black tracking-tight">SteemEditor <span className="text-cyan-400">Pro</span></h3>
-                         <p className="text-[10px] text-slate-500 uppercase font-black tracking-[0.2em] pt-1">Version 4.6.8 "Quantum"</p>
-                       </div>
-                       <label className="text-[10px] font-black text-slate-500 uppercase tracking-[0.2em] px-1 pt-4 block border-t border-slate-800">Changelog & Updates</label>
-                        <div className="mt-2 p-3 bg-slate-950 border border-cyan-500/20 rounded-xl text-left">
-                          <p className="text-xs text-slate-300 font-medium">New in v4.6.8: Visual Editor Informative Placeholders, Dynamic Semver Web Release & allowScripts Policy Update</p>
-                        </div>
-                       
-                       <div className="space-y-2 max-h-60 overflow-y-auto custom-scrollbar bg-slate-900 border border-slate-800 rounded-xl p-3">
-                         {APP_CHANGELOG.map((log, index) => (
-                           <div key={`${log.version}-${index}`} className={cn("space-y-1", index > 0 && "pt-2 border-t border-slate-800/50")}>
-                             <div className="flex items-center gap-2">
-                               <span className={cn("text-[10px] font-bold px-1.5 py-0.5 rounded", index === 0 ? "text-cyan-400 bg-cyan-500/10" : "text-slate-400 bg-slate-800")}>{log.version}</span>
-                               <span className="text-[9px] text-slate-500">{log.date}</span>
-                             </div>
-                             <ul className={cn("text-xs list-inside list-disc pl-1 leading-snug", index === 0 ? "text-slate-300 space-y-1.5" : "text-slate-400 space-y-1")}>
-                               {log.changes.map((change, i) => (
-                                 <li key={i}>{change}</li>
-                                ))}
-                             </ul>
-                           </div>
-                         ))}
-                       </div>
-                       
-                       <div className="flex justify-end pt-1">
-                         <button 
-                           onClick={() => {
-                             navigator.clipboard.writeText(getChangelogText());
-                             const btn = document.getElementById('copy-changelog-btn');
-                             if (btn) {
-                               const orig = btn.innerText;
-                               btn.innerText = "COPIED!";
-                               setTimeout(() => btn.innerText = orig, 2000);
-                             }
-                           }}
-                           id="copy-changelog-btn"
-                           className="text-[9px] font-bold text-slate-400 hover:text-cyan-400 transition-colors uppercase tracking-widest px-2 py-1 bg-slate-800/50 rounded flex gap-1 items-center"
-                         >
-                           <Copy size={10} /> COPY LOG
-                         </button>
-                       </div>
-                    </div>
-
-                    <div className="space-y-4 pt-2 text-left">
-                       <div>
-                          <label className="text-[10px] font-black text-slate-500 uppercase tracking-[0.2em] px-1">ĞŸĞ°ĞºĞµÑ‚Ğ½Ğ¸Ğ¹ ĞÑƒĞ´Ğ¸Ñ‚ (NPM Packages)</label>
-                          <div className="mt-2 space-y-2 max-h-64 overflow-y-auto custom-scrollbar pr-1">
-                             {[
-                               { n: 'react', v: '19.0.0', d: 'Ğ¯Ğ´Ñ€Ğ¾ Ñ–Ğ½Ñ‚ĞµÑ€Ñ„ĞµĞ¹ÑÑƒ, Ñ€ĞµĞ°ĞºÑ‚Ğ¸Ğ²Ğ½Ñ–ÑÑ‚ÑŒ Ñ‚Ğ° ĞºĞµÑ€ÑƒĞ²Ğ°Ğ½Ğ½Ñ ÑÑ‚Ğ°Ğ½Ğ¾Ğ¼ ĞºĞ¾Ğ¼Ğ¿Ğ¾Ğ½ĞµĞ½Ñ‚Ñ–Ğ².' },
-                               { n: '@blazeapps/dsteem', v: '0.12.2', d: 'ĞŸĞ¾Ğ²Ğ½Ğ¾Ñ†Ñ–Ğ½Ğ½Ğ° ĞºĞ»Ñ–Ñ”Ğ½Ñ‚ÑÑŒĞºĞ° Ñ–Ğ½Ñ‚ĞµĞ³Ñ€Ğ°Ñ†Ñ–Ñ Ğ· Ğ±Ğ»Ğ¾ĞºÑ‡ĞµĞ¹Ğ½Ğ¾Ğ¼ Steem (Ñ‚Ñ€Ğ°Ğ½Ğ·Ğ°ĞºÑ†Ñ–Ñ—, Ğ¿Ñ–Ğ´Ğ¿Ğ¸ÑĞ¸, Ğ°Ğ¿Ğ²Ğ¾ÑƒÑ‚Ğ¸).' },
-                               { n: 'motion', v: '13.1.0', d: 'ĞŸÑ€Ğ¾Ñ„ĞµÑÑ–Ğ¹Ğ½Ñ– Ñ‚Ğ° Ğ¿Ğ»Ğ°Ğ²Ğ½Ñ– Ğ°Ğ½Ñ–Ğ¼Ğ°Ñ†Ñ–Ñ— Ñ–Ğ½Ñ‚ĞµÑ€Ñ„ĞµĞ¹ÑÑƒ Ğ´Ğ»Ñ Ğ²Ñ–Ğ´Ğ¼Ñ–Ğ½Ğ½Ğ¾Ğ³Ğ¾ UX.' },
-                               { n: 'marked', v: '18.0.7', d: 'Ğ¨Ğ²Ğ¸Ğ´ĞºÑ–ÑĞ½Ğ¸Ğ¹ Ñ– Ğ±ĞµĞ·Ğ¿ĞµÑ‡Ğ½Ğ¸Ğ¹ Ğ¿Ğ°Ñ€ÑĞµÑ€ Markdown Ñ€Ğ¾Ğ·Ğ¼Ñ–Ñ‚ĞºĞ¸ Ğ² Ñ‡Ğ¸ÑÑ‚Ğ¸Ğ¹ HTML.' },
-                               { n: 'dompurify', v: '3.4.13', d: 'ĞĞ°Ğ´Ñ–Ğ¹Ğ½Ğµ Ğ¾Ñ‡Ğ¸Ñ‰ĞµĞ½Ğ½Ñ HTML Ğ²Ñ–Ğ´ XSS-Ğ·Ğ°Ğ³Ñ€Ğ¾Ğ· Ğ¿Ñ€Ğ¸ Ñ‡Ğ¸Ñ‚Ğ°Ğ½Ğ½Ñ– ÑÑ‚Ñ€Ñ–Ñ‡ĞºĞ¸ Ğ´Ğ¾Ğ¿Ğ¸ÑÑ–Ğ².' },
-                               { n: 'lucide-react', v: '1.31.0', d: 'ĞĞ°Ğ±Ñ–Ñ€ ÑÑƒÑ‡Ğ°ÑĞ½Ğ¸Ñ… Ñ‚Ğ° Ğ»Ğ°ĞºĞ¾Ğ½Ñ–Ñ‡Ğ½Ğ¸Ñ… Ğ²ĞµĞºÑ‚Ğ¾Ñ€Ğ½Ğ¸Ñ… Ñ–ĞºĞ¾Ğ½Ğ¾Ğº Ğ´Ğ»Ñ UI.' },
-                               { n: 'buffer', v: '6.0.3', d: 'ĞŸĞ¾Ğ»Ñ–Ñ„Ñ–Ğ» Ğ±ÑƒÑ„ĞµÑ€Ğ° Ğ´Ğ»Ñ ĞºÑ€Ğ¸Ğ¿Ñ‚Ğ¾Ğ³Ñ€Ğ°Ñ„Ñ–Ñ‡Ğ½Ğ¸Ñ… Ğ¿Ñ–Ğ´Ğ¿Ğ¸ÑÑ–Ğ² Ñƒ Ğ±Ñ€Ğ°ÑƒĞ·ĞµÑ€Ğ½Ğ¾Ğ¼Ñƒ Ğ¾Ñ‚Ğ¾Ñ‡ĞµĞ½Ğ½Ñ–.' },
-                               { n: 'fflate', v: '0.8.3', d: 'Ğ£Ğ»ÑŒÑ‚Ñ€Ğ°-ÑˆĞ²Ğ¸Ğ´ĞºĞµ Ñ‚Ğ° Ğ»ĞµĞ³ĞºĞ¾Ğ²Ğ°Ğ¶Ğ½Ğµ ÑÑ‚Ğ¸ÑĞ½ĞµĞ½Ğ½Ñ Ğ¹ Ñ€Ğ¾Ğ·Ğ°Ñ€Ñ…Ñ–Ğ²ÑƒĞ²Ğ°Ğ½Ğ½Ñ Ñ‡ĞµÑ€Ğ½ĞµÑ‚Ğ¾Ğº Ñƒ ZIP.' },
-                               { n: 'exifreader', v: '4.38.1', d: 'Ğ—Ñ‡Ğ¸Ñ‚ÑƒĞ²Ğ°Ğ½Ğ½Ñ Ñ‚Ğ° Ğ°Ğ½Ğ°Ğ»Ñ–Ğ· Ğ¼ĞµÑ‚Ğ°Ğ´Ğ°Ğ½Ğ¸Ñ… EXIF Ğ· Ñ„Ğ¾Ñ‚Ğ¾Ğ³Ñ€Ğ°Ñ„Ñ–Ğ¹ Ğ´Ğ»Ñ Ğ¿Ğ°Ñ€Ğ°Ğ¼ĞµÑ‚Ñ€Ñ–Ğ² Ğ·Ğ¹Ğ¾Ğ¼ĞºĞ¸.' },
-                               { n: 'idb-keyval', v: '6.2.2', d: 'ĞĞ°Ğ´ÑˆĞ²Ğ¸Ğ´ĞºĞµ ÑÑ…Ğ¾Ğ²Ğ¸Ñ‰Ğµ Ğ°Ğ²Ñ‚Ğ¾Ğ·Ğ±ĞµÑ€ĞµĞ¶ĞµĞ½Ğ½Ñ Ñ‡ĞµÑ€Ğ½ĞµÑ‚Ğ¾Ğº Ğ² IndexedDB Ğ±Ñ€Ğ°ÑƒĞ·ĞµÑ€Ğ°.' },
-                               { n: 'idiomorph', v: '0.7.4', d: 'Ğ†Ğ½Ñ‚ĞµĞ»ĞµĞºÑ‚ÑƒĞ°Ğ»ÑŒĞ½Ğµ Ğ·Ñ–ÑÑ‚Ğ°Ğ²Ğ»ĞµĞ½Ğ½Ñ (morphing) DOM Ğ´Ğ»Ñ Ğ±ĞµĞ·ÑˆĞ¾Ğ²Ğ½Ğ¾Ñ— ÑĞ¸Ğ½Ñ…Ñ€Ğ¾Ğ½Ñ–Ğ·Ğ°Ñ†Ñ–Ñ— Ğ±ĞµĞ· Ğ²Ñ‚Ñ€Ğ°Ñ‚Ğ¸ Ñ„Ğ¾ĞºÑƒÑÑƒ Ğ¹ ĞºÑƒÑ€ÑĞ¾Ñ€Ñƒ.' },
-                               { n: 'zustand', v: '5.0.14', d: 'Ğ›ĞµĞ³ĞºĞ¾Ğ²Ğ°Ğ¶Ğ½Ğµ ĞºĞµÑ€ÑƒĞ²Ğ°Ğ½Ğ½Ñ Ğ³Ğ»Ğ¾Ğ±Ğ°Ğ»ÑŒĞ½Ğ¸Ğ¼ ÑÑ‚Ğ°Ğ½Ğ¾Ğ¼ Ğ·Ğ°ÑÑ‚Ğ¾ÑÑƒĞ½ĞºÑƒ.' }
-                             ].map(pkg => (
-                               <div key={pkg.n} className="p-2.5 bg-slate-900 border border-slate-800/80 rounded-xl flex flex-col gap-1 hover:border-slate-700/50 transition-all">
-                                  <div className="flex justify-between items-center">
-                                     <span className="text-[11px] font-black text-cyan-400 font-mono leading-none">{pkg.n}</span>
-                                     <span className="text-[9px] text-slate-500 font-mono font-bold">v.{pkg.v} (STABLE)</span>
-                                  </div>
-                                  <p className="text-[10px] text-slate-400 leading-normal">{pkg.d}</p>
-                               </div>
-                             ))}
-                          </div>
-                       </div>
-
-                       <p className="text-[9px] text-slate-600 italic px-2 text-center pt-2">Ğ£ÑÑ– Ğ°ĞºÑ‚Ğ¸Ğ²Ğ¸ Ñ‚Ğ° Ğ·Ğ°Ğ»ĞµĞ¶Ğ½Ğ¾ÑÑ‚Ñ– Ğ²ĞµÑ€Ğ¸Ñ„Ñ–ĞºĞ¾Ğ²Ğ°Ğ½Ñ– Ğ² Ğ¼ĞµĞ¶Ğ°Ñ… Ğ±ĞµĞ·Ğ¿ĞµÑ‡Ğ½Ğ¾Ğ³Ğ¾ Ñ€ĞµĞ»Ñ–Ğ·Ñƒ Steem Editor Pro.</p>
-                    </div>
-
-                    <section className="space-y-4 border-t border-slate-800 pt-6">
-                      <button 
-                        onClick={() => setShowAdvancedSettings(!showAdvancedSettings)}
-                        className="flex items-center gap-2 w-full text-left"
-                      >
-                        <ChevronDown className={cn("text-slate-500 transition-transform", showAdvancedSettings && "rotate-180")} size={20} />
-                        <h3 className="text-sm font-bold flex items-center gap-2">
-                          <Terminal size={20} className="text-cyan-400" /> {t('advanced')}
-                        </h3>
-                      </button>
-
-                      <AnimatePresence>
-                        {showAdvancedSettings && (
-                          <motion.div 
-                            initial={{ height: 0, opacity: 0 }}
-                            animate={{ height: 'auto', opacity: 1 }}
-                            exit={{ height: 0, opacity: 0 }}
-                            className="space-y-4 bg-slate-800/30 p-4 rounded-xl border border-slate-800 overflow-hidden"
-                          >
-                            <div>
-                              <label className="text-[10px] font-bold text-slate-500 uppercase mb-2 block">{t('appAgent')}</label>
-                              <input 
-                                type="text" 
-                                value={appAgent}
-                                onChange={e => {
-                                  setAppAgent(e.target.value);
-                                  localStorage.setItem('steem_app_agent', e.target.value);
-                                }}
-                                className="w-full bg-slate-900 border border-slate-700 rounded-lg p-2.5 text-xs text-slate-200 outline-none focus:ring-1 focus:ring-cyan-500"
-                                placeholder="ultrasteemeditor/4.6.8"
-                              />
-                            </div>
-                          </motion.div>
-                        )}
-                      </AnimatePresence>
-                    </section>
-                  </section>
-                )}
-
-                {settingsTab === 'pwa' && (
-                  <section className="space-y-6">
-                    <div className="p-6 bg-slate-900 border border-slate-800 rounded-2xl text-center space-y-4">
-                      <div className="w-16 h-16 bg-gradient-to-br from-cyan-500 to-blue-600 rounded-2xl mx-auto flex items-center justify-center text-white font-black text-2xl shadow-xl shadow-cyan-500/20">S</div>
-                      <div>
-                        <h3 className="text-xl font-black tracking-tight">{t('pwaSupport')}</h3>
-                        <p className="text-[10px] text-slate-500 uppercase font-black tracking-[0.2em] pt-1">{t('pwaPlatformSupport')}</p>
-                      </div>
-
-                      <p className="text-xs text-slate-400 leading-relaxed text-left bg-slate-950 p-4 rounded-xl border border-slate-800/60">
-                        {t('pwaInstallDesc')}
-                      </p>
-
-                      <div className="pt-2">
-                        {isPwaInstalled ? (
-                          <div className="py-3 px-4 bg-green-500/10 border border-green-500/30 rounded-xl text-green-400 font-bold text-xs flex items-center justify-center gap-2">
-                            <CheckCircle size={16} />
-                            {t('pwaAlreadyInstalled')}
-                          </div>
-                        ) : (
-                          <div className="space-y-3">
-
-                            <button
-                              onClick={handleInstallPwa}
-                              className="w-full py-3 px-4 rounded-xl font-black text-xs uppercase tracking-wider transition-all flex items-center justify-center gap-2 shadow-lg bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-white shadow-cyan-500/20 active:scale-95 cursor-pointer"
-                            >
-                              <Download size={16} />
-                              {t('installApp')}
-                            </button>
-                            <button
-                              onClick={() => setShowPwaInstructionsModal(true)}
-                              className="w-full py-2 px-3 rounded-lg font-bold text-[11px] text-slate-400 hover:text-cyan-400 bg-slate-950 border border-slate-800/80 transition-colors cursor-pointer"
-                            >
-                              {t('pwaHowToInstall') || "Ğ†Ğ½ÑÑ‚Ñ€ÑƒĞºÑ†Ñ–Ñ Ğ·Ñ– Ğ²ÑÑ‚Ğ°Ğ½Ğ¾Ğ²Ğ»ĞµĞ½Ğ½Ñ"}
-                            </button>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  </section>
-                )}
-              </div>
-          </motion.div>
-        </div>
-      )}
-    </AnimatePresence>
-
-      <AnimatePresence>
-        {pubLog.msg && !activeModal && (
-            <motion.div 
-              initial={{ opacity: 0, y: -50 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -50 }}
-              className="fixed bottom-20 left-4 right-4 lg:left-auto lg:right-8 lg:top-8 lg:bottom-auto lg:w-80 z-[100]"
-            >
-              <div className={cn(
-                "p-4 rounded-2xl shadow-none border flex items-center gap-3 bg-slate-900",
-                pubLog.type === 'success' ? "border-green-500/30 text-green-400" :
-                pubLog.type === 'error' ? "border-red-500/30 text-red-400" :
-                "border-cyan-500/30 text-cyan-400"
-              )}>
-                {pubLog.type === 'loading' && <div className="w-4 h-4 border-2 border-cyan-500/30 border-t-cyan-500 rounded-full animate-spin shrink-0" />}
-                <p className="text-sm font-medium">{pubLog.msg}</p>
-                <button onClick={() => setPubLog({ msg: '', type: null })} className="ml-auto text-slate-500 hover:text-white">
-                  <X size={20} />
-                </button>
-              </div>
-            </motion.div>
-          )}
-      </AnimatePresence>
-
-      {/* Floating PWA Promotion Banner */}
-      <AnimatePresence>
-        {showPwaBanner && !isPwaInstalled && !isTauriEnv() && !isNeutralinoEnv() && !isEditorFullScreen && !isFullScreen && (
-          <motion.div
-            initial={{ opacity: 0, y: 50 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: 50 }}
-            className="fixed bottom-[calc(5rem)] lg:bottom-6 left-4 right-4 lg:left-auto lg:right-6 z-[65] max-w-sm"
-          >
-            <div className="p-4 bg-slate-900/95 backdrop-blur-md border border-cyan-500/30 rounded-2xl shadow-2xl shadow-cyan-950/50 flex flex-col gap-3">
-              <div className="flex items-start gap-3">
-                <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-cyan-500 to-blue-600 flex items-center justify-center text-white font-black text-lg shrink-0 shadow-md shadow-cyan-500/20">
-                  S
-                </div>
-                <div className="flex-1 min-w-0">
-                  <h4 className="text-xs font-bold text-white leading-tight">{t('pwaBannerTitle') || "Ğ’ÑÑ‚Ğ°Ğ½Ğ¾Ğ²Ğ¸Ñ‚Ğ¸ Steem Editor"}</h4>
-                  <p className="text-[11px] text-slate-400 mt-0.5 leading-snug">{t('pwaBannerDesc') || "Ğ¨Ğ²Ğ¸Ğ´ĞºĞ¸Ğ¹ Ğ·Ğ°Ğ¿ÑƒÑĞº Ğ· Ñ€Ğ¾Ğ±Ğ¾Ñ‡Ğ¾Ğ³Ğ¾ ÑÑ‚Ğ¾Ğ»Ñƒ Ñ‚Ğ° Ğ¿Ñ–Ğ´Ñ‚Ñ€Ğ¸Ğ¼ĞºĞ° Ğ¾Ñ„Ğ»Ğ°Ğ¹Ğ½"}</p>
-                </div>
-                <button
-                  onClick={() => {
-                    setShowPwaBanner(false);
-                    try { localStorage.setItem('steem_pwa_banner_dismissed', 'true'); } catch { /* ignore storage error */ }
-                  }}
-                  className="text-slate-500 hover:text-slate-300 p-1 -mr-1 -mt-1 transition-colors"
-                  title={t('pwaBannerDismiss') || "Ğ—Ğ°ĞºÑ€Ğ¸Ñ‚Ğ¸"}
-                >
-                  <X size={16} />
-                </button>
-              </div>
-              <div className="flex items-center gap-2 pt-1">
-                <button
-                  onClick={handleInstallPwa}
-                  className="flex-1 py-2 px-3 bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-white text-xs font-black uppercase tracking-wider rounded-xl shadow-md shadow-cyan-500/20 active:scale-95 transition-all flex items-center justify-center gap-1.5"
-                >
-                  <Download size={14} />
-                  {t('pwaBannerInstall') || "Ğ’ÑÑ‚Ğ°Ğ½Ğ¾Ğ²Ğ¸Ñ‚Ğ¸"}
-                </button>
-                <button
-                  onClick={() => {
-                    setShowPwaBanner(false);
-                    try { localStorage.setItem('steem_pwa_banner_dismissed', 'true'); } catch { /* ignore storage error */ }
-                  }}
-                  className="py-2 px-3 bg-slate-800/80 hover:bg-slate-800 text-slate-300 text-xs font-bold rounded-xl transition-colors"
-                >
-                  {t('pwaBannerDismiss') || "ĞŸÑ–Ğ·Ğ½Ñ–ÑˆĞµ"}
-                </button>
-              </div>
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-
-      {/* PWA Step-by-Step Installation Instructions Modal */}
-      <AnimatePresence>
-        {showPwaInstructionsModal && (
-          <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              onClick={() => setShowPwaInstructionsModal(false)}
-              className="absolute inset-0 bg-black/80 backdrop-blur-sm"
-            />
-            <motion.div
-              initial={{ opacity: 0, scale: 0.95, y: 20 }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.95, y: 20 }}
-              className="relative w-full max-w-md bg-slate-900 border border-slate-800 rounded-3xl p-6 shadow-2xl z-10 overflow-hidden space-y-5"
-            >
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 bg-cyan-500/10 border border-cyan-500/30 rounded-xl flex items-center justify-center text-cyan-400">
-                    <Download size={20} />
-                  </div>
-                  <div>
-                    <h3 className="text-base font-bold text-white">{t('pwaHowToInstall') || "Ğ¯Ğº Ğ²ÑÑ‚Ğ°Ğ½Ğ¾Ğ²Ğ¸Ñ‚Ğ¸ Ğ´Ğ¾Ğ´Ğ°Ñ‚Ğ¾Ğº (PWA)"}</h3>
-                    <p className="text-xs text-slate-400">{t('pwaPlatformSupport') || "Ğ†Ğ½ÑÑ‚Ñ€ÑƒĞºÑ†Ñ–Ñ— Ğ´Ğ»Ñ Ğ²ÑÑ–Ñ… Ğ¿Ñ€Ğ¸ÑÑ‚Ñ€Ğ¾Ñ—Ğ²"}</p>
-                  </div>
-                </div>
-                <button
-                  onClick={() => setShowPwaInstructionsModal(false)}
-                  className="w-8 h-8 rounded-full bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white flex items-center justify-center transition-colors"
-                >
-                  <X size={16} />
-                </button>
-              </div>
-
-              <div className="space-y-3.5 text-xs text-slate-300">
-                {/* Direct Action Button if browser prompt is available */}
-                {deferredPrompt && (
-                  <button
-                    onClick={() => {
-                      setShowPwaInstructionsModal(false);
-                      handleInstallPwa();
-                    }}
-                    className="w-full py-3 px-4 bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-white font-black text-xs uppercase tracking-wider rounded-2xl shadow-lg shadow-cyan-500/25 transition-all flex items-center justify-center gap-2 cursor-pointer active:scale-95"
-                  >
-                    <Download size={18} />
-                    {t('installApp') || "Ğ’ÑÑ‚Ğ°Ğ½Ğ¾Ğ²Ğ¸Ñ‚Ğ¸ Ğ´Ğ¾Ğ´Ğ°Ñ‚Ğ¾Ğº Ğ·Ğ°Ñ€Ğ°Ğ·"}
-                  </button>
-                )}
-
-
-
-                {/* iOS / Safari */}
-                <div className="p-3.5 bg-slate-950/70 rounded-2xl border border-slate-800/80 space-y-1.5">
-                  <div className="font-bold text-cyan-400 flex items-center gap-1.5">
-                    <span>ğŸ“± Apple iOS / Safari</span>
-                  </div>
-                  <p className="text-slate-400 pl-1">{t('pwaIosStep1') || "1. ĞĞ°Ñ‚Ğ¸ÑĞ½Ñ–Ñ‚ÑŒ ĞºĞ½Ğ¾Ğ¿ĞºÑƒ 'ĞŸĞ¾Ğ´Ñ–Ğ»Ğ¸Ñ‚Ğ¸ÑÑ' (Ñ–ĞºĞ¾Ğ½ĞºĞ° Ğ·Ñ– ÑÑ‚Ñ€Ñ–Ğ»ĞºĞ¾Ñ Ğ²Ğ³Ğ¾Ñ€Ñƒ) Ğ²Ğ½Ğ¸Ğ·Ñƒ Ğ°Ğ±Ğ¾ Ğ²Ğ³Ğ¾Ñ€Ñ– Safari."}</p>
-                  <p className="text-slate-400 pl-1">{t('pwaIosStep2') || "2. ĞŸÑ€Ğ¾ĞºÑ€ÑƒÑ‚Ñ–Ñ‚ÑŒ ÑĞ¿Ğ¸ÑĞ¾Ğº Ğ²Ğ½Ğ¸Ğ· Ñ– Ğ²Ğ¸Ğ±ĞµÑ€Ñ–Ñ‚ÑŒ 'ĞĞ° ĞµĞºÑ€Ğ°Ğ½ Â«Ğ”Ğ¾Ğ´Ğ¾Ğ¼ÑƒÂ»'."}</p>
-                </div>
-
-                {/* Android / Chrome */}
-                <div className="p-3.5 bg-slate-950/70 rounded-2xl border border-slate-800/80 space-y-1.5">
-                  <div className="font-bold text-cyan-400 flex items-center gap-1.5">
-                    <span>ğŸ¤– Android / Chrome / Edge</span>
-                  </div>
-                  <p className="text-slate-400 pl-1">{t('pwaAndroidStep1') || "1. ĞĞ°Ñ‚Ğ¸ÑĞ½Ñ–Ñ‚ÑŒ Ğ¼ĞµĞ½Ñ Ğ±Ñ€Ğ°ÑƒĞ·ĞµÑ€Ğ° (Ñ–ĞºĞ¾Ğ½ĞºĞ° Ñ‚Ñ€ÑŒĞ¾Ñ… ĞºÑ€Ğ°Ğ¿Ğ¾Ğº â‹® Ñƒ ĞºÑƒÑ‚ĞºÑƒ)."}</p>
-                  <p className="text-slate-400 pl-1">{t('pwaAndroidStep2') || "2. Ğ’Ğ¸Ğ±ĞµÑ€Ñ–Ñ‚ÑŒ Ğ¿ÑƒĞ½ĞºÑ‚ 'Ğ’ÑÑ‚Ğ°Ğ½Ğ¾Ğ²Ğ¸Ñ‚Ğ¸ Ğ´Ğ¾Ğ´Ğ°Ñ‚Ğ¾Ğº' Ğ°Ğ±Ğ¾ 'Ğ”Ğ¾Ğ´Ğ°Ñ‚Ğ¸ Ğ½Ğ° Ğ³Ğ¾Ğ»Ğ¾Ğ²Ğ½Ğ¸Ğ¹ ĞµĞºÑ€Ğ°Ğ½'."}</p>
-                </div>
-
-                {/* Desktop */}
-                <div className="p-3.5 bg-slate-950/70 rounded-2xl border border-slate-800/80 space-y-1.5">
-                  <div className="font-bold text-cyan-400 flex items-center gap-1.5">
-                    <span>ğŸ’» ĞšĞ¾Ğ¼Ğ¿'ÑÑ‚ĞµÑ€ (Chrome / Edge / Brave)</span>
-                  </div>
-                  <p className="text-slate-400 pl-1">{t('pwaDesktopStep1') || "ĞĞ°Ñ‚Ğ¸ÑĞ½Ñ–Ñ‚ÑŒ Ğ·Ğ½Ğ°Ñ‡Ğ¾Ğº Ğ²ÑÑ‚Ğ°Ğ½Ğ¾Ğ²Ğ»ĞµĞ½Ğ½Ñ âŠ• Ğ² Ğ¿Ñ€Ğ°Ğ²Ğ¾Ğ¼Ñƒ ĞºÑƒÑ‚ĞºÑƒ Ğ°Ğ´Ñ€ĞµÑĞ½Ğ¾Ğ³Ğ¾ Ñ€ÑĞ´ĞºĞ° Ğ±Ñ€Ğ°ÑƒĞ·ĞµÑ€Ğ°."}</p>
-                </div>
-              </div>
-
-              <button
-                onClick={() => setShowPwaInstructionsModal(false)}
-                className="w-full py-2.5 bg-slate-800 hover:bg-slate-700 text-white font-bold text-xs rounded-xl transition-colors"
-              >
-                {t('close') || "Ğ—Ñ€Ğ¾Ğ·ÑƒĞ¼Ñ–Ğ»Ğ¾"}
-              </button>
-            </motion.div>
-          </div>
-        )}
-      </AnimatePresence>
-
-      {/* Mobile Bottom Navigation */}
-        <nav 
-          className={cn(
-            "lg:hidden fixed left-0 right-0 bg-slate-900 border-t border-slate-800 grid grid-cols-5 items-center px-1 z-[70] shadow-[0_-4px_20px_rgba(0,0,0,0.5)] transition-all duration-200",
-            (isEditorFullScreen || isFullScreen || isKeyboardOpen) ? "translate-y-full opacity-0 pointer-events-none" : "translate-y-0 opacity-100"
-          )}
-          style={{
-            bottom: 0,
-            paddingBottom: 'env(safe-area-inset-bottom, 0px)',
-            height: 'calc(4rem + env(safe-area-inset-bottom, 0px))'
-          }}
-        >
-          <button 
-            onClick={() => setActiveMobileTab('editor')}
-            className={cn("flex flex-col items-center justify-center gap-1 h-full transition-all", activeMobileTab === 'editor' ? "text-cyan-400 bg-cyan-400/5 shadow-[inset_0_2px_0_theme(colors.cyan.400)] neon-tab-glow" : "text-slate-500 hover:text-slate-300 opacity-80 hover:opacity-100")}
-          >
-            <Edit3 size={18} className={cn(visualStyle === 'neon' && "neon-icon-glow")} />
-            <span className="text-[9px] font-bold uppercase tracking-tighter">{t('text')}</span>
-          </button>
-          <button 
-            onClick={() => setActiveMobileTab('preview')}
-            className={cn("flex flex-col items-center justify-center gap-1 h-full transition-all", activeMobileTab === 'preview' ? "text-cyan-400 bg-cyan-400/5 shadow-[inset_0_2px_0_theme(colors.cyan.400)] neon-tab-glow" : "text-slate-500 hover:text-slate-300 opacity-80 hover:opacity-100")}
-          >
-            <Eye size={18} className={cn(visualStyle === 'neon' && "neon-icon-glow")} />
-            <span className="text-[9px] font-bold uppercase tracking-tighter">{t('preview')}</span>
-          </button>
-          
-          <div className="relative flex justify-center items-center">
-            <button 
-              onClick={() => {
-                if (!pubTitle) {
-                  const firstLine = useEditorStore.getState().content.split('\n')[0].replace(/[#*`]/g, '').trim().substring(0, 100);
-                  setPubTitle(firstLine);
-                }
-                setActiveModal('publish');
-              }}
-              className="w-14 h-14 bg-cyan-600 text-white rounded-full shadow-lg shadow-cyan-900/40 active:scale-95 transition-all flex items-center justify-center border-4 border-slate-900 -mt-10 hover:bg-cyan-500"
-            >
-              <Rocket size={24} />
-            </button>
-          </div>
-
-          <button 
-            onClick={() => {
-              setActiveMobileTab('editor');
-              setIsSidebarOpen(!isSidebarOpen);
-            }}
-            className={cn("flex flex-col items-center justify-center gap-1 h-full transition-all", isSidebarOpen ? "text-cyan-400 bg-cyan-400/5 shadow-[inset_0_2px_0_theme(colors.cyan.400)] neon-tab-glow" : "text-slate-500 hover:text-slate-300 opacity-80 hover:opacity-100")}
-          >
-            <ImageIcon size={18} className={cn(visualStyle === 'neon' && "neon-icon-glow")} />
-            <span className="text-[9px] font-bold uppercase tracking-tighter">{t('gallery')}</span>
-          </button>
-          <button 
-            onClick={() => {
-              setSettingsTab('general');
-              setActiveModal('settings');
-            }}
-            className={cn("flex flex-col items-center justify-center gap-1 h-full transition-all", activeModal === 'settings' ? "text-cyan-400 bg-cyan-400/5 shadow-[inset_0_2px_0_theme(colors.cyan.400)] neon-tab-glow" : "text-slate-500 hover:text-slate-300 opacity-80 hover:opacity-100")}
-          >
-            <Settings size={18} className={cn(visualStyle === 'neon' && "neon-icon-glow")} />
-            <span className="text-[9px] font-bold uppercase tracking-tighter">{t('settings')}</span>
-          </button>
-        </nav>
-
-        <style dangerouslySetInnerHTML={{ __html: `
-        .toolbar-btn {
-          width: var(--toolbar-btn-size, 3rem) !important;
-          height: var(--toolbar-btn-size, 3rem) !important;
-          font-size: var(--toolbar-btn-font-size, 1rem) !important;
-        }
-        .toolbar-btn svg {
-          width: var(--toolbar-icon-size, 1.25rem) !important;
-          height: var(--toolbar-icon-size, 1.25rem) !important;
-        }
-        
-        .wysiwyg-editor p,
-        .wysiwyg-editor ul,
-        .wysiwyg-editor ol,
-        .wysiwyg-editor h1,
-        .wysiwyg-editor h2,
-        .wysiwyg-editor h3,
-        .wysiwyg-editor h4,
-        .wysiwyg-editor h5,
-        .wysiwyg-editor h6,
-        .wysiwyg-editor,
-        #main-editor,
-        .markdown-body {
-          scroll-padding-bottom: 7rem !important;
-        }
-        .wysiwyg-editor blockquote,
-        .wysiwyg-editor pre {
-          margin-top: var(--wysiwyg-spacing, 18px) !important;
-          margin-bottom: var(--wysiwyg-spacing, 18px) !important;
-        }
-        .wysiwyg-editor table,
-        .wysiwyg-editor img {
-          margin-top: var(--wysiwyg-spacing, 18px) !important;
-          margin-bottom: var(--wysiwyg-spacing, 18px) !important;
-        }
-
-        .custom-scrollbar::-webkit-scrollbar {
-          width: 6px;
-        }
-        .custom-scrollbar::-webkit-scrollbar-track {
-          background: transparent;
-        }
-        .custom-scrollbar::-webkit-scrollbar-thumb {
-          background: #334155;
-          border-radius: 10px;
-        }
-        .custom-scrollbar::-webkit-scrollbar-thumb:hover {
-          background: #475569;
-        }
-        
-        .prose img {
-          border-radius: 0.75rem;
-          margin: 1.5rem 0;
-        }
-        .wysiwyg-editor table {
-          border-collapse: collapse;
-          width: 100%;
-          margin: 1.5rem 0;
-          border: 1px dashed rgba(255, 255, 255, 0.15);
-        }
-        .wysiwyg-editor th, .wysiwyg-editor td {
-          border: 1px solid rgba(255, 255, 255, 0.2);
-          padding: 10px 12px !important;
-          min-width: 90px;
-          height: 42px !important; /* height on table-cells serves as minimum height */
-          position: relative;
-        }
-        .wysiwyg-editor th {
-          background-color: rgba(255, 255, 255, 0.07);
-          font-weight: 700;
-          text-align: left;
-          color: #22d3ee !important; /* cyan-400 */
-        }
-        /* Empty cells helper */
-        .wysiwyg-editor th:empty::before, .wysiwyg-editor td:empty::before {
-          useEditorStore.getState().content: "âœ...";
-          color: rgba(6, 182, 212, 0.45);
-          font-size: 0.75rem;
-          position: absolute;
-          left: 12px;
-          top: 50%;
-          transform: translateY(-50%);
-          pointer-events: none;
-          font-style: italic;
-        }
-        .wysiwyg-editor th:focus, .wysiwyg-editor td:focus {
-          outline: 2px solid #06b6d4 !important;
-          outline-offset: -2px;
-          background-color: rgba(6, 182, 212, 0.08) !important;
-        }
-        .pull-left {
-          float: left;
-          margin-right: 1.5rem;
-          margin-bottom: 1rem;
-          max-width: 45%;
-        }
-        .pull-right {
-          float: right;
-          margin-left: 1.5rem;
-          margin-bottom: 1rem;
-          max-width: 45%;
-        }
-        .text-center {
-          text-align: center;
-        }
-        .text-justify {
-          text-align: justify;
-        }
-        .clearfix::after {
-          useEditorStore.getState().content: "";
-          clear: both;
-          display: table;
-        }
-        .no-scrollbar::-webkit-scrollbar {
-          display: none;
-        }
-        .no-scrollbar {
-          -ms-overflow-style: none;
-          scrollbar-width: none;
-        }
-      `}} />
-      {/* Hidden File Input */}
-      <input 
-        type="file" 
-        ref={fileInputRef} 
-        className="hidden" 
-        accept="image/*" 
-        multiple 
-        onChange={handleFileUpload} 
-      />
-      {/* Account Prompt Overlay */}
-      <AnimatePresence>
-        {showAccountPrompt && (
-          <div className="fixed inset-0 z-[10000] flex items-center justify-center p-4 bg-black/90">
-            <motion.div 
-              initial={{ scale: 0.9, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              exit={{ scale: 0.9, opacity: 0 }}
-              className="bg-slate-900 border border-slate-800 rounded-3xl shadow-none max-w-sm w-full p-6 sm:p-8 text-center max-h-[90vh] overflow-y-auto custom-scrollbar"
-            >
-              <div className="w-16 h-16 sm:w-20 sm:h-20 bg-gradient-to-tr from-cyan-500 to-blue-600 rounded-2xl flex items-center justify-center mx-auto mb-6 shadow-none">
-                <AtSign size={32} className="text-white sm:size-[40px]" />
-              </div>
-              <h1 className="text-xl sm:text-2xl font-bold text-white mb-2">{t('welcomeTitle')}</h1>
-              <p className="text-slate-400 text-xs sm:text-sm mb-6 sm:mb-8 leading-relaxed">
-                {t('welcomeDesc')}
-              </p>
-              
-              <div className="space-y-4 text-left">
-                <div>
-                  <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest ml-1 mb-1.5 block">{t('usernameNoAt')}</label>
-                  <input 
-                    type="text"
-                    value={username}
-                    onChange={(e) => setUsername(e.target.value.toLowerCase().trim())}
-                    placeholder="softpedia"
-                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-white outline-none focus:ring-2 focus:ring-cyan-500 transition-all font-bold placeholder:text-slate-700 text-sm"
-                    onKeyDown={(e) => e.key === 'Enter' && setShowAccountPrompt(false)}
-                  />
-                </div>
-                
-                <button 
-                  onClick={() => setShowAccountPrompt(false)}
-                  className="w-full py-3 sm:py-4 bg-cyan-600 hover:bg-cyan-500 text-white font-bold rounded-xl shadow-lg shadow-cyan-900/40 transition-all active:scale-95 text-sm sm:text-base"
-                >
-                  {t('saveAndStart')}
-                </button>
-                <button 
-                  onClick={() => setShowAccountPrompt(false)}
-                  className="w-full text-[10px] sm:text-xs text-slate-500 hover:text-slate-300 font-medium py-2"
-                >
-                  {t('skipForNow')}
-                </button>
-              </div>
-            </motion.div>
-          </div>
-        )}
-      </AnimatePresence>
-
-      {/* Notifications Popup */}
-      <AnimatePresence>
-        {showNotificationPopup && (
-          <motion.div 
-            initial={{ opacity: 0, scale: 0.9, y: 50, x: 50 }}
-            animate={{ opacity: 1, scale: 1, y: 0, x: 0 }}
-            exit={{ opacity: 0, scale: 0.9, y: 50, x: 50 }}
-            className="fixed bottom-4 left-4 right-4 sm:bottom-6 sm:left-auto sm:right-6 z-[200] max-w-sm w-auto sm:w-full bg-slate-900 border-2 border-lime-500 rounded-3xl shadow-[0_10px_50px_rgba(163,230,53,0.3)] p-5 overflow-hidden"
-          >
-            <div className="absolute top-0 right-0 p-2">
-              <button onClick={() => setShowNotificationPopup(null)} className="p-1.5 text-slate-500 hover:text-white transition-colors bg-slate-800 rounded-full">
-                <X size={18} />
-              </button>
-            </div>
-            <div className="flex items-start gap-4">
-              <div className="p-3 bg-lime-500 text-black rounded-2xl shadow-[0_0_20px_rgba(163,230,53,0.6)]">
-                <Bell size={22} className="animate-swing" />
-              </div>
-              <div className="flex-1">
-                <p className="text-[10px] font-black text-lime-400 uppercase tracking-widest mb-1">ĞĞ¾Ğ²Ğ° Ğ²Ñ–Ğ´Ğ¿Ğ¾Ğ²Ñ–Ğ´ÑŒ</p>
-                <p className="text-sm font-bold text-white mb-1">@{showNotificationPopup.author}</p>
-                <div 
-                  className="text-xs text-slate-400 line-clamp-2 italic mb-4 bg-slate-950/50 p-2 rounded-xl border border-white/5"
-                  dangerouslySetInnerHTML={{ __html: showNotificationPopup.body.substring(0, 100) }}
-                />
-                <div className="flex gap-2">
-                  <button 
-                    onClick={() => {
-                      setActiveView('reader');
-                      setShowNotificationPopup(null);
-                      setNotifications(prev => prev.map(n => n.id === showNotificationPopup.id ? { ...n, isRead: true } : n));
-                      setTargetReaderPost({ 
-                        author: showNotificationPopup.parent_author || showNotificationPopup.author, 
-                        permlink: showNotificationPopup.parent_permlink || showNotificationPopup.permlink,
-                        commentAuthor: showNotificationPopup.author,
-                        commentPermlink: showNotificationPopup.permlink
-                      });
-                    }}
-                    className="flex-1 py-2.5 bg-lime-500 text-black text-xs font-black rounded-xl hover:bg-lime-400 transition-all active:scale-95 shadow-lg shadow-lime-900/20"
-                  >
-                    ĞŸĞ•Ğ Ğ•Ğ“Ğ›Ğ¯ĞĞ£Ğ¢Ğ˜
-                  </button>
-                  <button 
-                    onClick={() => setShowNotificationPopup(null)}
-                    className="px-4 py-2.5 bg-slate-800 text-slate-400 text-xs font-bold rounded-xl hover:bg-slate-700 transition-colors"
-                  >
-                    Ğ—ĞĞšĞ Ğ˜Ğ¢Ğ˜
-                  </button>
-                </div>
-              </div>
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-      {/* Table Selector */}
-      <AnimatePresence>
-        {showTableSelector && tableSelectorPos && (
-          <div 
-            className="fixed inset-0 z-[9998]"
-            onClick={() => setShowTableSelector(false)}
-          >
-            <motion.div
-              initial={{ opacity: 0, y: tableSelectorPos.direction === 'down' ? -10 : 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.95 }}
-              transition={{ duration: 0.1, ease: 'easeOut' }}
-              onClick={(e) => e.stopPropagation()}
-              onMouseDown={(e) => e.preventDefault()}
-              className="absolute bg-slate-900 border border-slate-700 shadow-2xl p-4 rounded-3xl"
-              style={{
-                left: tableSelectorPos.x,
-                top: tableSelectorPos.direction === 'down' ? tableSelectorPos.y : undefined,
-                bottom: tableSelectorPos.direction === 'up' ? tableSelectorPos.y : undefined,
-              }}
-            >
-              <div className="flex items-center justify-between mb-3">
-                <h3 className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Insert Table</h3>
-              </div>
-              
-              <div className="flex flex-col gap-2 mb-4 border-b border-slate-800 pb-3">
-                <div className="flex justify-center gap-2 mb-2">
-                  <button 
-                    onClick={(e) => { e.preventDefault(); setTableImportFormat('markdown'); }}
-                    className={cn("px-3 py-1 rounded text-xs font-bold transition-all", tableImportFormat === 'markdown' ? "bg-cyan-600 text-white" : "bg-slate-800 text-slate-400 hover:text-slate-200")}
-                  >Markdown</button>
-                  <button 
-                    onClick={(e) => { e.preventDefault(); setTableImportFormat('html'); }}
-                    className={cn("px-3 py-1 rounded text-xs font-bold transition-all", tableImportFormat === 'html' ? "bg-cyan-600 text-white" : "bg-slate-800 text-slate-400 hover:text-slate-200")}
-                  >HTML</button>
-                </div>
-                <div className="grid grid-cols-2 gap-2">
-                  <button 
-                    onClick={() => {
-                      insertAtCursor(tableImportFormat === 'markdown' ? '| Head |\n| --- |\n' : '<table data-format="html" style="width:100%">\n  <tr>\n    <th>Head</th>\n  </tr>\n</table>\n');
-                      setShowTableSelector(false);
-                    }}
-                    className="p-1.5 bg-purple-500/10 hover:bg-purple-500/20 text-purple-400 text-[10px] rounded border border-purple-500/30 flex items-center justify-center transition-colors font-medium"
-                  >
-                     1 Col Separator
-                  </button>
-                  <button 
-                    onClick={() => {
-                      insertAtCursor(tableImportFormat === 'markdown' ? '| Head | Head |\n| --- | --- |\n' : '<table data-format="html" style="width:100%">\n  <tr>\n    <th>Head</th>\n    <th>Head</th>\n  </tr>\n</table>\n');
-                      setShowTableSelector(false);
-                    }}
-                    className="p-1.5 bg-purple-500/10 hover:bg-purple-500/20 text-purple-400 text-[10px] rounded border border-purple-500/30 flex items-center justify-center transition-colors font-medium"
-                  >
-                     2 Col Header
-                  </button>
-                  <button 
-                    onClick={() => {
-                      insertAtCursor(tableImportFormat === 'markdown' ? '| Head | Head |\n| --- | --- |\n| Cell | Cell |\n| Cell | Cell |\n' : '<table data-format="html" style="width:100%">\n  <tr>\n    <th>Head</th>\n    <th>Head</th>\n  </tr>\n  <tr>\n    <td>Cell</td>\n    <td>Cell</td>\n  </tr>\n  <tr>\n    <td>Cell</td>\n    <td>Cell</td>\n  </tr>\n</table>\n');
-                      setShowTableSelector(false);
-                    }}
-                    className="p-1.5 bg-cyan-500/10 hover:bg-cyan-500/20 text-cyan-400 text-[10px] rounded border border-cyan-500/30 flex items-center justify-center transition-colors font-medium"
-                  >
-                     2x2 Table
-                  </button>
-                  <button 
-                    onClick={() => {
-                      insertAtCursor(tableImportFormat === 'markdown' ? '| Head | Head | Head |\n| --- | --- | --- |\n| Cell | Cell | Cell |\n| Cell | Cell | Cell |\n| Cell | Cell | Cell |\n' : '<table data-format="html" style="width:100%">\n  <tr>\n    <th>Head</th>\n    <th>Head</th>\n    <th>Head</th>\n  </tr>\n  <tr>\n    <td>Cell</td>\n    <td>Cell</td>\n    <td>Cell</td>\n  </tr>\n  <tr>\n    <td>Cell</td>\n    <td>Cell</td>\n    <td>Cell</td>\n  </tr>\n  <tr>\n    <td>Cell</td>\n    <td>Cell</td>\n    <td>Cell</td>\n  </tr>\n</table>\n');
-                      setShowTableSelector(false);
-                    }}
-                    className="p-1.5 bg-cyan-500/10 hover:bg-cyan-500/20 text-cyan-400 text-[10px] rounded border border-cyan-500/30 flex items-center justify-center transition-colors font-medium"
-                  >
-                     3x3 Table
-                  </button>
-                </div>
-              </div>
-
-              <div className="text-[9px] font-bold text-slate-500 uppercase tracking-widest mb-2 text-center">Or draw standard matrix</div>
-              <div className="flex flex-col gap-1 items-center">
-                {Array.from({ length: 10 }).map((_, rowIndex) => (
-                  <div key={rowIndex} className="flex gap-1">
-                    {Array.from({ length: 10 }).map((_, colIndex) => {
-                      const isHovered = rowIndex <= tableHover.r && colIndex <= tableHover.c;
-                      return (
-                        <div
-                          key={colIndex}
-                          onMouseEnter={() => setTableHover({ r: rowIndex, c: colIndex })}
-                          onClick={() => {
-                            const r = rowIndex; // 0 for header-only
-                            const c = colIndex + 1;
-                            let table = '| ' + Array.from({ length: c }).map(() => 'Head').join(' | ') + ' |\n';
-                            table += '| ' + Array.from({ length: c }).map(() => '---').join(' | ') + ' |\n';
-                            for (let i = 0; i < r; i++) {
-                              table += '| ' + Array.from({ length: c }).map(() => 'Cell').join(' | ') + ' |\n';
-                            }
-                            insertAtCursor(table + '\n');
-                            setShowTableSelector(false);
-                          }}
-                          className={cn(
-                            "w-4 h-4 border border-slate-700 rounded-[2px] cursor-pointer transition-all",
-                            isHovered 
-                              ? (rowIndex === 0 ? "bg-purple-500/60 border-purple-400" : "bg-cyan-500/50 border-cyan-400") 
-                              : (rowIndex === 0 ? "bg-slate-800/80 border-slate-600 border-b-2 shadow-[0_2px_4px_rgba(0,0,0,0.5)] z-10" : "bg-slate-800 hover:border-slate-500")
-                          )}
-                        />
-                      );
-                    })}
-                  </div>
-                ))}
-              </div>
-              
-              <div className="mt-3 text-center text-[10px] font-mono font-bold text-cyan-400 bg-cyan-500/10 py-1 rounded flex items-center justify-center gap-2">
-                {tableHover.r === 0 ? (
-                  <><span className="text-purple-400">{tableHover.c + 1} Cols</span> <span className="text-purple-400/70">(Header / Separator)</span></>
-                ) : (
-                  <><span className="text-cyan-400">{tableHover.c + 1} Cols</span> <span className="opacity-50">x</span> <span className="text-cyan-400">{tableHover.r + 1} Rows</span></>
-                )}
-              </div>
-              
-              <div className="mt-3 pt-3 border-t border-slate-800 flex gap-2">
-                <input 
-                  type="number" min="0" max="50" 
-                  title="Rows"
-                  defaultValue="3"
-                  id="customTableRowInput"
-                  className="w-16 bg-slate-800 text-white text-[10px] p-1.5 rounded outline-none focus:ring-1 focus:ring-cyan-500 border border-slate-700" 
-                />
-                <span className="text-slate-500 self-center text-xs">x</span>
-                <input 
-                  type="number" min="1" max="50"
-                  title="Cols" 
-                  defaultValue="3"
-                  id="customTableColInput"
-                  className="w-16 bg-slate-800 text-white text-[10px] p-1.5 rounded outline-none focus:ring-1 focus:ring-cyan-500 border border-slate-700" 
-                />
-                <button 
-                  className="flex-1 bg-cyan-600 hover:bg-cyan-500 text-white text-[10px] font-bold rounded flex items-center justify-center gap-1"
-                  onClick={() => {
-                    const r = parseInt((document.getElementById('customTableRowInput') as HTMLInputElement)?.value || '3', 10);
-                    const c = parseInt((document.getElementById('customTableColInput') as HTMLInputElement)?.value || '3', 10);
-                    let table = '| ' + Array.from({ length: c }).map(() => 'Head').join(' | ') + ' |\n';
-                    table += '| ' + Array.from({ length: c }).map(() => '---').join(' | ') + ' |\n';
-                    for (let i = 0; i < r; i++) {
-                      table += '| ' + Array.from({ length: c }).map(() => 'Cell').join(' | ') + ' |\n';
-                    }
-                    insertAtCursor(table + '\n');
-                    setShowTableSelector(false);
-                  }}
-                >
-                  <Plus size={10} /> Add
-                </button>
-              </div>
-            </motion.div>
-          </div>
-        )}
-      </AnimatePresence>
-
-      {/* SystemDialog */}
-      <AnimatePresence>
-        {systemDialog && (
-          <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-black/90">
-            <motion.div 
-              initial={{ scale: 0.95, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              exit={{ scale: 0.95, opacity: 0 }}
-              className="bg-white dark:bg-slate-900 rounded-2xl shadow-none w-full sm:max-w-md border border-slate-200 dark:border-slate-700 mx-auto max-h-[90vh] overflow-y-auto custom-scrollbar"
-            >
-              <div className="p-4 sm:p-6 text-center sm:text-left">
-                <h3 className="text-lg sm:text-xl font-bold text-slate-900 dark:text-white mb-1">{systemDialog.title}</h3>
-                <p className="text-sm text-slate-600 dark:text-slate-400 mb-6 leading-relaxed">{systemDialog.message}</p>
-                
-                {systemDialog.type === 'prompt' && (
-                  <input
-                    autoFocus
-                    type={systemDialog.inputType || "text"}
-                    defaultValue={systemDialog.defaultValue}
-                    placeholder={systemDialog.placeholder}
-                    className="w-full px-4 py-2 mb-6 bg-slate-100 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter') {
-                        systemDialog.resolve((e.target as HTMLInputElement).value);
-                        setSystemDialog(null);
-                      }
-                      if (e.key === 'Escape') {
-                        systemDialog.resolve(null);
-                        setSystemDialog(null);
-                      }
-                    }}
-                    id="system-dialog-input"
-                  />
-                )}
-                
-                <div className="flex justify-center sm:justify-end gap-3 font-bold">
-                  {systemDialog.type !== 'alert' && (
-                    <button 
-                      onClick={() => {
-                        systemDialog.resolve(null);
-                        setSystemDialog(null);
-                      }}
-                      className="px-4 py-2 text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl transition-colors text-xs"
-                    >
-                      {t('cancel') || 'Ğ¡ĞºĞ°ÑÑƒĞ²Ğ°Ñ‚Ğ¸'}
-                    </button>
-                  )}
-                  <button 
-                    onClick={() => {
-                      if (systemDialog.type === 'prompt') {
-                        const val = (document.getElementById('system-dialog-input') as HTMLInputElement)?.value;
-                        systemDialog.resolve(val);
-                      } else {
-                        systemDialog.resolve(true);
-                      }
-                      setSystemDialog(null);
-                    }}
-                    className="px-6 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-xl transition-all shadow-lg shadow-blue-500/30 text-xs sm:text-sm active:scale-95"
-                  >
-                    {systemDialog.type === 'alert' ? 'OK' : (t('confirm') || 'OK')}
-                  </button>
-                </div>
-              </div>
-            </motion.div>
-          </div>
-        )}
-      </AnimatePresence>
-    </div>
-  );
-}
-
-export default App;
+             xœì½ksW– ø}Åº¢v ø-s$UÑíÒ¶%±Mºìn‚NI0[ ›™ E³a[vUõ®£jÃ[-Gôl¯w¢'b;b"¦eÙ*É’K˜_ ü…ùóöœso¾ï+ARR¹„Š’ÁDæÍ{Ï=÷¼Œ•>?c3;İ†ÓßqƒÆÙVk~¡Åvü ¥×VZ,roGâÊr«5ó¿”ÊViØ°çDnãõ³É˜üÂ¹V‹íùûn°š»üZK¼‡ÿyÖô;ÜÑü~Qûìù·ÏÚ='¯9}÷Bm·çŞf^äöÃFÛDnÀºÎ°±Ğ<ËvıAÔØñ{>·ÛaM?2Œ½Şñ¢%zº–î°yãáĞ\1ùxòÉøşøÁøÉø>›gãÿ<şãäŞøøßÃÉ'ççé.ı²æa]†[†ÙuÓšn¼>¼}3úeØ±~DËï¹NÇtÛsn»ãâ3‹x:ùİä÷lüşøfü.>Ã‹ã‡ã?¿cpááø	ŞÍ&w¬‘n™ü~~ÈÆßOîÁO¿Â¯O&w'M>†ß>šÜmÖ?ÔMğüüÎ(Š|µ ?ª~•¡bÑ"FEäÎóYi&aD~[MsŸ?¸ÔóÚ·.ÕgÙ…‹ìH¬Ğ®„kÜŞ-·?Ä¯ï:½Ğı¦ç®¹ñ#¸ØúÌŒö™;ºƒZ Ycf	ùÈP‹®œR,ÁŸé1üÑ ãv·{ñ‰eQàB/òüA£í÷ü TÃP‡>pá`ZŞD¾ØúXƒGFL;±Mïx¡³Ós;ÎòûÒŒ¯_ŸÕA¿Æx»¬®xÇ¬áQÆ~äíÖgÆ_ Ç€şÉäsÇı>Ğˆ@&¿¯_‰xtïî=Ná'p£Q0Ğß¥[< Ÿ?#†KZeñªØãZ¼Î*»·6şA}¶ù› …A·>;g@l•ÉAhzæoZe£ĞEã›ğ·Ùu£ÍïlSÜb)rºá*v¶à‹ñf/ê¹ünüf¼°6·Â-¸ ß!ıò-;0VöæF³ÙŒÄØá½é¦‘`Å“	ëb nõü¶ÓCğ:]·‰„ŞXßÜºşÎÚ[ëÛ½ş·Û[ëW7Ş^ÛZßœcÿëæõkÍ <~áâ8Dõ™x1›Î¾Û™1=÷ÒQí£ö ®}s¬²8ÄÚéõXY2ûûQˆ +j5=bÊœ—ÆjÀsÚ‡Î ±’åBtålÌ„ö`z¬=
+B?h}fÅ%ÛXî˜_lé(9~Vé)ëËKÄñk {:ş	è´½èó©`À~úSvfè»~Ğwm÷ªßqqåáÓñpgÄ·Ì"˜Ó¼}w5„Sş¹N[Ü6ğ®n‘v¤e¾_kx8ù„ÆoÅz5"ò§YXŸÉ5R_§±¬”úûgÊeT`Ì2’#=E¨NòO Y¯Ï„o8t#İƒ2bMD2$d‰YÉqáâaÏißšŠ¾,jÎ³îÌ©’Ì©‘3¾<~Ên,4[7'ï¬ú¤)Ï™F&İèÂXq=w'‹×Àßü[0‰ÅæYPk:öxZ¼l-ŒqeF9ıaUŸÇ;2-ìèŒW8HÛY¡Ùsİh]d-¼^á<‹]ß)›1ğŒ3à?,kí˜_neq/ÜÑàV£e¢¶¤ #Î¼éõ Eë3€ÈjçÎÙéIBõëÿ-4 ”U¨^·xZ~¢£CQnVìÂ…Œf¦eJ?ËXŠ~GgÀhhZe3Y£EB2uc¨Hjä&ûÆ=V?*¢Õ•0aäGÇŞı¡F/éöÓÔ~Tûÿo©:~ÌÆßÂ—ÆÑ(CŠ]¾7nYÔD¥(öÿÀÎğ«³/}şRbP<»ıcÑ*ú=ZCQšµÂd£‡3¹j‘#† n¸Äü¬Diò-Ø#•„W|ß=.}!š• )PÇİ‚»…³ÜÊI1ıÛgùœmÇzÈp:qæüğâQFK×ûÃè‹ÆÖ¬Q1H“Ğ‹ôÜàÁ‘€,eÌèõ:ê”äxVØÍ#§LâºZ¦WŸ`¨üñÏêãÇ@{QİttÅO8­n9äÓY'Å+uêGU-h'Üƒ,	1•\¼İ3øU$NtDÿèÇ÷ãû“ßçm§÷ÆĞ§2ù|û‘Ñ-ßåŞäK£›DëERêzRòâdkúÎĞŒÃüxá&G<Ó!“qgo¹‡pp¯“£]Ø !H÷Ë9gÄüRq§ÄüÙÜ¦æœ‰^7å™¢ióÕ¾Ê0r‚(QXwÜèÀuHİtî¦tTÓ=p×ŞrîÕyghÂã]ØŒ³_»H Eƒ7Ê½e‹w¡3'jxƒ7pAo÷Qo'Iã\"h¤FÄàAĞvBáÚ¾…îÊ÷gx›d8¢-øO¼3ı97õ¢HüIñÏâf©;=ï:/ NzçbkÆîÜµ`ÓBAÚQ[*Ì^{eÌÛ>
+¬·(Ì ã:çÉÁ)gåæœÔ<£wĞàÇÆómåûÖ˜ë–ó6 aÏâYXñÒO"‡;áá ÍlÜmñÙZr³£-ylºA´]"“1ÜØ?dt¬ÅŸÄgWÜãñƒÔÍOıgäÄWyí-|yñ”52q]õ;N¯>õz–ÏŞanh€5x ªÎãEÈiv½ Ùsz~û%¬V‚
+Éæ°È‡°¬ÏóA
+Ã"20[¸ò}Ãÿ¿ÿ•>4¹‡Ü§/õ82‚n~ ÿ2—	Šß¿?eã¯'wá¹‡öOp'`,zsÆÂñšƒí%Saƒû;İp‡Ûà>Äôâc¡W1ÿÈ\¶.AU¡¡HÂÚgˆ–èÂGV@Íã §É]å.­c.şdù(dŒA®›ó¸³5ÜŠiVf›Ä8[¾Š}¦’uæ–%[¾Iœ³ä/PñÏ¬¸ffœ¦`´øCH}¡À?SfÉÉ¢j†zröùeŠ»iøIÚX0ÒÊÌ—¼ İsc·À
+Æ³Á”Î_ÚsÛ·$¿ÙğsSpLrçsã¯2N Z|Áí¹‘›º3šßÚn}æˆÜ™9»³(r1´Aeò:ìÌ®ÿx¦È…ô3EØCú9ı ˆôS…àğ6CÄŸS š5N4‚z+zÑ+Gôÿ.‹ÛxUøîEgMQøáÄ¤6ş*rúa~Ô†œß
+œpo1w²Oì`Û„©ZÜRå‹.8tÛfÜp2Õùeë
+Ç¥ç¶#îFı²ïüœy»
+Ë
+fã¾s»±×X\fˆ1»=ÿ qÈmØY¿ßÛßëí8#ï47£·q8C¶¸Î-c ÚWSÑMÒFNmèQürgVl¨xôòùù¾'¥Yú­t{Ö^}ä¤r·8º¸@ºÂ™¢»7±úÔúxnÅÀ{k9íĞÃ}F=*j´Ø‡‹­ÖM³Œ4,Å}œO×TäeŞ ƒÓ»pt¤WYˆs^p+÷ÃşàŞö¢Òí…Q3‹pvB¿7ŠÜd¹sòz) ©ì0ÊŠ¼3ÃÑNÏ÷ŠŞ¢ùiLA0ÿæës™ÕÌ1øwQ²¨DÄ“™çè9Éc1¼*¾-B<ñvĞØ‘­\xÚÈÈ—‚³Ä¤¦^–‰ IiÅ×é¸[äaF!HÊ×[û{7ã—Âßçğïü¶•NQ6¢6V4Áôò¢11‡èE;¨&´á<0¢ÍXal LbrĞ€'Ï¾`Î£¾Y6Æé=9€’9ı’t~~oQ2e!mZŸ€Ò4R@Æ‰Hä¾vñüû07‡”’Bã®˜yMì­;'Û¢'g×ç÷–$.‡b6Lº^…Ä[òµUÙaxùÛÎ¡?ŠŞ
+@ğM£‘ÄÎ¶ı~„4Ä•n-mî’tIøuqxüÏZˆ@5ıs‘f¨tr^º~õê»×®l]Yß$wÎ
+‘EëãTrZò@àè‚°uåë´®Y€8±IRi4>iš.`Í!W.DxÓ´{#Ø¯z¤—¹IWJ‡5é:0Ø}ŒOç	sÆ‡šá°çÁÆ3Ğ»
+®qz`—&@Cæ8“B$»üæßûŞ€^gÈ,ĞGOÛX#_
+ğ¤PØõƒu§½ÇŸ7+±”R‡ópÂ8ÆwëaˆŸìæÌÆ(;±HÕ”ƒgİtäHÌÛà0ì=“ã°ÅÄÉ×Ò ğ8Î\åbÔ†¥ZSŠ€ÏÍòÆ3Œa­§ã…~ßÕrxq<ZdfÈ³5uTş4!­§bÉ…Ù/º2¹÷”Scá½Ô»Ÿ¤>%Â Òì(?A«Õ¥ğ#Ï¸ÓÕqñRcú~¸gÛéšL)gq-ífnáF ‚t×Aì­[˜j"¿Ûí¹€¸F3m0ÍºB
+~²É®ÃÛ˜–™÷“h/hÁAoJzbt‡ZØY
+)&ÅÃ– -Ëæ¤Úˆ:™D’„“0½I›Oh¶.ı…!mìH³šiØdñÚ©´^$âóŸd]ˆğÏÈÔş øx"µ„ô©fBôõkÛ[komÚ=£+ÀLë
+òsïª²Ææ¨Jn“ûnÇõ§ 4R£÷Ø“ı8Å¬4]á†e9e9«£,Spv-ÑSiÏ¹ô~-]>Öˆ¦0ÁÈÔxõÉ([2bucF~Ğ³¿©-˜³© Q±$cêÀK˜o‘p/Û"E=×	ä6Õ–V€1S‹•¤,]ò™<>9ó‡Ş8 M¦ª`VRÙ×·êmë¤rnPÀ°Á´Nw¾2ªëñâH^ÙÓ04ó$Íé/ƒüyšÆßvİÀÂ8ß¶sD>e³¸fßbk·,ïZCŸ	X.Š06•rÀ¼ì†m9@%ÑöJçµ°ûà¢Îë×™0R¡\‹²Y/w‚…V*	¨ *9/j…ê{ƒ÷`âá†l8f‡üÃ?°º„Òlˆµf–óŞ`8RÆ’ñB9ƒÆ„)åØ}§7RG»E¯¾£ºP|ÏtİÄH¾™<V¿Fï©»ÍÈ	ºnÔ¤ÕÚhf#+ßƒÆbËLç^Ké\b®X(ÄªíúíQ¸ê"Š“'È/}¹à-èPªÇÒ$˜Û½ast++	¥$lp§ª×¯:Ñ^³íz½z9QØ< L™gõtóƒ@ĞT½dõKŠ‹ä9£ÕUCJîR!cµX†jä«¢ rPM-Käş‘ÖèZªZ£KBsåe»¦”ÛXgAš<İ¨A§çnÆt¾€ì´[Ğa¥…Lµˆ×E\ZŞ•«qÄ´s7íaIGíhğ2hÀÙµˆâá·½Ò5^¤®QYÉ¨ª^¼Ò+4z…ÒÛöåq…§¥‰`"6<ã×‡n™—ôqÀU¦g‰:¢/¼¤.·yT¿A%IæØHhLÇ¯ˆú‡37™r÷ú,¤w-ÌÑzkô®µ-ée‚¨É°{"æèŒ¿+ŞQ!äŸ û«“N›¨õn›s³²ÂauÒfeÀÇ]Dgp8eÕ¢ŠÖeùe«úÄ
+3@ÏÙq{rí&ßÎÉRRÆCª¦§y15/Ï¼Î%ÖXaQ)46Ñ¶©H<=;!G…8RşWãï)…ï£É'™$¬+G%I`˜W7ù+S¹â'²áTôÎë¹—ıƒ¢|V¯Ãù[Ñ•Ïz.WhwaÄHqmw]¨5?ô†9ÙF°¢Œºêõ‡~½á´o†Šxıóó„ÒŸt¶„\¹·3ïøó@1=Nı¦k*V½;<NéHÕ)ÙôÅ»œß0ëÅ–˜µF9;–R-¢¥W(zÚ:PVFS4[’HKâß”GéPC'İz.‹ª+É¢ºüÎÚ›[›d«İ¸Y“ÆÄ”êÁ$/‹ãıêX¯Ğ,‹™|C§‰ö”QHW3wIß*¹T¹¼Š¡ ‡©¬Êâ1êşœ;©º?ÿr,NYñG]i©Y™”:íSv{5u“#Y”ÆÑ„›ëœ-ÙxÎ©M—ÙR(å(ÇB£Ùë­6ÕVIúÔ$zö|§C0¾Ä™1åqfré9hwüÎ¡©~j’áÎ1ç¸ã[FA o¡É]éÔã}Ô>–£;Û‡m#Ò3F®ÛßÆ³€:·1ßr{ßGNo{/ê÷ô‘µšŸ².Õ$§:§Dvø¸d¶98½ƒÃî;în³Í—c
+÷ÂMØQĞÏ2Ï`†¬¦0ÿpjÙ‡{Ş^u‚[nÇšˆ“ï›³vùÈDØ‰
+"õ¥·ÄøuÕ‚ŸòSMo0pƒ_l]}£Áijæ0Lin¯5æÄøqºd†ÜöÂmàH=upªan®Å ÔÿªÀ)zótãÚ3Q­X„ê%Š(X%#*ğÔ¾7h4¸}I†|3Ã¶ZT0´ôşe¡±L”¸9#ÄËºœo23©CˆW“vÖ€ãÄ‰Ûô¿‚J	‘R(écKY§hfİqÄfäu÷äÑ[…%+âk2DÙšk"M+õ”»QAòÇ¼éd1éJIcÍ[0E¿%#˜KET‹r¯á^]"˜N&(Q–4Œmêv¢0Id‰‹?9Mk1ã”>+sta•L\,·¸zİà÷ÇWòáƒâòt{Î¿ã·o¹±N°ØÒ1°nÙóQŒ‡,“(¸ITĞN´Ùz%mı¬ˆåX¾ÔDUi’­Ô0-‚èS44««è}‚¾É%‘æ$·{$ÊÈ‡š"k±¸\iç¹¢²Ğ­N¡5Y‡jÀ Æı›ù™M3.ŸwNË“ı«ãğK¥q::³M\æ'9ÒæÔÍ"#àãoînà?`óóìÔõÂgÛ ‰äó [^ßõGQ]5»ëæXË”‰9-Q’1©Å1BL%Wç˜'qªf4 Ë*¯œV8F$Ãßø*$ãUHÆŸkHÆi…z¯E›^×"´"9¬N‘ŞÊĞ9,5ÁÅÜ‹«P‹°â{p•CZÎÕR'­+€y-y¢Jlt«ŠC3|V¬NiŸIB†QFQ3è£‡© âEùâ8
+İ óååjÜ9iårv:-l²B6ö$³zIø¥MWXs­R¨è×´Ë¦Í{5ÓšPgí¼œÃ@a<Š	yp/¾&r*á}wÌVÃ®*ÓdUHÌİğJªj+½beì~ş±’@b–šmíjƒÔÊ±»²0ëvÄj¹òç|ÂJ©ÒªgÄl‹©œW¬‰šà¥PšF8•)J³¥LĞëüúîæú;S==fé‹=5H£Õ¼oStÚ.DRIÅ.d
+ıe).S½¸AÛÍ‰õ…FÉ*ñ3”ˆöIé74¸ZîÇRÏ‘Ü«T}$÷ÚhCø9†F„Ÿ²„y%…µhj\~­ßìÁdÊY5@N›&«ƒdÅ\Ùp%J£1‘=Ÿ2Ô‹Û¿™S™¸âìIèböÅ'íòFd¥H\?gLTQä…,‹ü!àX€^µO–ü¨›QD°Â¸j¡n‹©dYÜ^úÃ¶ÕOBTµ&%+¢jK¹¨¶Œ1R+j@9À(­=ü‡æNÇƒ¡‘ßØ	Øn ;œJÛp´›œXN)ƒ&ÊXÌ’ZÌ·óÍöÓÕ ·Ø[¨=¨×@@ñamñ˜„Íè°'BW®? óV¿5<J]@ßÚì‹›z×«ÑÍ©™¤ÄXPê]œñ'gAg+s8lºQ…
+¿wb%¸ø‹ÑX*ÏBL­ìNOE©¤¨pCeµ•å‹j7\¿N°%Üæ!ûÎ…\ócÛÍæÿ’mí¹}—­… !D(„²¿œWÊÛŠè¢%D”¾ÂÑİó|ZººÔTç$ÑÅËeÊwèbùÄ tGİ…µ±µ6¾BcöV†™Ë!&«™×<«¯šÇÓéñ*R'[:W 4ÜZ¡.+ÿ ‡±ëjuş’c†UE8Ş6©“ØŒÂnÈ¯°w ş¯îÿ*„cÿsÅ½( Ñl¾äLÁÊAw§¾ïõFÃ!låÊöììM.5Zi>-ÏEùÖ8å¡Cáa±ê´3ÿŒ.uÊ…òÊ¼v	€»”écWc!ò,0w€téÉ*Àc@|ÇØ·áyÔÚÓPÙ7Ğ1Š¹írÿ8éìzÇ‹–4”6g¸ß:ú L÷_,…Eè\¦fAmF¤x­=qİÕ»æŸiHë:Å!#bÕwíúåè+jŞFP aµğÄÉjZş#CXãTÍLÒDÖ*Œ±°ëfêê&@äYœÀ;Utu¾Õ\ Új ¾p×ÙYH¨¦Ğqfh¬Qt\y±Áøö­fKVê ÿ1g–’VÜú7¾×e}·¹KßL{l¤íR¹<k9®]\s,_Êc[_/Ğ7 G‘¨I¦”øÖMcáczù‹eo¸ÎÄ¯]•u¨ØÓ›A¿a†ë.–ª1‰»[­*¤$ã q¤s8MoĞñ@“-DZZëÖâñem‚MaıĞ2 ÍblR…éU9ÓÆÀrê\»˜Ç
++4Öœ!YÍ mßáÚÅõÁÖ¢éëæ)˜B²?W‰Lµà¤Ü	3À|ºìÌçáúÀÙé™L€}¾‘¿¿ãLãu8~=°_©ù›äv1´6°Œ/3G§
+×ŠÎ®Ç:Bz%‰íµ>[€«¿¦\1-ÿ¦#ºS›æÉŒ:9“ì;h,¬–~]AJcu«œ˜_u¨õÜİ¨ñ‡¾.ès{–\¦ĞbfQ˜X‡QÒ
+"-îeÁFNø”“ùû²ÜÂœ½ú/ù~ŒÃÚ!¶û0œÖÜ¶Ç–¦õËÔ ‹;¶cJ³È:#™³ÍìÆ<1²{z$–n÷X^Ü#Vf.F€2BµÎ%Ãv²nAl8Ò-Èª²Ø	Û§ñ~”â6¡İ)ªjÈl”«ìüUß×=‘w°]­î8å'R{­î¼ZÓIµ'šKR•c+ü?Ëîÿª¸Zé,““N¡q´ßù‹7Øp{n®©¬¸Tî++~½}^ü	ÍúrGìH½äÂ
+%)55jHqÍÕØP/qPGÀ’ó^o“)ïxÚÆse€‰Ë(~üô§.m9£À[ì×gÅ…kî0d?¹ªÃQ«F×aRï¶ÉvÅk]ŠåÁBM	<;HNa%YbÁYœõ¯|Å›ó¾dá†wÍx”g[^Öş˜g×lİÍìÑOÛ”£âƒBŠµ¤°(E¹Y‹Ç7gm8ä•”kIù?Ÿ%]äÇßÂßR1¢gã'¬¾ñŞÚ¬†cÙğ,ç4DÓj¸‹Uš…Û{ËÙ©Ïtİ'Ğ$5“›B1Æ‰H†E¤×ƒ}Y0xÊ¤¨$â „®NgŸl!›	`%79:ÛÜİµyİ±ã¡öjÛ ×Á-İ Å_¨|ˆˆÄ>ŒíşPW¢wn´“¼Èuzò–»%GõèÆå3™ŸÚ\un{}À˜Å2Ş ô6wßs¶Ü0¢ìcæ8ÏYq®LrdÆÙñGÑ©ĞmEn‹jM:dJkyO'-O‡$W»¾„®pNOL¦É½TVñT5­—>’›ôùùRüqæWtr¬áJÏÀÌ{8ÊÉ™*eq³˜›I÷é3—¦\ÖÆãNræ1ƒ‘§¨‹_2"Ú®ºzòôÈSÇWŒ>.çk.ò51
+˜ £MĞ¬\ƒ{cŒpa’êÔEÉÁ=~ãƒœ¡{EÄ¯hRÓm;¥d%‰ı]–Z§SRVşISD±¿#íû.s&ì‰¶$%‘tª0İå\nk¦ ãJ>d÷]5­•„Ã.åGİÁ”Æ\L,Øƒ+lNÆğW*bˆ€UÆ¾.'ªûil}¼ÒBû *=É{ŒéÍ‚Á®Åıñ”­©ˆ<Jê
+Í™‡4ùe±Uğe•"¢’¢]IÒš&|@ÎB7÷<·×É„<ß~Ïİa—‚Ã!Àgm}³ñÖ¥«lÓ•ÙíTáµrŒÁ÷²ÀúÕ¢+æ_$:äY‘À}/âD51UcŒíºÀš¡_=MRN&Û	–¯V%W©Áª Kk’?¡kUºÈÊ®UB/T5éà|.;„Úì à]ÒC™Cºz¶…B¸‚¤Y¹å‘ãm9á­éëÛşx6RÔTPïe©ºÂŞ¨ï^¦Í¤	o?«dR#;>éêø%«t1	´­÷' KkE#8@fkz)†+pÒ<9.döãÍğ~6ˆo¹¹Ò<wÌŒ¡:–İVd­º¢© Ò¨²ç²ÅfëAã–ª[¿Ğ£ÁàUZ°
+:®uè«iÂ²-h“¶"ÿk•ÄQ³$¶Ö.i‡háwZCK›LUW-®L<n;æ9ViX{U±°ÊëgÍz.Vâw¡S6‘‚éú5"+ÔLZ¿T™ÓƒÑíE€<zëUÃËM5…ğ½å¶÷@—Cä	Ëß:c%›Û¤Š`{Ôid‘ó[nĞ÷N¯, ÃºnÁ1ßİZäPËéePa»¬´ı…°É,›s¶ÕÅdøçè†…Ø`•Šp¶ñ<ïÃ÷…×›­fşèÀã;ùhüŒMîÿ8ùû§L>?7ùxrwÁOÇ÷ÇOĞÓ9~ wÜCèäs†nP6~B÷S/–ñá×ß±Œƒô{üıï„=Yp|xËƒæ»£‹æà3şùNÏùĞ…#Îwˆ.‰Ù·š‹ÍÅxö_‘#Ş6ù. şG³z
+óü=½ïãÉçØ&YŞøXÒ}¼&;~„İc¢ß[ÇŒ¿óæ6:<ş­å Ÿùr€±¾…E=|<~ß‡ï`wH³v«ãÌxC–šé†|…Û{ s¿‡SšÜĞş¦zŸï¾şÀåkùRºè›~Šë|@Sş^€èÙøØğwß·œ*•ö§zpçµxªÿ†Npø	¢üxüÃ¹aGG0İ‡ U~ş¸3ûçÇ°Y@;8áJáF˜Ìü	úÒ`ŸÇ„DøÖÛ·›eÇïG^Æ‰.5—›KñDÿÀõ-‡æø!ğâKşQ’–Êús ±÷77´áßğÙá~S£G>x~ğt.?‰ƒ %ì1¼7jñjäfs)ƒ	8ë¯ááÛîÂ›îs(O>è€Gì4şlÉC:¯Ï¨İ|ßEñ	%Ş½b7ÉÑî®ˆé­Àæ/e³Oaø§°ç0ÃO©ıÒıí ä ~ÁÏİ§Ù™fB!Â~M·İ…àœà8âåg´ _‹»g7÷İ]ä	İ8—Îı_a~Ÿóãİ˜ü&Æb@®@'fHØş@HÃq’6 FÄvÁˆÛŸáò´°Ğ
+øwW6ì&ïŞöv±trüåæÒ¹æB¼‚/9>æßG“Ç¿îãÎ î~Oï¾ñ)êëï_y	lÖ³üÆà1G§¡ÇÍaw`™ß9|·[‚×ÙiÜrAtLğ'Cºù™ÌÿãÉg"°æñ˜­£>B‚Bœè	ìK°…^9”õËoÑè¾í|=¿ïÃ½e^k.ÇÓı•àOùñ‚±ÈŸs‚òˆóE¢ÎO“9Öi0RfÙåëWàu„…Çœh70xâ3Â&$ë²ÎïFâDØJG¸u0‡»œÄÇè;Wlv×n­(BU¬ô,ì…d©ÿI‚şV÷ ëü:Äc`yşëø˜.L.>áÓSÎî&e¿ouMù¯ie<¸¹9ÈYDmÂÔ¹¢T.æÏ•Ó¸rŠ-Cæ®¥İÀÒ^ F”§HÉó¨3O¬	å+” +Ãñœ*;«h„ÙoÒëö-3Í™iZTÖ\7ğƒ¾Ó‹îè4(‹	¨³)OÎ¨§VNª[<ğ S51ˆª>³EÃpu~¾ëE{£fÛïÏĞ[7ô1Fdßmûw¤êÏ?n?‘DfxÈ–ÎÎ*Š±ìSÏ}—9Ÿg¶‹>±Zü²¨¶Ñ4–ÔÃ¼åE¿íg?ğïP ©Á:[ÿ¦O¯GóFf1ôu°SÓ	oÊ2~ÊTn622õünEEHb5wğ%¥-¥[­PSèRÎU‚–õÇŒYÃ·Ûsø±RwDaNHAşSö.Õ¯•³×Ø,ÂëªD×œ}¯ëÀáo¶{ŞpÇw‚Nó €ãê]7J¦MÙd</f'°¬ã·GT(Yï¹øõÃ+úLÛ26à>C¼0:…»Œİ(ø{ıÀ™_ÏµáŒ6ĞÜ½ğlíÒõ+ë—ÏÔÏ•º6Â¹Ì±ÅVËĞ´Ac-ÕYR½Åû¥®TÄ¼fUBWs`RgMÑ1wõRu›R-AwÔ.âcÖâÇìúÆß²·¯¿¥>[SXEï9¥¾‚a¯R 0JyñRñ9ZÛØØ¾ô‹µko­xSSÀ‘9æ¡^¤iiš.‡$ê~r5…KïNã'G4ÀréGX×/-$^Â.²UóN°¤fhuŸ½£ıN¢K+´4í2Kˆ1·•ÊN–Dw“´ªlíŒÛ²˜cUl²ËÍAÕJ×j%_"/zÃÇ6ËŞçG=)ÜÂ>ëy!&w†pêù÷¶3†ía¯±  _â¬”,ñ/špÛ&şÄ+&ÕùğV¢‹åõ<íl}Šá½º
++8*ˆÙ:š¥…ºrìêAÒÒèhUätév}WšÈé¾…"¯¹-ÜÙ éøUcCX¬ªà«î4¯ºÓh»Ól9İĞ=•ÙnN“ÁÛ—´CE º¹õ‚ÈùÇ²—q;êaà÷‡QÚ|Áét¶”gTšª4g¨^¨è@/¿¿-ÂU½ÜHÛÂèßˆ7Û¼qàĞüWY¼x¿Jûò°¥lpsàÔ³5GT¦g\·ê7œá*ı+
+£ÍÿÇğ¯ægãNoø~Ïu³Ò§ïÈ—„ZZŒõõÍf39sÉBoJ¡fªŸÚ»Ó§¤…õíŠ¸&;ĞÊv8ª²§Öì&:	i]Tæv7t#V­Ìù‚1qCãšª6zŠm}‚øÒ·øÉÒºe:zSEZªD‰ç ó’›úÇù&Ğ©Üõƒu§½W‡?lÓ8¡ïmzƒvoÔqC|zv6™Os8
+iDST™]gg±ı÷¾7 êŠ'’÷Y:ªÇk6d(ÉÃÁNå°Y]„…õãÓ.'‚ø9•^´Ï±Qb§tC`<á]7îÜÓ‡Sèôû Ui‡Ê-ËS#CõPèBEc]8Z†pP¥xÇìÎµ©ÊÂÅ;]}”iÅÚ-§Cyù¹ÈŒZ$‚Võ•c²–GLƒªïGtp@K‚‡Ğt{¡[m¾1‡ï¼Yåzo6lQÃ9g!“Xõ$TÚT¢9Æ†ÜŠÊRi!RU·‚Ó3Ò/¸EWLåíµ'½¹ê/LÇÅ¢Í1œàv£bË±²ñê¹#×h¸¢»^Ù¬^5SÎ¦ÏP-øh«zFªé-So{at¸«Ù:ÅÏä£m²ŞuDKmöÜA7ÚK<#2¦+6€ÖÅb8V6„Ş²ŞF‡”E"¥Å³À¦l^œäæM6&•sN@¼6ˆMZ‡MjÀ[Ë&å’¯ÙÔ PšÛ!#.$-µ*t’³·+„‘PšŠ!ıÌ—oQfçRâÜØ'aC/ò¢º¹4!&êuIÊ!`ß±ã…3æ%©¼–sÖ.şœ¯noëp(*_şríİ··°ô%ı‚ŞÙÜÎ/Q/z,¯òâÆÙ–ÁüMa{ÏíŒznƒ>LÕ%-V\ˆÚ”w1•^s	ø™Í—~Àédš­—ç†Ú·1õÏÍµ¦æHùl€eÈÜ¥À¦'M;ÈIAÊm™9±jŸ‡sñb+ˆ ˆFõXãßà(–™-Z3ÿÍ»ëï®O×šY¯VèèS£;š²@±‰¦‚a?Fz–³ÃûsØ(YælRÃÏ•{® åÖDYi#¿©¢Ák#tÒH4£Ï)aäD£sŒ!N,t(ôxQ;$[‚ ½}åá¹[ÔMÊ¿w€znüäŠyx ‘9û¸øÛd:0ò¸¨™¼‘ˆ³¹JÂS9¨Î@ed®VfÂ’Ş*Şğfà÷9ŒéfZcŠ".:ä•9‡:õyÇoßr#Iº²<‚¤ô¼M©ãu‘’)S¥›ï=–5(¾®*ş¨îJ/‹}Úé¹WúC?(–~,Ç>Á§aBRUNÃ|4µñ¨¢éh¾ê
++•Y´­ê˜{hª‚ÏÛ„”ÏXËnÁÍœ´E'ÏÊäÑù¤¶Pá­`Z:†Ğs”¡” äf.V>:[ù‘ë3j"/aY9Y¸ /ÉCSäŒ+ï—³0%[È;.WÒx=×	ÔğÔŒJÎL^ˆ]°‚ÿ¢’±PV³_²†Ğ]]8æ<>é®¤¨{9´‰r*Õæá©	L2MÄ0IT±z\úG*U2%_Ìáé¬¥ÙÓ(¸hääÊ#Š3mù¾´,“«8…"Iå!ĞDú&.µğË|)Qtªî™)¦€‹’æµix†.Új]ıREj
+°yÓp#ME3é2sŒq˜/ù¦¶íh©©––òYÖ©À	–#QQ"+õµ–”†m9ÈIÜÏÔÔHÅ¢â4¹ü™LUíÅ…°/K±ÈP·ÄT,§æR`ÈI|\ÏE*á«©øñwn/ê÷şv¦ùRí¼©´[:&W¼ªÚÖdK‡ßvÃ0³¡Ú²è…sMkIz¹.»\Àñ3Z^§ºÍæè)·y#’Ğ9,Kp”ë±¹ÛÒˆ†“Qb“Æ;z6¾í•û|•ØŠÚk5½uJ…õo“‹Ğò:.e™şóâ'áF¥º7­õWPè"dÃ í¹}W­ÁÚè¯ò©TÔeÊ²Ñ´š¬(÷ÎgEßû°ÖÙ›2á+iëdToCe{'™Rû"´"«X	.òYí`aR$ ~F[÷@¸ÕI¸GõI³²96ÓÅ¾‚Œ›ÙGW1~úâywø2<pfn2'ä~¹YĞº£
+Yà–2]¿º#—WÊ”m²WÎYá4ÖÑRì7·xÈ2HÚj®£|ŒıU:ZÂt®ÄdDJ#2JBù¨‹‚5=›[}VScw5ˆ&>t0BUãTa“ò|ş© VÁñTm”Z´*›Ær•Æ~°Gç¼f×àEr6Š;˜œ•!ë|(ÊÇT(‹õg6`n(ƒ”Â¨ß¯¼üÌ4ºp)hÑª0©j©C%R¯®È.Û7ÊÓº3<PÚ|ß¤ºFo°ÖI'5-©‰¸Z?L7÷L_Xñiİ‚Œ·ø"nÍÂÆ›3ã/°¸üÿÉøşä÷XIïáäwXv´TuF?±iıW¾Ç2ßÈ­~¦ E«úZ—9hGØQèl¡ÑLÇ²ÖQ^˜]Aa-Åµ«ı˜ÊuYÓ¢s-¢@b],åA÷e®ÒHZlYôWO_5şÛYM(ˆUí%Íä­Áoö¼Iñm~ %œÊyœpa~¶ÓóÛ·D`£ÈVs !(Î.MzÆT°ßĞThÑn¢“¼ø§jçÉl?ö´ŸûÉue·ó${³‹Vãˆ`r$Èízõº|U{¶'ğ¤'õ3È‚tscbÊÉ“©ÔÅš,‡Ú§Ñ²}s4(„dzáe'¸%HÊ~ŸyÎ¼UgÕ¥÷t±ZÊŸ Æ›ÇûóÁv‚…Àôá(ö]ç—Œy—
+>gq)ƒñ7ZÛ­m\ÉvĞİqê+çæÎ[\~m®Õ\š½ù2‡ŒøÊÃ¥Ã Ú5Wƒ·Ço)«ä¥ø^Æû2rÔ_B3Ûò»]Øš:7‹À±é‚şJE:[æ…Ì Õº3«d¾GŠÖ·=OE§ˆÛQàĞKÊÚœvS4©AJEHİü)§Q´-È*—¢¢&¤Œ{Èfåv8~!z™ò´zÔ4šT^F+GÆĞ_sUkÅbD€ÁqtÌHçÊ…7€#áÙÅÙ_âËÁÒ¹ÚUá9•t±ÔR©g…ÉN¯–MOÁ+)g§¨IQAAÓ«hÇâ:Ù´ãì9Î›@P^r­‡0wU3(iKæœ m«"vDe¥fB@i*«LÌn/ÎÎñ×cs\4İ©owêŞnyTºZ–®Ú‹%ğKÃ^Å‹ÅQéN]öï~°k¬_iOî†]Ì˜ÔßW±`TÎ­ë»6	HZ ß&œc6ã™’„*å›MA¡$`üdú7‰¸ ç¨Ï2Byz¡ ”Î³Û¤?î\\s¦+h+Çv›t~DÅ¬)r£uÓ®­1áÄÛ8P»<ôVsÍ!|9):ùÓMÒ±\úç²‘ÂzÑÉD,Ï‘Lšë%¼Š4
+wıEkeg¥³lìfCCÂóÓë”G]?d^hí¼~nÁn` Yƒ®[÷:¿v÷õ×–Vì†üP2è;x57äòÒîY×Ü1‡¶,²¤=¡ÜG£GE¾|´Í¸¶züŠc5*¥A¶	X KË!O¡ÚUÕÊ™H^öÏ–qÈ7*‡Ûƒfâ5QPît8»)EÂ-´*s |a+ÅäXUŠ$ì ÈÔ^¦:ª5F6HŒÚºÙ¥ß.ñcÆÁFh„e†l^q:èä¾¸ÒJJÆ$[×‡ˆszÖ$o^@Æ«¶oáï~Ïëtİˆ;õêÉ>sêò€f»á‡±ùÿ¥sØÄ,é´yòÛÉ¯E¿LÑDó¼£Ñ¡uÚ’A]Š™ÉˆÖOÙIX7=n¡…yæ~õû/ØøjÑöhr—|tíş¤AÓ‰ß³ÛóŒÑ¾é·¿aã¯rà{<şN¼~{3Ãò<NPûÆş¯LÄ<ÍŸ‰÷Á/¿àÏk‹ˆ®s~hî`ÃC…ñÌÊ—è%ÎG5ˆîÀq¯ú£Ğ½ì’áns¸ûÔ4zƒØÌ=ªê{È¹ß‹ÏJ¯
+âœÁ¡YñÓòo~·aHØ_>°¹” }Ò¶ò—ú‰ï'Êr÷(Ú@”Ìú"Káµ °ñ)vÒ\ŞâÏC0–’1®‚Föl™	ÌTø“røè<3•Ò¶Ln
+0>´7)TPgê7)ç§S"+<³ìL:Çuî3ÖˆŞ,>AÕ¢áÛÆ)lóÊ™9šX¦
+şóñq4^?™Ğ/€P<Ş~)8È½pöyz4Âö%Šéå}îbğ>D›Ô ‚yäny€¡¶uãüreñÔ}p§şµÍîÎØ‚Ôû7R¿‰"ç[æ*ß1i¹èÒ§_x¹iÃ2ÃS»4®ò¡]¦ºëİ´ÓêDË±é#—Œœ‡R­„¢+öf£O-,+µÚø÷ÔıkR¥¾#R°ÙGrb§Î,¬h†şÏ¢sö·ÔNşüohl9ú9Íè_PïrŒ 'ş6&­[½¸¨úÿ†i?™|Lƒ^un×l”-ÌSŒNVß¢!-T®i õÜá©'ï:¦”ñ}mclB‚HßğBT"<‚9¥”†İ¾w*QTqµ(†‡½f¤Nµ¶Uv¦Ì$Z:}‡Cãùi9ÕØ~90E}mÎ
+½.SFZ»¸°8¼mQ—ÎG‘PÜC^ıîõ½Á…ÚÂ¢á&çö…Ú’á&Q¤À˜MNQŒDØìÊ‰îcî7:Aè^–Ì±C§b&£ğì±¼7jÚ‡#Ÿ”‡è˜ÓFtLóê‰ŞeH]šÄÀÓ–Û£ ôƒÆĞ÷´íŠY©~ş3%/Yàø1¬mbË÷)‰–
+m½R'£Nx Â³:qT¹"–ùrêK:úÄä^emb±ušÚÄ¢NWI´	1íX—øÑ	ş[y4?1É_Ÿm$/¥è¿xr¢¿…Ä_ &¯Dşâç•Èÿcù‹Ìó¥•ù‹äï¸B¿†ì½’ú_”Ô/²Ë…+a‹E¿%ùO)ù‹@Æ«øpz‡]±Ê—Sú)¼	:)úŸÇÏÆß ó9—Ğ/ù}€hdkğ×i_‚VqŸ±ş(lóo8=$n—C½Ğ9+¾š|4~6ùŞñõ#®!ªù£ğÇ¨e¼—;M'¦dˆCº
+Zô’©/È»']¯Tâç•ª‘È`­¢i6˜eÃMBÑ(°é—VÏ(ÀãªJÂ÷JÉÈ#ø²†O[3Í”ªpiíÒ/ÖÙ¥·××ŞauĞA¼æeHÚ‡0Y¬Ä®²-gxslmĞ	|¯3Ç6Ş[›cï¹;êS×ÓÀ¬,^o¥ &?,¾àªÉD’>`x¡\,#×qãDŠæÛ*jeˆÚ°F‰:¬‡—œöÑC¢ïVjUÄëcÁjü1ì¯ŠKüB\%#ÂšL¦%ä$Vú›ÿ?˜1ùÇÉ],^ødüpò6~Âÿ× çŞÇ”Ñ?ŸÃk”6}’\¿Ç&ƒğş}2~Ìğüçñø{ô>\}†™)lò)<ñå›lüÿÁ+>Âd¸šc“ßÀ¯_Ã¯Ï0r‰¿<Å¬¢ø/ãbğæÇ(ÏÃÕßÁõO&Ÿƒş»¦i}«læn'óú@‰Cê}‹æ÷¼0
+ÙOa°Hº²]¯ç†Mv9pv#¸Àİ¯Î ƒRvÈ<8ü×®o±—ñÖ™¦¦@–¡ÚÈó¨ö,³Ós	„Í65±ï2£ÌƒøLƒ$9.#ïÅ]QÓ^äm¨mOòÚöiåÅ\5é½Éá¥Ú¯ê£kUïPöƒ¨*+©“+©°!©Z+Š:ŸdÕZ}²œš	œJO^ËÜLjc
+[í-~µfÊM³äZÒŒÚ¶¡J‹  j…¥."=Æ®3U—º nIƒ\Ö@Õ•×¯àl¯B·ÔÉ¤ L×’[,“i[èæ8ÅÍdÕo¤Øe‹FÌŞ¹ˆ=Alô¹ÊkËô×9™õYtÁQ¬ñêe«šJ‹™ÔÖv€bìîzmÌşí{:‚DÛœ«’2’í·r¯ÄêZ^éš)'±bÁ–´!ŒoJ•í+Wp)/À¾dı2/YŸV¦—&Ç­œn–#ù
+®_£‰]óÍšvt‹3r‚Éo¹Z†6=1±¥ˆ8OÚ‚ƒ'™eÇ¦=œnNº­x½óÛn/\‹¢À Ÿìy•U$Ç·ÅRCíÀû«”ÉK¶ò#ÖlR>ñâÑ^fV«ì^o.³;:ë~
+ÿ q®T›!­ˆWê³5ÌÍ·ôvSŠÚ±‘,-Ÿq†î²j9g¢Ì²åf&Í«5ê³ÉØñÏly½/óyyÔ——ä ô`*ëı·»Ÿ’ìµç|Dr¯ş“?ÅÕ¼ Ãa6rÊ~8¦&Ë{¦{Î«Q{OÜö)Êª.´Šå‚sHe¬Òo§¥G˜Í=Ïíu.í¹í[ÂŠºØ2$ôÓ¼ºlo^¥ ÄM·=
+¼èHáŞò±Í¤yóy¨°„ëí£^øî µ:µÔ³,Yymí™YF%Ïh	—z~èvL&àcÚøcï°è9aUãÀÁ”rfàí²z
+ÀYïò¦ì{m·‰×ë'Q×zÀxCoÀ.0çÀñà{à÷‡ÑeÏéùİ:ìœ
+óÍÌÌ1<o»ŞÀí`k4 Üon‰!–¯™µˆ† \;´¹‰¡3"¸ÑÛÌÁŒ÷cü%¯œcqÿÖv¢öİ>’cøÁP|³y•éıº_O¶ÉBÆ¹Y W¥ê©‚µTğõ@‰[Õ’;äÄ•¸Æø;qºˆ§…GÒkñCÉ•S¨eQ¦ø=&}IõåU,[œñáˆÃ®ôSZ .¼ƒÁ!tbffg-N´ü˜r'B¯gqêªœĞôÈ…Î¾»9jc£á£Ëÿøg¥{sŠõ˜JŠöøâ´uWôè(ß@rĞIè”šqT7’¸GƒĞDÛªvö!Š=)kâO£+eKïI>ñ+(`^o,ß÷g>‚›ïTRÔÙ·Î®"éD¼’v¯B®]ü9Í×¦<´zª†3e»Lg±/3³ÍÀ‚ôëÖgh ıÀ¬H~äd¯“}îú))&Á¡BDg‡Oç-×ÙHEÁw³l
+©†zó¶Ñ´ 	`Ñ£…[Ç ¢§«ì‡cªÿÔ‰ø¹x±Õ'ıùèM§è+ç6¥¿vÍÕĞe‹N
+¨0^ÁWYÓy2X-ñbeó‹Œ7-¦µÒ…<á4¢<…šˆ%<U5Sä°ˆN‰¡‡kÂÚ¸Úü¤±£‚(ÛEæcHó¡£fB—ØiùL­¢F98“Õ¯­È¹.Ú”ƒkNìvà Ÿ°›ÈK-?rn‚2îFŒİ–Ë?Iîp˜sI8k&	 æ¢¨Œ ½ÆëlÄ=ÉAÚõGQÏˆÀØ]¿=
+W1j·±ı#6 šp™x÷7¸PãPbkW€Jÿ¨>ÎÖØuLbh{½`gC&Z)Ş0¯#Â·±ÁíbÌ,I”<M†ÿ8¸ƒvp8Œà;üNèËB¿Zï¯ÎØfˆ{0ØÓÌñC'ÊqÁ§Æs6¼ÛÎshÁjN—ˆóiLGÅŸıÎNÒ’‚É¨ `F,Ú’?'Z‡”néÔ(İ1ÉÕàÀ½;Ø‡{/úÄÄ<ÖÈêôŸºw‹=“—_ü«(>úøB4KgÊå•jDdñv>›s
+İô ±°‚Nâ•“ßÑ¿İpF‘_ÑWœó„â8”«O¿eŞY»¸iØwC$$Ù^¤tÈÂûPä7©An#ğ…5Î[sB>ã­æ¢Û¿)’4éè
+fËÍ•æ9Vû›‘3ˆFıš…Ø©úÕ‚«¤[§e+ÉL1­7Â¡¦1šv8œt÷ü.û){wØÁt–ÊaúX-#o¢-Ñ¶»[¥<´+è¥êòF¢k.ŸjÌ³İ»qñš{@jíÒj¡BÈ•Á.Ecc<ÒFªe…sìòáÀé{m`ı}˜û{î{ÇM€üSÌëó6Û7ŒB¶á÷¼ö¡ Ùô~%W×&Á´¯=PÁZ1waJp•ˆB›ª¡4xI¬‚XU24À>ZÛØØ¾ô‹µko­¿}ı-2û×qæ Ğ÷ö¬¹ígâ øà'Gğ`sŸ¥;ŸÑw>(ØÇË^¨‰×°‹¬…¤¿f(Ñr–âåõÜÙ.ÒÇ$²²3¦.—ñh¢í _¬$^ò·ªÈòàì³iC³b}Æq‡ÏÁ×ªµ¥2à±¨ü£<ÁÇGÔ·Ü(Æã=£„pÒ1¯áBêß;^ØF¡h!1C„ƒQWÆ”D$Ø$"ğ
+@L‘Íˆ:˜C	hõä.°:ÿæ`>
+bÅ=Ÿ6Œ?^ÏønmM>ôüH¯G˜vDó†“!h¹²Hî c¬`ã]«V»dàì{]8B³İó†;¾tš ¸[€uPIæHŒµF¸V³a8R¤ğ>‘&³Şsñë‡W:è«ƒ³ßnÀİÆh´øÂ}–^>?ğº0x¤én€³7*G¹»áéÚ¥ëWÖ/Ÿ©ŸÄ2k^ß¡¼ÎÁ^
+ç3Ç[-c)-Vë•-¯s¡V†­Vó‘“:ehwÆm˜Pæ’ßPï¬Éb¹z(g[iæ	¹—+¦^„şŒ_xÄ>
+ÿd°©Ë€{k™ÉyÂÑË¼Øš… hŒA=AºvqüV¸¢dtj›ÁÆÿçäîøÛñãÉ'¬~mã*Û€Ç0w|v
+÷	Ï%énÙ,İCÍf¬ğ…w°¶óu6v/ß‡ï¯7[ÍüíÇÿ>şkY±É=Jê8ùhòéøáø»ÉÇ“»s~zÈ«\`²?½š|$èãıwyI øõwŒjbáÏ°MåQ?ìï{OŞ?h[+&Óş9ìç‡®3†óre‰%´š‹ÍÅx	_a…|åäW¸
+øŸ¨poò{zéÇ“ÏáïûÉÇß`Y¼f<~ÄDá'“_ãÊÅäIceuxü#ZĞ#‚>óåÿ@½6yÕƒÇğ÷}øş fp!5[a‰}Ÿ’ªÄÖ,5Ò­áEÆ`7`÷p^XEà·ÿÄ+Tá€™/èKéN2˜ìS\,ïú½€oúîûUæë·ÜN<ßs€J¯Åóı7Q á	b‰8I8Á¯a`Î¾â|ı@UÙ>ÆI²«"[‘íÜ“ãU!`¶ŒêR|Lè÷Ãà
+Síøıá( ñCÌv©¹Ü\XŠgû/ ¸o9\Ç š*`P{NDd|— {s³AûÿŸ"nÿGX¥ùDàş=Â}¬—iößÂ½„!±¾7jCiäÎls)ƒ8õ¯á=á+ïŠ* ÙÉg?={Fçõ×âØœ‡tŸQåºù¿q?Æw¯T˜éÎhw×ÄW –²gà§ğ§€0ÍO©æÇıŸ ’Ÿ Òü4;İÌ	Cø1Db*Gôæ‘(ç/?£UıZìİ½
+ØİE.‘P•séş&ù9?üÉobÌL‰!T„ ÷€
+¡ q<¥­ˆ±O ÇjÄ÷Ïp!yrùëL!ÜXÎß]Ù¨°÷¶·˜ÒI¶a¹¹t®¹/ãK£ù—Ò
+ğ/,¥rñù{Ş4˜ª«pø¯¿åM¤°mÏò[„çWl!cx„§Bñ°FÌwDöáTX‡×Ùi€®´ïôtÊx~XsÛğñä3‚>Z\Îšæ#$7Ä¶şìB	Ê0Í+¨HºËo±ê~¥I{~ß†{	½Ö\çü+Álòs/@pÎÉÍ#ÎI‰Š?M&Z§Á@@™e—¯_MÀLV³¹/±âÎcxâ3B.$ÿòÏïFÒEÈ‹(I›s¸ËYÁwŒ¾#ıÅê•w+,øCRœALşÏÂ‰_HÖûŸ$GB"!À=Èl¿N ­ób.†×Ö„ùÂÅ'|ú)ŠÂš·ºVÊyj«‚'šƒ;yïÀb¡$«² ë¹œ}Ä{*ºº‚óå-fQ)(äš»réáìÀŠ\Ø™dw;P…ßØJƒŞªÚESK³”vã”¬°píâ~“Şº‡Õ7·ÖŞx{}Öşõ6Ö+~£m-¯Tq–C¤sGkG®0½yÈÊ¥§üÙ2<È‹œ×æ:oÖ3†ÊhTÿŠ\›eT‡¸¦×#ªùûèUĞÅÛå}LÜ%& $Û> Ö7ßG‘ /Hrá•H=q1 m\f^€Ào*®Õd5ÆeµI—®r@ZX·Ê9Ş›{şÁZgŸJ"'™ŞgBÉU:˜ÍßL8®S]1˜ÆriÏİüv~—ÚxÓÃ›¡zô=5µ9&[¹?ÂGÎ¡ÙÛ2ÕÕT
+p?Àù-7è{RKæ ta¢%†’6ÄŠô‰Tjgj«Qİ°6ğú Ÿ¬ˆoÒät¨ ¬MéàÚiÙ–"aü¿çô.±==¾«¬5Ç|¬nÂwS …Ã—‘}~­"3™ALƒ€(M=ùYÏ×5¦2œæ²ì©igÏët\­ÒdÁ—´ÔßAG[î‡k]wÙE£Ó¬B–â %œˆE	j³ÏÆ˜mš	Srí‚”È²½&Æ/Ô¶J{ÑÅ\Ã¼·ã«<´1ìHx¤ÉíË‘˜+q¶/"
+Ÿd¤s!ÖyÔÊOPâ-çÉ‰oÄ˜`c²Ï§ÄL“d£Î±±"µšà§ˆŒ8êqQÚ°¨n b3ÖªüÆNÀv¿Ÿ©g×àøô9}Ì¯ëR-`jÑ0¥'ÔÕÃ¥(-èÀÙ*íœë"¡N%JÌaCTºÎÎE©ÅêY˜Â|²ª¦5İv;©Xš>²cÅú)b…W!(3½ËnØÖÕ‹ÚWŒ‹ôéµ^¸‘¼•2&Œiµù<î%Fõyåu¤åŠYüÇ4t0›Òm<G6A3ç©4Í%/h÷ÜØC¹bÌ’²ÖC‹æa!Sõ=Eg«•à›-İ§_¢Uo–Bf±&Øÿê‘ÅéÎgmNJv[é¡.Ö™´ÜèL¥æ…ÖhnöJÏø×Å]…ÚÑešËªÆ³‚…g¾B'‹^TU±¸=rŠ¶¹|AlÔc¥]Êoe,Ê	FÄøÃ«~ÇéÕáO×=$G®ED®%M½a´›°	‚Gãi9¼â$7Y“_ø[¾8x¢|ç¹»î®ğêşŒòh7OmÑÛ¼¾"é‰äw?¿ônÃ rQ9w›D"‹Ô–‰£áhçm¿Ûì‡]”eÏğcNÈ[–m5ˆŒÍ!Uóçü¤¬BeL©In—Ü›lÎZØ<”Xvü#9[<¡È5
+uğß^w•®¸
+ğëçğ+æ\Óñp|Ëœö!Js­›ùÃPÜXIµÃÒÖ×²RSFæ%-OSU£¬^ ©$6U|®«„¢¶M¦4±ªÂ™ÌVÍCòÚT™eU–ƒË#'Ï$F»Â#²Ñ£Ò”…`ÄÜ²j³L…2Å›K¡òKIí§Lw\Í@´k %]€S•i…D¸qĞ|æäÉ…xuÙôz²~ÄàÙUª´†0Xeœå\áôZ¿ÇÑWİ?Lİ†åüûz¯ŠÎJ¡JáOèŸšxa÷Ÿ7akQûÆ~>èKàƒ±7|Ì´öÑºóhñÒº‚äÏ/Q¡õÁ> ›_¸æ€1ö¼Ÿ½ÊİoÀ7ÛxlÄåü…ì™ÏĞÎ`Ô„³LŞ*PMÍ,©"˜7@Ğk×Ïnöf†®Ø‘Ñ$“+goŠ>:a?{ ˜aÈ)as$çN T„Õ Ñï¨Ò]–Z2‚ºX°"`‡S DÙA\NÈĞ$- Ú‘²:©º*iVO®`d9A…úºpr`(3¬HˆÀ¦äØKå¬Ø¤0@>¶¬i¾OMº¨B	!Nòã¼åE=7–&¿ÈÉŒ)æ"ë‹¬)ËŸJ-72)»O¥„óéùqûŸPŠÇÃíĞéú†`ìË#’ô5…L	'*E[ŒŸNîÆ†|E$)’ç>£HÄ§ÔÂé5÷Pl’RÃ±ŠæOu¾Ìú®ÓUFtªÍ©¯…ràlïĞ@Û/ì{aHÑŒ3¨6ÍÌş‡´€&àu~àÆe)É@ú¥¡(R›}‰#ë»ibÀH£Ğ¿6°©Z!&^È£_YŒ_’ş#˜EFËˆšqFlˆ¥J±À ëJ™P¤Jïiš6ò4†h¤ÒD“­Z !›%ÛÈ4¦Ì’²Ã…¢±dYa,É!aAã–ĞH	*ªõèWd$-ã£lÎ–RnÅ[Ì -3»¬]ØLkŒ[^ ;_Q`"!ÿfü°ÂfK…y+…¥l"=ğgîø_&p•±¬Mq»Dq¿d’+ÉåEjHB°7 k$Ê¾ù—K©~…Èoi#±±”ï©`±ä'QcVI
+ÔÅ0$':ŠhŸÔóbÉk\BsŒ,|k¾~–´™E{Ë’x´’Éæu’ÒqW}PY©âÄ]¢Ôğ•¬îò!ª…0–Ä¹{¶’!jª6-ÇéÑ`İÁ¬Ñİ>¡®Eª`SÛsÕ&`‰sy'õğÊz3(lâÿN‘ñU†2Y¾¥XrŒ¯ùœ­i\Ò6~^µYe ÿ2“Äô1üı™HÃá·aXüøB3Që&ÇTYª“5üä›éœ+µŸÉ4è.UØÖ8`„2nÄÙéxı1uH¯ò¨¤%ééBn~ÙÜvÄxÇWö7az»l'ğBd”Ô3‚y!sö¯ç`oYkî£»²™ÛÙà¨m4;Ëüt3Ú¨bÄŠzªŞ²"‚LçT>M¨Š—ZbNK»§:Ğt:ÏbÁÁXT¤d
+¶M×.úÕF£¥åycpÏ#©ûQ­,a8™$ u‘ë›lm:»NàIOAÙ8º”Ë†9Ûš-oóÔøw³9lxµ¢H»Â)¥Ud“\üŸ_ı__3€8œ÷ì²Õ‰!jö+q®$ôë”$ììŠ¢F± vy¡‰½ËïÇ‰˜Ú:ùÓ¢şHÉ¡O&wE²$¦¢>åX€]ÍgX=ÉÎ$óÛ£L‚)Ü¿L~‹‰ßğ®YF¹a)‚Z©?K½'ŞT³Çªë[ë[„õQ2˜0ûY¬0i	ÏÓíøÔÏõxÌSôÄ”ÜÇ(G­Ùÿ¯ãßÓ) ìÎÿştF5mU°¢ùÚ t¯{~iÈ”œàÿ¨Pı¿Ü+/z­wºî©â»x§ÎO% ~[Ê·,`:¡øç€·Ÿ1?ıÿã¿QğÊ±‡gO3ÓÏ¢ô$Eë9%"~øj&Ü3ñœ¨ÌÓ0ye‚oĞÒ.r9É:Ÿ şT˜~ÙoEşğÇà_<eãæ%f&¿åX=‡éğŸ7gßÕäş ÊˆgQ^†ïp»ÉÅRR«ÒŒßÿñ¿ÿe¹ı@ğ ÎhOœQâóGX"“ò6ùùvî—s—«¸fb¹B¼=ÍGu–ÅHÂ“•$³ñªUl˜Û«`¿ÄYÂö¦ß§}V½äb—*Ü  zKåUÇ±år³k¼ª7Ùc~~àä¢¢4Ñ?µ^wU˜q¸¹‘7'>õ–Ì`$Kq,TL?›?ÇT–òÃÆ×Z7cyıFk»±<¼½½Ø‚‚îSoÍÑÿšggo%øÎ( EbJ!Ä¨.‰€íÊ…?ĞßíR¡¯ëCw0K%â2M,ç„½-t€†»óyò2•Ë<ÒJî_ÈÇåğ;ŒÑ—×÷xüÚõr—‡N]¸oˆ_gÜÁ~=tvİ†¸Nƒ›8ù£s 6;“<É£h‰åÀí³¿b¦1fg2cdtÃ¢Ê2TË§~M„ë!~n9;õÄSŒ†-dæ#Œ)¶'rR‹ıwüÛE\Ÿº®"5½OP’À³İÚ^”lmG{nß­srÑÄ»›p7àæÀÅUg§ÑíùÅj‚JnŒ,‰?&‹=9¨b÷’´?ÂoŸê›n"–ñ%ãì(è¬FóôÚğM´ÜkX—YŸRSS_k|HÚÑZF§E%lNí¹/—â)üi#Ó¡û£RºËvØ¤q%\%±ûšBŠl|£ùzóG;ı#¯×ÈK4îzA½í ÆlºœwQë,¹‰9íõÙ&ÜaÉpØó 0ÿq03{£u3éë6ã/şòƒ›ó]lm;ÛŒ¯Ï„£· ¨ÀIÙ‚¢ä"Ø¤YÖ“©Hî,Ëh™c‰¢Ü,¶ç…{å–:¿ÔAcC_–“C³’—âræn¹‘ãğ–è D˜å¼,ƒR…ØdÄMy6kIh~ÛÜD±#§	!¥‡%IÛ†B±KÇ|‹»ƒá
+á¦×qwœ E!ì(•ù³p¿2@óDémnÒôõJßéºWàô¾ÄT¶‹!ÆÁá‰òl	Fn¦9ÊğNwàNOŠ9ªg6ï|>ˆ˜Í8á¹
+ñtş¤±2©êñò"eºïVXy~4Üİ<Ozë`™`!aïÖ|#°\#SloïEıŞ*û y¦ù>ÖSÅjÁ9>ğ:ÑŞ*Ûw‚z£‘¹©à›cK‡ÎÎx}ôJ;ƒ\åX›æYŞ&{<ùX»rŒ;òµ…û]óúh‹Cïÿ  ÿÿì]ënÛÈşŸ§`’7–¬‹åÄLìl6› Áv“ I-²AJ[”ÍFUŠŠ%8şQôoQ(Š.zAoĞWq^¡OÒsæBÎg†¤oi+`W†så93gfÎ÷VA§?¬İÇªù³6f=ZÍƒ£ÕA›¯YÎlİ˜´˜˜Ó"KÚaÏ’Ö·¤,i›–´¡%mË˜–%\½`Zøµ
+JTPªÑJ{©œ¸-ÎÚòˆá”ÈJ®}Œñå—‹(ñÍ} K]«Úu íM¢™”™‡¡A ·gK“H‰ì²ÑµK0w&ÁK}s?‚ğà«YKó´Ï®Û>ò÷Ş‰ÂMhõÖlIK…âÚljÖ
+Eºf“»|µœy±oùJ5.Â=c×ƒÍŞp¨¨Äóy£`1wä®8_å.[:ÍMØ¼5nmÛç«YÁB–—\S»[8ÅzÑÁ§[Y€©zÀª˜x³9¬ò¯;Ei ËàFµÈr!m¶„…t~èv.Û×ìİNo¸V©å‡ëÅßFDWx•óh˜jìkÖ ˜ã¸48=0µLêˆp>Ûšàd‹Øf.7zeó40qùàƒé8™€íäÇïı¹ãÍ±Ø \„ò¹Ï6Ô¶EÜ tyQm¨Éo+\Ã°toiãÂl„#Ñ±[]íå2£Ì›Ğ2<áWÓD×ûıÑÀ÷ó£‘¼J?³ÀÃY²rø ú“AZºêú˜Áu÷üqû”ŒèOhCSzd¶ôşòÛN§Ó ºÈ†qgà>b¯ƒ¸9,"·ÂÎ^¯t=VSq`]&ÚĞãb2Ôõ0e8Ó*Úø?kéC—tíÂuğ"¢ØX4}]Á»YMÚ\ÆÕE=KÑ†\0~¹N?ÕÒëİ­½­Ñ¦Aí$EX4ƒYï:íÜ€Ä;÷^º·K×úlâ8ÚŞ1âs‹R.Öæ˜«Ÿ -kw¯¼”sÉæğ†¹9¬|ª=,¨PÍ%´GåßR¤Î<Ùœ]lŸùE:½&O|/K×õÆù6TÑc]ƒ±0¯ÎÕŸGï\¹|ª&›1ªQiqº¦JÓ²¶Ãy;uŒ:™××Ì¯®æç'Ê./}óÚGxóû„Q**¸“Ç"çRÃ£
+—bìwñ7–û…?>ÉÒ”­» ¥ÌÒ¼ı}–ì4<×ÚøLI	“$@ºô—Œf‘û¢bk2CGÈ´2­S÷÷÷aHáTûÆ†¾:¢Fä§}r«@iª‚i2TÉvŞÓ¸IŞ°*x‘#RoSµe@jATF‰¤—ğ	]d*Q'Òæõv÷ıá›Ò°6õ°#; Ô{„”*ğ}ˆß9oå¤*[`©$H:Áp/ƒÄpZó\[Qr“—0=Šó¶A¿È,¸­Bi¿ŞDN¾FÑM˜vÏ9ìQ¬PXJYH¢Ö‘Ï•Ÿ¶ù“ı(ôT½B%6¯'éa#«Ià£ºğ};OÕG¹çg­ éõo¥‘ÈØym!¥Lx™ñbBú¨èÂÂO¡ü§Ñı"]y®B˜K¦Ë¸Ş¢2Úç¿¾l‹9ÖÛNı8:òãĞÓ–¼q4ğRi”®óhœÌÀºôèv3J6âÓ¡À°
+Š¤›HjûImáæ0Ù™õD=‹Ï6!İ«hú•¿B@:²~ç¿âGëq2agë’É]]Ç,à WCJsñ93Ç¼]¾b›°\MvzÉ[¸N¥÷Š8wúú7÷Ò
+·ÁbZ’3ßªã–Yxøéè%ÒªPl~¥`ô«iu~’İÔ‘QÆ›$…ü‰yZÖ™wÁìQ?
+¾8¶q©AÂt6¯È§PÖ8Ø÷84ûy4[Ìª’jfÕÌ—¤¿ØRl° :Zw–58”t|0Ë[‰S©jµ&š¥Í<ŸHUJµgÜJğ…[©†´bÊGÌôãåÙ$}İL15_wß¢t¿¦.¢½­ÁzĞ]Ö»ÁÚ0<‡6R};»SŠG½Ìã•â°5óŸ½¤¨…ìgk¹ØA=	_43Ÿ´—š´êCÙ6?µAÎLŞÉEÕ¬B4U$ò&0Øúôóy˜Aı$¼ì®â¬½é­µ7To¿ğ'iĞİÄNÙñ`¡¯lV“œQTÅFRíÙö}Ón&î±@£åÁmdFD¶°¿>ş†vÛ7súV?Tğ9=Óu@W£Ø€0D÷¨@ÕÆ<"®R‚vlêFÖİ7“u³öoÈË
+ıtñŞ´è)G¡b)s‹R3éµ5²Ou@0÷ù&ğZMĞÏˆ¶OH–\ÚÚBGLl~³èiSü×´Œ˜Km€„åÇN§Ó™¢K×h*n/|çÄq©9ˆ6†‘f{¬wÏ£yÒ:6Çá"kzÁü‚ò-=ÿmr¿n®ô51~WR|Ì\“|ÂH6Á%ü¾µ_¢Áe…</k¶H7”srfÔ¸BœÅq;Ô¼O^)ÚŸîÒi³ÄÈ/lXÆmÎH4˜†‘şíô§‡ÿ~úçÓÃLü¯Ó~Gé³…Ê¹®—Xe#-w¼|”á†Ü[QXª*œr†!üãéïNÿƒø]í¡³Ğ¬?Õçyâ	¸]xÅ.Õ_ú?‰jp¶²|i6Ø%$ê0q‘ÇĞvã[9“ŞŞŞ¾#s¦EGk±i<'·‘¼NQ:™cF†b :E¢£4^Ä_­¶ByTÌ	+f“ø0|êğ=t‹hâ×³EÒ´qPÉã™9ì`>ó8š®UPÃhú5˜~îTH˜u¿ôÇŞb’sQ»Já˜Ê%•švGy­$føá‹…¹,®!ì†ºê/<·ÀÖÁè—˜eå/fõKÏ½ØsN¡‘J2èTJ¶“a«ÉßØ}*Û(¦ÅY9'Vé›Æ Ü&7­=",¥¡³¶X²c
+¿P8ûjÈµè˜Ğ£;Ü(„ñyÂ< a¸Ô¤Õ”şŒI±l¥d®áŒVËÔ!b],ø'ùš¹ˆ¦µ3¦yÀÂœ¹m«rá<®ŸwŞ–Ÿİ¯Eu`wÔiÜD}šQf5_Íã±¦iRÔô¹É;Â€M÷“Œ®¨UAT›œÇ°³r>|;ıà´Ûmü£	£Ø¼ËG^âµÇ,óNG¿!•÷R@'ÂÆî·Sh³oüëp½»°¤–_Xæ."ÖJ6©”sÖİ?]©˜-âÙÄ—D~©•«üÜ#~J-e1ŸKùÕf%ÿ 
+ÿyáO·PÙ¬vzÎ˜Ì_ú°Ùô`.qOr	Ò–ºK½¤ñj¤±Ï¤ñ1;¤ù~ˆâç!Ë/â‡+V=Ûh› I#ÓOçËö©UCå[-\§j‘:—+…JÓzu*±ìs3şÿRhµ0(‡IGJ¿
+º8­º8E»Š’~Ğâ‹ĞâÁrp-®C•Û2Ùêe—]ñ³lì>‹Qì.yÓ‘Ğ¯8XV¹¡ôlø9¾ÇŞªƒ~•­cgâO8ÖÈ9Yc·E­·ëğzÀû]²)ŒdËÅv¼óW;ÇòÑònº­ÚèQÖÓ<Êy9‚ùc”_È´íÎİ¾IeIvâ+‹Ì¥í›´/ö“E<µš½[<–U?l„d¥¶P“â€’¹—)ÇÅ¯Ò6Â(!ÔBôÇÍ:sbZqAâ>œ±2Œwœbçíh:YU(d
+I›xÓé™Æ˜&~"Ğr;¸Ò5!)"û©„°Ş4qÕh®u~ÓVÖ­æäl²•Ë^!¯ìf½Ú`q=Se8z-ìb İëŞ¯»N_7oÒl3çn(.7gj©=*eµ`Á¶Œj¯c¢9¶ö”„ÅT?¹¨Å#{yFÿºózM:øe£t.*y±÷œV:W¡µ×ÇfÊq«›Û5ò0˜Ùé>”ºÚfñ
+ÖÊêvukÔ Ú meş_{Yøè×œ,c“¢ÄhÅó>ah¨E#;Ïš¥Á–éÍÜÙd‘eÎ
+‹>Òg9ÛéŞ¬†–P/ ÂhåM‰S‰°Ó´cÚ3Çt?ÖF) äB¿KS„(ò¸«–¶Sı	5Ìˆc$+`ã”Ñâ'Èæ-Ì$İë]â%›Â¿›š›Eò¨ÛXIÓ2„¼K{—èJb^É‹èhnëĞ…‰Úÿgæú´º=™Q³0]„{`T"ˆz§ÊzËŒ™ƒ°k`¿I'0~‡ñÃ:4Ô#Áh§ÁFlÙx4z4.*^1(AÛ„îñ}Ô%ê G¢Ë1”')=ÙæaîOÆÚd±œg²w¾wÖËŞ™ù•¡>¯´ş;{€à÷â™Ï|Š~T•‘ô]t­é½Gm%›?³õaÂûO¦I«5‚qCO4Äô>œøøç«'£V“ĞC°)½¹ƒ·pìŸâñµ{t„>uÍA]4kq¶M¨W¿”©óÖe[+Ùjœe‹q5[Úz«¿•¨¹… ¶äaîóÉ"åVc¼œû£q^ô‰À1/Ws˜¾¼ItPÑ×MÍQY½Ÿ+V/Y]Rƒ­æsóÈ‹ß¹š»|`+€Ê ~6ÔG¬5}(‚šß|¦àäËƒ\Ï8"±Şê^DBÏLx[Âu
+v%`­€UÎ‹õ´€dĞ„³ÃìCÄ9$¡T²¥U¢„ÔŞc±åsf½âĞŸÏ½ŸFNwKz£Áª’¤Òûk#Š1ÃŒœÊğ…>B…^/ĞnÓ+eE½Âš1šƒÓÓªf¢ée¨Iåà_=¯’R9™ôtæo$Õ¤^ªe`aZarâ±ã†`%H±á¬:<ØxÅ7vZè°í¼Oq˜×£É{¿•b¹Ic‡Û:–#4\4•bíPÓ9K¾'0¯Îüú]±Ö}!M5â¦„·¨=be·Ó¦¤ÊÖœÂhWp»„YSşâOG<Ôi6’%ÄÌó#|°¬Åæ‰§ä†ºÆ•Àå¿F“ÈQ‰ü%5ûç édC„Ñ¶E˜I÷İdóL‡,êŒÖ˜¾Ú<ıÆóùø«¿F| †jÒ¶¹ĞG–áƒ jm_Úl*Î·oï‘lÙ1ïÛµ³ïÛ,‚E	#ä1—ãÃæ ®x#è­öYCè+\Ğ/a½d¿wÎ¹—_§tæıe»³’Ùñ’ ‚9säL“•$æª{NóÙWèMÒB%‰¦ã …–Àï†cùóãÎ½Ó‡Wzríš¿D?ija(Ê;×ş  ÿÿ VÇ
