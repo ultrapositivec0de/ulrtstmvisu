@@ -1,0 +1,124 @@
+382:  const tripleStars = starRuns.filter(r => r.len === 3);
+406:  const doubleStars = starRuns.filter(r => r.len === 2);
+421:  const singleStars = starRuns.filter(r => r.len === 1);
+488:  const tripleUnders = underRuns.filter(r => r.len === 3);
+512:  const doubleUnders = underRuns.filter(r => r.len === 2);
+527:  const singleUnders = underRuns.filter(r => r.len === 1);
+555:  const ranges = getAllFormatRangesInLine(line).filter(r => r.formatKey === key);
+563:  const ranges = getAllFormatRangesInLine(line);
+564:  const matching = ranges.filter(r => caretInLine >= r.contentStart && caretInLine <= r.contentEnd);
+884:  const t = useCallback((key: TranslationKey) => getTranslation(lang, key), [lang]);
+886:  const contentForPublish = useEditorStore(state => activeModal === 'publish' ? state.content : '');
+887:  const setContent = useEditorStore(state => state.setContent);
+888:  const stats = useEditorStore(state => state.stats);
+906:  const previewRef = useRef<HTMLDivElement>(null);
+908:  const isTauriEnv = () => typeof window !== 'undefined' && (!!(window as any).__TAURI_INTERNALS__ || !!(window as any).__TAURI__);
+909:  const isNeutralinoEnv = () => typeof window !== 'undefined' && ('Neutralino' in window || !!(window as any).Neutralino);
+911:  const toggleFullScreen = () => {
+947:  const toggleEditorFullScreen = () => {
+1066:  const saveLargeStorage = useCallback((key: string, val: string) => {
+1079:  const getMotionConfig = useCallback((custom?: { initial?: any; animate?: any; exit?: any }) => {
+1096:  const getSidebarMotionConfig = useCallback(() => {
+1119:  const fileInputRef = useRef<HTMLInputElement>(null);
+1120:  const scrollRef = useRef<HTMLDivElement>(null);
+1121:  const editorPaneRef = useRef<HTMLDivElement>(null);
+1122:  const lastWidth = useRef(window.innerWidth);
+1178:  const confirmDialog = useCallback((message: string, title?: string) => {
+1189:  const promptDialog = useCallback((message: string, defaultValue: string = "", title?: string, inputType?: "text" | "password") => {
+1205:  const isFirstRender = useRef(true);
+1343:  const visibleNotifications = useMemo(() => {
+1346:  const lastFetchedNotificationTime = useRef<string | null>(localStorage.getItem('steem_last_notif_time'));
+1348:  const markAllAsRead = () => {
+1363:  const currentUser = authType === 'VAULT' ? selectedVaultUser : username;
+1499:  const themeAssortment = useMemo(() => [
+1516:  const neonAssortment = useMemo(() => [
+1527:  const activeAssortment = useMemo(() => visualStyle === 'neon' ? neonAssortment : themeAssortment, [visualStyle, neonAssortment, themeAssortment]);
+1529:  const fontOptions = useMemo(() => [
+1612:  const extractMentions = (text: string) => {
+1629:  const sanitizeFilename = (name: string): string => {
+1652:  const notify = useCallback((msg: string, type: 'success' | 'error' | 'loading' = 'success') => {
+1751:  const handleInstallPwa = async () => {
+1793:  const editorRef = useRef<HTMLTextAreaElement>(null);
+1794:  const cursorPositionRef = useRef<{start: number, end: number} | null>(null);
+1795:  const isTransitioningModeRef = useRef<boolean>(false);
+1796:  const previewPaneRef = useRef<HTMLDivElement>(null);
+1802:  const wysiwygSyncTimeoutRef = useRef<number | null>(null);
+1803:  const wysiwygLocalBackupTimeoutRef = useRef<number | null>(null);
+1804:  const isInitialLoadRef = useRef(true);
+1806:  const toggleLivePreview = useCallback(() => {
+1861:  const wysiwygRef = useRef<HTMLDivElement>(null);
+1862:  const isSyncingRef = useRef<boolean>(false);
+1864:  const savedVisualRangeRef = useRef<Range | null>(null);
+1866:  const saveVisualSelection = useCallback(() => {
+1973:  const scrollCaretIntoView = useCallback((block: ScrollLogicalPosition = 'center') => {
+2025:  const restoreVisualSelection = useCallback((shouldExpandWord = false) => {
+2085:  const focusVisualEditorEnd = useCallback(() => {
+2104:  const isWysiwygContentEmpty = (el: HTMLElement | null): boolean => {
+2114:  const updateWysiwygEmptyStatus = useCallback((targetEl?: HTMLElement | null) => {
+2129:  const lastSyncContentRef = useRef<string>(useEditorStore.getState().content);
+2131:  const updateContentFromWysiwyg = useCallback((forceImmediate = false) => {
+2159:  const syncWysiwygToContentIfVisual = useCallback(() => {
+2172:  const insertHtmlAtCursor = useCallback((html: string) => {
+2318:  const getVisualSelectionHtml = useCallback(() => {
+2335:  const findDomPositionForMarkdownOffset = (container: HTMLElement, markdown: string, offset: number): { node: Node, offset: number } | null => {
+2615:  const syncCursorMarkdownToVisual = useCallback(async () => {
+3040:  const hasRestoredInitialCursorRef = useRef(false);
+3042:  const saveCursorPosition = useCallback(() => {
+3105:  const restoreMarkdownCursorAndScroll = useCallback((retryCount = 0, forceScrollToCaret = false) => {
+3218:  const syncCursorVisualToMarkdown = useCallback(() => {
+3369:  const handleSetEditorMode = useCallback((mode: 'visual' | 'markdown') => {
+3585:  const activeTableRef = useRef<HTMLTableElement | null>(null);
+3586:  const activeTableRowRef = useRef<HTMLTableRowElement | null>(null);
+3587:  const activeTableCellRef = useRef<HTMLTableCellElement | null>(null);
+3595:  const updateTableRect = useCallback(() => {
+3753:  const handleEditorScroll = useCallback(() => {
+3767:  const handleWorkerStats = useCallback((rawStats: { words: number; chars: number }, cleanStatsResult: { words: number; chars: number }) => {
+3782:  const getSelectionOrWord = useCallback(() => {
+3796:  const insertAtCursor = useCallback((text: string, selectionMode: 'end' | 'select' = 'end') => {
+3839:  const widgetRef = useRef<HTMLDivElement>(null);
+3840:  const lastKeyboardToggleTimeRef = useRef<number>(0);
+3846:  const handleWidgetAction = useCallback((actionFn: () => void) => {
+3862:  const showWidget = useCallback((x: number, y: number) => {
+3873:  const handleEditorKeyDown = useCallback((e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+4045:  const handleMarkdownFormat = useCallback((tag: string, closeTag: string = tag) => {
+4209:  const fmt = useCallback((prefix: string, suffix: string = prefix) => {
+4470:  const deleteActiveTableRow = useCallback(() => {
+4485:  const deleteActiveTableCol = useCallback(() => {
+4507:  const deleteActiveTable = useCallback(() => {
+4518:  const fmtLine = useCallback((prefix: string) => {
+4570:  const handleLink = useCallback(async () => {
+4610:  const handleIndent = useCallback(() => {
+4640:  const tryHeadingEnterBreakout = useCallback((shiftKey: boolean = false): boolean => {
+4827:  const handleWysiwygBeforeInput = useCallback((e: any) => {
+4835:  const handleWysiwygKeyDown = useCallback((e: React.KeyboardEvent<HTMLDivElement>) => {
+5387:  const importTable = useCallback(() => {
+5391:  const processTableImport = useCallback(() => {
+5508:  const parseImages = useCallback((input: string) => {
+5527:  const toggleImageSelection = (filteredIdx: number) => {
+5539:  const moveImageLocal = (filteredIdx: number, direction: -1 | 1) => {
+5604:  const toggleGalleryMode = (mode: 'local' | 'pexels' | 'unsplash' | 'pixabay') => {
+5610:  const handleExternalSearch = async (query: string, page: number = 1) => {
+5706:  const shortenName = (name: string, max: number = 30) => {
+5711:  const insertExternalImage = (photo: any, position: 'left' | 'right' | 'center' | 'plain') => {
+5757:  const insertImage = (url: string, name: string, position: 'left' | 'right' | 'center' | 'plain') => {
+5807:  const insertGrid = () => {
+5991:  const handleSplitPost = () => {
+6058:  const toggleTag = (tag: string) => {
+6067:  const handlePublish = async () => {
+6103:  const handleAddToQueue = () => {
+6108:  const saveDraft = (status: 'working' | 'ready' = 'working') => {
+6114:  const handleEditPost = (post: SteemPost) => {
+6122:  const handleDeleteComment = async (author: string, permlink: string) => {
+6154:  const handleUploadImageForReader = async (file: File): Promise<string> => {
+6219:  const handleReaderComment = async (parentAuthor: string, parentPermlink: string, body: string, editPermlink?: string) => {
+6265:  const handleMuteUser = async (targetUser: string, mute: boolean = true) => {
+6310:  const handleReaderVote = async (author: string, permlink: string, weight: number) => {
+6356:  const addMention = () => {
+6365:  const toggleTool = (key: string) => {
+6373:  const moveTool = (key: string, dir: 'up' | 'down') => {
+6386:  const handleClearCache = async () => {
+6506:  const handleExportBackup = async () => {
+6510:  const handleImportBackup = async (e: React.ChangeEvent<HTMLInputElement>) => {
+6516:  const downloadFile = async () => {
+6562:  const uploadExternalImage = async (url: string, fileName: string = 'image.jpg') => {
+6661:  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {

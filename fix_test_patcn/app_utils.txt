@@ -1,0 +1,231 @@
+};
+
+// Access libraries
+const getMarked = () => {
+  // In modern marked (v4+), we should use marked.use()
+  if (marked && (marked as any).use) {
+    (marked as any).use({
+      breaks: true,
+      gfm: true,
+      mangle: false,
+      headerIds: false
+    });
+  } else if (marked && (marked as any).setOptions) {
+    (marked as any).setOptions({
+      breaks: true,
+      gfm: true
+    });
+  }
+
+  return {
+    parse: async (text: string) => {
+      if (!marked || !marked.parse) return text;
+      try {
+        // Normalize line endings
+        let normalizedText = text.replace(/\r\n/g, '\n');
+
+        // Prevent non-table text from being merged into preceding tables
+        const strictTableLines = [];
+        const lines = normalizedText.split('\n');
+        let inTable = false;
+        
+        for (let i = 0; i < lines.length; i++) {
+          const line = lines[i];
+          const isSeparator = /^[\s|:-]+$/.test(line) && line.includes('-') && line.includes('|');
+          
+          if (isSeparator && i > 0 && lines[i-1].includes('|')) {
+            inTable = true;
+            strictTableLines.push(line);
+            continue;
+          }
+          
+          if (inTable) {
+            if (line.trim() === '') {
+              inTable = false;
+            } else if (!line.includes('|')) {
+              strictTableLines.push('');
+              inTable = false;
+            }
+          }
+          
+          strictTableLines.push(line);
+        }
+        normalizedText = strictTableLines.join('\n');
+
+        // Preserve consecutive blank lines (3 or more newlines) outside of code blocks
+        normalizedText = normalizedText.replace(/(```[\s\S]*?```|`[^`\n]*`)|(\n{3,})/g, (match, code, newlines) => {
+          if (code) return code;
+          const count = newlines.length - 2;
+          return '\n\n' + Array(count).fill('<br>').join('') + '\n\n';
+        });
+
+        // Prevent distinct list blocks separated by blank lines from merging into a single list; generate a real break/paragraph so cursor can be placed between them
+        let prevLists = '';
+        while (prevLists !== normalizedText) {
+          prevLists = normalizedText;
+          normalizedText = normalizedText.replace(/(```[\s\S]*?```|`[^`\n]*`)|(^|\n)([\t ]*(?:[-*+]|\d+\.)[^\n]+)(\n\s*\n)([\t ]*(?:[-*+]|\d+\.)[^\n]+)/g, (match, code, pre, item1, newlines, item2) => {
+            if (code) return code;
+            return `${pre || ''}${item1}\n\n<br>\n\n${item2}`;
+          });
+        }
+
+        // Prevent distinct tables separated by blank lines from sticking together; generate a real break/paragraph so cursor can be placed between them
+        let prevTables = '';
+        while (prevTables !== normalizedText) {
+          prevTables = normalizedText;
+          normalizedText = normalizedText.replace(/(```[\s\S]*?```|`[^`\n]*`)|(\|[^\n]+\|)(\n\s*\n)(\|[^\n]+\|)/g, (match, code, row1, newlines, row2) => {
+            if (code) return code;
+            return `${row1}\n\n<br>\n\n${row2}`;
+          });
+        }
+
+        let textWithImageMarkdown = convertBareImageUrlsToMarkdown(normalizedText);
+        
+        // Preprocess to convert markdown images inside pull-left/pull-right divs or center tags to <img> tags
+        textWithImageMarkdown = textWithImageMarkdown.replace(/(<div[^>]*class="[^"]*pull-(?:left|right)[^"]*"[^>]*>)([\s\S]*?)(<\/div>)/gi, (m, open, htmlContent, close) => {
+          const processedContent = htmlContent.replace(/!\[([^\]]*)\]\(([^)]+)\)/g, '<img src="$2" alt="$1">');
+          return open + processedContent + close;
+        });
+        textWithImageMarkdown = textWithImageMarkdown.replace(/(<div[^>]*class='[^']*pull-(?:left|right)[^']*'[^>]*>)([\s\S]*?)(<\/div>)/gi, (m, open, htmlContent, close) => {
+          const processedContent = htmlContent.replace(/!\[([^\]]*)\]\(([^)]+)\)/g, '<img src="$2" alt="$1">');
+          return open + processedContent + close;
+        });
+        textWithImageMarkdown = textWithImageMarkdown.replace(/(<center[^>]*>)([\s\S]*?)(<\/center>)/gi, (m, open, htmlContent, close) => {
+          const processedContent = htmlContent.replace(/!\[([^\]]*)\]\(([^)]+)\)/g, '<img src="$2" alt="$1">');
+          return open + processedContent + close;
+        });
+
+        // marked.parse can be sync or async
+        let html = await marked.parse(textWithImageMarkdown);
+        
+        // Map image titles representing alignment classes to actual class attributes
+        html = html.replace(/<img([^>]*)title="([^"]+)"([^>]*)/gi, (m, p1, title, p2) => {
+          if (['pull-left', 'pull-right', 'text-justify', 'text-right', 'text-center'].includes(title)) {
+            const hasClass = p1.includes('class="') || p2.includes('class="');
+            if (hasClass) {
+              return m;
+            } else {
+              return `<img${p1}class="${title}" title="${title}"${p2}`;
+            }
+          }
+          return m;
+        });
+
+        if (DOMPurify) {
+          return DOMPurify.sanitize(html, DOM_PURIFY_CONFIG as any) as unknown as string;
+        }
+        return html;
+      } catch (e) {
+        console.error('Markdown parse error:', e);
+        return text;
+      }
+    }
+  };
+};
+// --- Constants ---
+const STORAGE_KEY_DRAFTS = 'steem_drafts_v2';
+const STORAGE_KEY_TEMPLATES = 'steem_templates_v2';
+const STORAGE_KEY_USERS = 'steem_users_v2';
+const STORAGE_KEY_AUTOSAVE = 'steem_autosave_temp';
+const STORAGE_KEY_FLOAT_CONFIG = 'steem_float_config';
+const STORAGE_KEY_IMAGES = 'steem_uploaded_images_v2';
+
+const DEFAULT_FLOAT_TOOLS = ['B', 'I', 'sub', 'sup', 'Img', 'Gallery', 'Caption', 'Mentions', 'Table', 'Separator', 'Grid', 'HR'];
+
+// --- Components ---
+
+
+
+interface FormatRange {
+  formatKey: 'bold' | 'italic' | 'code' | 'strikethrough' | 'sub' | 'sup' | 'phishy';
+  openTag: string;
+  closeTag: string;
+  openIdx: number;
+  closeIdx: number;
+  contentStart: number;
+  contentEnd: number;
+}
+
+function getAllFormatRangesInLine(line: string): FormatRange[] {
+  const ranges: FormatRange[] = [];
+  if (!line) return ranges;
+
+  // 1. Paired HTML-like tags: <sub>, <sup>, <div class="phishy">, <span class="phishy">
+  const htmlPairs: Array<{ formatKey: 'sub' | 'sup' | 'phishy'; openTag: string; closeTag: string }> = [
+    { formatKey: 'sub', openTag: '<sub>', closeTag: '</sub>' },
+    { formatKey: 'sup', openTag: '<sup>', closeTag: '</sup>' },
+    { formatKey: 'phishy', openTag: '<div class="phishy">', closeTag: '</div>' },
+    { formatKey: 'phishy', openTag: '<span class="phishy">', closeTag: '</span>' },
+  ];
+
+  for (const { formatKey, openTag, closeTag } of htmlPairs) {
+    const oLen = openTag.length;
+    const cLen = closeTag.length;
+    let s = 0;
+    while (s < line.length) {
+      const oIdx = line.indexOf(openTag, s);
+      if (oIdx === -1) break;
+      if (oIdx > 0 && line[oIdx - 1] === '\\') {
+        s = oIdx + oLen;
+        continue;
+      }
+      const cIdx = line.indexOf(closeTag, oIdx + oLen);
+      if (cIdx === -1) break;
+      if (cIdx > 0 && line[cIdx - 1] === '\\') {
+        s = cIdx + cLen;
+        continue;
+      }
+      ranges.push({
+        formatKey,
+        openTag,
+        closeTag,
+        openIdx: oIdx,
+        closeIdx: cIdx,
+        contentStart: oIdx + oLen,
+        contentEnd: cIdx,
+      });
+      s = cIdx + cLen;
+    }
+  }
+
+  // 2. Inline code: `...`
+  const codeIdxs: number[] = [];
+  let cSearch = 0;
+  while (cSearch < line.length) {
+    const idx = line.indexOf('`', cSearch);
+    if (idx === -1) break;
+    if (idx === 0 || line[idx - 1] !== '\\') {
+      codeIdxs.push(idx);
+    }
+    cSearch = idx + 1;
+  }
+  for (let i = 0; i < codeIdxs.length; i += 2) {
+    if (i + 1 < codeIdxs.length) {
+      ranges.push({
+        formatKey: 'code',
+        openTag: '`',
+        closeTag: '`',
+        openIdx: codeIdxs[i],
+        closeIdx: codeIdxs[i + 1],
+        contentStart: codeIdxs[i] + 1,
+        contentEnd: codeIdxs[i + 1],
+      });
+    }
+  }
+
+  // 3. Strikethrough: ~~...~~
+  const strikeIdxs: number[] = [];
+  let sSearch = 0;
+  while (sSearch < line.length) {
+    const idx = line.indexOf('~~', sSearch);
+    if (idx === -1) break;
+    if (idx === 0 || line[idx - 1] !== '\\') {
+      strikeIdxs.push(idx);
+    }
+    sSearch = idx + 2;
+  }
+  for (let i = 0; i < strikeIdxs.length; i += 2) {
+    if (i + 1 < strikeIdxs.length) {
+      ranges.push({
+        formatKey: 'strikethrough',
+        openTag: '~~',

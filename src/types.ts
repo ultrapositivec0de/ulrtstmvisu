@@ -80,6 +80,17 @@ export type Language = 'uk' | 'en' | 'es' | 'ko' | string;
 
 export type AuthType = 'KEYCHAIN' | 'VAULT';
 
+export interface Beneficiary {
+  account: string;
+  weight: number;
+}
+
+export interface VaultAccount {
+  username: string;
+  ciphertext?: string;
+  iv?: string;
+}
+
 export interface QueueItem {
   id: string;
   title: string;

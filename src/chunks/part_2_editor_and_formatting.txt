@@ -1,0 +1,3000 @@
+                  curSel.removeAllRanges();
+                  curSel.addRange(savedVisualRangeRef.current);
+                }
+              }
+            };
+
+            setTimeout(() => {
+              restoreSel();
+              scrollCaretIntoView('center');
+            }, 50);
+            setTimeout(() => {
+              restoreSel();
+              scrollCaretIntoView('center');
+            }, 150);
+            setTimeout(() => {
+              restoreSel();
+              scrollCaretIntoView('center');
+            }, 350);
+            setTimeout(() => scrollCaretIntoView('center'), 600);
+          }
+        }
+      } else {
+        wysiwygRef.current.focus();
+      }
+    } catch (e) {
+      console.warn('syncCursorMarkdownToVisual error:', e);
+    }
+  }, [scrollCaretIntoView, t]);
+
+  // Bidirectional sync: sync content to visual editor unless visual editor currently has focus
+  useEffect(() => {
+    if (isTransitioningModeRef.current) return;
+    if (editorMode === 'visual' && wysiwygRef.current && !isEditorFocused && !wysiwygRef.current.contains(document.activeElement) && useEditorStore.getState().content !== lastSyncContentRef.current) {
+      if (isInitialLoadRef.current) {
+        isInitialLoadRef.current = false;
+        if (onDemandSyncEnabled) {
+          const isStale = localStorage.getItem('steem_visual_html_is_stale') === 'true';
+          const cachedHtml = localStorage.getItem('steem_autosave_temp_visual_html');
+          if (cachedHtml && !isStale) {
+            isSyncingRef.current = true;
+            wysiwygRef.current.innerHTML = cachedHtml;
+            lastSyncContentRef.current = useEditorStore.getState().content;
+            isSyncingRef.current = false;
+            return;
+          }
+        }
+      }
+      const renderHtml = async () => {
+        const m = getMarked();
+        const processed = processContentForSteem(useEditorStore.getState().content);
+        if (m) {
+          let rawHtml = await m.parse(processed);
+          
+          // Ensure block elements have spacers so users can arrow out
+          const tempDiv = document.createElement('div');
+          tempDiv.innerHTML = rawHtml;
+
+          // Convert inline-intended divs back to spans for the visual editor
+          tempDiv.querySelectorAll('div.phishy, div.text-blue, div.text-green').forEach(div => {
+             const span = document.createElement('span');
+             span.className = div.className;
+             span.innerHTML = div.innerHTML;
+             if (div.parentNode) div.parentNode.replaceChild(span, div);
+          });
+
+          // Normalize any loose paragraphs inside list items
+          tempDiv.querySelectorAll('li > p:only-child').forEach(p => {
+             const parent = p.parentNode;
+             if (parent) {
+                while (p.firstChild) {
+                   parent.insertBefore(p.firstChild, p);
+                }
+                parent.removeChild(p);
+             }
+          });
+
+          // Normalize bare <br> tags at root level into paragraphs
+          Array.from(tempDiv.childNodes).forEach(node => {
+             if (node.nodeType === Node.ELEMENT_NODE && (node as HTMLElement).tagName === 'BR') {
+                const p = document.createElement('p');
+                p.innerHTML = '<br>';
+                tempDiv.replaceChild(p, node);
+             }
+          });
+
+          // Clean up formatting whitespace text nodes inside lists and tables so they do not create phantom gaps
+          tempDiv.querySelectorAll('ul, ol, table, thead, tbody, tr').forEach(parent => {
+            Array.from(parent.childNodes).forEach(child => {
+              if (child.nodeType === Node.TEXT_NODE && !child.nodeValue?.trim()) {
+                parent.removeChild(child);
+              }
+            });
+          });
+          
+          const blockTags = ['TABLE'];
+
+          // Clean up any orphan or non-boundary spacers
+          tempDiv.querySelectorAll('.table-spacer, [data-placeholder], [data-empty]').forEach((spacerEl) => {
+             const isTop = spacerEl === tempDiv.firstElementChild && spacerEl.classList.contains('top-spacer');
+             const isBottom = spacerEl === tempDiv.lastElementChild && spacerEl.classList.contains('bottom-spacer');
+             const text = spacerEl.textContent || '';
+             const hasContent = text.trim() !== '' || spacerEl.children.length > 1 || (spacerEl.children.length === 1 && spacerEl.firstElementChild?.tagName !== 'BR');
+             if (!isTop && !isBottom) {
+                spacerEl.removeAttribute('data-empty');
+                spacerEl.removeAttribute('data-placeholder');
+                spacerEl.classList.remove('table-spacer', 'top-spacer', 'bottom-spacer');
+             } else if (hasContent) {
+                spacerEl.removeAttribute('data-empty');
+                spacerEl.removeAttribute('data-placeholder');
+                spacerEl.classList.remove('table-spacer', 'top-spacer', 'bottom-spacer');
+             }
+          });
+
+          // 1. One Top Spacer at the very top of the editor if the first element is a block element
+          const firstEl = tempDiv.firstElementChild;
+          if (firstEl && blockTags.includes(firstEl.tagName) && !firstEl.classList.contains('top-spacer')) {
+             if (!tempDiv.querySelector('.top-spacer')) {
+                const pBefore = document.createElement('p');
+                pBefore.className = 'table-spacer top-spacer';
+                pBefore.setAttribute('data-empty', 'true');
+                pBefore.setAttribute('data-placeholder', lang === 'uk' ? '↵ Новий параграф...' : lang === 'es' ? '↵ Nuevo párrafo...' : lang === 'ko' ? '↵ 새 문단...' : '↵ New paragraph...');
+                pBefore.innerHTML = '<br>';
+                tempDiv.insertBefore(pBefore, firstEl);
+             }
+          }
+          
+          // 2. One Bottom Spacer at the very bottom of the editor ONLY if last element is a block element
+          const lastEl = tempDiv.lastElementChild;
+          if (lastEl && blockTags.includes(lastEl.tagName) && !lastEl.classList.contains('bottom-spacer')) {
+             if (!tempDiv.querySelector('.bottom-spacer')) {
+                const pAfter = document.createElement('p');
+                pAfter.className = 'table-spacer bottom-spacer';
+                pAfter.setAttribute('data-empty', 'true');
+                pAfter.setAttribute('data-placeholder', lang === 'uk' ? '↵ Новий параграф...' : lang === 'es' ? '↵ Nuevo párrafo...' : lang === 'ko' ? '↵ 새 문단...' : '↵ New paragraph...');
+                pAfter.innerHTML = '<br>';
+                tempDiv.appendChild(pAfter);
+             }
+          }
+          
+          rawHtml = tempDiv.innerHTML;
+          
+          // We rely on CSS padding instead of inserting <p><br></p> after block elements
+          const trimmedRaw = rawHtml.trim();
+          if (trimmedRaw === '') {
+            rawHtml = '<p><br></p>';
+          }
+          if (wysiwygRef.current && lastSyncContentRef.current !== useEditorStore.getState().content && wysiwygRef.current.innerHTML !== rawHtml) {
+            isSyncingRef.current = true;
+            wysiwygRef.current.innerHTML = rawHtml;
+            lastSyncContentRef.current = useEditorStore.getState().content;
+            isSyncingRef.current = false;
+            localStorage.setItem('steem_autosave_temp_visual_html', rawHtml);
+            localStorage.setItem('steem_visual_html_is_stale', 'false');
+
+            if (!hasRestoredInitialCursorRef.current) {
+              hasRestoredInitialCursorRef.current = true;
+              syncCursorMarkdownToVisual().then(() => {
+                if (wysiwygRef.current) wysiwygRef.current.focus();
+              });
+            }
+          }
+        }
+      };
+      renderHtml();
+    }
+  }, [ editorMode, isEditorFocused, syncCursorMarkdownToVisual, lang, onDemandSyncEnabled]);
+
+  // Keep visual editor empty placeholder state dynamically synchronized
+  useEffect(() => {
+    if (editorMode !== 'visual' || !wysiwygRef.current) return;
+    const el = wysiwygRef.current;
+
+    updateWysiwygEmptyStatus(el);
+
+    const observer = new MutationObserver(() => {
+      updateWysiwygEmptyStatus(el);
+    });
+
+    observer.observe(el, {
+      childList: true,
+      subtree: true,
+      characterData: true,
+    });
+
+    return () => {
+      observer.disconnect();
+    };
+  }, [editorMode, updateWysiwygEmptyStatus]);
+
+  // Load cursor position on start
+  useEffect(() => {
+     try {
+        const savedCursor = localStorage.getItem('steem_editor_cursor');
+        if (savedCursor) {
+            const parsed = JSON.parse(savedCursor);
+            cursorPositionRef.current = parsed;
+            if (parsed && typeof parsed.start === 'number' && typeof parsed.end === 'number') {
+              useEditorStore.getState().setSelection(parsed.start, parsed.end);
+            }
+        }
+     } catch (e) {
+        console.error("Failed to load cursor position", e);
+     }
+  }, []);
+
+  const [isMiniGalleryOpen, setIsMiniGalleryOpen] = useState(false);
+  const [justInsertedUrl, setJustInsertedUrl] = useState<string | null>(null);
+
+  const hasRestoredInitialCursorRef = useRef(false);
+
+  const saveCursorPosition = useCallback(() => {
+     if (isTransitioningModeRef.current || isSyncingRef.current) return;
+     if (editorRef.current) {
+        const start = editorRef.current.selectionStart;
+        const end = editorRef.current.selectionEnd;
+        if (start === null || end === null || start === undefined || end === undefined) return;
+        const pos = {
+           start,
+           end
+        };
+        cursorPositionRef.current = pos;
+        try {
+          localStorage.setItem('steem_editor_cursor', JSON.stringify(pos));
+        } catch (err) {
+          console.warn('Failed to save cursor position:', err);
+        }
+
+        // Sync content and Zustand store (in-memory only, disk persistence is debounced)
+        const text = editorRef.current.value;
+        const rowColPos = getRowColFromOffset(text, start);
+        useEditorStore.getState().setCursor(rowColPos);
+        useEditorStore.getState().setSelection(start, end);
+
+        if (editorMode === 'markdown') {
+          const caretPos = start;
+          const selEnd = end;
+
+          const lineStart = text.lastIndexOf('\n', caretPos - 1) + 1;
+          const lineEnd = text.indexOf('\n', caretPos);
+          const actualLineEnd = lineEnd === -1 ? text.length : lineEnd;
+
+          const currentLine = text.substring(lineStart, actualLineEnd);
+          const caretInLine = caretPos - lineStart;
+          const selEndInLine = Math.min(actualLineEnd, selEnd) - lineStart;
+
+          const newFormats = {
+            bold: isInsideTagInLine(currentLine, caretInLine, '**', selEndInLine),
+            italic: isInsideTagInLine(currentLine, caretInLine, '*', selEndInLine),
+            code: isInsideTagInLine(currentLine, caretInLine, '`', selEndInLine),
+            strikethrough: isInsideTagInLine(currentLine, caretInLine, '~~', selEndInLine),
+            sub: isInsideTagInLine(currentLine, caretInLine, '<sub>', selEndInLine),
+            sup: isInsideTagInLine(currentLine, caretInLine, '<sup>', selEndInLine),
+            phishy: isInsideTagInLine(currentLine, caretInLine, '<div class="phishy">', selEndInLine)
+          };
+
+          setActiveFormats(prev => {
+            if (
+              prev.bold === newFormats.bold &&
+              prev.italic === newFormats.italic &&
+              prev.code === newFormats.code &&
+              prev.strikethrough === newFormats.strikethrough &&
+              prev.sub === newFormats.sub &&
+              prev.sup === newFormats.sup &&
+              prev.phishy === newFormats.phishy
+            ) {
+              return prev;
+            }
+            return newFormats;
+          });
+        }
+     }
+  }, [editorMode]);
+
+  const restoreMarkdownCursorAndScroll = useCallback((retryCount = 0, forceScrollToCaret = false) => {
+    if (!editorRef.current) {
+      if (retryCount < 15) {
+        setTimeout(() => restoreMarkdownCursorAndScroll(retryCount + 1, forceScrollToCaret), 30);
+      }
+      return;
+    }
+
+    try {
+      const ta = editorRef.current;
+      const textVal = useEditorStore.getState().content;
+      
+      // Ensure the textarea has the correct value
+      if (ta.value !== textVal) {
+        ta.value = textVal;
+      }
+
+      // Get saved cursor position
+      let start = 0;
+      let end = 0;
+      if (cursorPositionRef.current) {
+        start = cursorPositionRef.current.start;
+        end = cursorPositionRef.current.end;
+      } else {
+        const saved = localStorage.getItem('steem_editor_cursor');
+        if (saved) {
+          const parsed = JSON.parse(saved);
+          if (parsed && typeof parsed.start === 'number' && typeof parsed.end === 'number') {
+            start = parsed.start;
+            end = parsed.end;
+            cursorPositionRef.current = parsed;
+          }
+        }
+      }
+
+      const safeStart = Math.min(Math.max(0, start), textVal.length);
+      const safeEnd = Math.min(Math.max(0, end), textVal.length);
+
+      isSyncingRef.current = true;
+      ta.focus({ preventScroll: true });
+      ta.setSelectionRange(safeStart, safeEnd);
+
+      // Sync to Zustand store
+      const rowColPos = getRowColFromOffset(textVal, safeStart);
+      useEditorStore.getState().setCursor(rowColPos);
+      useEditorStore.getState().setSelection(safeStart, safeEnd);
+
+      // Restore scroll position
+      const savedScroll = localStorage.getItem('steem_editor_scroll');
+      if (!forceScrollToCaret && savedScroll !== null) {
+        const scrollTop = Number(savedScroll);
+        if (!isNaN(scrollTop) && scrollTop > 0) {
+          ta.scrollTop = scrollTop;
+        } else {
+          // Fallback to scroll calculating from caretY
+          const clone = ta.cloneNode() as HTMLTextAreaElement;
+          clone.style.visibility = 'hidden';
+          clone.style.position = 'absolute';
+          clone.style.overflow = 'hidden';
+          clone.style.height = '0px';
+          clone.style.width = ta.clientWidth + 'px';
+          clone.style.padding = window.getComputedStyle(ta).padding;
+          clone.style.paddingBottom = '0px';
+          clone.style.font = window.getComputedStyle(ta).font;
+          clone.style.lineHeight = window.getComputedStyle(ta).lineHeight;
+          clone.style.boxSizing = 'border-box';
+          clone.value = textVal.substring(0, safeStart);
+          document.body.appendChild(clone);
+          
+          const caretY = clone.scrollHeight;
+          document.body.removeChild(clone);
+          ta.scrollTop = calculateCaretScrollTop(caretY, ta.clientHeight, {
+            isMobile: window.innerWidth < 1024,
+            isKeyboardOpen,
+            widgetPos,
+            toolbarIconSize,
+          });
+        }
+      } else {
+        // Compute from caretY
+        const clone = ta.cloneNode() as HTMLTextAreaElement;
+        clone.style.visibility = 'hidden';
+        clone.style.position = 'absolute';
+        clone.style.overflow = 'hidden';
+        clone.style.height = '0px';
+        clone.style.width = ta.clientWidth + 'px';
+        clone.style.padding = window.getComputedStyle(ta).padding;
+        clone.style.paddingBottom = '0px';
+        clone.style.font = window.getComputedStyle(ta).font;
+        clone.style.lineHeight = window.getComputedStyle(ta).lineHeight;
+        clone.style.boxSizing = 'border-box';
+        clone.value = textVal.substring(0, safeStart);
+        document.body.appendChild(clone);
+        
+        const caretY = clone.scrollHeight;
+        document.body.removeChild(clone);
+        ta.scrollTop = calculateCaretScrollTop(caretY, ta.clientHeight, {
+          isMobile: window.innerWidth < 1024,
+          isKeyboardOpen,
+          widgetPos,
+          toolbarIconSize,
+        });
+      }
+
+      setTimeout(() => {
+        isSyncingRef.current = false;
+      }, 100);
+    } catch (e) {
+      console.warn('restoreMarkdownCursorAndScroll failed:', e);
+      isSyncingRef.current = false;
+    }
+  }, [isKeyboardOpen, widgetPos, toolbarIconSize]);
+
+  const syncCursorVisualToMarkdown = useCallback(() => {
+    try {
+      let range: Range | null = null;
+      const sel = window.getSelection();
+      if (sel && sel.rangeCount > 0 && wysiwygRef.current && wysiwygRef.current.contains(sel.getRangeAt(0).commonAncestorContainer)) {
+        range = sel.getRangeAt(0);
+      } else if (savedVisualRangeRef.current && wysiwygRef.current && wysiwygRef.current.contains(savedVisualRangeRef.current.commonAncestorContainer)) {
+        range = savedVisualRangeRef.current;
+      }
+
+      if (range && wysiwygRef.current) {
+        // Create an exact temporary clone to insert marker elements BEFORE any modifications
+        const clonedWysiwyg = wysiwygRef.current.cloneNode(true) as HTMLElement;
+
+        const pathStart = getNodePath(wysiwygRef.current, range.startContainer);
+        const pathEnd = getNodePath(wysiwygRef.current, range.endContainer);
+        
+        if (pathStart && pathEnd) {
+          const clonedStartNode = getNodeByPath(clonedWysiwyg, pathStart);
+          const clonedEndNode = getNodeByPath(clonedWysiwyg, pathEnd);
+          
+          if (clonedStartNode && clonedEndNode) {
+            try {
+              if (clonedStartNode === clonedEndNode && clonedStartNode.nodeType === Node.TEXT_NODE) {
+                  const text = clonedStartNode.nodeValue || '';
+                  const sOff = Math.min(range.startOffset, text.length);
+                  const eOff = Math.min(range.endOffset, text.length);
+                  clonedStartNode.nodeValue = text.slice(0, sOff) + '\x01' + text.slice(sOff, eOff) + '\x02' + text.slice(eOff);
+              } else {
+                  if (clonedEndNode.nodeType === Node.TEXT_NODE) {
+                      const text = clonedEndNode.nodeValue || '';
+                      const eOff = Math.min(range.endOffset, text.length);
+                      clonedEndNode.nodeValue = text.slice(0, eOff) + '\x02' + text.slice(eOff);
+                  } else {
+                      const idx = Math.min(range.endOffset, clonedEndNode.childNodes.length);
+                      clonedEndNode.insertBefore(document.createTextNode('\x02'), clonedEndNode.childNodes[idx] || null);
+                  }
+                  
+                  if (clonedStartNode.nodeType === Node.TEXT_NODE) {
+                      const text = clonedStartNode.nodeValue || '';
+                      const sOff = Math.min(range.startOffset, text.length);
+                      clonedStartNode.nodeValue = text.slice(0, sOff) + '\x01' + text.slice(sOff);
+                  } else {
+                      const idx = Math.min(range.startOffset, clonedStartNode.childNodes.length);
+                      clonedStartNode.insertBefore(document.createTextNode('\x01'), clonedStartNode.childNodes[idx] || null);
+                  }
+              }
+              
+              // Clean any auxiliary elements or indicators from the clone ONLY after markers are securely inserted
+              clonedWysiwyg.querySelectorAll('.table-controls, .col-resizer, .row-resizer, [data-ignore-sync]').forEach(el => el.remove());
+              
+              clonedWysiwyg.querySelectorAll('.table-spacer, [data-placeholder]').forEach(spacer => {
+                if ((spacer.textContent || '').trim() === '' && (!spacer.children.length || (spacer.children.length === 1 && spacer.firstElementChild?.tagName === 'BR'))) {
+                  spacer.className = '';
+                  spacer.removeAttribute('data-placeholder');
+                  spacer.removeAttribute('data-empty');
+                }
+              });
+
+              const htmlWithMarkers = clonedWysiwyg.innerHTML;
+              const rawMd = htmlToMarkdown(htmlWithMarkers);
+              
+              const startIdx = rawMd.indexOf('\x01');
+              const cleanMdAfterStart = rawMd.replace('\x01', '');
+              const endIdx = cleanMdAfterStart.indexOf('\x02');
+              
+              if (startIdx !== -1 && endIdx !== -1) {
+                const cleanMd = cleanMdAfterStart.replace('\x02', '');
+                const pos = { start: startIdx, end: endIdx };
+                cursorPositionRef.current = pos;
+                localStorage.setItem('steem_editor_cursor', JSON.stringify(pos));
+                
+                // Sync to Zustand store
+                const rowColPos = getRowColFromOffset(cleanMd, startIdx);
+                useEditorStore.getState().setCursor(rowColPos);
+                useEditorStore.getState().setSelection(startIdx, endIdx);
+                return { start: startIdx, end: endIdx, md: cleanMd };
+              } else if (startIdx !== -1) {
+                const cleanMd = cleanMdAfterStart;
+                const pos = { start: startIdx, end: startIdx };
+                cursorPositionRef.current = pos;
+                localStorage.setItem('steem_editor_cursor', JSON.stringify(pos));
+                
+                // Sync to Zustand store
+                const rowColPos = getRowColFromOffset(cleanMd, startIdx);
+                useEditorStore.getState().setCursor(rowColPos);
+                useEditorStore.getState().setSelection(startIdx, startIdx);
+                return { start: startIdx, end: startIdx, md: cleanMd };
+              }
+            } catch (e) {
+              console.warn("Failed to apply range on cloned DOM", e);
+            }
+          }
+        }
+      }
+    } catch (e) {
+      console.warn('syncCursorVisualToMarkdown error:', e);
+    }
+    return null;
+  }, []);
+
+  // Automatic Cursor & Scroll Position Restoration after page reload
+  useEffect(() => {
+    if (hasRestoredInitialCursorRef.current) return;
+
+    const getPos = () => {
+      if (cursorPositionRef.current) return cursorPositionRef.current;
+      try {
+        const saved = localStorage.getItem('steem_editor_cursor');
+        if (saved) {
+          const parsed = JSON.parse(saved);
+          if (parsed && typeof parsed.start === 'number' && typeof parsed.end === 'number') {
+            cursorPositionRef.current = parsed;
+            return parsed;
+          }
+        }
+      } catch (e) {
+        console.warn('Failed to parse saved cursor in restoration effect', e);
+      }
+      return null;
+    };
+
+    if (editorMode === 'markdown') {
+      hasRestoredInitialCursorRef.current = true;
+      restoreMarkdownCursorAndScroll();
+    } else if (editorMode === 'visual' && wysiwygRef.current) {
+      hasRestoredInitialCursorRef.current = true;
+      const timer = setTimeout(async () => {
+        const pos = getPos();
+        if (pos) {
+          useEditorStore.getState().setSelection(pos.start, pos.end);
+          await syncCursorMarkdownToVisual();
+          if (wysiwygRef.current) {
+            wysiwygRef.current.focus();
+          }
+        } else if (wysiwygRef.current) {
+          wysiwygRef.current.focus();
+        }
+
+        const savedScroll = localStorage.getItem('steem_editor_scroll');
+        if (savedScroll !== null && wysiwygRef.current) {
+          const scrollTop = Number(savedScroll);
+          if (!isNaN(scrollTop) && scrollTop > 0) {
+            wysiwygRef.current.scrollTop = scrollTop;
+          }
+        }
+      }, 250);
+      return () => clearTimeout(timer);
+    }
+  }, [editorMode, syncCursorMarkdownToVisual, restoreMarkdownCursorAndScroll]);
+
+  const handleSetEditorMode = useCallback((mode: 'visual' | 'markdown') => {
+    if (editorMode === mode) return;
+
+    isTransitioningModeRef.current = true;
+    hasRestoredInitialCursorRef.current = true;
+    localStorage.setItem('steem_editor_mode', mode);
+
+    // Immediately reset active formats to prevent phantom button highlighting during transition
+    setActiveFormats({
+      bold: false,
+      italic: false,
+      code: false,
+      strikethrough: false,
+      sub: false,
+      sup: false,
+      phishy: false
+    });
+
+    if (mode === 'visual') {
+      let start = 0;
+      let end = 0;
+      let val = useEditorStore.getState().content;
+
+      if (editorRef.current) {
+        val = editorRef.current.value;
+        start = editorRef.current.selectionStart ?? 0;
+        end = editorRef.current.selectionEnd ?? start;
+      } else if (cursorPositionRef.current) {
+        start = cursorPositionRef.current.start;
+        end = cursorPositionRef.current.end;
+      }
+
+      const pos = getRowColFromOffset(val, start);
+      const cursorObj = { start, end };
+      cursorPositionRef.current = cursorObj;
+      try {
+        localStorage.setItem('steem_editor_cursor', JSON.stringify(cursorObj));
+      } catch {
+        /* ignore storage error */
+      }
+
+      useEditorStore.setState({
+        content: val,
+        cursor: pos,
+        selectionStart: start,
+        selectionEnd: end
+      });
+
+      saveCursorPosition();
+
+      // Update lastSyncContentRef so background useEffect won't trigger another innerHTML wipe
+      lastSyncContentRef.current = val;
+      setEditorMode('visual');
+
+      setTimeout(async () => {
+        try {
+          await syncCursorMarkdownToVisual();
+          if (wysiwygRef.current) {
+            wysiwygRef.current.focus({ preventScroll: true });
+            saveVisualSelection();
+          }
+        } finally {
+          setTimeout(() => {
+            isTransitioningModeRef.current = false;
+          }, 300);
+        }
+      }, 50);
+    } else {
+      saveVisualSelection();
+      isSyncingRef.current = true;
+      const syncResult = syncCursorVisualToMarkdown();
+
+      // Always synchronize when switching from visual to markdown code
+      if (syncResult && syncResult.md) {
+        if (syncResult.md !== useEditorStore.getState().content) {
+          setContent(syncResult.md);
+        }
+      } else if (wysiwygRef.current) {
+        const md = htmlToMarkdown(wysiwygRef.current.innerHTML);
+        if (md !== useEditorStore.getState().content) {
+          setContent(md);
+        }
+      }
+      localStorage.removeItem('steem_editor_scroll');
+      setEditorMode('markdown');
+
+      requestAnimationFrame(() => {
+        setTimeout(() => {
+          try {
+            restoreMarkdownCursorAndScroll(0, true);
+          } finally {
+            setTimeout(() => {
+              isTransitioningModeRef.current = false;
+              isSyncingRef.current = false;
+            }, 250);
+          }
+        }, 50);
+      });
+    }
+  }, [editorMode, saveCursorPosition, syncCursorMarkdownToVisual, syncCursorVisualToMarkdown, saveVisualSelection, setContent, restoreMarkdownCursorAndScroll]);
+
+  // Save cursor position when unmounting or switching view
+  useEffect(() => {
+    return () => saveCursorPosition();
+  }, [saveCursorPosition]);
+
+  useEffect(() => {
+    if (activeView === 'editor' && activeMobileTab === 'editor') {
+       if (isTransitioningModeRef.current) return;
+       setTimeout(() => {
+          if (isTransitioningModeRef.current) return;
+          if (editorMode === 'visual') {
+             restoreVisualSelection();
+          } else {
+             restoreMarkdownCursorAndScroll();
+             return;
+          }
+          if (editorRef.current) {
+             const cursor = useEditorStore.getState().cursor;
+             if (cursor) {
+               const text = editorRef.current.value;
+               const offset = getOffsetFromRowCol(text, cursor);
+               
+               // Ensure we prevent user event handlers from overwriting while setting programmatic focus/selection
+               isSyncingRef.current = true;
+               
+               // Cross-browser reliable cursor positioning
+               const ta = editorRef.current;
+               ta.focus();
+               ta.setSelectionRange(offset, offset);
+               
+               // Robust Y-axis scroll calculation using a hidden clone
+                const clone = ta.cloneNode() as HTMLTextAreaElement;
+                clone.style.visibility = 'hidden';
+                clone.style.position = 'absolute';
+                clone.style.overflow = 'hidden';
+                clone.style.height = '0px'; // Force scrollHeight to equal content height
+                clone.style.width = ta.clientWidth + 'px';
+                clone.style.padding = window.getComputedStyle(ta).padding;
+                clone.style.paddingBottom = '0px'; // Ignore bottom padding for caret Y coord
+                clone.style.font = window.getComputedStyle(ta).font;
+                clone.style.lineHeight = window.getComputedStyle(ta).lineHeight;
+                clone.style.boxSizing = 'border-box';
+                clone.value = text.substring(0, offset);
+                document.body.appendChild(clone);
+                
+                const caretY = clone.scrollHeight;
+                document.body.removeChild(clone);
+                
+                // Scroll so the caret is in the upper-middle of the visible screen above widget
+                ta.scrollTop = calculateCaretScrollTop(caretY, ta.clientHeight, {
+                  isMobile: window.innerWidth < 1024,
+                  isKeyboardOpen,
+                  widgetPos,
+                  toolbarIconSize,
+                });
+                
+                // Reset sync flag after a brief timeout so that user actions are once again captured
+                setTimeout(() => {
+                  isSyncingRef.current = false;
+                }, 100);
+             } else {
+               isSyncingRef.current = false;
+             }
+          } else {
+             isSyncingRef.current = false;
+          }
+       }, 150);
+    } else {
+       saveVisualSelection();
+       saveCursorPosition();
+       isSyncingRef.current = false;
+    }
+  }, [activeView, activeMobileTab, editorMode, saveCursorPosition, restoreVisualSelection, saveVisualSelection, restoreMarkdownCursorAndScroll, isKeyboardOpen, widgetPos, toolbarIconSize]);
+
+  useEffect(() => {
+    if (isImagesLoaded.current) {
+      localStorage.setItem(STORAGE_KEY_IMAGES, JSON.stringify(images));
+      localStorage.setItem('steem_editor_source_links', sourceInput);
+      localStorage.setItem('steem_image_format', imageInsertFormat);
+      localStorage.setItem('steem_text_wrap', String(isTextWrapEnabled));
+    }
+  }, [images, sourceInput, imageInsertFormat, isTextWrapEnabled]);
+
+  useEffect(() => {
+    let saved = null;
+    try {
+      saved = localStorage.getItem(STORAGE_KEY_AUTOSAVE) || sessionStorage.getItem(STORAGE_KEY_AUTOSAVE);
+    } catch (err) {
+      console.debug(err);
+    }
+    if (saved) setContent(saved);
+    
+    const savedUser = localStorage.getItem('steem_username');
+    if (savedUser) setUsername(savedUser);
+
+    const savedTpls = localStorage.getItem(STORAGE_KEY_TEMPLATES);
+    if (savedTpls) setTemplates(JSON.parse(savedTpls));
+
+    const savedMentions = localStorage.getItem(STORAGE_KEY_USERS);
+    if (savedMentions) setMentions(Array.from(new Set(JSON.parse(savedMentions))));
+
+    const handleResize = () => {
+      const currentWidth = window.innerWidth;
+      if (currentWidth !== lastWidth.current) {
+        if (currentWidth < 1024) setIsSidebarOpen(false);
+        else setIsSidebarOpen(true);
+        lastWidth.current = currentWidth;
+      }
+    };
+    handleResize();
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, [setContent]);
+
+  const [activeTable, setActiveTable] = useState<HTMLTableElement | null>(null);
+  const [activeTableRow, setActiveTableRow] = useState<HTMLTableRowElement | null>(null);
+  const [activeTableCell, setActiveTableCell] = useState<HTMLTableCellElement | null>(null);
+  
+  const activeTableRef = useRef<HTMLTableElement | null>(null);
+  const activeTableRowRef = useRef<HTMLTableRowElement | null>(null);
+  const activeTableCellRef = useRef<HTMLTableCellElement | null>(null);
+
+  const [tableRect, setTableRect] = useState<DOMRect | null>(null);
+  const [isTableMenuExpanded, setIsTableMenuExpanded] = useState(false);
+  const [isTableMenuPinned, setIsTableMenuPinned] = useState(() => {
+    return localStorage.getItem('steem_table_menu_pinned') === 'true';
+  });
+
+  const updateTableRect = useCallback(() => {
+    if (activeTable) {
+      setTableRect(activeTable.getBoundingClientRect());
+    } else {
+      setTableRect(null);
+    }
+  }, [activeTable]);
+
+  useEffect(() => {
+    updateTableRect();
+    window.addEventListener('resize', updateTableRect);
+    const scrollContainer = wysiwygRef.current;
+    if (scrollContainer) {
+      scrollContainer.addEventListener('scroll', updateTableRect);
+    }
+    return () => {
+      window.removeEventListener('resize', updateTableRect);
+      if (scrollContainer) {
+        scrollContainer.removeEventListener('scroll', updateTableRect);
+      }
+    };
+  }, [updateTableRect, activeTable]);
+
+  useEffect(() => {
+    const handleSelectionChange = () => {
+      if (editorMode === 'visual') {
+        saveVisualSelection();
+        if (wysiwygRef.current) {
+          const sel = window.getSelection();
+          if (sel && sel.rangeCount > 0) {
+            try {
+              const range = sel.getRangeAt(0);
+              if (wysiwygRef.current.contains(range.commonAncestorContainer)) {
+                savedVisualRangeRef.current = range.cloneRange();
+                
+                let node: Node | null = range.commonAncestorContainer;
+                if (node.nodeType === 3) node = node.parentNode;
+                const table = ((node as Element)?.closest?.('table') as HTMLTableElement) || null;
+                const row = ((node as Element)?.closest?.('tr') as HTMLTableRowElement) || null;
+                const cell = ((node as Element)?.closest?.('td, th') as HTMLTableCellElement) || null;
+
+                if (activeTableRef.current !== table) {
+                  activeTableRef.current = table;
+                  setActiveTable(table);
+                }
+                if (activeTableRowRef.current !== row) {
+                  activeTableRowRef.current = row;
+                  setActiveTableRow(row);
+                }
+                if (activeTableCellRef.current !== cell) {
+                  activeTableCellRef.current = cell;
+                  setActiveTableCell(cell);
+                }
+              } else {
+                if (activeTableRef.current !== null) { activeTableRef.current = null; setActiveTable(null); }
+                if (activeTableRowRef.current !== null) { activeTableRowRef.current = null; setActiveTableRow(null); }
+                if (activeTableCellRef.current !== null) { activeTableCellRef.current = null; setActiveTableCell(null); }
+              }
+            } catch {
+              if (activeTableRef.current !== null) { activeTableRef.current = null; setActiveTable(null); }
+              if (activeTableRowRef.current !== null) { activeTableRowRef.current = null; setActiveTableRow(null); }
+              if (activeTableCellRef.current !== null) { activeTableCellRef.current = null; setActiveTableCell(null); }
+            }
+          } else {
+            if (activeTableRef.current !== null) { activeTableRef.current = null; setActiveTable(null); }
+            if (activeTableRowRef.current !== null) { activeTableRowRef.current = null; setActiveTableRow(null); }
+            if (activeTableCellRef.current !== null) { activeTableCellRef.current = null; setActiveTableCell(null); }
+          }
+        }
+      } else if (editorMode === 'markdown') {
+        saveCursorPosition();
+        if (activeTableRef.current !== null) { activeTableRef.current = null; setActiveTable(null); }
+        if (activeTableRowRef.current !== null) { activeTableRowRef.current = null; setActiveTableRow(null); }
+        if (activeTableCellRef.current !== null) { activeTableCellRef.current = null; setActiveTableCell(null); }
+      }
+    };
+
+    document.addEventListener('selectionchange', handleSelectionChange);
+    return () => {
+      document.removeEventListener('selectionchange', handleSelectionChange);
+    };
+  }, [editorMode, saveVisualSelection, saveCursorPosition]);
+
+  useEffect(() => {
+    // DEBOUNCED PERSISTENCE: Fast 350ms save to storage so state and cursor match without blocking UI thread during typing
+    let timer: any;
+    const unsubscribe = useEditorStore.subscribe((state, prevState) => {
+      if (state.content !== prevState.content) {
+        if (timer) clearTimeout(timer);
+        timer = setTimeout(() => {
+          saveLargeStorage(STORAGE_KEY_AUTOSAVE, state.content);
+          if (cursorPositionRef.current) {
+            try {
+              localStorage.setItem('steem_editor_cursor', JSON.stringify(cursorPositionRef.current));
+            } catch (err) {
+              console.debug(err);
+            }
+          }
+          if (editorMode === 'markdown') {
+            try {
+              localStorage.setItem('steem_visual_html_is_stale', 'true');
+            } catch (err) {
+              console.debug(err);
+            }
+          }
+        }, 350);
+      }
+    });
+
+    return () => {
+      if (timer) clearTimeout(timer);
+      unsubscribe();
+    };
+  }, [editorMode, saveLargeStorage]);
+
+  // Synchronous flush on page reload / unload
+  useEffect(() => {
+    const handleBeforeUnload = () => {
+      try {
+        if (editorMode === 'markdown' && editorRef.current) {
+          const val = editorRef.current.value;
+          useEditorStore.setState({ content: val });
+          saveLargeStorage(STORAGE_KEY_AUTOSAVE, val);
+          saveCursorPosition();
+        } else if (editorMode === 'visual' && wysiwygRef.current) {
+          const html = wysiwygRef.current.innerHTML;
+          try {
+            localStorage.setItem('steem_autosave_temp_visual_html', html);
+          } catch (err) {
+            console.debug(err);
+          }
+          const md = htmlToMarkdown(html);
+          useEditorStore.setState({ content: md });
+          saveLargeStorage(STORAGE_KEY_AUTOSAVE, md);
+          saveVisualSelection();
+          syncCursorVisualToMarkdown();
+          if (cursorPositionRef.current) {
+            try {
+              localStorage.setItem('steem_editor_cursor', JSON.stringify(cursorPositionRef.current));
+            } catch (err) {
+              console.debug(err);
+            }
+          }
+        } else {
+          saveLargeStorage(STORAGE_KEY_AUTOSAVE, useEditorStore.getState().content);
+          saveCursorPosition();
+        }
+      } catch (err) {
+        console.warn('Error flushing autosave state before unload:', err);
+      }
+    };
+
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => {
+      window.removeEventListener('beforeunload', handleBeforeUnload);
+    };
+  }, [editorMode, saveCursorPosition, saveVisualSelection, syncCursorVisualToMarkdown, saveLargeStorage]);
+
+  const handleEditorScroll = useCallback(() => {
+    if (editorRef.current) {
+      localStorage.setItem('steem_editor_scroll', String(editorRef.current.scrollTop));
+    }
+    if (!syncScrollEnabled) return;
+    const editor = editorRef.current;
+    const preview = previewPaneRef.current;
+    if (editor && preview) {
+      const percentage = editor.scrollTop / (editor.scrollHeight - editor.clientHeight || 1);
+      preview.scrollTop = percentage * (preview.scrollHeight - preview.clientHeight);
+    }
+  }, [syncScrollEnabled]);
+
+  // OFF-THREAD WEB WORKER: Process stats and clean text metrics off the main UI thread!
+  const handleWorkerStats = useCallback((rawStats: { words: number; chars: number }, cleanStatsResult: { words: number; chars: number }) => {
+    useEditorStore.getState().setStats(rawStats, cleanStatsResult);
+  }, []);
+
+  useEditorWorker(handleWorkerStats);
+
+  useEffect(() => {
+    localStorage.setItem('steem_lang', lang);
+  }, [lang]);
+
+  useEffect(() => {
+    localStorage.setItem('steem_tag_groups', JSON.stringify(tagGroups));
+  }, [tagGroups]);
+
+  // --- Logic ---
+  const getSelectionOrWord = useCallback(() => {
+    const content = useEditorStore.getState().content;
+    if (!editorRef.current) return { s: 0, e: 0, text: '' };
+    const s = editorRef.current.selectionStart;
+    const e = editorRef.current.selectionEnd;
+    if (s !== e) return { s, e, text: content.substring(s, e) };
+    
+    let start = s;
+    let end = e;
+    while (start > 0 && !/[\s\n]/.test(content[start - 1])) start--;
+    while (end < content.length && !/[\s\n]/.test(content[end])) end++;
+    return { s: start, e: end, text: content.substring(start, end) };
+  }, []);
+
+  const insertAtCursor = useCallback((text: string, selectionMode: 'end' | 'select' = 'end') => {
+    const content = useEditorStore.getState().content;
+    if (editorMode === 'visual') {
+      const runParse = async () => {
+        const m = getMarked();
+        if (m) {
+          const html = await m.parse(text);
+          insertHtmlAtCursor(html);
+        } else {
+          insertHtmlAtCursor(text);
+        }
+      };
+      runParse();
+      return;
+    }
+
+    if (!editorRef.current) return;
+    const start = editorRef.current.selectionStart;
+    const end = editorRef.current.selectionEnd;
+    const scrollTop = editorRef.current.scrollTop;
+    const scrollLeft = editorRef.current.scrollLeft;
+    
+    const finalText = text;
+
+    const newContent = content.substring(0, start) + finalText + content.substring(end);
+    setContent(newContent);
+    
+    setTimeout(() => {
+      if (!editorRef.current) return;
+      if (selectionMode === 'select') {
+        editorRef.current.focus({ preventScroll: true }); editorRef.current.setSelectionRange(start, start + finalText.length);
+      } else {
+        editorRef.current.focus({ preventScroll: true }); editorRef.current.setSelectionRange(start + finalText.length, start + finalText.length);
+      }
+      editorRef.current.scrollTop = scrollTop;
+      editorRef.current.scrollLeft = scrollLeft;
+    }, 0);
+  }, [ editorMode, insertHtmlAtCursor, setContent]);
+
+  useEffect(() => {
+    // Timer removed as per user request to hide only on typing
+  }, [isEditorFocused, isWidgetVisible]);
+
+  const widgetRef = useRef<HTMLDivElement>(null);
+  const lastKeyboardToggleTimeRef = useRef<number>(0);
+
+  useEffect(() => {
+    lastKeyboardToggleTimeRef.current = Date.now();
+  }, [isKeyboardOpen]);
+
+  const handleWidgetAction = useCallback((actionFn: () => void) => {
+    if (Date.now() - lastKeyboardToggleTimeRef.current < 250) {
+      return;
+    }
+    actionFn();
+  }, []);
+  const [menuDirection, setMenuDirection] = useState<'up' | 'down'>('up');
+  const [lockedToolsWidth, setLockedToolsWidth] = useState<number | null>(null);
+
+  useEffect(() => {
+    if (isWidgetMenuOpen && widgetRef.current) {
+      const rect = widgetRef.current.getBoundingClientRect();
+      setMenuDirection(rect.top < 350 ? 'down' : 'up');
+    }
+  }, [isWidgetMenuOpen]);
+
+  const showWidget = useCallback((x: number, y: number) => {
+    if (widgetPos === 'hidden') return;
+    if (widgetPos !== 'floating') {
+      if (!isWidgetVisible) setIsWidgetVisible(true);
+      return;
+    }
+
+    setFloatingPos({ x, y });
+    if (!isWidgetVisible) setIsWidgetVisible(true);
+  }, [widgetPos, isWidgetVisible]);
+
+  const handleEditorKeyDown = useCallback((e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    
+
+    if (e.key === 'Enter') {
+      if (!editorRef.current) return;
+      const textarea = editorRef.current;
+      const text = textarea.value;
+      const caretPos = textarea.selectionStart;
+
+      const lineStart = text.lastIndexOf('\n', caretPos - 1) + 1;
+      const lineEnd = text.indexOf('\n', caretPos);
+      const actualLineEnd = lineEnd === -1 ? text.length : lineEnd;
+      const currentLine = text.slice(lineStart, actualLineEnd);
+      const caretInLine = caretPos - lineStart;
+
+      // 1. Identify quote or list prefix
+      const quoteMatch = currentLine.match(/^(\s*>+\s*)/);
+      const unorderedListMatch = currentLine.match(/^(\s*[-*+]\s+(?:\[[ xX]\]\s+)?)/);
+      const orderedListMatch = currentLine.match(/^(\s*)(\d+)([.)]\s+)/);
+
+      const cleanLineTrimmed = currentLine.trim();
+
+      // Check if this line is an empty list or quote item
+      const isEmptyUnorderedList = cleanLineTrimmed === '-' || cleanLineTrimmed === '*' || cleanLineTrimmed === '+' ||
+        cleanLineTrimmed === '- [ ]' || cleanLineTrimmed === '- [x]' || cleanLineTrimmed === '- [X]';
+      const isEmptyOrderedList = orderedListMatch && (cleanLineTrimmed === `${orderedListMatch[2]}.` || cleanLineTrimmed === `${orderedListMatch[2]}`);
+      const isEmptyQuote = cleanLineTrimmed === '>';
+
+      if (isEmptyUnorderedList || isEmptyOrderedList || isEmptyQuote) {
+        e.preventDefault();
+        const before = text.slice(0, lineStart);
+        const after = text.slice(actualLineEnd);
+        const newText = before + '\n' + after;
+        const newCaretPos = lineStart + 1;
+        setContent(newText);
+        setTimeout(() => {
+          if (!editorRef.current) return;
+          editorRef.current.focus({ preventScroll: true });
+          editorRef.current.setSelectionRange(newCaretPos, newCaretPos);
+          saveCursorPosition();
+        }, 0);
+        return;
+      }
+
+      let listPrefix = '';
+      if (quoteMatch) {
+        listPrefix = quoteMatch[0];
+      } else if (unorderedListMatch) {
+        listPrefix = unorderedListMatch[0];
+        if (listPrefix.includes('[x]')) listPrefix = listPrefix.replace('[x]', '[ ]');
+        else if (listPrefix.includes('[X]')) listPrefix = listPrefix.replace('[X]', '[ ]');
+      } else if (orderedListMatch) {
+        const indent = orderedListMatch[1];
+        const num = parseInt(orderedListMatch[2], 10);
+        const delimiter = orderedListMatch[3];
+        listPrefix = indent + (num + 1) + delimiter;
+      }
+
+      // 2. Check if caret is inside an active inline formatting tag in the current line
+      const activeRange = getActiveFormatRangeInLine(currentLine, caretInLine);
+
+      if (activeRange) {
+        e.preventDefault();
+        const { openTag, closeTag, openIdx, closeIdx, contentStart, contentEnd, formatKey } = activeRange;
+        const insideText = currentLine.slice(contentStart, contentEnd);
+        const trimmedInside = insideText.trim();
+        const leadingSpaces = insideText.slice(0, insideText.length - insideText.trimStart().length);
+        const trailingSpaces = insideText.slice(insideText.trimEnd().length);
+
+        // Case A: Empty formatting tag (e.g. *|* or **|** or **   **) -> cancel formatting and start clean line
+        if (trimmedInside.length === 0) {
+          const beforeTag = currentLine.slice(0, openIdx);
+          const afterTag = currentLine.slice(closeIdx + closeTag.length);
+          const cleanedCurrentLine = beforeTag + insideText + afterTag;
+
+          const beforeDoc = text.slice(0, lineStart);
+          const afterDoc = text.slice(actualLineEnd);
+
+          const newText = beforeDoc + cleanedCurrentLine + '\n' + listPrefix + afterDoc;
+          const newCaretPos = lineStart + cleanedCurrentLine.length + 1 + listPrefix.length;
+
+          setContent(newText);
+          setActiveFormats(prev => ({ ...prev, [formatKey]: false }));
+          setTimeout(() => {
+            if (!editorRef.current) return;
+            editorRef.current.focus({ preventScroll: true });
+            editorRef.current.setSelectionRange(newCaretPos, newCaretPos);
+            saveCursorPosition();
+          }, 0);
+          return;
+        }
+
+        // Case B: Caret is at the end of formatted content (e.g. *курсор текст|*) -> close tag tightly and continue onto new line
+        if (caretInLine >= contentEnd) {
+          const beforeTag = currentLine.slice(0, openIdx);
+          const afterTag = currentLine.slice(closeIdx + closeTag.length);
+
+          const beforeDoc = text.slice(0, lineStart);
+          const afterDoc = text.slice(actualLineEnd);
+
+          const line1 = beforeTag + leadingSpaces + openTag + trimmedInside + closeTag + trailingSpaces + afterTag;
+          const line2 = listPrefix + openTag + closeTag;
+          const newText = beforeDoc + line1 + '\n' + line2 + afterDoc;
+          const newCaretPos = lineStart + line1.length + 1 + listPrefix.length + openTag.length;
+
+          setContent(newText);
+          setTimeout(() => {
+            if (!editorRef.current) return;
+            editorRef.current.focus({ preventScroll: true });
+            editorRef.current.setSelectionRange(newCaretPos, newCaretPos);
+            saveCursorPosition();
+          }, 0);
+          return;
+        }
+
+        // Case C: Caret is in the middle of formatted text (e.g. *перша частина| друга частина*) -> split tags cleanly and tightly
+        if (caretInLine > contentStart && caretInLine < contentEnd) {
+          const textBeforeCaretInTag = currentLine.slice(openIdx + openTag.length, caretInLine);
+          const textAfterCaretInTag = currentLine.slice(caretInLine, closeIdx);
+          const beforeTag = currentLine.slice(0, openIdx);
+          const afterTag = currentLine.slice(closeIdx + closeTag.length);
+
+          const lead1 = textBeforeCaretInTag.slice(0, textBeforeCaretInTag.length - textBeforeCaretInTag.trimStart().length);
+          const trail1 = textBeforeCaretInTag.slice(textBeforeCaretInTag.trimEnd().length);
+          const trim1 = textBeforeCaretInTag.trim();
+          const line1 = trim1 
+            ? (beforeTag + lead1 + openTag + trim1 + closeTag + trail1) 
+            : (beforeTag + textBeforeCaretInTag);
+
+          const lead2 = textAfterCaretInTag.slice(0, textAfterCaretInTag.length - textAfterCaretInTag.trimStart().length);
+          const trail2 = textAfterCaretInTag.slice(textAfterCaretInTag.trimEnd().length);
+          const trim2 = textAfterCaretInTag.trim();
+          const line2 = trim2 
+            ? (listPrefix + lead2 + openTag + trim2 + closeTag + trail2 + afterTag) 
+            : (listPrefix + openTag + closeTag + textAfterCaretInTag + afterTag);
+
+          const beforeDoc = text.slice(0, lineStart);
+          const afterDoc = text.slice(actualLineEnd);
+
+          const newText = beforeDoc + line1 + '\n' + line2 + afterDoc;
+          const newCaretPos = lineStart + line1.length + 1 + listPrefix.length + (trim2 ? (lead2.length + openTag.length) : openTag.length);
+
+          setContent(newText);
+          setTimeout(() => {
+            if (!editorRef.current) return;
+            editorRef.current.focus({ preventScroll: true });
+            editorRef.current.setSelectionRange(newCaretPos, newCaretPos);
+            saveCursorPosition();
+          }, 0);
+          return;
+        }
+      }
+
+      // 3. Handle default list/quote continuation
+      if (listPrefix) {
+        e.preventDefault();
+        const before = text.slice(0, caretPos);
+        const after = text.slice(caretPos);
+        const newText = before + '\n' + listPrefix + after;
+        const newCaretPos = caretPos + 1 + listPrefix.length;
+        setContent(newText);
+        setTimeout(() => {
+          if (!editorRef.current) return;
+          editorRef.current.focus({ preventScroll: true });
+          editorRef.current.setSelectionRange(newCaretPos, newCaretPos);
+          saveCursorPosition();
+        }, 0);
+        return;
+      }
+    }
+  }, [widgetPos, isWidgetVisible, isWidgetMenuOpen, saveCursorPosition, setContent]);
+
+  const handleMarkdownFormat = useCallback((tag: string, closeTag: string = tag) => {
+    if (!editorRef.current) return;
+    const textarea = editorRef.current;
+    const text = textarea.value;
+    const start = textarea.selectionStart;
+    const end = textarea.selectionEnd;
+
+    let formatKey: 'bold' | 'italic' | 'code' | 'strikethrough' | 'sub' | 'sup' | 'phishy' = 'bold';
+    if (tag === '*') formatKey = 'italic';
+    else if (tag === '`') formatKey = 'code';
+    else if (tag === '~~') formatKey = 'strikethrough';
+    else if (tag === '<sub>') formatKey = 'sub';
+    else if (tag === '<sup>') formatKey = 'sup';
+    else if (tag === '<div class="phishy">') formatKey = 'phishy';
+
+    textarea.focus();
+
+    if (start !== end) {
+      const selectedText = text.slice(start, end);
+      const before = text.slice(0, start);
+      const after = text.slice(end);
+
+      const leadingSpaces = selectedText.slice(0, selectedText.length - selectedText.trimStart().length);
+      const trailingSpaces = selectedText.slice(selectedText.trimEnd().length);
+      const trimmedSelection = selectedText.trim();
+
+      if (trimmedSelection.length > 0) {
+        const newText = before + leadingSpaces + tag + trimmedSelection + closeTag + trailingSpaces + after;
+        setContent(newText);
+        
+        const newStart = start + leadingSpaces.length + tag.length;
+        const newEnd = newStart + trimmedSelection.length;
+        setTimeout(() => {
+          if (!editorRef.current) return;
+          editorRef.current.focus({ preventScroll: true });
+          editorRef.current.setSelectionRange(newStart, newEnd);
+          saveCursorPosition();
+        }, 0);
+        return;
+      }
+    }
+
+    const caretPos = start;
+    const lineStart = text.lastIndexOf('\n', caretPos - 1) + 1;
+    const lineEnd = text.indexOf('\n', caretPos);
+    const actualLineEnd = lineEnd === -1 ? text.length : lineEnd;
+    const currentLine = text.substring(lineStart, actualLineEnd);
+    const caretInLine = caretPos - lineStart;
+
+    const ranges = getAllFormatRangesInLine(currentLine);
+    const matchingRanges = ranges.filter(r => r.formatKey === formatKey && caretInLine >= r.openIdx && caretInLine <= r.closeIdx + r.closeTag.length);
+    matchingRanges.sort((a, b) => (a.closeIdx - a.openIdx) - (b.closeIdx - b.openIdx));
+    const matchingRange = matchingRanges[0] || null;
+
+    if (matchingRange) {
+      const { openIdx, closeIdx, contentStart, contentEnd, openTag, closeTag: cTag } = matchingRange;
+      const insideText = currentLine.slice(contentStart, contentEnd);
+      const trimmedInside = insideText.trim();
+      const leadingSpaces = insideText.slice(0, insideText.length - insideText.trimStart().length);
+      const trailingSpaces = insideText.slice(insideText.trimEnd().length);
+
+      // 1. If tag is empty or only whitespace (e.g. *|* or **   **), remove it completely
+      if (trimmedInside.length === 0) {
+        const beforeTag = currentLine.slice(0, openIdx);
+        const afterTag = currentLine.slice(closeIdx + cTag.length);
+        const newLine = beforeTag + insideText + afterTag;
+        const newText = text.slice(0, lineStart) + newLine + text.slice(actualLineEnd);
+        const newCaretPos = lineStart + openIdx + leadingSpaces.length;
+
+        setContent(newText);
+        setActiveFormats(prev => ({ ...prev, [formatKey]: false }));
+        setTimeout(() => {
+          if (!editorRef.current) return;
+          editorRef.current.focus({ preventScroll: true });
+          editorRef.current.setSelectionRange(newCaretPos, newCaretPos);
+          saveCursorPosition();
+        }, 0);
+        return;
+      }
+
+      // 2. If caret is at or after the end of formatted content (e.g. **іаві| ** or ** іаві **|), exit/finish format and jump out
+      if (caretInLine >= contentEnd || caretInLine >= closeIdx) {
+        const beforeTag = currentLine.slice(0, openIdx);
+        const afterTag = currentLine.slice(closeIdx + cTag.length);
+        const normalizedTag = leadingSpaces + openTag + trimmedInside + cTag + trailingSpaces;
+        const newLine = beforeTag + normalizedTag + afterTag;
+        const newText = text.slice(0, lineStart) + newLine + text.slice(actualLineEnd);
+        const newCaretPos = lineStart + beforeTag.length + normalizedTag.length;
+
+        setContent(newText);
+        setActiveFormats(prev => ({ ...prev, [formatKey]: false }));
+        setTimeout(() => {
+          if (!editorRef.current) return;
+          editorRef.current.focus({ preventScroll: true });
+          editorRef.current.setSelectionRange(newCaretPos, newCaretPos);
+          saveCursorPosition();
+        }, 0);
+        return;
+      }
+
+      // 3. Otherwise, unwrap the format tags from the surrounding text
+      const beforeTag = currentLine.slice(0, openIdx);
+      const afterTag = currentLine.slice(closeIdx + cTag.length);
+
+      const newLine = beforeTag + insideText + afterTag;
+      const newText = text.slice(0, lineStart) + newLine + text.slice(actualLineEnd);
+      const newCaretPos = lineStart + openIdx + (caretInLine - (openIdx + openTag.length));
+
+      setContent(newText);
+      setActiveFormats(prev => ({ ...prev, [formatKey]: false }));
+      setTimeout(() => {
+        if (!editorRef.current) return;
+        editorRef.current.focus({ preventScroll: true });
+        editorRef.current.setSelectionRange(newCaretPos, newCaretPos);
+        saveCursorPosition();
+      }, 0);
+      return;
+    }
+
+    // 4. We are NOT inside this format tag. Check if caret is inside a word to wrap it.
+    let wordStart = caretInLine;
+    let wordEnd = caretInLine;
+    while (wordStart > 0 && /\w|[\u0400-\u04FF]/.test(currentLine[wordStart - 1])) {
+      wordStart--;
+    }
+    while (wordEnd < currentLine.length && /\w|[\u0400-\u04FF]/.test(currentLine[wordEnd])) {
+      wordEnd++;
+    }
+    const word = currentLine.slice(wordStart, wordEnd);
+
+    if (word.length > 0 && caretInLine >= wordStart && caretInLine <= wordEnd) {
+      const beforeWord = currentLine.slice(0, wordStart);
+      const afterWord = currentLine.slice(wordEnd);
+      const newLine = beforeWord + tag + word + closeTag + afterWord;
+      const newText = text.slice(0, lineStart) + newLine + text.slice(actualLineEnd);
+      const newCaretPos = lineStart + wordStart + tag.length + (caretInLine - wordStart);
+
+      setContent(newText);
+      setActiveFormats(prev => ({ ...prev, [formatKey]: true }));
+      setTimeout(() => {
+        if (!editorRef.current) return;
+        editorRef.current.focus({ preventScroll: true });
+        editorRef.current.setSelectionRange(newCaretPos, newCaretPos);
+        saveCursorPosition();
+      }, 0);
+    } else {
+      // Insert empty pair e.g. *|*
+      const beforeCaret = currentLine.slice(0, caretInLine);
+      const afterCaret = currentLine.slice(caretInLine);
+      const newLine = beforeCaret + tag + closeTag + afterCaret;
+      const newText = text.slice(0, lineStart) + newLine + text.slice(actualLineEnd);
+      const newCaretPos = lineStart + caretInLine + tag.length;
+
+      setContent(newText);
+      setActiveFormats(prev => ({ ...prev, [formatKey]: true }));
+      setTimeout(() => {
+        if (!editorRef.current) return;
+        editorRef.current.focus({ preventScroll: true });
+        editorRef.current.setSelectionRange(newCaretPos, newCaretPos);
+        saveCursorPosition();
+      }, 0);
+    }
+  }, [saveCursorPosition, setContent]);
+
+  const fmt = useCallback((prefix: string, suffix: string = prefix) => {
+    if (editorMode === 'visual') {
+      let formatKey: 'bold' | 'italic' | 'strikethrough' | 'sub' | 'sup' | 'code' | 'phishy' | null = null;
+      if (prefix === '**') formatKey = 'bold';
+      else if (prefix === '*') formatKey = 'italic';
+      else if (prefix === '~~') formatKey = 'strikethrough';
+      else if (prefix === '<sub>') formatKey = 'sub';
+      else if (prefix === '<sup>') formatKey = 'sup';
+      else if (prefix === '`') formatKey = 'code';
+      else if (prefix === '<div class="phishy">') formatKey = 'phishy';
+
+      const isFormatActive = formatKey ? activeFormats[formatKey] : false;
+
+      let isCollapsed = false;
+      let range: Range | null = null;
+      const sel = window.getSelection();
+      if (sel && sel.rangeCount > 0) {
+        range = sel.getRangeAt(0);
+        isCollapsed = sel.isCollapsed || range.collapsed;
+      } else if (savedVisualRangeRef.current) {
+        range = savedVisualRangeRef.current;
+        isCollapsed = range.collapsed;
+      }
+
+      // 1. If format is active AND cursor is collapsed, we handle EXITING/DEACTIVATING the format.
+      // We should jump out of the active element instead of stripping the formatting from the word.
+      if (isCollapsed && isFormatActive && formatKey && range) {
+        let activeElement: HTMLElement | null = null;
+        let temp = range.startContainer as Node | null;
+        while (temp && temp !== wysiwygRef.current) {
+          if (temp.nodeType === Node.ELEMENT_NODE) {
+            const tagName = (temp as HTMLElement).tagName.toUpperCase();
+            if (formatKey === 'bold' && (tagName === 'STRONG' || tagName === 'B')) {
+              activeElement = temp as HTMLElement;
+              break;
+            }
+            if (formatKey === 'italic' && (tagName === 'EM' || tagName === 'I')) {
+              activeElement = temp as HTMLElement;
+              break;
+            }
+            if (formatKey === 'strikethrough' && (tagName === 'STRIKE' || tagName === 'DEL' || tagName === 'S')) {
+              activeElement = temp as HTMLElement;
+              break;
+            }
+            if (formatKey === 'sub' && tagName === 'SUB') {
+              activeElement = temp as HTMLElement;
+              break;
+            }
+            if (formatKey === 'sup' && tagName === 'SUP') {
+              activeElement = temp as HTMLElement;
+              break;
+            }
+            if (formatKey === 'code' && tagName === 'CODE') {
+              activeElement = temp as HTMLElement;
+              break;
+            }
+            if (formatKey === 'phishy' && (tagName === 'SPAN' || tagName === 'DIV') && (temp as HTMLElement).classList.contains('phishy')) {
+              activeElement = temp as HTMLElement;
+              break;
+            }
+          }
+          temp = temp.parentNode;
+        }
+
+        if (activeElement) {
+          let isAtEnd: boolean;
+          if (range.startContainer.nodeType === Node.TEXT_NODE) {
+            const textContent = range.startContainer.textContent || '';
+            const offset = range.startOffset;
+            const remainingText = textContent.substring(offset);
+            isAtEnd = /^[\u200B]*$/.test(remainingText);
+          } else {
+            isAtEnd = range.startContainer === activeElement && range.startOffset === activeElement.childNodes.length;
+          }
+          
+          if (isAtEnd) {
+            const parent = activeElement.parentNode;
+            if (parent) {
+              const zwsp = document.createTextNode('\u200B');
+              parent.insertBefore(zwsp, activeElement.nextSibling);
+              
+              const newRange = document.createRange();
+              newRange.setStart(zwsp, 1);
+              newRange.setEnd(zwsp, 1);
+              
+              const currentSel = window.getSelection();
+              if (currentSel) {
+                currentSel.removeAllRanges();
+                currentSel.addRange(newRange);
+              }
+              
+              if (wysiwygRef.current) {
+                wysiwygRef.current.focus({ preventScroll: true });
+              }
+              
+              savedVisualRangeRef.current = newRange.cloneRange();
+              
+              setActiveFormats(prev => ({ ...prev, [formatKey!]: false }));
+              updateContentFromWysiwyg();
+              return;
+            }
+          }
+        }
+      }
+
+      // 2. Determine if we should expand the word when RESTORING selection.
+      // We only expand the word if:
+      // - The cursor is collapsed
+      // - The format is NOT currently active (we want to apply it to a word)
+      // - The cursor is strictly inside a word (not at the start or end of a word or at a space)
+      let shouldExpandWord = false;
+      if (isCollapsed && range && !isFormatActive) {
+        const node = range.startContainer;
+        const offset = range.startOffset;
+        if (node && node.nodeType === Node.TEXT_NODE) {
+          const textValue = node.nodeValue || '';
+          const wordBoundaryRegex = /[\s\n.,!?;:"'()[\]{}*~`<>#_]/;
+          let wStart = offset;
+          let wEnd = offset;
+          while (wStart > 0 && !wordBoundaryRegex.test(textValue[wStart - 1])) {
+            wStart--;
+          }
+          while (wEnd < textValue.length && !wordBoundaryRegex.test(textValue[wEnd])) {
+            wEnd++;
+          }
+          
+          // Only expand if cursor is strictly inside/adjacent to word, and not at the very end of the text node (continuous typing)
+          if (wStart < wEnd && offset > wStart && offset < wEnd) {
+            shouldExpandWord = true;
+          }
+        }
+      }
+
+      restoreVisualSelection(shouldExpandWord);
+
+      let command = '';
+      if (prefix === '**') command = 'bold';
+      else if (prefix === '*') command = 'italic';
+      else if (prefix === '~~') command = 'strikeThrough';
+      else if (prefix === '<sub>') command = 'subscript';
+      else if (prefix === '<sup>') command = 'superscript';
+
+      if (command) {
+        if (isCollapsed) {
+          const sel = window.getSelection();
+          if (sel && sel.rangeCount > 0) {
+            const r = sel.getRangeAt(0);
+            const container = r.startContainer;
+            let isEmpty = false;
+            if (container.nodeType === Node.ELEMENT_NODE) {
+               if ((container.textContent || '').replace(/[\u200B\s\n]/g, '') === '') isEmpty = true;
+            } else if (container.nodeType === Node.TEXT_NODE) {
+               if ((container.textContent || '').replace(/[\u200B\s\n]/g, '') === '') isEmpty = true;
+            }
+            if (isEmpty) {
+              const zwsp = document.createTextNode('\u200B');
+              r.insertNode(zwsp);
+              r.setStart(zwsp, 1);
+              r.setEnd(zwsp, 1);
+              sel.removeAllRanges();
+              sel.addRange(r);
+            }
+          }
+        }
+        document.execCommand(command, false);
+        const selAfter = window.getSelection();
+        if (selAfter && selAfter.rangeCount > 0 && shouldExpandWord) {
+          selAfter.collapseToEnd();
+          savedVisualRangeRef.current = selAfter.getRangeAt(0).cloneRange();
+          updateContentFromWysiwyg();
+          return;
+        }
+        const isCollapsedAfter = selAfter ? (selAfter.isCollapsed || (selAfter.rangeCount > 0 && selAfter.getRangeAt(0).collapsed)) : true;
+
+        if (isCollapsedAfter) {
+          // Toggle local state for immediate toolbar response
+          let formatKeyToggle: 'bold' | 'italic' | 'strikethrough' | 'sub' | 'sup' = 'bold';
+          if (command === 'italic') formatKeyToggle = 'italic';
+          else if (command === 'strikeThrough') formatKeyToggle = 'strikethrough';
+          else if (command === 'subscript') formatKeyToggle = 'sub';
+          else if (command === 'superscript') formatKeyToggle = 'sup';
+          
+          setActiveFormats(prev => ({
+            ...prev,
+            [formatKeyToggle]: !prev[formatKeyToggle]
+          }));
+          
+          if (wysiwygRef.current) {
+            wysiwygRef.current.focus({ preventScroll: true });
+          }
+          return; // Skip updateContentFromWysiwyg to preserve typing command state
+        }
+      } else {
+        if (prefix === '`') {
+          const text = getVisualSelectionHtml() || '';
+          insertHtmlAtCursor(`<code>${text}</code>`);
+          if (!text) {
+            setActiveFormats(prev => ({ ...prev, code: true }));
+          }
+        } else if (prefix === '```\n') {
+          const text = getVisualSelectionHtml() || 'code block';
+          insertHtmlAtCursor(`<pre><code>${text}</code></pre>`);
+        } else if (prefix === '<div class="phishy">') {
+          const text = getVisualSelectionHtml() || '';
+          insertHtmlAtCursor(`<span class="phishy">${text}</span>`);
+          if (!text) {
+            setActiveFormats(prev => ({ ...prev, phishy: true }));
+          }
+        } else if (prefix.includes('text-left') || prefix === '<div class="text-left">\n') {
+          const text = getVisualSelectionHtml() || '';
+          insertHtmlAtCursor(`<div class="text-left">${text}</div>`);
+        } else if (prefix.includes('text-right') || prefix === '<div class="text-right">\n') {
+          const text = getVisualSelectionHtml() || '';
+          insertHtmlAtCursor(`<div class="text-right">${text}</div>`);
+        } else if (prefix.includes('text-justify') || prefix === '<div class="text-justify">\n') {
+          const text = getVisualSelectionHtml() || '';
+          insertHtmlAtCursor(`<div class="text-justify">${text}</div>`);
+        } else if (prefix.includes('<center>') || prefix === '<center>\n') {
+          const text = getVisualSelectionHtml() || '';
+          insertHtmlAtCursor(`<center>${text}</center>`);
+        } else {
+          const text = getVisualSelectionHtml() || '';
+          insertHtmlAtCursor(`${prefix}${text}${suffix}`);
+        }
+      }
+      updateContentFromWysiwyg();
+      return;
+    }
+
+    if (!editorRef.current) return;
+
+    if (prefix === '**' || prefix === '*' || prefix === '`' || prefix === '~~' || prefix === '<sub>' || prefix === '<sup>' || prefix === '<div class="phishy">') {
+      handleMarkdownFormat(prefix, suffix);
+      return;
+    }
+
+    const range = getSelectionOrWord();
+    
+    if (range.text.length === 0) {
+      const textToInsert = prefix + suffix;
+      const newContent = useEditorStore.getState().content.substring(0, range.s) + textToInsert + useEditorStore.getState().content.substring(range.e);
+      setContent(newContent);
+      setTimeout(() => {
+        if (!editorRef.current) return;
+        editorRef.current.focus({ preventScroll: true }); editorRef.current.setSelectionRange(range.s + prefix.length, range.s + prefix.length);
+      }, 0);
+    } else {
+      const leadingSpaces = range.text.slice(0, range.text.length - range.text.trimStart().length);
+      const trailingSpaces = range.text.slice(range.text.trimEnd().length);
+      const trimmed = range.text.trim();
+      const newText = trimmed ? (leadingSpaces + prefix + trimmed + suffix + trailingSpaces) : (prefix + suffix);
+      const newContent = useEditorStore.getState().content.substring(0, range.s) + newText + useEditorStore.getState().content.substring(range.e);
+      setContent(newContent);
+      setTimeout(() => {
+        if (!editorRef.current) return;
+        editorRef.current.focus({ preventScroll: true }); 
+        editorRef.current.setSelectionRange(range.s + leadingSpaces.length + prefix.length, range.s + leadingSpaces.length + prefix.length + trimmed.length);
+      }, 0);
+    }
+  }, [ getSelectionOrWord, editorMode, insertHtmlAtCursor, getVisualSelectionHtml, restoreVisualSelection, handleMarkdownFormat, updateContentFromWysiwyg, activeFormats, setContent]);
+
+  const deleteActiveTableRow = useCallback(() => {
+    if (activeTableRow && wysiwygRef.current && wysiwygRef.current.contains(activeTableRow)) {
+      const table = activeTableRow.closest('table');
+      activeTableRow.remove();
+      if (table && (!table.textContent || table.textContent.trim() === '')) {
+        table.remove();
+        setActiveTable(null);
+      }
+      setActiveTableRow(null);
+      setActiveTableCell(null);
+      updateContentFromWysiwyg();
+      setIsWidgetVisible(false);
+    }
+  }, [activeTableRow, updateContentFromWysiwyg]);
+
+  const deleteActiveTableCol = useCallback(() => {
+    if (activeTableCell && activeTable && wysiwygRef.current && wysiwygRef.current.contains(activeTableCell)) {
+      const colIndex = (activeTableCell as HTMLTableCellElement).cellIndex;
+      const rows = activeTable.querySelectorAll('tr');
+      rows.forEach(row => {
+        if (row.cells[colIndex]) {
+          row.cells[colIndex].remove();
+        }
+      });
+      
+      if (activeTable.rows.length === 0 || (activeTable.rows[0] && activeTable.rows[0].cells.length === 0)) {
+        activeTable.remove();
+        setActiveTable(null);
+        setActiveTableRow(null);
+      }
+      setActiveTableCell(null);
+      
+      updateContentFromWysiwyg();
+      setIsWidgetVisible(false);
+    }
+  }, [activeTable, activeTableCell, updateContentFromWysiwyg]);
+
+  const deleteActiveTable = useCallback(() => {
+    if (activeTable && wysiwygRef.current && wysiwygRef.current.contains(activeTable)) {
+      activeTable.remove();
+      setActiveTable(null);
+      setActiveTableRow(null);
+      setActiveTableCell(null);
+      updateContentFromWysiwyg();
+      setIsWidgetVisible(false);
+    }
+  }, [activeTable, updateContentFromWysiwyg]);
+
+  const fmtLine = useCallback((prefix: string) => {
+    const content = useEditorStore.getState().content;
+    if (editorMode === 'visual') {
+      restoreVisualSelection(true);
+      if (prefix === '# ') {
+        document.execCommand('formatBlock', false, '<h1>');
+      } else if (prefix === '## ') {
+        document.execCommand('formatBlock', false, '<h2>');
+      } else if (prefix === '### ') {
+        document.execCommand('formatBlock', false, '<h3>');
+      } else if (prefix === '> ') {
+        document.execCommand('formatBlock', false, '<blockquote>');
+      } else if (prefix === '- ') {
+        document.execCommand('insertUnorderedList', false);
+      } else if (prefix === '1. ') {
+        document.execCommand('insertOrderedList', false);
+      } else if (prefix === '- [ ] ') {
+        insertHtmlAtCursor('<ul class="task-list"><li><input type="checkbox" style="margin-right: 0.5rem;" /> Task</li></ul>');
+      } else {
+        const text = getVisualSelectionHtml();
+        insertHtmlAtCursor(`${prefix}${text}`);
+      }
+      updateContentFromWysiwyg();
+      return;
+    }
+
+    if (!editorRef.current) return;
+    const start = editorRef.current.selectionStart;
+    const end = editorRef.current.selectionEnd;
+    
+    if (start === end) {
+      const lastNewline = content.lastIndexOf('\n', start - 1) + 1;
+      const newContent = content.substring(0, lastNewline) + prefix + content.substring(lastNewline);
+      setContent(newContent);
+      setTimeout(() => {
+        if (!editorRef.current) return;
+        editorRef.current.focus({ preventScroll: true }); editorRef.current.setSelectionRange(start + prefix.length, start + prefix.length);
+      }, 0);
+    } else {
+      // Multi-line selection
+      const selectedText = content.substring(start, end);
+      const lines = selectedText.split('\n');
+      const newText = lines.map(line => line.trim() ? prefix + line : line).join('\n');
+      const newContent = content.substring(0, start) + newText + content.substring(end);
+      setContent(newContent);
+      setTimeout(() => {
+        if (!editorRef.current) return;
+        editorRef.current.focus({ preventScroll: true }); editorRef.current.setSelectionRange(start, start + newText.length);
+      }, 0);
+    }
+  }, [ editorMode, insertHtmlAtCursor, getVisualSelectionHtml, restoreVisualSelection, updateContentFromWysiwyg, setContent]);
+
+  const handleLink = useCallback(async () => {
+    const content = useEditorStore.getState().content;
+    if (editorMode === 'visual') {
+      restoreVisualSelection(true);
+      const selectionHtml = getVisualSelectionHtml() || '';
+      const isUrl = /^(https?:\/\/|www\.)\S+$/i.test(selectionHtml.trim());
+      
+      if (isUrl) {
+        const label = await promptDialog(t('linkPrompt'), "");
+        if (label !== null) {
+          const cleanLabel = label.trim() || selectionHtml;
+          insertHtmlAtCursor(`<a href="${selectionHtml.trim()}">${cleanLabel}</a>`);
+        }
+      } else {
+        const url = await promptDialog(t('urlPrompt'), "https://");
+        if (url) {
+          document.execCommand('createLink', false, url);
+          updateContentFromWysiwyg();
+        }
+      }
+      return;
+    }
+
+    const selection = getSelectionOrWord();
+    const trimmed = selection.text.trim();
+    const isUrl = /^(https?:\/\/|www\.)\S+$/i.test(trimmed);
+    
+    if (isUrl) {
+      const label = await promptDialog(t('linkPrompt'), "");
+      if (label !== null) {
+        const newText = label ? `[${label}](${trimmed})` : `[${trimmed}](${trimmed})`;
+        const newContent = content.substring(0, selection.s) + newText + content.substring(selection.e);
+        setContent(newContent);
+      }
+    } else {
+      const url = await promptDialog(t('urlPrompt'), "https://");
+      if (url) fmt('[', `](${url})`);
+    }
+  }, [ t, getSelectionOrWord, fmt, promptDialog, editorMode, restoreVisualSelection, getVisualSelectionHtml, insertHtmlAtCursor, updateContentFromWysiwyg, setContent]);
+
+  const handleIndent = useCallback(() => {
+    const content = useEditorStore.getState().content;
+    if (editorMode === 'visual') {
+      restoreVisualSelection(false);
+      const sel = window.getSelection();
+      let insideList = false;
+      if (sel && sel.rangeCount > 0) {
+        let node: Node | null = sel.getRangeAt(0).startContainer;
+        if (node.nodeType === Node.TEXT_NODE) node = node.parentNode;
+        insideList = !!(node as HTMLElement)?.closest?.('li, ul, ol');
+      }
+      
+      if (insideList) {
+        document.execCommand('indent', false);
+      } else {
+        insertHtmlAtCursor('&nbsp;&nbsp;&nbsp;&nbsp;');
+      }
+      updateContentFromWysiwyg();
+      return;
+    }
+    if (!editorRef.current) return;
+    const start = editorRef.current.selectionStart;
+    const end = editorRef.current.selectionEnd;
+    const selectedText = content.substring(start, end);
+    const lines = selectedText.split('\n');
+    const newText = lines.map(line => '    ' + line).join('\n');
+    const newContent = content.substring(0, start) + newText + content.substring(end);
+    setContent(newContent);
+  }, [ editorMode, restoreVisualSelection, updateContentFromWysiwyg, insertHtmlAtCursor, setContent]);
+
+  const tryHeadingEnterBreakout = useCallback((shiftKey: boolean = false): boolean => {
+    if (shiftKey) return false;
+    const sel = window.getSelection();
+    if (!sel || sel.rangeCount === 0 || !wysiwygRef.current) return false;
+    const range = sel.getRangeAt(0);
+    const node = range.startContainer;
+    if (!node) return false;
+
+    let headingEl: HTMLElement | null = node.nodeType === Node.TEXT_NODE ? node.parentElement : (node as HTMLElement);
+    while (headingEl && headingEl !== wysiwygRef.current && !['H1', 'H2', 'H3', 'H4', 'H5', 'H6'].includes(headingEl.tagName)) {
+      headingEl = headingEl.parentElement;
+    }
+
+    if (!headingEl || headingEl === wysiwygRef.current) return false;
+    const parent = headingEl.parentNode;
+    if (!parent) return false;
+
+    const headingText = (headingEl.textContent || '').replace(/[\u200B\s\n]/g, '');
+
+    // Case 1: Heading is completely empty -> turn into standard paragraph
+    if (headingText === '') {
+      const p = document.createElement('p');
+      p.innerHTML = '<br>';
+      parent.replaceChild(p, headingEl);
+
+      const newRange = document.createRange();
+      newRange.selectNodeContents(p);
+      newRange.collapse(true);
+      sel.removeAllRanges();
+      sel.addRange(newRange);
+      savedVisualRangeRef.current = newRange.cloneRange();
+      if (wysiwygRef.current) wysiwygRef.current.focus({ preventScroll: true });
+      updateContentFromWysiwyg();
+      return true;
+    }
+
+    // Case 2: Check if cursor is at the end, beginning, or middle
+    const marker = document.createElement('span');
+    marker.id = 'temp-heading-marker';
+    try {
+      range.insertNode(marker);
+
+      const hasText = (n: Node): boolean => {
+        if (n.nodeType === Node.TEXT_NODE) {
+          return (n.nodeValue?.replace(/[\u200B\s\n]/g, '') || '').length > 0;
+        }
+        if (n.nodeType === Node.ELEMENT_NODE) {
+          const el = n as HTMLElement;
+          if (el.tagName === 'BR' || el.id === 'temp-heading-marker') return false;
+          return (el.textContent?.replace(/[\u200B\s\n]/g, '') || '').length > 0;
+        }
+        return false;
+      };
+
+      // Scan left from marker
+      let isLeftEmpty = true;
+      let currLeft: Node | null = marker;
+      while (currLeft && currLeft !== headingEl) {
+        let sib = currLeft.previousSibling;
+        while (sib) {
+          if (sib.nodeType === Node.ELEMENT_NODE && (sib as HTMLElement).tagName === 'BR') break;
+          if (hasText(sib)) { isLeftEmpty = false; break; }
+          sib = sib.previousSibling;
+        }
+        if (!isLeftEmpty || (currLeft.previousSibling && (currLeft.previousSibling as HTMLElement).tagName === 'BR')) break;
+        currLeft = currLeft.parentNode;
+      }
+
+      // Scan right from marker
+      let isRightEmpty = true;
+      let currRight: Node | null = marker;
+      while (currRight && currRight !== headingEl) {
+        let sib = currRight.nextSibling;
+        while (sib) {
+          if (sib.nodeType === Node.ELEMENT_NODE && (sib as HTMLElement).tagName === 'BR') break;
+          if (hasText(sib)) { isRightEmpty = false; break; }
+          sib = sib.nextSibling;
+        }
+        if (!isRightEmpty || (currRight.nextSibling && (currRight.nextSibling as HTMLElement).tagName === 'BR')) break;
+        currRight = currRight.parentNode;
+      }
+
+      // Find direct child of heading containing the marker
+      let directChild: Node | null = marker;
+      while (directChild && directChild.parentNode !== headingEl) {
+        directChild = directChild.parentNode;
+      }
+
+      if (directChild) {
+        const childs: Node[] = Array.from(headingEl.childNodes);
+        const directIndex = childs.indexOf(directChild);
+        const leftChildren = directIndex > 0 ? childs.slice(0, directIndex) : [];
+        const rightChildren = directIndex + 1 < childs.length ? childs.slice(directIndex + 1) : [];
+
+        // Clean trailing/leading <br>
+        while (leftChildren.length > 0 && leftChildren[leftChildren.length - 1].nodeType === Node.ELEMENT_NODE && (leftChildren[leftChildren.length - 1] as HTMLElement).tagName === 'BR') {
+          leftChildren.pop();
+        }
+        while (rightChildren.length > 0 && rightChildren[0].nodeType === Node.ELEMENT_NODE && (rightChildren[0] as HTMLElement).tagName === 'BR') {
+          rightChildren.shift();
+        }
+
+        // If at the end of the heading: create <p><br></p> AFTER heading
+        if (isRightEmpty) {
+          headingEl.innerHTML = '';
+          if (leftChildren.length > 0) {
+            leftChildren.forEach(c => headingEl!.appendChild(c));
+          } else {
+            headingEl.innerHTML = '<br>';
+          }
+
+          const p = document.createElement('p');
+          p.innerHTML = '<br>';
+          parent.insertBefore(p, headingEl.nextSibling);
+
+          const newRange = document.createRange();
+          newRange.selectNodeContents(p);
+          newRange.collapse(true);
+          sel.removeAllRanges();
+          sel.addRange(newRange);
+          savedVisualRangeRef.current = newRange.cloneRange();
+          if (wysiwygRef.current) wysiwygRef.current.focus({ preventScroll: true });
+          updateContentFromWysiwyg();
+          return true;
+        }
+
+        // If at the beginning of the heading: create <p><br></p> BEFORE heading, stay in heading
+        if (isLeftEmpty) {
+          headingEl.innerHTML = '';
+          if (rightChildren.length > 0) {
+            rightChildren.forEach(c => headingEl!.appendChild(c));
+          } else {
+            headingEl.innerHTML = '<br>';
+          }
+
+          const p = document.createElement('p');
+          p.innerHTML = '<br>';
+          parent.insertBefore(p, headingEl);
+
+          const newRange = document.createRange();
+          newRange.selectNodeContents(headingEl);
+          newRange.collapse(true);
+          sel.removeAllRanges();
+          sel.addRange(newRange);
+          savedVisualRangeRef.current = newRange.cloneRange();
+          if (wysiwygRef.current) wysiwygRef.current.focus({ preventScroll: true });
+          updateContentFromWysiwyg();
+          return true;
+        }
+
+        // If in the middle of the heading: split into two headings
+        const leftHeading = headingEl;
+        const rightHeading = document.createElement(leftHeading.tagName.toLowerCase());
+        rightHeading.className = leftHeading.className;
+
+        leftHeading.innerHTML = '';
+        leftChildren.forEach(c => leftHeading.appendChild(c));
+
+        rightHeading.innerHTML = '';
+        if (rightChildren.length > 0) {
+          rightChildren.forEach(c => rightHeading.appendChild(c));
+        } else {
+          rightHeading.innerHTML = '<br>';
+        }
+
+        parent.insertBefore(rightHeading, leftHeading.nextSibling);
+
+        const newRange = document.createRange();
+        newRange.selectNodeContents(rightHeading);
+        newRange.collapse(true);
+        sel.removeAllRanges();
+        sel.addRange(newRange);
+        savedVisualRangeRef.current = newRange.cloneRange();
+        if (wysiwygRef.current) wysiwygRef.current.focus({ preventScroll: true });
+        updateContentFromWysiwyg();
+        return true;
+      }
+    } catch (err) {
+      console.warn('Heading breakout error:', err);
+    } finally {
+      if (marker.parentNode) {
+        marker.parentNode.removeChild(marker);
+      }
+    }
+    return false;
+  }, [updateContentFromWysiwyg]);
+
+  const handleWysiwygBeforeInput = useCallback((e: any) => {
+    if (e.inputType === 'insertParagraph' || e.inputType === 'insertLineBreak') {
+      if (tryHeadingEnterBreakout(false)) {
+        e.preventDefault();
+      }
+    }
+  }, [tryHeadingEnterBreakout]);
+
+  const handleWysiwygKeyDown = useCallback((e: React.KeyboardEvent<HTMLDivElement>) => {
+    const isMod = e.ctrlKey || e.metaKey;
+    
+    
+
+    if (e.key === 'Tab') {
+      e.preventDefault();
+      handleIndent();
+      return;
+    }
+
+    // 1. Single Enter on Heading breakout
+    if ((e.key === 'Enter' || e.keyCode === 13) && !isMod && !e.shiftKey) {
+      if (tryHeadingEnterBreakout(e.shiftKey)) {
+        e.preventDefault();
+        return;
+      }
+    }
+
+    if ((e.key === ' ' || e.key === 'Enter') && !isMod) {
+      const sel = window.getSelection();
+      if (sel && sel.rangeCount > 0 && sel.isCollapsed) {
+        const node = sel.focusNode;
+        if (node && node.nodeType === Node.TEXT_NODE) {
+          const text = node.textContent || '';
+          const offset = sel.focusOffset;
+          const headText = text.substring(0, offset);
+          const words = headText.split(/[\s\n]/);
+          const lastWord = words[words.length - 1];
+          if (lastWord && isImageAndProxyUrl(lastWord.trim())) {
+            e.preventDefault();
+            const trimmedWord = lastWord.trim();
+            const beforeWord = headText.substring(0, headText.length - lastWord.length);
+            const afterCursor = text.substring(offset);
+            
+            node.nodeValue = beforeWord;
+            
+            const img = document.createElement('img');
+            img.src = trimmedWord;
+            img.alt = 'image';
+            
+            const parent = node.parentNode;
+            if (parent) {
+              const nextSib = node.nextSibling;
+              parent.insertBefore(img, nextSib);
+              
+              const spacer = e.key === ' ' ? '\u00A0' : '\n';
+              const suffixNode = document.createTextNode(spacer + afterCursor);
+              parent.insertBefore(suffixNode, img.nextSibling);
+              
+              const newRange = document.createRange();
+              newRange.setStart(suffixNode, 1);
+              newRange.collapse(true);
+              sel.removeAllRanges();
+              sel.addRange(newRange);
+              
+              updateContentFromWysiwyg();
+              return;
+            }
+          }
+        }
+      }
+    }
+
+    if (e.key === ' ' && !isMod) {
+      const sel = window.getSelection();
+      if (sel && sel.rangeCount > 0 && sel.isCollapsed) {
+        const node = sel.focusNode;
+        if (node && node.nodeType === Node.TEXT_NODE) {
+          const text = node.textContent || '';
+          const offset = sel.focusOffset;
+          if (offset === text.length) {
+            let format = null;
+            if (text === '#') format = '<h1>';
+            else if (text === '##') format = '<h2>';
+            else if (text === '###') format = '<h3>';
+            else if (text === '####') format = '<h4>';
+            else if (text === '>') format = '<blockquote>';
+            
+            if (text === '-') {
+                e.preventDefault();
+                node.textContent = '';
+                document.execCommand('insertUnorderedList', false);
+                return;
+            } else if (text === '1.') {
+                e.preventDefault();
+                node.textContent = '';
+                document.execCommand('insertOrderedList', false);
+                return;
+            } else if (format) {
+              e.preventDefault();
+              node.textContent = '';
+              document.execCommand('formatBlock', false, format);
+              return;
+            }
+          }
+        }
+      }
+    }
+
+    // Formatting keyboard shortcuts
+    if (isMod) {
+      if (e.key.toLowerCase() === 'b') {
+        e.preventDefault();
+        fmt('**');
+        return;
+      }
+      if (e.key.toLowerCase() === 'i') {
+        e.preventDefault();
+        fmt('*');
+        return;
+      }
+      if (e.key.toLowerCase() === 'k') {
+        e.preventDefault();
+        handleLink();
+        return;
+      }
+    }
+
+    if (e.shiftKey && isMod) {
+      if (e.key.toLowerCase() === 'x') {
+        e.preventDefault();
+        fmt('~~');
+        return;
+      }
+      if (e.key.toLowerCase() === 'c') {
+        e.preventDefault();
+        fmt('`');
+        return;
+      }
+    }
+    
+    // On-the-fly markdown shortcut expander
+    if (e.key === ' ') {
+      const sel = window.getSelection();
+      if (sel && sel.rangeCount > 0) {
+        const range = sel.getRangeAt(0);
+        const startNode = range.startContainer;
+        
+        if (startNode.nodeType === Node.TEXT_NODE) {
+          const textValue = startNode.nodeValue || '';
+          const offset = range.startOffset;
+          const headText = textValue.substring(0, offset);
+          
+          let match = false;
+          let blockTag = '';
+          let cmd = '';
+          
+          if (headText === '#') {
+            blockTag = 'h1';
+            match = true;
+          } else if (headText === '##') {
+            blockTag = 'h2';
+            match = true;
+          } else if (headText === '###') {
+            blockTag = 'h3';
+            match = true;
+          } else if (headText === '####') {
+            blockTag = 'h4';
+            match = true;
+          } else if (headText === '>') {
+            blockTag = 'blockquote';
+            match = true;
+          } else if (headText === '-' || headText === '*') {
+            cmd = 'insertUnorderedList';
+            match = true;
+          } else if (headText === '1.') {
+            cmd = 'insertOrderedList';
+            match = true;
+          } else if (headText === '- [ ]') {
+            blockTag = 'checklist';
+            match = true;
+          }
+          
+          if (match) {
+            e.preventDefault();
+            
+            // Remove the characters before space
+            startNode.nodeValue = textValue.substring(offset);
+            
+            if (cmd) {
+              document.execCommand(cmd, false);
+            } else if (blockTag === 'checklist') {
+              insertHtmlAtCursor('<ul class="task-list"><li><input type="checkbox" style="margin-right: 0.5rem;" /> </li></ul>');
+            } else if (blockTag === 'blockquote') {
+              document.execCommand('formatBlock', false, '<blockquote>');
+              // Ensure there is a block element inside
+              const sel2 = window.getSelection();
+              if (sel2 && sel2.rangeCount > 0) {
+                 let curr = sel2.getRangeAt(0).startContainer;
+                 if (curr.nodeType === Node.TEXT_NODE) curr = curr.parentNode as Node;
+                 if ((curr as HTMLElement).tagName === 'BLOCKQUOTE') {
+                    document.execCommand('formatBlock', false, '<p>');
+                 }
+              }
+            } else if (blockTag) {
+              document.execCommand('formatBlock', false, `<${blockTag}>`);
+            }
+            
+            updateContentFromWysiwyg();
+          }
+        }
+      }
+    }
+    
+    if (e.key.length === 1 && !e.ctrlKey && !e.metaKey && !e.altKey) {
+      const sel = window.getSelection();
+      if (sel && sel.rangeCount > 0 && wysiwygRef.current) {
+        const range = sel.getRangeAt(0);
+        let current: Node | null = range.startContainer;
+        if (current.nodeType === Node.TEXT_NODE) current = current.parentNode;
+        const spacer = (current as Element)?.closest?.('.table-spacer, [data-placeholder], [data-empty]');
+        if (spacer && wysiwygRef.current.contains(spacer)) {
+          spacer.removeAttribute('data-empty');
+          spacer.removeAttribute('data-placeholder');
+          spacer.classList.remove('table-spacer', 'top-spacer', 'bottom-spacer');
+        }
+      }
+    }
+
+    // Check if we are inside a table cell when pressing Enter
+    if (e.key === 'Enter') {
+      const sel = window.getSelection();
+      if (sel && sel.rangeCount > 0 && wysiwygRef.current) {
+        const range = sel.getRangeAt(0);
+        let current: Node | null = range.startContainer;
+        if (current.nodeType === Node.TEXT_NODE) current = current.parentNode;
+        
+        const spacer = (current as Element)?.closest?.('.table-spacer, [data-placeholder], [data-empty]');
+        if (spacer && wysiwygRef.current.contains(spacer)) {
+          e.preventDefault();
+          spacer.removeAttribute('data-empty');
+          spacer.removeAttribute('data-placeholder');
+          spacer.classList.remove('table-spacer', 'top-spacer', 'bottom-spacer');
+          document.execCommand('insertParagraph');
+          updateContentFromWysiwyg();
+          return;
+        }
+        
+        const tableCell = (current as Element)?.closest?.('td, th');
+        if (tableCell && wysiwygRef.current.contains(tableCell)) {
+          e.preventDefault();
+          document.execCommand('insertLineBreak');
+
+          updateContentFromWysiwyg();
+          return;
+        }
+      }
+    }
+
+    // Press Enter on empty line to break out of formatting containers (quotes, centered text, etc)
+    if (e.key === 'Enter' && !e.shiftKey) {
+      const sel = window.getSelection();
+      if (sel && sel.rangeCount > 0 && wysiwygRef.current) {
+        const range = sel.getRangeAt(0);
+        const node: Node | null = range.startContainer;
+        
+        if (node) {
+          // Find the block container we might want to escape
+          let escapeTarget: HTMLElement | null = node.nodeType === Node.TEXT_NODE ? node.parentElement : node as HTMLElement;
+          while (escapeTarget && escapeTarget !== wysiwygRef.current && 
+                 !['BLOCKQUOTE', 'H1', 'H2', 'H3', 'H4', 'H5', 'H6', 'PRE', 'CENTER'].includes(escapeTarget.tagName) &&
+                 !(escapeTarget.tagName === 'DIV' && Array.from(escapeTarget.classList).some(c => c.startsWith('text-') || c.startsWith('pull-') || c === 'phishy'))) {
+            escapeTarget = escapeTarget.parentElement;
+          }
+
+          if (escapeTarget && escapeTarget !== wysiwygRef.current) {
+            // Insert a temporary marker to check the neighborhood
+            const marker = document.createElement('span');
+            marker.id = 'temp-caret-marker';
+            try {
+              range.insertNode(marker);
+
+              const hasText = (n: Node): boolean => {
+                if (n.nodeType === Node.TEXT_NODE) {
+                  return (n.nodeValue?.replace(/[\u200B\s\n]/g, '') || '').length > 0;
+                }
+                if (n.nodeType === Node.ELEMENT_NODE) {
+                  const el = n as HTMLElement;
+                  if (el.tagName === 'BR' || el.id === 'temp-caret-marker') return false;
+                  return (el.textContent?.replace(/[\u200B\s\n]/g, '') || '').length > 0;
+                }
+                return false;
+              };
+
+              // Scan left for any text on the current line
+              let isLeftEmpty = true;
+              let currLeft: Node | null = marker;
+              while (currLeft && currLeft !== escapeTarget) {
+                let sib = currLeft.previousSibling;
+                while (sib) {
+                  if (sib.nodeType === Node.ELEMENT_NODE && (sib as HTMLElement).tagName === 'BR') {
+                    break; // stopped by line break
+                  }
+                  if (hasText(sib)) {
+                    isLeftEmpty = false;
+                    break;
+                  }
+                  sib = sib.previousSibling;
+                }
+                if (!isLeftEmpty || (currLeft.previousSibling && (currLeft.previousSibling as HTMLElement).tagName === 'BR')) {
+                  break;
+                }
+                currLeft = currLeft.parentNode;
+              }
+
+              // Scan right for any text on the current line
+              let isRightEmpty = true;
+              let currRight: Node | null = marker;
+              while (currRight && currRight !== escapeTarget) {
+                let sib = currRight.nextSibling;
+                while (sib) {
+                  if (sib.nodeType === Node.ELEMENT_NODE && (sib as HTMLElement).tagName === 'BR') {
+                    break; // stopped by line break
+                  }
+                  if (hasText(sib)) {
+                    isRightEmpty = false;
+                    break;
+                  }
+                  sib = sib.nextSibling;
+                }
+                if (!isRightEmpty || (currRight.nextSibling && (currRight.nextSibling as HTMLElement).tagName === 'BR')) {
+                  break;
+                }
+                currRight = currRight.parentNode;
+              }
+              if (isLeftEmpty && isRightEmpty) {
+                e.preventDefault();
+                
+                const rLeft = document.createRange();
+                rLeft.setStart(escapeTarget, 0);
+                rLeft.setEndBefore(marker);
+                const leftFrag = rLeft.cloneContents();
+                
+                const rRight = document.createRange();
+                rRight.setStartAfter(marker);
+                rRight.setEnd(escapeTarget, escapeTarget.childNodes.length);
+                const rightFrag = rRight.cloneContents();
+
+                if (leftFrag.lastChild && leftFrag.lastChild.nodeType === Node.ELEMENT_NODE && (leftFrag.lastChild as HTMLElement).tagName === 'BR') {
+                  leftFrag.removeChild(leftFrag.lastChild);
+                }
+                if (rightFrag.firstChild && rightFrag.firstChild.nodeType === Node.ELEMENT_NODE && (rightFrag.firstChild as HTMLElement).tagName === 'BR') {
+                  rightFrag.removeChild(rightFrag.firstChild);
+                }
+                
+                const checkFragHasContent = (frag: DocumentFragment) => {
+                   if ((frag.textContent || '').replace(/[\u200B\s\n]/g, '').length > 0) return true;
+                   if (frag.querySelector('img, iframe, video, td, th, hr')) return true;
+                   return false;
+                };
+                
+                const leftHasContent = checkFragHasContent(leftFrag);
+                const rightHasContent = checkFragHasContent(rightFrag);
+
+                const p = document.createElement('p');
+                p.innerHTML = '<br>';
+                const parentNode = escapeTarget.parentNode;
+                if (parentNode) {
+                  if (leftHasContent && rightHasContent) {
+                    const rightBlock = document.createElement(escapeTarget.tagName.toLowerCase());
+                    rightBlock.className = escapeTarget.className;
+                    escapeTarget.innerHTML = '';
+                    escapeTarget.appendChild(leftFrag);
+                    rightBlock.appendChild(rightFrag);
+                    parentNode.insertBefore(rightBlock, escapeTarget.nextSibling);
+                    parentNode.insertBefore(p, rightBlock);
+                  } else if (leftHasContent) {
+                    escapeTarget.innerHTML = '';
+                    escapeTarget.appendChild(leftFrag);
+                    parentNode.insertBefore(p, escapeTarget.nextSibling);
+                  } else if (rightHasContent) {
+                    escapeTarget.innerHTML = '';
+                    escapeTarget.appendChild(rightFrag);
+                    parentNode.insertBefore(p, escapeTarget);
+                  } else {
+                    parentNode.replaceChild(p, escapeTarget);
+                  }
+                    // Focus the new paragraph
+                    const newRange = document.createRange();
+                    newRange.selectNodeContents(p);
+                    newRange.collapse(true);
+                    sel.removeAllRanges();
+                    sel.addRange(newRange);
+                    savedVisualRangeRef.current = newRange.cloneRange();
+                    p.focus();
+
+                    updateContentFromWysiwyg();
+                    return;
+                  }
+              }
+            } catch (err) {
+              console.warn('Unified escape breakout error:', err);
+            } finally {
+              if (marker.parentNode) {
+                marker.parentNode.removeChild(marker);
+              }
+            }
+          }
+        }
+
+        let blockNode = node.nodeType === Node.TEXT_NODE ? node.parentElement : node as HTMLElement;
+        while (blockNode && blockNode !== wysiwygRef.current && !['P', 'DIV', 'BLOCKQUOTE', 'LI', 'CENTER', 'PRE'].includes(blockNode.tagName)) {
+           blockNode = blockNode.parentElement;
+        }
+
+        if (blockNode && blockNode !== wysiwygRef.current) {
+           const textContent = blockNode.textContent?.replace(/\u200B/g, '').trim();
+           if (textContent === '' || textContent === undefined) {
+               // Check if the empty block has formatting elements inside it or active formats
+               const formattingTags = ['B', 'STRONG', 'I', 'EM', 'STRIKE', 'S', 'CODE', 'SUB', 'SUP', 'SPAN'];
+               const hasFormattingElements = Array.from(blockNode.querySelectorAll('*')).some(el => 
+                 formattingTags.includes(el.tagName)
+               );
+               const hasActiveFormats = activeFormats.bold || activeFormats.italic || activeFormats.strikethrough || activeFormats.sub || activeFormats.sup || activeFormats.code || activeFormats.phishy;
+               
+               if (hasFormattingElements || hasActiveFormats) {
+                 // Clear formatting by resetting innerHTML to a single <br>
+                 blockNode.innerHTML = '<br>';
+                 
+                 // Reset browser formatting states
+                 try {
+                   if (document.queryCommandState('bold')) document.execCommand('bold', false);
+                   if (document.queryCommandState('italic')) document.execCommand('italic', false);
+                   if (document.queryCommandState('strikeThrough')) document.execCommand('strikeThrough', false);
+                   if (document.queryCommandState('subscript')) document.execCommand('subscript', false);
+                   if (document.queryCommandState('superscript')) document.execCommand('superscript', false);
+                 } catch (err) {
+                   console.warn('Failed to clear commands:', err);
+                 }
+                 
+                 setActiveFormats({
+                   bold: false,
+                   italic: false,
+                   code: false,
+                   strikethrough: false,
+                   sub: false,
+                   sup: false,
+                   phishy: false
+                 });
+               }
+
+               let curr: HTMLElement | null = blockNode as HTMLElement;
+               let containerToEscape: HTMLElement | null = null;
+               while (curr && curr !== wysiwygRef.current) {
+                  if (['BLOCKQUOTE', 'PRE', 'CENTER', 'UL', 'OL'].includes(curr.tagName) || 
+                      (curr.tagName === 'DIV' && Array.from(curr.classList).some(c => c.startsWith('text-') || c.startsWith('pull-') || c === 'phishy'))) {
+                    containerToEscape = curr;
+                    break;
+                  }
+                  curr = curr.parentNode as HTMLElement;
+               }
+
+               if (containerToEscape || hasFormattingElements || hasActiveFormats) {
+                 e.preventDefault();
+                 
+                 const p = document.createElement('p');
+                 p.innerHTML = '<br>';
+                 
+                 const targetParent = containerToEscape ? containerToEscape.parentNode : blockNode.parentNode;
+                 const targetSibling = containerToEscape ? containerToEscape.nextSibling : blockNode.nextSibling;
+
+                 if (targetSibling) {
+                   targetParent?.insertBefore(p, targetSibling);
+                 } else {
+                   targetParent?.appendChild(p);
+                 }
+                 
+                 if (containerToEscape) {
+                   const containerTextContent = containerToEscape.textContent?.replace(/\u200B/g, '').trim();
+                   if (!containerTextContent) {
+                     containerToEscape.parentNode?.removeChild(containerToEscape);
+                   } else if (blockNode !== containerToEscape && containerToEscape.contains(blockNode)) {
+                     blockNode.parentNode?.removeChild(blockNode);
+                   }
+                 }
+                 
+                 const newRange = document.createRange();
+                 newRange.selectNodeContents(p);
+                 newRange.collapse(true);
+                 sel.removeAllRanges();
+                 sel.addRange(newRange);
+                 
+                 if (wysiwygRef.current) {
+                   updateContentFromWysiwyg();
+                 }
+                 return;
+               }
+           }
+        }
+      }
+    }
+
+    if (e.key === 'Enter') {
+      const sel = window.getSelection();
+      if (!sel || sel.rangeCount === 0 || !wysiwygRef.current) return;
+      const range = sel.getRangeAt(0);
+
+      let current: Node | null = range.startContainer;
+      if (current.nodeType === Node.TEXT_NODE) current = current.parentNode;
+      
+      const isListItem = (current as Element)?.closest?.('li');
+      if (isListItem && wysiwygRef.current.contains(isListItem)) {
+        return;
+      }
+
+      if (e.ctrlKey || e.metaKey) {
+        e.preventDefault();
+        try { document.execCommand('defaultParagraphSeparator', false, 'p'); } catch { /* ignore */ }
+        document.execCommand('insertParagraph');
+        
+        // Ensure it created a p, not a div (Chrome sometimes ignores defaultParagraphSeparator if inside div)
+        setTimeout(() => {
+           if (!wysiwygRef.current) return;
+           const sel2 = window.getSelection();
+           if (sel2 && sel2.rangeCount > 0) {
+              let node = sel2.focusNode;
+              while (node && node.nodeType !== Node.ELEMENT_NODE) node = node.parentNode;
+              if (node && ((node as HTMLElement).tagName === 'DIV') && !(node as HTMLElement).className) {
+                  // It created a naked DIV instead of P
+                  const p = document.createElement('p');
+                  p.innerHTML = (node as HTMLElement).innerHTML || '<br>';
+                  if (node.parentNode) node.parentNode.replaceChild(p, node);
+                  const r = document.createRange();
+                  r.selectNodeContents(p);
+                  r.collapse(false);
+                  sel2.removeAllRanges();
+                  sel2.addRange(r);
+              }
+           }
+           updateContentFromWysiwyg();
+        }, 0);
+        return;
+      } else {
+        e.preventDefault();
+        document.execCommand('insertLineBreak');
+        updateContentFromWysiwyg();
+        if (window.scrollY !== 0 || window.scrollX !== 0) {
+          window.scrollTo({ top: 0, left: 0, behavior: 'instant' as ScrollBehavior });
+        }
+        scrollCaretIntoView('nearest');
+        requestAnimationFrame(() => {
+          if (window.scrollY !== 0 || window.scrollX !== 0) {
+            window.scrollTo({ top: 0, left: 0, behavior: 'instant' as ScrollBehavior });
+          }
+          scrollCaretIntoView('nearest');
+        });
+        return;
+      }
+    }
+  }, [fmt, handleLink, insertHtmlAtCursor, widgetPos, isWidgetVisible, isWidgetMenuOpen, setIsWidgetVisible, updateContentFromWysiwyg, activeFormats, handleIndent, tryHeadingEnterBreakout, scrollCaretIntoView]);
+
+  const importTable = useCallback(() => {
+    setActiveModal('tableImport');
+  }, []);
+
+  const processTableImport = useCallback(() => {
+    const data = tableImportText;
+    if (!data) {
+      setActiveModal(null);
+      return;
+    }
+
+    // Split by lines, handle all newline types
+    // We don't trim lines here because it would remove leading tabs (empty first cells)
+    const lines = data.split(/\r\n|\r|\n/).filter(l => l.trim() !== '');
+    if (lines.length === 0) {
+      setActiveModal(null);
+      return;
+    }
+
+    // Detect delimiter
+    const delimiters = ['\t', ';', ',', '|'];
+    let bestDelimiter = '\t';
+    let maxConsistency = -1;
+
+    delimiters.forEach(d => {
+      const colCounts = lines.map(l => l.split(d).length);
+      const avg = colCounts.reduce((a, b) => a + b, 0) / colCounts.length;
+      if (avg > 1.1) { // Reduced threshold to allow simple 2-col tables
+        const mostFrequent = colCounts.reduce((acc, curr) => {
+          acc[curr] = (acc[curr] || 0) + 1;
+          return acc;
+        }, {} as Record<number, number>);
+        
+        const frequency = Math.max(...Object.values(mostFrequent));
+        if (frequency > maxConsistency) {
+          maxConsistency = frequency;
+          bestDelimiter = d;
+        }
+      }
+    });
+
+    const rows = lines.map(line => {
+      let parts: string[];
+      if (bestDelimiter === '|') {
+        // For Markdown tables, we trim the line itself but keep empty cells
+        const trimmedLine = line.trim();
+        parts = trimmedLine.split('|').map(p => p.trim());
+        if (parts[0] === '') parts.shift();
+        if (parts[parts.length - 1] === '') parts.pop();
+      } else if (bestDelimiter === ',') {
+        // Simple CSV parsing (handles quotes)
+        const partsArray = [];
+        let current = '';
+        let inQuotes = false;
+        for (let i = 0; i < line.length; i++) {
+          const char = line[i];
+          if (char === '"') inQuotes = !inQuotes;
+          else if (char === ',' && !inQuotes) {
+            partsArray.push(current.trim());
+            current = '';
+          } else {
+            current += char;
+          }
+        }
+        partsArray.push(current.trim());
+        parts = partsArray;
+      } else {
+        // For TSV (Excel), we do NOT trim the line before split to keep \t at start
+        parts = line.split(bestDelimiter).map(p => p.trim());
+      }
+      return parts;
+    });
+
+    // Determine the true number of columns (max found in any row to be safe)
+    const maxCols = Math.max(...rows.map(r => r.length));
+    
+    // Normalize rows: ensure every row has exact same number of columns
+    const normalizedRows = rows.map(r => {
+      const newRow = [...r];
+      while (newRow.length < maxCols) {
+        newRow.push(''); // Pad missing cells
+      }
+      if (newRow.length > maxCols) {
+        return newRow.slice(0, maxCols); // Crop extra
+      }
+      return newRow;
+    });
+
+    let resultTable = '';
+    if (tableImportFormat === 'markdown') {
+      normalizedRows.forEach((cols, i) => {
+        const cleanCols = cols.map(c => {
+          // Replace newlines with <br/> but try to avoid breaking markdown link syntax [text](url)
+          // If a cell is purely a markdown link, we might want to keep it on one line.
+          // For now, standard <br/> is mostly fine, but let's ensure we don't have leading/trailing garbage.
+          return c.replace(/\|/g, '\\|').replace(/\r\n|\r|\n/g, '<br/>').trim();
+        });
+        resultTable += '| ' + cleanCols.join(' | ') + ' |\n';
+        if (i === 0) {
+          resultTable += '| ' + cleanCols.map(() => '---').join(' | ') + ' |\n';
+        }
+      });
+    } else {
+      resultTable = '<table data-format="html" style="width:100%">\n';
+      normalizedRows.forEach((cols, i) => {
+        resultTable += '  <tr>\n';
+        cols.forEach(col => {
+          const tag = i === 0 ? 'th' : 'td';
+          resultTable += `    <${tag}>${col}</${tag}>\n`;
+        });
+        resultTable += '  </tr>\n';
+      });
+      resultTable += '</table>';
+    }
+    
+    insertAtCursor(resultTable, 'end');
+    setTableImportText('');
+    setActiveModal(null);
+    notify(t('importTableSuccess'), 'success');
+  }, [tableImportText, insertAtCursor, tableImportFormat, t, notify]);
+
+  const parseImages = useCallback((input: string) => {
+    setSourceInput(input);
+    const urlPattern = /(https?:\/\/[^[\]\s<>"'()]+?\.(?:jpg|jpeg|png|webp|gif|svg))/gi;
+    const matches = input.match(urlPattern) || [];
+    const uniqueUrls = Array.from(new Set(matches));
+    
+    setImages(prev => {
+      const existingUrls = new Set(prev.map(img => img.url));
+      const newImages = uniqueUrls.map(url => ({
+        url,
+        name: url.split('/').pop()?.split('?')[0] || 'image',
+        selected: false
+      })).filter(img => !existingUrls.has(img.url));
+      
+      const keptImages = prev.filter(img => uniqueUrls.includes(img.url));
+      return [...keptImages, ...newImages];
+    });
+  }, []);
+
+  const toggleImageSelection = (filteredIdx: number) => {
+    const url = filteredLocalImages[filteredIdx]?.url;
+    if (!url) return;
+    setImages(prev => {
+      const idx = prev.findIndex(i => i.url === url);
+      if (idx === -1) return prev;
+      const newImages = [...prev];
+      newImages[idx] = { ...newImages[idx], selected: !newImages[idx].selected };
+      return newImages;
+    });
+  };
+
+  const moveImageLocal = (filteredIdx: number, direction: -1 | 1) => {
+    const targetFilteredIdx = filteredIdx + direction;
+    if (targetFilteredIdx < 0 || targetFilteredIdx >= filteredLocalImages.length) return;
+
+    const url1 = filteredLocalImages[filteredIdx].url;
+    const url2 = filteredLocalImages[targetFilteredIdx].url;
+
+    setImages(prev => {
+      const idx1 = prev.findIndex(i => i.url === url1);
+      const idx2 = prev.findIndex(i => i.url === url2);
+      if (idx1 === -1 || idx2 === -1) return prev;
+
+      const newImages = [...prev];
+      const temp = newImages[idx1];
+      newImages[idx1] = newImages[idx2];
+      newImages[idx2] = temp;
+      return newImages;
+    });
+  };
+
+  // Load data on mount
+  const initVault = useCallback(async () => {
+    const initialized = await SecurityService.isInitialized();
+    setIsVaultInitialized(initialized);
+    
+    const accounts = await SecurityService.getAccounts();
+    const usernames = Array.from(new Set(accounts.map(a => a.username)));
+    setVaultAccounts(usernames);
+    
+    if (usernames.length > 0) {
+      const firstUser = usernames[0];
+      setSelectedVaultUser(prev => prev || firstUser);
+      setUsername(prev => prev || firstUser);
+    }
+    
+    const rawPxKey = localStorage.getItem('steem_pexels_key_raw');
+    if (rawPxKey) {
+      setPexelsApiKey(rawPxKey);
+    } else {
+      const pxKey = await SecurityService.getPexelsKey();
+      if (pxKey) setPexelsApiKey(pxKey);
+    }
+    const encryptedPixabay = await SecurityService.getApiKey('pixabay');
+    if (encryptedPixabay) setPixabayApiKey(encryptedPixabay);
+    const encryptedUnsplashAccess = await SecurityService.getApiKey('unsplashAccess');
+    if (encryptedUnsplashAccess) setUnsplashAccessKey(encryptedUnsplashAccess);
+  }, []);
+
+  useEffect(() => {
+    initVault();
+
+    // Load saved images and links
+    const savedLinks = localStorage.getItem('steem_editor_source_links');
+    if (savedLinks) {
+      parseImages(savedLinks);
+    } else {
+      const savedImages = localStorage.getItem(STORAGE_KEY_IMAGES);
+      if (savedImages) {
+        try {
+          const parsed = JSON.parse(savedImages);
+          if (Array.isArray(parsed)) {
+            setImages(parsed);
+          }
+        } catch (e) {
+          console.error("Failed to load images", e);
+        }
+      }
+    }
+
+    // Додаємо невелику затримку перед активацією збереження
+    setTimeout(() => {
+      isImagesLoaded.current = true;
+    }, 1000);
+
+    SecurityService.setStatusCallback((unlocked) => {
+      setIsUnlocked(unlocked);
+    });
+
+    const handleKeyboardResize = () => {
+      // Prevents gallery/sidebar from closing when mobile keyboard pops up
+      // Keyboard usually only affects height, not width
+    };
+    window.addEventListener('resize', handleKeyboardResize);
+    
+    return () => {
+      SecurityService.setStatusCallback(() => {});
+      window.removeEventListener('resize', handleKeyboardResize);
+    };
+  }, [parseImages, initVault]);
+
+  useEffect(() => {
+    localStorage.setItem('steem_pexels_settings', JSON.stringify(pexelsSettings));
+  }, [pexelsSettings]);
+
+  useEffect(() => {
+    localStorage.setItem('steem_gallery_cache_results', JSON.stringify(pexelsResults));
+  }, [pexelsResults]);
+
+  const toggleGalleryMode = (mode: 'local' | 'pexels' | 'unsplash' | 'pixabay') => {
+    setGalleryMode(mode);
+    setGallerySearch('');
+    // No longer clearing results here to support caching
+  };
+
+  const handleExternalSearch = async (query: string, page: number = 1) => {
+    if (!query.trim()) return;
+
+    let apiKey = '';
+    if (galleryMode === 'pexels') apiKey = pexelsApiKey || '';
+    if (galleryMode === 'pixabay') apiKey = pixabayApiKey || '';
+    if (galleryMode === 'unsplash') apiKey = unsplashAccessKey || '';
+
+    if (!apiKey) {
+      if (!isUnlocked && isVaultInitialized) {
+        setVaultPin('');
+        setActiveModal('unlock-pin');
+        return;
+      }
+      const msg = galleryMode === 'pexels' ? t('pexelsKeyRequired') : 
+                  galleryMode === 'pixabay' ? t('pixabayKeyRequired') : t('unsplashKeyRequired');
+      notify(msg, 'error');
+      return;
+    }
+
+    setIsSearchingPexels(true);
+    try {
+      let results: any[] = [];
+      const trimmedKey = apiKey.trim();
+
+      const fetchWithRetry = async (url: string, options: RequestInit) => {
+        try {
+          const resp = await fetch(url, options);
+          if (resp.ok) return resp;
+          throw new Error(`${resp.status} ${resp.statusText}`);
+        } catch (err: any) {
+          if (err.name === 'TypeError' || err.message.includes('fetch')) {
+            // Try proxy as fallback if network/CORS error
+            const proxyUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`;
+            const proxyResp = await fetch(proxyUrl, options);
+            if (proxyResp.ok) return proxyResp;
+          }
+          throw err;
+        }
+      };
+
+      if (galleryMode === 'pexels') {
+        const pRes = await PexelsService.searchPhotos(query, trimmedKey, page);
+        results = pRes.map(p => ({
+          id: p.id,
+          url: p.src.large2x || p.src.large,
+          thumb: performanceMode ? p.src.medium : (p.src.large2x || p.src.large),
+          alt: p.alt || 'Pexels Photo',
+          author: p.photographer,
+          authorUrl: p.photographer_url,
+          source: 'pexels'
+        }));
+      } else if (galleryMode === 'pixabay') {
+        const url = `https://pixabay.com/api/?key=${trimmedKey}&q=${encodeURIComponent(query)}&page=${page}&image_type=photo&per_page=30`;
+        const resp = await fetchWithRetry(url, {});
+        const data = await resp.json();
+        results = (data.hits || []).map((h: any) => ({
+          id: h.id,
+          url: h.largeImageURL,
+          thumb: performanceMode ? h.webformatURL : h.largeImageURL,
+          alt: h.tags || 'Pixabay Photo',
+          author: h.user,
+          authorUrl: `https://pixabay.com/users/${h.user}-${h.user_id}/`,
+          source: 'pixabay'
+        }));
+      } else if (galleryMode === 'unsplash') {
+        const url = `https://api.unsplash.com/search/photos?query=${encodeURIComponent(query)}&page=${page}&per_page=30&client_id=${trimmedKey}`;
+        const resp = await fetchWithRetry(url, {});
+        const data = await resp.json();
+        results = (data.results || []).map((r: any) => ({
+          id: r.id,
+          url: r.urls.regular,
+          thumb: performanceMode ? r.urls.small : r.urls.regular,
+          alt: r.alt_description || 'Unsplash Photo',
+          author: r.user.name,
+          authorUrl: r.user.links.html,
+          source: 'unsplash'
+        }));
+      }
+
+      const mapped = results.map(r => ({ ...r, selected: false }));
+      if (page === 1) setPexelsResults(mapped);
+      else setPexelsResults(prev => {
+        const existingIds = new Set(prev.map(p => p.id + p.source));
+        const uniqueNew = mapped.filter(p => !existingIds.has(p.id + p.source));
+        return [...prev, ...uniqueNew];
+      });
+      setPexelsPage(page);
+    } catch (e: any) {
+      console.error(e);
+      notify(t('pexelsError'), 'error');
+    } finally {
+      setIsSearchingPexels(false);
+    }
+  };
+
+  const shortenName = (name: string, max: number = 30) => {
+    if (name.length <= max) return name;
+    return name.substring(0, max) + '...';
+  };
+
+  const insertExternalImage = (photo: any, position: 'left' | 'right' | 'center' | 'plain') => {
+    const url = photo.url.split('?')[0];
+    const name = shortenName(photo.alt || 'Photo');
+    const photographer = photo.author;
+    const photographerUrl = photo.authorUrl;
+
+    let attribution = '';
+    if (pexelsSettings.withAttribution) {
+      const source = (photo.source || 'pexels').toLowerCase();
+      const sourceName = source === 'unsplash' ? 'Unsplash' : source === 'pixabay' ? 'Pixabay' : 'Pexels';
+      attribution = `<div align="${singleCaptionAlign}"><sup>By <a href="${photographerUrl}">${photographer}</a> on <a href="https://${source}.com">${sourceName}</a></sup></div>`;
+    }
+
+    if (imageInsertFormat === 'markdown') {
+      const externalLinkUrl = photo.pageURL || photo.url.split('?')[0];
+      let md = `![${name}](${url})`;
+      if (pexelsSettings.linkEmbedded) {
+        md = `[${md}](${externalLinkUrl})`;
+      }
+      
+      let finalMd: string;
+      if (position === 'plain') {
+        finalMd = md + (attribution ? '\n\n' + attribution : '');
+      } else if (position === 'center') {
+        finalMd = `<center>\n\n${md}\n\n${attribution ? attribution + '\n\n' : ''}</center>`;
+      } else {
+        finalMd = `<div class="pull-${position}">\n\n${md}\n\n${attribution ? attribution + '\n\n' : ''}</div>`;
+      }
+
+      if (!isTextWrapEnabled && (position === 'left' || position === 'right')) finalMd += '\n<div class="clearfix"></div>\n';
+      insertAtCursor(finalMd);
+      if (window.innerWidth < 1024) setIsSidebarOpen(false);
+      return;
+    }
+
+    const imgHtml = `<img src="${url}" alt="${name}">`;
+    let html = '';
+    if (position === 'plain') html = imgHtml + (attribution ? '<br/>' + attribution : '');
+    else if (position === 'left' || position === 'right') html = `<div class="pull-${position}">${imgHtml}<br/>${attribution}</div>`;
+    else if (position === 'center') html = `<center>${imgHtml}<br/>${attribution}</center>`;
+
+    if (!isTextWrapEnabled && (position === 'left' || position === 'right')) html += '\n<div class="clearfix"></div>\n';
+    insertAtCursor(html);
+    if (window.innerWidth < 1024) setIsSidebarOpen(false);
+  };
+
+  const insertImage = (url: string, name: string, position: 'left' | 'right' | 'center' | 'plain') => {
+    const sName = shortenName(name);
+    // Find exif if it exists in local gallery
+    const localImg = images.find(i => i.url === url);
+    const exifTable = localImg?.exif || '';
+    
+    let attribution = '';
+    if (gridWithCaptions) {
+      attribution = `<div align="${singleCaptionAlign}"><sup> ✍️ </sup></div>`;
+    }
+
+    if (imageInsertFormat === 'markdown') {
+      const md = `![${sName}](${url})`;
+      let finalMd: string;
+      if (position === 'plain') {
+        finalMd = md + (attribution ? '\n\n' + attribution : '');
+      } else if (position === 'center') {
+        finalMd = `<center>\n\n${md}\n\n${attribution ? attribution + '\n\n' : ''}</center>`;
+      } else {
+        finalMd = `<div class="pull-${position}">\n\n${md}\n\n${attribution ? attribution + '\n\n' : ''}</div>`;
+      }
+
+      if (!isTextWrapEnabled && (position === 'left' || position === 'right')) {
+        finalMd += '\n<div class="clearfix"></div>\n';
+      }
+
+      insertAtCursor(finalMd + exifTable, 'end');
+      if (window.innerWidth < 1024) setIsSidebarOpen(false);
+      return;
+    }
+
+    const imgHtml = `<img src="${url}" alt="${sName}">`;
+    let html = '';
+
+    if (position === 'plain') {
+      html = imgHtml + (attribution ? '<br/>' + attribution : '');
+    } else if (position === 'left' || position === 'right') {
+      html = `<div class="pull-${position}">${imgHtml}<br/>${attribution}</div>`;
+    } else if (position === 'center') {

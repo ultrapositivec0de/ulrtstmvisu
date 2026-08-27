@@ -1,0 +1,401 @@
+    }
+    
+    insertAtCursor(resultTable, 'end');
+    setTableImportText('');
+    setActiveModal(null);
+    notify(t('importTableSuccess'), 'success');
+  }, [tableImportText, insertAtCursor, tableImportFormat, t, notify]);
+
+  const parseImages = useCallback((input: string) => {
+    setSourceInput(input);
+    const urlPattern = /(https?:\/\/[^[\]\s<>"'()]+?\.(?:jpg|jpeg|png|webp|gif|svg))/gi;
+    const matches = input.match(urlPattern) || [];
+    const uniqueUrls = Array.from(new Set(matches));
+    
+    setImages(prev => {
+      const existingUrls = new Set(prev.map(img => img.url));
+      const newImages = uniqueUrls.map(url => ({
+        url,
+        name: url.split('/').pop()?.split('?')[0] || 'image',
+        selected: false
+      })).filter(img => !existingUrls.has(img.url));
+      
+      const keptImages = prev.filter(img => uniqueUrls.includes(img.url));
+      return [...keptImages, ...newImages];
+    });
+  }, []);
+
+  const toggleImageSelection = (filteredIdx: number) => {
+    const url = filteredLocalImages[filteredIdx]?.url;
+    if (!url) return;
+    setImages(prev => {
+      const idx = prev.findIndex(i => i.url === url);
+      if (idx === -1) return prev;
+      const newImages = [...prev];
+      newImages[idx] = { ...newImages[idx], selected: !newImages[idx].selected };
+      return newImages;
+    });
+  };
+
+  const moveImageLocal = (filteredIdx: number, direction: -1 | 1) => {
+    const targetFilteredIdx = filteredIdx + direction;
+    if (targetFilteredIdx < 0 || targetFilteredIdx >= filteredLocalImages.length) return;
+
+    const url1 = filteredLocalImages[filteredIdx].url;
+    const url2 = filteredLocalImages[targetFilteredIdx].url;
+
+    setImages(prev => {
+      const idx1 = prev.findIndex(i => i.url === url1);
+      const idx2 = prev.findIndex(i => i.url === url2);
+      if (idx1 === -1 || idx2 === -1) return prev;
+
+      const newImages = [...prev];
+      const temp = newImages[idx1];
+      newImages[idx1] = newImages[idx2];
+      newImages[idx2] = temp;
+      return newImages;
+    });
+  };
+
+  useEffect(() => {
+    initVault();
+
+    // Load saved images and links
+    const savedLinks = localStorage.getItem('steem_editor_source_links');
+    if (savedLinks) {
+      parseImages(savedLinks);
+    } else {
+      const savedImages = localStorage.getItem(STORAGE_KEY_IMAGES);
+      if (savedImages) {
+        try {
+          const parsed = JSON.parse(savedImages);
+          if (Array.isArray(parsed)) {
+            setImages(parsed);
+          }
+        } catch (e) {
+          console.error("Failed to load images", e);
+        }
+      }
+    }
+
+    // Додаємо невелику затримку перед активацією збереження
+    setTimeout(() => {
+      isImagesLoaded.current = true;
+    }, 1000);
+
+    const handleKeyboardResize = () => {
+      // Prevents gallery/sidebar from closing when mobile keyboard pops up
+      // Keyboard usually only affects height, not width
+    };
+    window.addEventListener('resize', handleKeyboardResize);
+    
+    return () => {
+      window.removeEventListener('resize', handleKeyboardResize);
+    };
+  }, [parseImages, initVault]);
+
+  useEffect(() => {
+    localStorage.setItem('steem_pexels_settings', JSON.stringify(pexelsSettings));
+  }, [pexelsSettings]);
+
+  useEffect(() => {
+    localStorage.setItem('steem_gallery_cache_results', JSON.stringify(pexelsResults));
+  }, [pexelsResults]);
+
+  const toggleGalleryMode = (mode: 'local' | 'pexels' | 'unsplash' | 'pixabay') => {
+    setGalleryMode(mode);
+    setGallerySearch('');
+    // No longer clearing results here to support caching
+  };
+
+  const handleExternalSearch = async (query: string, page: number = 1) => {
+    if (!query.trim()) return;
+
+    let apiKey = '';
+    if (galleryMode === 'pexels') apiKey = pexelsApiKey || '';
+    if (galleryMode === 'pixabay') apiKey = pixabayApiKey || '';
+    if (galleryMode === 'unsplash') apiKey = unsplashAccessKey || '';
+
+    if (!apiKey) {
+      if (!isUnlocked && isVaultInitialized) {
+        setVaultPin('');
+        setActiveModal('unlock-pin');
+        return;
+      }
+      const msg = galleryMode === 'pexels' ? t('pexelsKeyRequired') : 
+                  galleryMode === 'pixabay' ? t('pixabayKeyRequired') : t('unsplashKeyRequired');
+      notify(msg, 'error');
+      return;
+    }
+
+    setIsSearchingPexels(true);
+    try {
+      let results: any[] = [];
+      const trimmedKey = apiKey.trim();
+
+      const fetchWithRetry = async (url: string, options: RequestInit) => {
+        try {
+          const resp = await fetch(url, options);
+          if (resp.ok) return resp;
+          throw new Error(`${resp.status} ${resp.statusText}`);
+        } catch (err: any) {
+          if (err.name === 'TypeError' || err.message.includes('fetch')) {
+            // Try proxy as fallback if network/CORS error
+            const proxyUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`;
+            const proxyResp = await fetch(proxyUrl, options);
+            if (proxyResp.ok) return proxyResp;
+          }
+          throw err;
+        }
+      };
+
+      if (galleryMode === 'pexels') {
+        const pRes = await PexelsService.searchPhotos(query, trimmedKey, page);
+        results = pRes.map(p => ({
+          id: p.id,
+          url: p.src.large2x || p.src.large,
+          thumb: performanceMode ? p.src.medium : (p.src.large2x || p.src.large),
+          alt: p.alt || 'Pexels Photo',
+          author: p.photographer,
+          authorUrl: p.photographer_url,
+          source: 'pexels'
+        }));
+      } else if (galleryMode === 'pixabay') {
+        const url = `https://pixabay.com/api/?key=${trimmedKey}&q=${encodeURIComponent(query)}&page=${page}&image_type=photo&per_page=30`;
+        const resp = await fetchWithRetry(url, {});
+        const data = await resp.json();
+        results = (data.hits || []).map((h: any) => ({
+          id: h.id,
+          url: h.largeImageURL,
+          thumb: performanceMode ? h.webformatURL : h.largeImageURL,
+          alt: h.tags || 'Pixabay Photo',
+          author: h.user,
+          authorUrl: `https://pixabay.com/users/${h.user}-${h.user_id}/`,
+          source: 'pixabay'
+        }));
+      } else if (galleryMode === 'unsplash') {
+        const url = `https://api.unsplash.com/search/photos?query=${encodeURIComponent(query)}&page=${page}&per_page=30&client_id=${trimmedKey}`;
+        const resp = await fetchWithRetry(url, {});
+        const data = await resp.json();
+        results = (data.results || []).map((r: any) => ({
+          id: r.id,
+          url: r.urls.regular,
+          thumb: performanceMode ? r.urls.small : r.urls.regular,
+          alt: r.alt_description || 'Unsplash Photo',
+          author: r.user.name,
+          authorUrl: r.user.links.html,
+          source: 'unsplash'
+        }));
+      }
+
+      const mapped = results.map(r => ({ ...r, selected: false }));
+      if (page === 1) setPexelsResults(mapped);
+      else setPexelsResults(prev => {
+        const existingIds = new Set(prev.map(p => p.id + p.source));
+        const uniqueNew = mapped.filter(p => !existingIds.has(p.id + p.source));
+        return [...prev, ...uniqueNew];
+      });
+      setPexelsPage(page);
+    } catch (e: any) {
+      console.error(e);
+      notify(t('pexelsError'), 'error');
+    } finally {
+      setIsSearchingPexels(false);
+    }
+  };
+
+  const shortenName = (name: string, max: number = 30) => {
+    if (name.length <= max) return name;
+    return name.substring(0, max) + '...';
+  };
+
+  const insertExternalImage = (photo: any, position: 'left' | 'right' | 'center' | 'plain') => {
+    const url = photo.url.split('?')[0];
+    const name = shortenName(photo.alt || 'Photo');
+    const photographer = photo.author;
+    const photographerUrl = photo.authorUrl;
+
+    let attribution = '';
+    if (pexelsSettings.withAttribution) {
+      const source = (photo.source || 'pexels').toLowerCase();
+      const sourceName = source === 'unsplash' ? 'Unsplash' : source === 'pixabay' ? 'Pixabay' : 'Pexels';
+      attribution = `<div align="${singleCaptionAlign}"><sup>By <a href="${photographerUrl}">${photographer}</a> on <a href="https://${source}.com">${sourceName}</a></sup></div>`;
+    }
+
+    if (imageInsertFormat === 'markdown') {
+      const externalLinkUrl = photo.pageURL || photo.url.split('?')[0];
+      let md = `![${name}](${url})`;
+      if (pexelsSettings.linkEmbedded) {
+        md = `[${md}](${externalLinkUrl})`;
+      }
+      
+      let finalMd: string;
+      if (position === 'plain') {
+        finalMd = md + (attribution ? '\n\n' + attribution : '');
+      } else if (position === 'center') {
+        finalMd = `<center>\n\n${md}\n\n${attribution ? attribution + '\n\n' : ''}</center>`;
+      } else {
+        finalMd = `<div class="pull-${position}">\n\n${md}\n\n${attribution ? attribution + '\n\n' : ''}</div>`;
+      }
+
+      if (!isTextWrapEnabled && (position === 'left' || position === 'right')) finalMd += '\n<div class="clearfix"></div>\n';
+      insertAtCursor(finalMd);
+      if (window.innerWidth < 1024) setIsSidebarOpen(false);
+      return;
+    }
+
+    const imgHtml = `<img src="${url}" alt="${name}">`;
+    let html = '';
+    if (position === 'plain') html = imgHtml + (attribution ? '<br/>' + attribution : '');
+    else if (position === 'left' || position === 'right') html = `<div class="pull-${position}">${imgHtml}<br/>${attribution}</div>`;
+    else if (position === 'center') html = `<center>${imgHtml}<br/>${attribution}</center>`;
+
+    if (!isTextWrapEnabled && (position === 'left' || position === 'right')) html += '\n<div class="clearfix"></div>\n';
+    insertAtCursor(html);
+    if (window.innerWidth < 1024) setIsSidebarOpen(false);
+  };
+
+  const insertImage = (url: string, name: string, position: 'left' | 'right' | 'center' | 'plain') => {
+    const sName = shortenName(name);
+    // Find exif if it exists in local gallery
+    const localImg = images.find(i => i.url === url);
+    const exifTable = localImg?.exif || '';
+    
+    let attribution = '';
+    if (gridWithCaptions) {
+      attribution = `<div align="${singleCaptionAlign}"><sup> ✍️ </sup></div>`;
+    }
+
+    if (imageInsertFormat === 'markdown') {
+      const md = `![${sName}](${url})`;
+      let finalMd: string;
+      if (position === 'plain') {
+        finalMd = md + (attribution ? '\n\n' + attribution : '');
+      } else if (position === 'center') {
+        finalMd = `<center>\n\n${md}\n\n${attribution ? attribution + '\n\n' : ''}</center>`;
+      } else {
+        finalMd = `<div class="pull-${position}">\n\n${md}\n\n${attribution ? attribution + '\n\n' : ''}</div>`;
+      }
+
+      if (!isTextWrapEnabled && (position === 'left' || position === 'right')) {
+        finalMd += '\n<div class="clearfix"></div>\n';
+      }
+
+      insertAtCursor(finalMd + exifTable, 'end');
+      if (window.innerWidth < 1024) setIsSidebarOpen(false);
+      return;
+    }
+
+    const imgHtml = `<img src="${url}" alt="${sName}">`;
+    let html = '';
+
+    if (position === 'plain') {
+      html = imgHtml + (attribution ? '<br/>' + attribution : '');
+    } else if (position === 'left' || position === 'right') {
+      html = `<div class="pull-${position}">${imgHtml}<br/>${attribution}</div>`;
+    } else if (position === 'center') {
+      html = `<center>${imgHtml}<br/>${attribution}</center>`;
+    }
+
+    if (!isTextWrapEnabled && (position === 'left' || position === 'right')) {
+      html += '\n<div class="clearfix"></div>\n';
+    }
+
+    insertAtCursor(html + exifTable, 'end');
+    if (window.innerWidth < 1024) setIsSidebarOpen(false);
+  };
+
+  const insertGrid = () => {
+    const selected = galleryMode === 'local' 
+      ? images.filter(img => img.selected)
+      : pexelsResults.filter(p => p.selected);
+
+    if (selected.length === 0) return;
+    
+    let result = '';
+
+    const getCaption = (item: any, index: number, isLocal: boolean, htmlMode: boolean = false) => {
+      if (isLocal) return ` ✍️ `;
+      
+      const photo = item as any;
+      const author = photo.photographer || item.author || 'Author';
+      const source = (photo.source || 'pexels').toLowerCase();
+      const authorUrl = photo.photographer_url || item.authorUrl || '#';
+      
+      // Officially capitalized
+      const sourceName = source === 'unsplash' ? 'Unsplash' : source === 'pixabay' ? 'Pixabay' : 'Pexels';
+      
+      if (pexelsSettings.withAttribution) {
+        if (htmlMode) {
+           return `By <a href="${authorUrl}">${author}</a> on <a href="https://${source}.com">${sourceName}</a>`;
+        }
+        return `By [${author}](${authorUrl}) on [${sourceName}](https://${source}.com)`;
+      }
+      return ` ✍️ `;
+    };
+
+    const getMarkdownImg = (item: any, isLocal: boolean) => {
+      if (isLocal) return `![${(item as ImageItem).name}](${item.url})`;
+      const photo = item as PexelsPhoto;
+      let url = photo.src?.large2x || photo.src?.large || item.url;
+      if (url?.includes('?')) url = url.split('?')[0];
+      return `![Photo by ${photo.photographer || item.author || 'Author'}](${url})`;
+    };
+
+    const getHtmlImg = (item: any, isLocal: boolean) => {
+      if (isLocal) return `<img src="${item.url}" style="width:100%">`;
+      const photo = item as PexelsPhoto;
+      let url = photo.src?.large2x || photo.src?.large || item.url;
+      if (url?.includes('?')) url = url.split('?')[0];
+      return `<img src="${url}" style="width:100%">`;
+    };
+
+    const generateCell = (item: any, idx: number, isLocal: boolean, isHtml: boolean) => {
+      const photo = item as any;
+      const externalLinkUrl = item.url || item.pageURL || photo?.photographer_url || item.url;
+      const shouldLink = pexelsSettings.linkEmbedded || !isLocal;
+      
+      const img = isHtml ? getHtmlImg(item, isLocal) : getMarkdownImg(item, isLocal);
+      let wrapped = img;
+      if (shouldLink && externalLinkUrl) {
+        wrapped = isHtml ? `<a href="${externalLinkUrl}">${img}</a>` : `[${img}](${externalLinkUrl})`;
+      }
+      
+      const shouldShowCaption = gridWithCaptions || (pexelsSettings.withAttribution && !isLocal);
+      if (shouldShowCaption) {
+        const cap = getCaption(item, idx, isLocal, isHtml);
+        const capHtml = `<br/><div align="${singleCaptionAlign}"><sup>${cap}</sup></div>`;
+        const capMd = `<br/><sub>${cap}</sub>`;
+        return wrapped + (isHtml ? capHtml : capMd);
+      }
+      
+      return wrapped;
+    }
+
+    if (gridLayout === 'col-img-text' || gridLayout === 'col-text-img') {
+      const isImgFirst = gridLayout === 'col-img-text';
+      if (imageInsertFormat === 'markdown') {
+        const header = isImgFirst 
+          ? `| ${t('image') || 'Зображення'} | ${t('description') || 'Опис'} |\n|---|---|\n`
+          : `| ${t('description') || 'Опис'} | ${t('image') || 'Зображення'} |\n|---|---|\n`;
+        let rows = '';
+        selected.forEach((item, index) => {
+          const imgCell = generateCell(item, index, galleryMode === 'local', false);
+          const descCell = `${t('typeHere') || ' ✍️ '}`;
+          rows += isImgFirst ? `| ${imgCell} | ${descCell} |\n` : `| ${descCell} | ${imgCell} |\n`;
+        });
+        result = '\n' + header + rows + '\n';
+      } else {
+        result = `<table style="width:100%">\n`;
+        selected.forEach((item, index) => {
+          const imgCell = generateCell(item, index, galleryMode === 'local', true);
+          const descCell = `${t('typeHere') || ' ✍️ '}`;
+          result += `  <tr>\n`;
+          if (isImgFirst) {
+            result += `    <td style="width:50%">${imgCell}</td>\n    <td style="width:50%">${descCell}</td>\n`;
+          } else {
+            result += `    <td style="width:50%">${descCell}</td>\n    <td style="width:50%">${imgCell}</td>\n`;
+          }
+          result += `  </tr>\n`;
+        });
+        result += `</table>\n\n`;

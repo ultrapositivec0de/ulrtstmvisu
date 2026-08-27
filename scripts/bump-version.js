@@ -127,19 +127,24 @@ if (fs.existsSync(changelogPath)) {
   updatedFiles.push('CHANGELOG.md');
 }
 
-// 6. Update src/App.tsx
+// 6. Update src/data/changelog.ts
+const dataChangelogPath = path.join(rootDir, 'src', 'data', 'changelog.ts');
+if (fs.existsSync(dataChangelogPath)) {
+  let dataChangelog = fs.readFileSync(dataChangelogPath, 'utf8');
+  
+  if (!dataChangelog.includes(`version: "v${newVersion}"`)) {
+    const changelogObjStr = `export const APP_CHANGELOG: ChangelogEntry[] = [\n  {\n    version: "v${newVersion}",\n    date: "${today}",\n    changes: [\n      "${customNote.replace(/"/g, '\\"')}"\n    ]\n  },`;
+    dataChangelog = dataChangelog.replace('export const APP_CHANGELOG: ChangelogEntry[] = [', changelogObjStr);
+    fs.writeFileSync(dataChangelogPath, dataChangelog, 'utf8');
+    updatedFiles.push('src/data/changelog.ts');
+  }
+}
+
+// 7. Update src/App.tsx
 const appTsxPath = path.join(rootDir, 'src', 'App.tsx');
 if (fs.existsSync(appTsxPath)) {
   let appTsx = fs.readFileSync(appTsxPath, 'utf8');
-
-  // Replace version literals
   const oldVerEsc = oldVersion.replace(/\./g, '\\.');
-  
-  // Replace APP_CHANGELOG array insertion (avoid duplicate if already present)
-  if (!appTsx.includes(`version: "v${newVersion}"`)) {
-    const changelogObjStr = `const APP_CHANGELOG = [\n  {\n    version: "v${newVersion}",\n    date: "${today}",\n    changes: [\n      "${customNote.replace(/"/g, '\\"')}"\n    ]\n  },`;
-    appTsx = appTsx.replace('const APP_CHANGELOG = [', changelogObjStr);
-  }
 
   // Replace agent string default references
   appTsx = appTsx.replace(
@@ -160,13 +165,32 @@ if (fs.existsSync(appTsxPath)) {
     new RegExp(`New in v${oldVerEsc}:`, 'g'),
     `New in v${newVersion}:`
   );
-  appTsx = appTsx.replace(
-    new RegExp(`v${oldVerEsc}`, 'g'),
-    `v${newVersion}`
-  );
 
   fs.writeFileSync(appTsxPath, appTsx, 'utf8');
   updatedFiles.push('src/App.tsx');
+}
+
+// 8. Update src/components/modals/SettingsModal.tsx
+const settingsModalPath = path.join(rootDir, 'src', 'components', 'modals', 'SettingsModal.tsx');
+if (fs.existsSync(settingsModalPath)) {
+  let settingsModal = fs.readFileSync(settingsModalPath, 'utf8');
+  const oldVerEsc = oldVersion.replace(/\./g, '\\.');
+
+  settingsModal = settingsModal.replace(
+    new RegExp(`Version ${oldVerEsc}`, 'g'),
+    `Version ${newVersion}`
+  );
+  settingsModal = settingsModal.replace(
+    new RegExp(`New in v${oldVerEsc}:`, 'g'),
+    `New in v${newVersion}:`
+  );
+  settingsModal = settingsModal.replace(
+    new RegExp(`ultrasteemeditor/${oldVerEsc}`, 'g'),
+    `ultrasteemeditor/${newVersion}`
+  );
+
+  fs.writeFileSync(settingsModalPath, settingsModal, 'utf8');
+  updatedFiles.push('src/components/modals/SettingsModal.tsx');
 }
 
 // 7. Update package-lock.json if available
