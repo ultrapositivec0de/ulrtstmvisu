@@ -922,12 +922,7 @@ function App() {
       console.debug(err);
     }
     if (saved) setContent(saved);
-    
-    // Delay setting hasLoaded to true to give time for the visual editor 
-    // to perform its initial sync from store to DOM without triggering a sync-back
-    setTimeout(() => {
-      hasLoadedRef.current = true;
-    }, 1500);
+    hasLoadedRef.current = true;
   }, [setContent]);
 
   // Initial Steem Node probing & marked parser config

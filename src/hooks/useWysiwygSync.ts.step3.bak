@@ -330,7 +330,6 @@ export function useWysiwygSync(options: UseWysiwygSyncOptions) {
   const setContent = useEditorStore((state) => state.setContent);
   const savedVisualRangeRef = useRef<Range | null>(null);
   const lastSyncContentRef = useRef<string>(useEditorStore.getState().content);
-  const hasInitializedRef = useRef(false);
 
   const saveVisualSelection = useCallback(() => {
     if (editorMode !== 'visual') return;
@@ -552,16 +551,9 @@ export function useWysiwygSync(options: UseWysiwygSyncOptions) {
 
   const updateContentFromWysiwyg = useCallback(
     (forceImmediate = false) => {
-      if (!wysiwygRef.current || !hasInitializedRef.current) return;
+      if (!wysiwygRef.current) return;
       updateWysiwygEmptyStatus(wysiwygRef.current);
       const html = wysiwygRef.current.innerHTML;
-
-      // Safety check: if editor is empty but store has content, and we just started, ignore
-      const storeContent = useEditorStore.getState().content;
-      if (isWysiwygContentEmpty(wysiwygRef.current) && storeContent.trim() !== '' && !forceImmediate) {
-        console.warn('Prevented accidental store wipe: Editor is empty but store has content.');
-        return;
-      }
 
       if (onDemandSyncEnabled && !forceImmediate) {
         if (wysiwygLocalBackupTimeoutRef.current) clearTimeout(wysiwygLocalBackupTimeoutRef.current);
@@ -597,18 +589,9 @@ export function useWysiwygSync(options: UseWysiwygSyncOptions) {
   );
 
   const syncWysiwygToContentIfVisual = useCallback(() => {
-    if (editorMode === 'visual' && wysiwygRef.current && hasInitializedRef.current) {
-      const html = wysiwygRef.current.innerHTML;
-      const storeContent = useEditorStore.getState().content;
-      
-      // Safety check for mode switching
-      if (isWysiwygContentEmpty(wysiwygRef.current) && storeContent.trim() !== '') {
-        console.warn('Prevented accidental store wipe during mode switch.');
-        return storeContent;
-      }
-
-      const md = htmlToMarkdown(html);
-      if (md !== storeContent) {
+    if (editorMode === 'visual' && wysiwygRef.current) {
+      const md = htmlToMarkdown(wysiwygRef.current.innerHTML);
+      if (md !== useEditorStore.getState().content) {
         lastSyncContentRef.current = md;
         setContent(md);
         return md;
@@ -762,7 +745,6 @@ export function useWysiwygSync(options: UseWysiwygSyncOptions) {
       isSyncingRef.current = true;
       wysiwygRef.current.innerHTML = rawHtml;
       lastSyncContentRef.current = useEditorStore.getState().content;
-      hasInitializedRef.current = true;
       isSyncingRef.current = false;
 
       if (pos) {

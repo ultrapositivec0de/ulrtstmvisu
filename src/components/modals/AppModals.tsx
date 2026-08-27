@@ -4,6 +4,7 @@ import { X, Download } from 'lucide-react';
 import { cn } from '../../lib/utils';
 import { COMMUNITIES, COMMON_TAGS } from '../../data/communities';
 
+import { useEditorStore } from '../../store';
 import { UnlockPinModal } from './UnlockPinModal';
 import { KeysModal } from './KeysModal';
 import { PublishModal } from './PublishModal';
@@ -85,7 +86,6 @@ export interface AppModalsProps {
   toggleTag: (tag: string) => void;
   splitWords: number;
   setSplitWords: (w: number) => void;
-  stats: { words?: number };
   handleSplitPost: () => void;
 
   // DraftsModal
@@ -244,7 +244,6 @@ export const AppModals: React.FC<AppModalsProps> = (props) => {
     toggleTag,
     splitWords,
     setSplitWords,
-    stats,
     handleSplitPost,
     currentDraftId,
     setCurrentDraftId,
@@ -326,6 +325,9 @@ export const AppModals: React.FC<AppModalsProps> = (props) => {
     deferredPrompt,
     t
   } = props;
+  
+  const storeStats = useEditorStore(state => state.stats);
+  const wordsCount = storeStats?.words || 0;
 
   return (
     <>
@@ -448,7 +450,7 @@ export const AppModals: React.FC<AppModalsProps> = (props) => {
           onClose={() => setActiveModal(null)}
           splitWords={splitWords}
           setSplitWords={setSplitWords}
-          wordsCount={stats?.words || 0}
+          wordsCount={wordsCount}
           handleSplitPost={handleSplitPost}
           t={t}
         />

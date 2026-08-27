@@ -249,27 +249,36 @@ export function useEditorModeManager({
       restoreMarkdownCursorAndScroll();
     } else if (editorMode === 'visual' && wysiwygRef.current) {
       hasRestoredInitialCursorRef.current = true;
+      isSyncingRef.current = true;
       const timer = setTimeout(async () => {
-        const pos = getPos();
-        if (pos) {
-          useEditorStore.getState().setSelection(pos.start, pos.end);
+        try {
+          const pos = getPos();
+          if (pos) {
+            useEditorStore.getState().setSelection(pos.start, pos.end);
+          }
+          
           await syncCursorMarkdownToVisual();
+          
           if (wysiwygRef.current) {
             wysiwygRef.current.focus();
           }
-        } else if (wysiwygRef.current) {
-          wysiwygRef.current.focus();
-        }
 
-        const savedScroll = localStorage.getItem('steem_editor_scroll');
-        if (savedScroll !== null && wysiwygRef.current) {
-          const scrollTop = Number(savedScroll);
-          if (!isNaN(scrollTop) && scrollTop > 0) {
-            wysiwygRef.current.scrollTop = scrollTop;
+          const savedScroll = localStorage.getItem('steem_editor_scroll');
+          if (savedScroll !== null && wysiwygRef.current) {
+            const scrollTop = Number(savedScroll);
+            if (!isNaN(scrollTop) && scrollTop > 0) {
+              wysiwygRef.current.scrollTop = scrollTop;
+            }
           }
+        } finally {
+          setTimeout(() => {
+            isSyncingRef.current = false;
+          }, 300);
         }
       }, 250);
-      return () => clearTimeout(timer);
+      return () => {
+        clearTimeout(timer);
+      };
     }
   }, [editorMode, syncCursorMarkdownToVisual, restoreMarkdownCursorAndScroll, wysiwygRef]);
 
@@ -326,6 +335,7 @@ export function useEditorModeManager({
       // Update lastSyncContentRef so background useEffect won't trigger another innerHTML wipe
       lastSyncContentRef.current = val;
       setEditorMode('visual');
+      isSyncingRef.current = true;
 
       setTimeout(async () => {
         try {
@@ -337,6 +347,7 @@ export function useEditorModeManager({
         } finally {
           setTimeout(() => {
             isTransitioningModeRef.current = false;
+            isSyncingRef.current = false;
           }, 300);
         }
       }, 50);

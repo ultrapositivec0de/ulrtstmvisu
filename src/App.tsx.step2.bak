@@ -108,8 +108,7 @@ function App() {
 
   // 4. Editor Store State
   const setContent = useEditorStore(state => state.setContent);
-  // stats is now handled internally by components to prevent root re-renders
-  // const stats = useEditorStore(state => state.stats);
+  const stats = useEditorStore(state => state.stats);
 
   // 5. Post Metadata State
   const [pubTitle, setPubTitle] = useState('');
@@ -163,8 +162,6 @@ function App() {
     isWidgetMenuOpen,
     setIsWidgetMenuOpen,
   });
-
-  const hasLoadedRef = useRef(false);
 
   const contentForPublish = useEditorStore(state => activeModal === 'publish' ? state.content : '');
 
@@ -870,15 +867,12 @@ function App() {
       if (state.content !== prevState.content) {
         if (timer) clearTimeout(timer);
         timer = setTimeout(() => {
-          // Only save if we have finished initial loading to prevent overwriting with default empty state
-          if (hasLoadedRef.current) {
-            saveLargeStorage(STORAGE_KEY_AUTOSAVE, state.content);
-            if (cursorPositionRef.current) {
-              try {
-                localStorage.setItem('steem_editor_cursor', JSON.stringify(cursorPositionRef.current));
-              } catch (err) {
-                console.debug(err);
-              }
+          saveLargeStorage(STORAGE_KEY_AUTOSAVE, state.content);
+          if (cursorPositionRef.current) {
+            try {
+              localStorage.setItem('steem_editor_cursor', JSON.stringify(cursorPositionRef.current));
+            } catch (err) {
+              console.debug(err);
             }
           }
         }, 350);
@@ -922,12 +916,6 @@ function App() {
       console.debug(err);
     }
     if (saved) setContent(saved);
-    
-    // Delay setting hasLoaded to true to give time for the visual editor 
-    // to perform its initial sync from store to DOM without triggering a sync-back
-    setTimeout(() => {
-      hasLoadedRef.current = true;
-    }, 1500);
   }, [setContent]);
 
   // Initial Steem Node probing & marked parser config
@@ -1451,6 +1439,7 @@ function App() {
         toggleTag={toggleTag}
         splitWords={splitWords}
         setSplitWords={setSplitWords}
+        stats={stats}
         handleSplitPost={handleSplitPost}
         currentDraftId={currentDraftId}
         setCurrentDraftId={setCurrentDraftId}
