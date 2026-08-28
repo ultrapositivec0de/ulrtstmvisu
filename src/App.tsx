@@ -1111,11 +1111,16 @@ function App() {
   });
 
   return (
-    <div className={cn(
-      "flex flex-col w-full h-full relative font-sans overflow-hidden transition-colors duration-500 selection:bg-[rgb(var(--accent-color)/0.3)]",
-      visualStyle === 'neon' ? "theme-neon bg-slate-950 text-cyan-400" : (isDarkMode ? "bg-slate-950 text-slate-100" : "theme-light bg-white text-slate-900 border-slate-200"),
-      performanceMode && "perf-mode"
-    )}>
+    <div 
+      className={cn(
+        "flex flex-col w-full h-full relative font-sans overflow-hidden transition-colors duration-500 selection:bg-[rgb(var(--accent-color)/0.3)]",
+        visualStyle === 'neon' ? "theme-neon bg-slate-950 text-cyan-400" : (isDarkMode ? "bg-slate-950 text-slate-100" : "theme-light bg-white text-slate-900 border-slate-200"),
+        performanceMode && "perf-mode"
+      )}
+      style={{
+        height: isKeyboardOpen && vvHeight ? `${vvHeight}px` : '100dvh'
+      }}
+    >
       {/* Dynamic Theme & Editor Styles */}
       <GlobalEditorStyles visualStyle={visualStyle} neonTextColored={neonTextColored} />
       
