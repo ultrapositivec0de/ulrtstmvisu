@@ -62,9 +62,9 @@ export const TagPresetsModal: React.FC<TagPresetsModalProps> = ({
               <LayoutGrid size={18} /> {t('communities')}
             </h3>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              {communities.map(comm => (
+              {communities.map((comm, cIdx) => (
                 <div 
-                  key={comm.id}
+                  key={comm.id || `comm-${cIdx}`}
                   onClick={() => {
                     const allSelected = comm.tags.every(t => pubTags.includes(t));
                     if (allSelected) {
@@ -89,9 +89,9 @@ export const TagPresetsModal: React.FC<TagPresetsModalProps> = ({
                 >
                   <span className="font-bold text-sm text-slate-200 mb-2">{comm.name}</span>
                   <div className="flex flex-wrap gap-1">
-                    {comm.tags.map(tag => (
+                    {comm.tags.filter(Boolean).map((tag, tIdx) => (
                       <button
-                        key={tag}
+                        key={tag || `comm-tag-${tIdx}`}
                         onClick={(e) => {
                           e.stopPropagation();
                           toggleTag(tag);
@@ -117,9 +117,9 @@ export const TagPresetsModal: React.FC<TagPresetsModalProps> = ({
               <Plus size={18} /> {t('commonTags')}
             </h3>
             <div className="flex flex-wrap gap-2">
-              {commonTags.map(tag => (
+              {commonTags.filter(Boolean).map((tag, tIdx) => (
                 <button 
-                  key={tag}
+                  key={tag || `common-tag-${tIdx}`}
                   onClick={() => toggleTag(tag)}
                   className={cn(
                     "px-3 py-1.5 rounded-full text-xs font-medium border transition-all",

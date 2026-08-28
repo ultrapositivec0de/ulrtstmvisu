@@ -76,8 +76,8 @@ export const TagGroupsModal: React.FC<TagGroupsModalProps> = ({
             {t('addTagGroup')}
           </button>
           <div className="space-y-2 max-h-[60vh] sm:max-h-[50vh] overflow-y-auto custom-scrollbar pr-1">
-            {tagGroups.map(group => (
-              <div key={group.id} className="p-3 bg-slate-800 rounded-lg group">
+            {tagGroups.map((group, gIdx) => (
+              <div key={group.id || `group-${gIdx}`} className="p-3 bg-slate-800 rounded-lg group">
                 <div className="flex justify-between items-center mb-1">
                   <button 
                     onClick={() => {
@@ -104,9 +104,9 @@ export const TagGroupsModal: React.FC<TagGroupsModalProps> = ({
                   </button>
                 </div>
                 <div className="flex flex-wrap gap-1">
-                  {group.tags.map(tag => (
+                  {group.tags.filter(Boolean).map((tag, tIdx) => (
                     <button 
-                      key={tag}
+                      key={tag || `group-tag-${tIdx}`}
                       onClick={() => {
                         const currentTags = pubTags.split(/\s+/).filter(Boolean);
                         if (currentTags.includes(tag)) {

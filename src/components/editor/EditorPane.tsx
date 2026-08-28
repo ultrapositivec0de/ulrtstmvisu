@@ -108,7 +108,7 @@ export interface EditorPaneProps {
   handleWysiwygKeyDown: (e: React.KeyboardEvent<HTMLDivElement>) => void;
   isImageAndProxyUrl: (url: string) => boolean;
   insertHtmlAtCursor: (html: string) => void;
-  updateContentFromWysiwyg: () => void;
+  updateContentFromWysiwyg: (forceImmediate?: boolean) => void;
   htmlToMarkdown: (html: string) => string;
   convertBareImageUrlsToMarkdown: (text: string) => string;
   getMarked: () => any;
@@ -855,28 +855,8 @@ export const EditorPane: React.FC<EditorPaneProps> = ({
               }
             }
 
-            const html = target.innerHTML;
-            const syncDelay = onDemandSyncEnabled ? 4000 : 150;
-            const backupDelay = onDemandSyncEnabled ? 2000 : 800;
-
-            if (wysiwygLocalBackupTimeoutRef.current) {
-              clearTimeout(wysiwygLocalBackupTimeoutRef.current);
-            }
-            wysiwygLocalBackupTimeoutRef.current = setTimeout(() => {
-              localStorage.setItem('steem_autosave_temp_visual_html', html);
-            }, backupDelay) as any;
-            
-            if (wysiwygSyncTimeoutRef.current) {
-              clearTimeout(wysiwygSyncTimeoutRef.current);
-            }
-            wysiwygSyncTimeoutRef.current = setTimeout(() => {
-              const md = htmlToMarkdown(html);
-              if (md !== useEditorStore.getState().content) {
-                lastSyncContentRef.current = md;
-                setContent(md);
-                saveVisualSelection();
-              }
-            }, syncDelay) as any;
+            // Use the unified sync function from useWysiwygSync hook
+            updateContentFromWysiwyg(false);
           }}
           onFocus={() => {
             setIsEditorFocused(true);
@@ -885,9 +865,7 @@ export const EditorPane: React.FC<EditorPaneProps> = ({
           }}
           onBlur={() => {
             setIsEditorFocused(false);
-            if (onDemandSyncEnabled && wysiwygRef.current) {
-              localStorage.setItem('steem_autosave_temp_visual_html', wysiwygRef.current.innerHTML);
-            }
+            updateContentFromWysiwyg(true);
           }}
           onScroll={() => {
             if (wysiwygRef.current) {
@@ -1056,9 +1034,9 @@ export const EditorPane: React.FC<EditorPaneProps> = ({
               className="flex items-center gap-2 overflow-x-auto py-1 px-0.5 no-scrollbar scroll-smooth"
               style={{ scrollbarWidth: 'none' }}
             >
-              {images.map((img, idx) => (
+              {images.filter(img => Boolean(img && (img.url || img.name))).map((img, idx) => (
                 <button
-                  key={img.url || idx}
+                  key={img.url || (img as any).id || `img-${idx}`}
                   type="button"
                   onMouseDown={(e) => e.preventDefault()}
                   onClick={(e) => {

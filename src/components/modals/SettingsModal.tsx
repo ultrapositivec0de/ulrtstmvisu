@@ -673,8 +673,8 @@ export const SettingsModal: React.FC<SettingsModalProps> = (props) => {
                     <div className="space-y-2">
                       <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest px-1">{t('accounts') || "Accounts"}</label>
                       <div className="space-y-2">
-                        {vaultAccounts.map(acc => (
-                          <div key={acc} className="flex items-center justify-between p-3 bg-slate-900 border border-slate-800 rounded-xl">
+                        {vaultAccounts.filter(Boolean).map((acc, idx) => (
+                          <div key={acc || `settings-vault-acc-${idx}`} className="flex items-center justify-between p-3 bg-slate-900 border border-slate-800 rounded-xl">
                             <span className="font-bold text-cyan-400">@{acc}</span>
                             <button 
                               onClick={async () => {
@@ -760,11 +760,11 @@ export const SettingsModal: React.FC<SettingsModalProps> = (props) => {
                        <div className="w-16 h-16 bg-cyan-500/10 rounded-2xl mx-auto flex items-center justify-center text-cyan-400 font-black text-2xl shadow-xl shadow-cyan-500/10">S</div>
                        <div>
                          <h3 className="text-xl font-black tracking-tight">SteemEditor <span className="text-cyan-400">Pro</span></h3>
-                         <p className="text-[10px] text-slate-500 uppercase font-black tracking-[0.2em] pt-1">Version 4.6.8 "Quantum"</p>
+                         <p className="text-[10px] text-slate-500 uppercase font-black tracking-[0.2em] pt-1">Version 4.7.4 "Quantum"</p>
                        </div>
                        <label className="text-[10px] font-black text-slate-500 uppercase tracking-[0.2em] px-1 pt-4 block border-t border-slate-800">Changelog & Updates</label>
                         <div className="mt-2 p-3 bg-slate-950 border border-cyan-500/20 rounded-xl text-left">
-                          <p className="text-xs text-slate-300 font-medium">New in v4.6.8: Visual Editor Informative Placeholders, Dynamic Semver Web Release & allowScripts Policy Update</p>
+                          <p className="text-xs text-slate-300 font-medium">New in v4.7.4: WYSIWYG State Persistence Hardening, Flush on Pagehide / VisibilityChange & Responsive 300ms Debounce</p>
                         </div>
                        
                        <div className="space-y-2 max-h-60 overflow-y-auto custom-scrollbar bg-slate-900 border border-slate-800 rounded-xl p-3">
@@ -863,7 +863,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = (props) => {
                                   localStorage.setItem('steem_app_agent', e.target.value);
                                 }}
                                 className="w-full bg-slate-900 border border-slate-700 rounded-lg p-2.5 text-xs text-slate-200 outline-none focus:ring-1 focus:ring-cyan-500"
-                                placeholder="ultrasteemeditor/4.6.8"
+                                placeholder="ultrasteemeditor/4.7.4"
                               />
                             </div>
                           </motion.div>

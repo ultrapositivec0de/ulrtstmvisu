@@ -254,7 +254,7 @@ export const TamedWidget: React.FC<TamedWidgetProps> = (props) => {
                         width: isWidgetMenuOpen && lockedToolsWidth ? `${lockedToolsWidth}px` : undefined
                       }}
                     >
-                      {enabledTools.map((key: string) => {
+                      {enabledTools.filter((k: any) => Boolean(k && TOOLS_MAP[k])).map((key: string, idx: number) => {
                         const tool = TOOLS_MAP[key];
                         if (!tool) return null;
                         const isToolActive = 
@@ -268,7 +268,7 @@ export const TamedWidget: React.FC<TamedWidgetProps> = (props) => {
                           false;
                         return (
                           <button 
-                            key={key}
+                            key={key || `tool-${idx}`}
                             onMouseDown={(e) => e.preventDefault()}
                             onClick={(e) => handleWidgetAction(tool.action, e)} 
                             className={cn(
@@ -449,9 +449,9 @@ export const TamedWidget: React.FC<TamedWidgetProps> = (props) => {
                                   }} 
                                   className="space-y-2"
                                 >
-                                  {enabledTools.map((key: string, idx: number) => (
+                                  {enabledTools.filter((k: any) => Boolean(k && TOOLS_MAP[k])).map((key: string, idx: number) => (
                                     <Reorder.Item 
-                                      key={key} 
+                                      key={key || `tool-order-${idx}`} 
                                       value={key}
                                       transition={{ duration: 0.1 }}
                                       dragListener={true}
@@ -495,9 +495,9 @@ export const TamedWidget: React.FC<TamedWidgetProps> = (props) => {
                                 </Reorder.Group>
 
                                 <div className="grid grid-cols-4 gap-1.5 pt-2">
-                                  {Object.keys(TOOLS_MAP).map(key => (
+                                  {Object.keys(TOOLS_MAP).filter(Boolean).map((key, idx) => (
                                     <button
-                                      key={`toggle-${key}`}
+                                      key={`toggle-${key || idx}`}
                                       onClick={() => toggleTool(key)}
                                       className={cn(
                                         "text-[9px] py-1.5 px-2 rounded-lg border text-center transition-all font-medium truncate",

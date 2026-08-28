@@ -6,6 +6,16 @@ export interface ChangelogEntry {
 
 export const APP_CHANGELOG: ChangelogEntry[] = [
   {
+    version: "v4.7.4",
+    date: "2026-08-28",
+    changes: [
+      "WYSIWYG State Persistence Hardening: Resolved visual editor state desynchronization upon page refresh and abrupt browser closure using Zustand v5 subscribeWithSelector middleware.",
+      "Synchronous Flush & Unload Lifecycle: Added pagehide and document visibilitychange listeners alongside beforeunload to guarantee immediate visual DOM-to-markdown storage flushes.",
+      "Optimized Debounce & Blur Synchronization: Replaced legacy multi-second delay with a responsive 300ms debounce and immediate onBlur markdown sync.",
+      "Cross-Platform Release Sync: Synchronized application version to v4.7.4 across Web, Tauri, Neutralino, and Steem blockchain broadcasting metadata."
+    ]
+  },
+  {
     version: "v4.6.8",
     date: "2026-08-25",
     changes: [

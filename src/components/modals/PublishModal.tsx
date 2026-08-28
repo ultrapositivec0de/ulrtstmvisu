@@ -471,9 +471,9 @@ export const PublishModal: React.FC<PublishModalProps> = (props) => {
                                   <button onClick={() => setActiveModal('mentions')} className="text-[8px] text-cyan-400 hover:underline px-1 uppercase font-bold">Редагувати список</button>
                                 </div>
                                 <div className="flex flex-wrap gap-1.5 min-h-[1rem]">
-                                  {mentions.map(m => (
+                                  {mentions.filter(Boolean).map((m, idx) => (
                                     <button
-                                      key={m}
+                                      key={m || `mention-${idx}`}
                                       onClick={() => {
                                         if (beneficiaries.some(b => b.account === m)) return;
                                         setBeneficiaries([...beneficiaries, { account: m, weight: 5 }]);
@@ -494,13 +494,13 @@ export const PublishModal: React.FC<PublishModalProps> = (props) => {
                             )}
 
                             {/* Mentions in text Picker */}
-                            {extractMentions(contentForPublish).filter(m => !mentions.includes(m)).length > 0 && (
+                            {extractMentions(contentForPublish).filter(m => Boolean(m && !mentions.includes(m))).length > 0 && (
                               <div className="px-1">
                                 <span className="text-[8px] text-slate-600 uppercase font-bold mb-1 block opacity-60">{t('fromMentions')}:</span>
                                 <div className="flex flex-wrap gap-1">
-                                  {extractMentions(contentForPublish).filter(m => !mentions.includes(m)).map(m => (
+                                  {extractMentions(contentForPublish).filter(m => Boolean(m && !mentions.includes(m))).map((m, idx) => (
                                     <button
-                                      key={m}
+                                      key={m || `extracted-mention-${idx}`}
                                       onClick={() => {
                                         if (beneficiaries.some(b => b.account === m)) return;
                                         setBeneficiaries([...beneficiaries, { account: m, weight: 5 }]);
@@ -523,7 +523,7 @@ export const PublishModal: React.FC<PublishModalProps> = (props) => {
                             <div className="space-y-1.5 pt-2">
                               <label className="text-[8px] font-bold text-slate-600 uppercase px-1">{t('beneficiaries')}</label>
                               {beneficiaries.map((b, idx) => (
-                                <div key={idx} className="flex items-center justify-between bg-slate-800/40 p-2.5 rounded-xl border border-slate-700/50 text-[10px] hover:border-slate-600 transition-colors">
+                                <div key={b.account ? `ben-${b.account}` : `ben-idx-${idx}`} className="flex items-center justify-between bg-slate-800/40 p-2.5 rounded-xl border border-slate-700/50 text-[10px] hover:border-slate-600 transition-colors">
                                   <span className="text-slate-200 font-bold tracking-tight">@{b.account}</span>
                                   <div className="flex items-center gap-3">
                                     <div className="flex items-center gap-1.5 px-2 py-1 bg-slate-900 rounded-lg border border-slate-700/50">

@@ -232,6 +232,11 @@ function App() {
   });
 
   const saveLargeStorage = useCallback((key: string, val: string) => {
+    // Safety: Prevent clearing storage during the initial loading window
+    if (!val && !hasLoadedRef.current) {
+      console.warn(`Prevented clearing ${key} during initial load window.`);
+      return;
+    }
     try {
       localStorage.setItem(key, val);
     } catch (e) {
@@ -891,26 +896,45 @@ function App() {
     };
   }, [saveLargeStorage, cursorPositionRef]);
 
-  // Synchronous flush on page reload / unload
+  // Synchronous flush on page reload / unload / visibility hidden
   useEffect(() => {
-    const handleBeforeUnload = () => {
+    const flushSave = () => {
+      if (!hasLoadedRef.current) return;
+
       try {
         if (editorMode === 'markdown' && editorRef.current) {
           const val = editorRef.current.value;
-          useEditorStore.setState({ content: val });
-          saveLargeStorage(STORAGE_KEY_AUTOSAVE, val);
+          if (val !== undefined && val !== null) {
+            useEditorStore.setState({ content: val });
+            saveLargeStorage(STORAGE_KEY_AUTOSAVE, val);
+          }
         } else if (editorMode === 'visual' && wysiwygRef.current) {
           const md = htmlToMarkdown(wysiwygRef.current.innerHTML);
-          useEditorStore.setState({ content: md });
-          saveLargeStorage(STORAGE_KEY_AUTOSAVE, md);
+          if (md !== undefined && md !== null) {
+            useEditorStore.setState({ content: md });
+            saveLargeStorage(STORAGE_KEY_AUTOSAVE, md);
+          }
         }
       } catch (err) {
         console.debug('Autosave flush on unload failed:', err);
       }
     };
 
-    window.addEventListener('beforeunload', handleBeforeUnload);
-    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'hidden') {
+        flushSave();
+      }
+    };
+
+    window.addEventListener('beforeunload', flushSave);
+    window.addEventListener('pagehide', flushSave);
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
+    return () => {
+      window.removeEventListener('beforeunload', flushSave);
+      window.removeEventListener('pagehide', flushSave);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
   }, [editorMode, saveLargeStorage]);
 
   // Restore initial document content from storage on startup
@@ -921,13 +945,10 @@ function App() {
     } catch (err) {
       console.debug(err);
     }
-    if (saved) setContent(saved);
-    
-    // Delay setting hasLoaded to true to give time for the visual editor 
-    // to perform its initial sync from store to DOM without triggering a sync-back
-    setTimeout(() => {
-      hasLoadedRef.current = true;
-    }, 1500);
+    if (saved && saved !== useEditorStore.getState().content) {
+      setContent(saved);
+    }
+    hasLoadedRef.current = true;
   }, [setContent]);
 
   // Initial Steem Node probing & marked parser config

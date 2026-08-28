@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import { subscribeWithSelector } from 'zustand/middleware';
 
 interface EditorState {
   lines: string[];
@@ -17,25 +18,35 @@ interface EditorState {
   setStats: (stats: { words: number; chars: number }, cleanStats: { words: number; chars: number }) => void;
 }
 
-export const useEditorStore = create<EditorState>((set) => ({
-  lines: [],
-  cursor: null,
-  selectionStart: null,
-  selectionEnd: null,
-  content: '',
-  stats: { words: 0, chars: 0 },
-  cleanStats: { words: 0, chars: 0 },
-  setStats: (stats, cleanStats) => set({ stats, cleanStats }),
-  setLines: (lines) => set({ lines, content: lines.join('\n') }),
-  updateLine: (index, newText) => set((state) => {
-    const newLines = [...state.lines];
-    newLines[index] = newText;
-    return { lines: newLines, content: newLines.join('\n') };
-  }),
-  setCursor: (cursor) => set({ cursor }),
-  setSelection: (start, end) => set({ selectionStart: start, selectionEnd: end }),
-  setContent: (content) => set({ content })
-}));
+const getInitialContent = () => {
+  try {
+    return localStorage.getItem('steem_autosave_temp') || sessionStorage.getItem('steem_autosave_temp') || '';
+  } catch {
+    return '';
+  }
+};
+
+export const useEditorStore = create<EditorState>()(
+  subscribeWithSelector((set) => ({
+    lines: [],
+    cursor: null,
+    selectionStart: null,
+    selectionEnd: null,
+    content: getInitialContent(),
+    stats: { words: 0, chars: 0 },
+    cleanStats: { words: 0, chars: 0 },
+    setStats: (stats, cleanStats) => set({ stats, cleanStats }),
+    setLines: (lines) => set({ lines, content: lines.join('\n') }),
+    updateLine: (index, newText) => set((state) => {
+      const newLines = [...state.lines];
+      newLines[index] = newText;
+      return { lines: newLines, content: newLines.join('\n') };
+    }),
+    setCursor: (cursor) => set({ cursor }),
+    setSelection: (start, end) => set({ selectionStart: start, selectionEnd: end }),
+    setContent: (content) => set({ content })
+  }))
+);
 
 export function getRowColFromOffset(text: string, offset: number) {
   let row = 0;

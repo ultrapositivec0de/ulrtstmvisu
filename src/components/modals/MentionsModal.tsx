@@ -77,8 +77,8 @@ export const MentionsModal: React.FC<MentionsModalProps> = ({
             </button>
           </div>
           <div className="flex flex-wrap gap-2 max-h-[60vh] sm:max-h-[50vh] overflow-y-auto custom-scrollbar pr-1">
-            {mentions.map(user => (
-              <div key={user} className="flex items-center gap-1 bg-slate-800 px-3 py-1.5 rounded-full border border-slate-700 group">
+            {mentions.filter(Boolean).map((user, idx) => (
+              <div key={user || `user-${idx}`} className="flex items-center gap-1 bg-slate-800 px-3 py-1.5 rounded-full border border-slate-700 group">
                 <button 
                   onClick={() => { 
                     insertAtCursor(`@${user} `); 

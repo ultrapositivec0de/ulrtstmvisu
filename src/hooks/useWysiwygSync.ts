@@ -563,34 +563,36 @@ export function useWysiwygSync(options: UseWysiwygSyncOptions) {
         return;
       }
 
-      if (onDemandSyncEnabled && !forceImmediate) {
-        if (wysiwygLocalBackupTimeoutRef.current) clearTimeout(wysiwygLocalBackupTimeoutRef.current);
-        wysiwygLocalBackupTimeoutRef.current = setTimeout(() => {
-          localStorage.setItem('steem_autosave_temp_visual_html', html);
-        }, 2000) as any;
+      if (wysiwygSyncTimeoutRef.current) clearTimeout(wysiwygSyncTimeoutRef.current);
 
-        if (wysiwygSyncTimeoutRef.current) clearTimeout(wysiwygSyncTimeoutRef.current);
-        wysiwygSyncTimeoutRef.current = setTimeout(() => {
-          const md = htmlToMarkdown(html);
-          const currentContent = useEditorStore.getState().content;
-          if (md !== currentContent) {
-            lastSyncContentRef.current = md;
-            setContent(md);
-            saveVisualSelection();
+      const doSync = () => {
+        if (!wysiwygRef.current) return;
+        const currentHtml = wysiwygRef.current.innerHTML;
+        const md = htmlToMarkdown(currentHtml);
+        const currentContent = useEditorStore.getState().content;
+        if (md !== currentContent) {
+          lastSyncContentRef.current = md;
+          setContent(md);
+          try {
+            localStorage.setItem('steem_autosave_temp', md);
+            sessionStorage.setItem('steem_autosave_temp', md);
+          } catch (e) {
+            console.debug(e);
           }
-        }, 5000) as any;
+          saveVisualSelection();
+        }
+      };
+
+      if (forceImmediate) {
+        doSync();
       } else {
-        const md = htmlToMarkdown(html);
-        lastSyncContentRef.current = md;
-        setContent(md);
+        wysiwygSyncTimeoutRef.current = setTimeout(doSync, 300) as any;
       }
     },
     [
-      onDemandSyncEnabled,
       saveVisualSelection,
       setContent,
       updateWysiwygEmptyStatus,
-      wysiwygLocalBackupTimeoutRef,
       wysiwygRef,
       wysiwygSyncTimeoutRef,
     ]
@@ -611,6 +613,12 @@ export function useWysiwygSync(options: UseWysiwygSyncOptions) {
       if (md !== storeContent) {
         lastSyncContentRef.current = md;
         setContent(md);
+        try {
+          localStorage.setItem('steem_autosave_temp', md);
+          sessionStorage.setItem('steem_autosave_temp', md);
+        } catch (e) {
+          console.debug(e);
+        }
         return md;
       }
     }

@@ -124,9 +124,9 @@ export const DraftsModal: React.FC<DraftsModalProps> = (props) => {
               <p>{t('noDrafts')}</p>
             </div>
           ) : (
-            filtered.map((draft: Draft) => (
+            filtered.map((draft: Draft, idx: number) => (
               <div 
-                key={draft.id}
+                key={draft.id || `draft-${draft.date || idx}`}
                 className="group p-4 bg-slate-800/50 hover:bg-slate-800 border border-slate-700/50 rounded-xl transition-all cursor-pointer flex justify-between items-center"
                 onClick={async () => {
                   if (await confirmDialog(t('loadDraftConfirm'))) {

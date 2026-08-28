@@ -161,6 +161,7 @@ export const CodeEditor = forwardRef<HTMLTextAreaElement, CodeEditorProps>((prop
 
     // Fast debounced save directly to localStorage to prevent any data loss on refresh/unload
     const STORAGE_KEY_AUTOSAVE = 'steem_autosave_temp';
+    
     const backupDelay = props.onDemandSyncEnabled === false ? 350 : 1500;
     if (localSaveTimeoutRef.current) clearTimeout(localSaveTimeoutRef.current);
     localSaveTimeoutRef.current = setTimeout(() => {

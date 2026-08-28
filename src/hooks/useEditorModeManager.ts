@@ -247,10 +247,20 @@ export function useEditorModeManager({
     if (editorMode === 'markdown') {
       hasRestoredInitialCursorRef.current = true;
       restoreMarkdownCursorAndScroll();
-    } else if (editorMode === 'visual' && wysiwygRef.current) {
-      hasRestoredInitialCursorRef.current = true;
-      isSyncingRef.current = true;
-      const timer = setTimeout(async () => {
+    } else if (editorMode === 'visual') {
+      let isCancelled = false;
+      const attemptRestore = async () => {
+        if (!wysiwygRef.current) {
+          requestAnimationFrame(() => {
+            if (!isCancelled && !hasRestoredInitialCursorRef.current) {
+              attemptRestore();
+            }
+          });
+          return;
+        }
+
+        hasRestoredInitialCursorRef.current = true;
+        isSyncingRef.current = true;
         try {
           const pos = getPos();
           if (pos) {
@@ -260,7 +270,7 @@ export function useEditorModeManager({
           await syncCursorMarkdownToVisual();
           
           if (wysiwygRef.current) {
-            wysiwygRef.current.focus();
+            wysiwygRef.current.focus({ preventScroll: true });
           }
 
           const savedScroll = localStorage.getItem('steem_editor_scroll');
@@ -273,11 +283,13 @@ export function useEditorModeManager({
         } finally {
           setTimeout(() => {
             isSyncingRef.current = false;
-          }, 300);
+          }, 150);
         }
-      }, 250);
+      };
+
+      attemptRestore();
       return () => {
-        clearTimeout(timer);
+        isCancelled = true;
       };
     }
   }, [editorMode, syncCursorMarkdownToVisual, restoreMarkdownCursorAndScroll, wysiwygRef]);

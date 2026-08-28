@@ -233,8 +233,8 @@ export const KeysModal: React.FC<KeysModalProps> = (props) => {
 
                         <div className="space-y-2">
                           {vaultAccounts.length > 0 ? (
-                            vaultAccounts.map(acc => (
-                              <div key={acc} className="p-3 bg-slate-800/50 border border-slate-700 rounded-xl flex items-center justify-between group">
+                            vaultAccounts.filter(Boolean).map((acc, idx) => (
+                              <div key={acc || `vault-acc-${idx}`} className="p-3 bg-slate-800/50 border border-slate-700 rounded-xl flex items-center justify-between group">
                                 <div className="flex items-center gap-3">
                                   <div className="w-8 h-8 rounded-full bg-cyan-500/20 text-cyan-400 flex items-center justify-center text-xs font-bold">
                                     {acc[0].toUpperCase()}

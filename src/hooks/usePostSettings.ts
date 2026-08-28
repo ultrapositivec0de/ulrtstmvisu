@@ -14,7 +14,7 @@ export function usePostSettings() {
 
   // App identifier / User Agent
   const [appAgent, setAppAgent] = useState<string>(() => {
-    return localStorage.getItem('steem_app_agent') || 'ultrasteemeditor/4.6.8';
+    return localStorage.getItem('steem_app_agent') || 'ultrasteemeditor/4.7.4';
   });
 
   // Beneficiaries list & inputs
