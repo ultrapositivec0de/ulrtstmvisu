@@ -1,4 +1,4 @@
-const CACHE_NAME = 'steem-editor-pro-v2';
+const CACHE_NAME = 'steem-editor-pro-v4.7.4';
 const ASSETS_TO_CACHE = [
   '/',
   '/index.html',
