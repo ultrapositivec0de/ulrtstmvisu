@@ -101,13 +101,13 @@ export function getFloatingWidgetStyles({
 
     if (isKeyboardOpen) {
       // Place exactly 8px above virtual keyboard top edge
-      const targetTop = visualBottom - actualWidgetHeight - 8;
+      const targetTop = Math.max(offsetTop + 8, visualBottom - actualWidgetHeight - 8);
       style.top = `${targetTop}px`;
       style.bottom = 'auto';
     } else {
-      // Place above bottom navigation bar or screen bottom
-      const bottomNavOffset = (isEditorFullScreen || isFullScreen) ? 12 : 72;
-      const targetTop = visualBottom - actualWidgetHeight - bottomNavOffset;
+      // Place above bottom navigation bar or screen bottom, taking browser chrome and insets into account
+      const bottomNavOffset = (isEditorFullScreen || isFullScreen) ? 16 : 76;
+      const targetTop = Math.max(offsetTop + 8, visualBottom - actualWidgetHeight - bottomNavOffset);
       style.top = `${targetTop}px`;
       style.bottom = 'auto';
     }

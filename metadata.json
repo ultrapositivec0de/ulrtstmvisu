@@ -1,6 +1,6 @@
 {
   "name": "Ultra Steem Editor",
-  "description": "Ultra Steem Editor v4.7.4 - High-performance Markdown and WYSIWYG editor.",
+  "description": "Ultra Steem Editor v4.7.5 - High-performance Markdown and WYSIWYG editor.",
   "requestFramePermissions": [],
   "majorCapabilities": [
     "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"

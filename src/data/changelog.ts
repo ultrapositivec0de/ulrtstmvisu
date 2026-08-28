@@ -6,6 +6,13 @@ export interface ChangelogEntry {
 
 export const APP_CHANGELOG: ChangelogEntry[] = [
   {
+    version: "v4.7.5",
+    date: "2026-08-28",
+    changes: [
+      "PWA Cache-First & Instant UI Shell Launch, Offline Asset Strategy & Cross-Platform Version Sync"
+    ]
+  },
+  {
     version: "v4.7.4",
     date: "2026-08-28",
     changes: [

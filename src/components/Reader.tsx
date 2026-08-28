@@ -3258,10 +3258,10 @@ export default function Reader({
 
                             <div className="bg-slate-950/50 border border-slate-800 rounded-xl p-3 min-h-[80px]">
                               <div className="flex flex-wrap gap-2 mb-2">
-                                {config.tags.length > 0 ? (
-                                  config.tags.map((t) => (
+                                {config.tags.filter(Boolean).length > 0 ? (
+                                  config.tags.filter(Boolean).map((t, idx) => (
                                     <span
-                                      key={t}
+                                      key={`reader-tag-${t}-${idx}`}
                                       className="flex items-center gap-1 bg-purple-500/10 text-purple-400 px-2 py-0.5 rounded-full text-[10px] font-bold border border-purple-500/20"
                                     >
                                       #{t}
@@ -3286,11 +3286,11 @@ export default function Reader({
                                 )}
                               </div>
                               <div className="flex flex-wrap gap-1 opacity-60">
-                                {POPULAR_TAGS.filter(
+                                {POPULAR_TAGS.filter(Boolean).filter(
                                   (t) => !config.tags.includes(t),
-                                ).map((t) => (
+                                ).map((t, idx) => (
                                   <button
-                                    key={t}
+                                    key={`reader-pop-tag-${t}-${idx}`}
                                     onClick={() =>
                                       setConfig((c) => ({
                                         ...c,
@@ -4177,9 +4177,9 @@ export default function Reader({
                                   {t("noMutedAccounts")}
                                 </p>
                               ) : (
-                                fetchedMutedUsers.map((username) => (
+                                fetchedMutedUsers.filter(Boolean).map((username, idx) => (
                                   <div
-                                    key={username}
+                                    key={`muted-user-${username}-${idx}`}
                                     className="flex items-center justify-between group py-1.5 px-2 hover:bg-slate-900 rounded border-b border-slate-900/50 last:border-0 text-sm"
                                   >
                                     <span className="font-bold text-slate-400">
@@ -4307,9 +4307,9 @@ export default function Reader({
                         />
                       </div>
                       <div className="p-3 bg-slate-950 rounded-xl border border-slate-800 h-32 overflow-y-auto custom-scrollbar space-y-1">
-                        {config.whiteList.map((username) => (
+                        {config.whiteList.filter(Boolean).map((username, idx) => (
                           <div
-                            key={username}
+                            key={`white-user-${username}-${idx}`}
                             className="flex items-center justify-between group py-1 border-b border-slate-900 last:border-0 text-sm"
                           >
                             <span>@{username}</span>
@@ -4429,9 +4429,9 @@ export default function Reader({
                         />
                       </div>
                       <div className="p-3 bg-slate-950 rounded-xl border border-slate-800 h-32 overflow-y-auto custom-scrollbar space-y-1">
-                        {config.blackList.map((username) => (
+                        {config.blackList.filter(Boolean).map((username, idx) => (
                           <div
-                            key={username}
+                            key={`black-user-${username}-${idx}`}
                             className="flex items-center justify-between group py-1 border-b border-slate-900 last:border-0 text-sm"
                           >
                             <span>@{username}</span>

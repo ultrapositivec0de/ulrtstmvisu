@@ -106,7 +106,7 @@ export const TagGroupsModal: React.FC<TagGroupsModalProps> = ({
                 <div className="flex flex-wrap gap-1">
                   {group.tags.filter(Boolean).map((tag, tIdx) => (
                     <button 
-                      key={tag || `group-tag-${tIdx}`}
+                      key={`group-${group.id || gIdx}-tag-${tag}-${tIdx}`}
                       onClick={() => {
                         const currentTags = pubTags.split(/\s+/).filter(Boolean);
                         if (currentTags.includes(tag)) {

@@ -349,12 +349,12 @@ export const Sidebar: React.FC<SidebarProps> = (props) => {
                                           style={{ colorScheme: 'dark' }}
                                         >
                                           {(typeof window !== 'undefined' && (window as any).steem_keychain) && (
-                                            <option value="" className="bg-slate-900 text-slate-300 py-1">
+                                            <option key="sidebar-opt-kc" value="" className="bg-slate-900 text-slate-300 py-1">
                                               🛡️ {username ? `@${username} (Keychain)` : '@keychain (default)'}
                                             </option>
                                           )}
-                                          {vaultAccounts.map(acc => (
-                                            <option key={acc} value={acc} className="bg-slate-900 text-slate-200 py-1">
+                                          {vaultAccounts.filter(Boolean).map((acc, idx) => (
+                                            <option key={`sidebar-opt-vault-${acc}-${idx}`} value={acc} className="bg-slate-900 text-slate-200 py-1">
                                               🔑 @{acc} (Vault) {!SecurityService.isLocked() ? '✓' : '🔒'}
                                             </option>
                                           ))}

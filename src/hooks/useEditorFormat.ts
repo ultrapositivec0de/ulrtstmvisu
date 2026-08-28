@@ -372,6 +372,8 @@ const insertHtmlAtCursor = useCallback((html: string) => {
 
   const fmt = useCallback((prefix: string, suffix: string = prefix) => {
     if (editorMode === 'visual') {
+      if (!wysiwygRef.current) return;
+
       let formatKey: 'bold' | 'italic' | 'strikethrough' | 'sub' | 'sup' | 'code' | 'phishy' | null = null;
       if (prefix === '**') formatKey = 'bold';
       else if (prefix === '*') formatKey = 'italic';
@@ -386,16 +388,24 @@ const insertHtmlAtCursor = useCallback((html: string) => {
       let isCollapsed = false;
       let range: Range | null = null;
       const sel = window.getSelection();
-      if (sel && sel.rangeCount > 0) {
+      if (sel && sel.rangeCount > 0 && wysiwygRef.current.contains(sel.getRangeAt(0).commonAncestorContainer)) {
         range = sel.getRangeAt(0);
         isCollapsed = sel.isCollapsed || range.collapsed;
-      } else if (savedVisualRangeRef.current) {
+      } else if (savedVisualRangeRef.current && wysiwygRef.current.contains(savedVisualRangeRef.current.commonAncestorContainer)) {
         range = savedVisualRangeRef.current;
         isCollapsed = range.collapsed;
+        restoreVisualSelection(false);
+      } else {
+        focusVisualEditorEnd();
+        const curSel = window.getSelection();
+        if (curSel && curSel.rangeCount > 0) {
+          range = curSel.getRangeAt(0);
+          isCollapsed = true;
+        }
       }
 
       // 1. If format is active AND cursor is collapsed, we handle EXITING/DEACTIVATING the format.
-      // We should jump out of the active element instead of stripping the formatting from the word.
+      // We should jump out of the active element instead of stripping the formatting from the whole word.
       if (isCollapsed && isFormatActive && formatKey && range) {
         let activeElement: HTMLElement | null = null;
         let temp = range.startContainer as Node | null;
@@ -435,42 +445,56 @@ const insertHtmlAtCursor = useCallback((html: string) => {
         }
 
         if (activeElement) {
-          let isAtEnd: boolean;
-          if (range.startContainer.nodeType === Node.TEXT_NODE) {
-            const textContent = range.startContainer.textContent || '';
-            const offset = range.startOffset;
-            const remainingText = textContent.substring(offset);
-            isAtEnd = /^[\u200B]*$/.test(remainingText);
-          } else {
-            isAtEnd = range.startContainer === activeElement && range.startOffset === activeElement.childNodes.length;
-          }
-          
-          if (isAtEnd) {
-            const parent = activeElement.parentNode;
-            if (parent) {
-              const zwsp = document.createTextNode('\u200B');
-              parent.insertBefore(zwsp, activeElement.nextSibling);
-              
-              const newRange = document.createRange();
-              newRange.setStart(zwsp, 1);
-              newRange.setEnd(zwsp, 1);
-              
-              const currentSel = window.getSelection();
-              if (currentSel) {
-                currentSel.removeAllRanges();
-                currentSel.addRange(newRange);
-              }
-              
-              if (wysiwygRef.current) {
-                wysiwygRef.current.focus({ preventScroll: true });
-              }
-              
-              savedVisualRangeRef.current = newRange.cloneRange();
-              
-              setActiveFormats(prev => ({ ...prev, [formatKey!]: false }));
-              updateContentFromWysiwyg();
-              return;
+          const cleanText = (activeElement.textContent || '').replace(/[\u200B\s\n]/g, '');
+          const parent = activeElement.parentNode;
+
+          if (cleanText === '' && parent) {
+            // Tag was empty or only had zero-width spaces -> remove empty element completely
+            const zwsp = document.createTextNode('\u200B');
+            parent.insertBefore(zwsp, activeElement);
+            parent.removeChild(activeElement);
+
+            const newRange = document.createRange();
+            newRange.setStart(zwsp, 1);
+            newRange.setEnd(zwsp, 1);
+
+            const currentSel = window.getSelection();
+            if (currentSel) {
+              currentSel.removeAllRanges();
+              currentSel.addRange(newRange);
             }
+            if (wysiwygRef.current) {
+              wysiwygRef.current.focus({ preventScroll: true });
+            }
+            savedVisualRangeRef.current = newRange.cloneRange();
+            setActiveFormats(prev => ({ ...prev, [formatKey!]: false }));
+            updateContentFromWysiwyg();
+            return;
+          }
+
+          if (parent) {
+            // Step out of active element to type plain text continuously
+            const zwsp = document.createTextNode('\u200B');
+            parent.insertBefore(zwsp, activeElement.nextSibling);
+
+            const newRange = document.createRange();
+            newRange.setStart(zwsp, 1);
+            newRange.setEnd(zwsp, 1);
+
+            const currentSel = window.getSelection();
+            if (currentSel) {
+              currentSel.removeAllRanges();
+              currentSel.addRange(newRange);
+            }
+
+            if (wysiwygRef.current) {
+              wysiwygRef.current.focus({ preventScroll: true });
+            }
+
+            savedVisualRangeRef.current = newRange.cloneRange();
+            setActiveFormats(prev => ({ ...prev, [formatKey!]: false }));
+            updateContentFromWysiwyg();
+            return;
           }
         }
       }
@@ -478,7 +502,7 @@ const insertHtmlAtCursor = useCallback((html: string) => {
       // 2. Determine if we should expand the word when RESTORING selection.
       // We only expand the word if:
       // - The cursor is collapsed
-      // - The format is NOT currently active (we want to apply it to a word)
+      // - The format is NOT currently active (we want to apply it to an existing word)
       // - The cursor is strictly inside a word (not at the start or end of a word or at a space)
       let shouldExpandWord = false;
       if (isCollapsed && range && !isFormatActive) {
@@ -495,11 +519,54 @@ const insertHtmlAtCursor = useCallback((html: string) => {
           while (wEnd < textValue.length && !wordBoundaryRegex.test(textValue[wEnd])) {
             wEnd++;
           }
-          
-          // Only expand if cursor is strictly inside/adjacent to word, and not at the very end of the text node (continuous typing)
+
+          // Only expand if cursor is strictly inside/adjacent to word, and not at the very end of the text node
           if (wStart < wEnd && offset > wStart && offset < wEnd) {
             shouldExpandWord = true;
           }
+        }
+      }
+
+      // 3. If cursor is collapsed and not inside a word to expand, activate continuous formatted typing!
+      if (isCollapsed && !shouldExpandWord && formatKey && range) {
+        let tagToCreate = '';
+        if (formatKey === 'bold') tagToCreate = 'strong';
+        else if (formatKey === 'italic') tagToCreate = 'em';
+        else if (formatKey === 'strikethrough') tagToCreate = 'del';
+        else if (formatKey === 'sub') tagToCreate = 'sub';
+        else if (formatKey === 'sup') tagToCreate = 'sup';
+        else if (formatKey === 'code') tagToCreate = 'code';
+        else if (formatKey === 'phishy') tagToCreate = 'span';
+
+        if (tagToCreate) {
+          const el = document.createElement(tagToCreate);
+          if (formatKey === 'phishy') {
+            el.className = 'phishy';
+          }
+          const zwsp = document.createTextNode('\u200B');
+          el.appendChild(zwsp);
+
+          range.deleteContents();
+          range.insertNode(el);
+
+          const newRange = document.createRange();
+          newRange.setStart(zwsp, 1);
+          newRange.setEnd(zwsp, 1);
+
+          const currentSel = window.getSelection();
+          if (currentSel) {
+            currentSel.removeAllRanges();
+            currentSel.addRange(newRange);
+          }
+
+          if (wysiwygRef.current) {
+            wysiwygRef.current.focus({ preventScroll: true });
+          }
+
+          savedVisualRangeRef.current = newRange.cloneRange();
+          setActiveFormats(prev => ({ ...prev, [formatKey!]: true }));
+          updateContentFromWysiwyg();
+          return;
         }
       }
 
@@ -513,27 +580,6 @@ const insertHtmlAtCursor = useCallback((html: string) => {
       else if (prefix === '<sup>') command = 'superscript';
 
       if (command) {
-        if (isCollapsed) {
-          const sel = window.getSelection();
-          if (sel && sel.rangeCount > 0) {
-            const r = sel.getRangeAt(0);
-            const container = r.startContainer;
-            let isEmpty = false;
-            if (container.nodeType === Node.ELEMENT_NODE) {
-               if ((container.textContent || '').replace(/[\u200B\s\n]/g, '') === '') isEmpty = true;
-            } else if (container.nodeType === Node.TEXT_NODE) {
-               if ((container.textContent || '').replace(/[\u200B\s\n]/g, '') === '') isEmpty = true;
-            }
-            if (isEmpty) {
-              const zwsp = document.createTextNode('\u200B');
-              r.insertNode(zwsp);
-              r.setStart(zwsp, 1);
-              r.setEnd(zwsp, 1);
-              sel.removeAllRanges();
-              sel.addRange(r);
-            }
-          }
-        }
         document.execCommand(command, false);
         const selAfter = window.getSelection();
         if (selAfter && selAfter.rangeCount > 0 && shouldExpandWord) {
@@ -541,26 +587,6 @@ const insertHtmlAtCursor = useCallback((html: string) => {
           savedVisualRangeRef.current = selAfter.getRangeAt(0).cloneRange();
           updateContentFromWysiwyg();
           return;
-        }
-        const isCollapsedAfter = selAfter ? (selAfter.isCollapsed || (selAfter.rangeCount > 0 && selAfter.getRangeAt(0).collapsed)) : true;
-
-        if (isCollapsedAfter) {
-          // Toggle local state for immediate toolbar response
-          let formatKeyToggle: 'bold' | 'italic' | 'strikethrough' | 'sub' | 'sup' = 'bold';
-          if (command === 'italic') formatKeyToggle = 'italic';
-          else if (command === 'strikeThrough') formatKeyToggle = 'strikethrough';
-          else if (command === 'subscript') formatKeyToggle = 'sub';
-          else if (command === 'superscript') formatKeyToggle = 'sup';
-          
-          setActiveFormats(prev => ({
-            ...prev,
-            [formatKeyToggle]: !prev[formatKeyToggle]
-          }));
-          
-          if (wysiwygRef.current) {
-            wysiwygRef.current.focus({ preventScroll: true });
-          }
-          return; // Skip updateContentFromWysiwyg to preserve typing command state
         }
       } else {
         if (prefix === '`') {

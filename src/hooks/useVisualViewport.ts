@@ -80,7 +80,7 @@ export function useVisualViewport(): VisualViewportState {
     const effectiveKeyboardOffset = isKeyboardOpen ? Math.max(rawOverlayDiff, heightShrinkDiff) : 0;
 
     // Browser bottom address bar / navigation bar inset (when keyboard is closed)
-    const browserBottomInset = 0;
+    const browserBottomInset = !isKeyboardOpen ? Math.max(0, currentInnerH - (visualH + offsetTop)) : 0;
 
     // Synchronize global CSS custom properties for hardware-accelerated layouts
     if (typeof document !== 'undefined' && document.documentElement) {

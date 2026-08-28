@@ -1,4 +1,8 @@
 # Changelog
+## [2026-08-28] - Version 4.7.5 (ultrasteemeditor/4.7.5)
+### Added & Improved
+- **Release Updates**: PWA Cache-First & Instant UI Shell Launch, Offline Asset Strategy & Cross-Platform Version Sync
+
 ## [2026-08-25] - Version 4.6.8 (ultrasteemeditor/4.6.8)
 ### Added & Improved
 - **Android & Mobile Viewport Precision**: Enhanced caret positioning and viewport scroll bounding (`scrollCaretIntoView`, `restoreMarkdownCursorAndScroll`, `syncCursorVisualToMarkdown`) to ensure text and active caret always remain fully visible above the floating toolbar widget.

@@ -240,9 +240,9 @@ export const PublishModal: React.FC<PublishModalProps> = (props) => {
                                 className="w-full bg-slate-900 border border-slate-700/80 rounded-xl p-2.5 text-xs text-slate-200 outline-none focus:ring-2 focus:ring-cyan-500/50 transition-all font-mono"
                                 style={{ colorScheme: 'dark' }}
                               >
-                                <option value="" className="bg-slate-900 text-slate-400">{t('selectAccount')}</option>
-                                {vaultAccounts.map(acc => (
-                                  <option key={acc} value={acc} className="bg-slate-900 text-slate-200 py-1">@{acc}</option>
+                                <option key="pub-select-placeholder" value="" className="bg-slate-900 text-slate-400">{t('selectAccount')}</option>
+                                {vaultAccounts.filter(Boolean).map((acc, idx) => (
+                                  <option key={`pub-vault-acc-${acc}-${idx}`} value={acc} className="bg-slate-900 text-slate-200 py-1">@{acc}</option>
                                 ))}
                               </select>
                               <div className="p-3 bg-green-500/10 border border-green-500/20 rounded-lg text-[11px] text-green-400 flex items-start gap-2">
@@ -348,9 +348,9 @@ export const PublishModal: React.FC<PublishModalProps> = (props) => {
                       placeholder={t('tagsPlaceholder')}
                     />
                     <div className="flex flex-wrap gap-1 mt-2">
-                      {COMMON_TAGS.slice(0, 8).map(tag => (
+                      {COMMON_TAGS.slice(0, 8).filter(Boolean).map((tag, idx) => (
                         <button 
-                          key={tag}
+                          key={`pub-common-tag-${tag}-${idx}`}
                           onClick={() => {
                             const existing = pubTags.split(' ').filter((t: string) => t.trim());
                             if (!existing.includes(tag)) {
@@ -374,9 +374,9 @@ export const PublishModal: React.FC<PublishModalProps> = (props) => {
                   <div className="pt-3 border-t border-slate-800 space-y-2">
                     <label className="text-[10px] font-bold text-slate-500 uppercase">{t('rewardType')}</label>
                     <div className="grid grid-cols-3 gap-1">
-                      {(['50', 'SP', '0'] as const).map(type => (
+                      {(['50', 'SP', '0'] as const).map((type, idx) => (
                         <button 
-                          key={type}
+                          key={`pub-reward-type-${type}-${idx}`}
                           onClick={() => {
                             setRewardType(type);
                             localStorage.setItem('steem_reward_type', type);

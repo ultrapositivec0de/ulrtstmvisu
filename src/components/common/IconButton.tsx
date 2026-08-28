@@ -17,8 +17,10 @@ export const IconButton: React.FC<IconButtonProps> = ({
   active = false
 }) => (
   <button
+    type="button"
     onClick={onClick}
     onMouseDown={(e) => e.preventDefault()}
+    onPointerDown={(e) => e.preventDefault()}
     title={title}
     className={cn(
       "p-2 rounded-md transition-all duration-200 flex items-center justify-center shrink-0",

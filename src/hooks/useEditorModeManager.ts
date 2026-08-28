@@ -41,7 +41,7 @@ export function useEditorModeManager({
   setContent,
 }: UseEditorModeManagerProps) {
   const [editorMode, setEditorMode] = useState<'visual' | 'markdown'>(() => {
-    return (localStorage.getItem('steem_editor_mode') as 'visual' | 'markdown') || 'markdown';
+    return (localStorage.getItem('steem_editor_mode') as 'visual' | 'markdown') || 'visual';
   });
 
   const cursorPositionRef = useRef<{ start: number; end: number } | null>(null);

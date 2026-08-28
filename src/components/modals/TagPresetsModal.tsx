@@ -91,7 +91,7 @@ export const TagPresetsModal: React.FC<TagPresetsModalProps> = ({
                   <div className="flex flex-wrap gap-1">
                     {comm.tags.filter(Boolean).map((tag, tIdx) => (
                       <button
-                        key={tag || `comm-tag-${tIdx}`}
+                        key={`preset-comm-${comm.id || cIdx}-tag-${tag}-${tIdx}`}
                         onClick={(e) => {
                           e.stopPropagation();
                           toggleTag(tag);
@@ -119,7 +119,7 @@ export const TagPresetsModal: React.FC<TagPresetsModalProps> = ({
             <div className="flex flex-wrap gap-2">
               {commonTags.filter(Boolean).map((tag, tIdx) => (
                 <button 
-                  key={tag || `common-tag-${tIdx}`}
+                  key={`preset-common-tag-${tag}-${tIdx}`}
                   onClick={() => toggleTag(tag)}
                   className={cn(
                     "px-3 py-1.5 rounded-full text-xs font-medium border transition-all",

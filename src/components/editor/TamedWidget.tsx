@@ -227,7 +227,9 @@ export const TamedWidget: React.FC<TamedWidgetProps> = (props) => {
                     )}
                   >
                     <button 
+                      type="button"
                       onMouseDown={(e) => e.preventDefault()}
+                      onPointerDown={(e) => e.preventDefault()}
                       onClick={() => scrollRef.current?.scrollBy({ left: -100, behavior: 'smooth' })}
                       className="hidden lg:flex h-[var(--toolbar-btn-size,3rem)] px-1.5 items-center justify-center text-slate-500 hover:text-cyan-400 transition-colors"
                     >
@@ -269,7 +271,9 @@ export const TamedWidget: React.FC<TamedWidgetProps> = (props) => {
                         return (
                           <button 
                             key={key || `tool-${idx}`}
+                            type="button"
                             onMouseDown={(e) => e.preventDefault()}
+                            onPointerDown={(e) => e.preventDefault()}
                             onClick={(e) => handleWidgetAction(tool.action, e)} 
                             className={cn(
                               "toolbar-btn flex-shrink-0 flex items-center justify-center rounded-xl transition-colors font-bold",
@@ -287,7 +291,9 @@ export const TamedWidget: React.FC<TamedWidgetProps> = (props) => {
                     </div>
 
                     <button 
+                      type="button"
                       onMouseDown={(e) => e.preventDefault()}
+                      onPointerDown={(e) => e.preventDefault()}
                       onClick={() => scrollRef.current?.scrollBy({ left: 100, behavior: 'smooth' })}
                       className="hidden lg:flex h-[var(--toolbar-btn-size,3rem)] px-1.5 items-center justify-center text-slate-500 hover:text-cyan-400 transition-colors"
                     >
@@ -299,7 +305,10 @@ export const TamedWidget: React.FC<TamedWidgetProps> = (props) => {
                     <div className="relative widget-settings-container">
                       <button 
                         type="button"
-                        onPointerDown={(e) => e.stopPropagation()}
+                        onPointerDown={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                        }}
                         onMouseDown={(e) => {
                           e.preventDefault();
                           e.stopPropagation();
@@ -518,7 +527,7 @@ export const TamedWidget: React.FC<TamedWidgetProps> = (props) => {
                     </div>
                     <button 
                       type="button"
-                      onPointerDown={(e) => e.stopPropagation()}
+                      onPointerDown={(e) => { e.preventDefault(); e.stopPropagation(); }}
                       onMouseDown={(e) => {
                         e.preventDefault();
                         e.stopPropagation();
