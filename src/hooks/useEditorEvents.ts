@@ -13,6 +13,7 @@ export interface UseEditorEventsOptions {
 
   syncScrollEnabled: boolean;
   isKeyboardOpen: boolean;
+  keyboardOffset?: number;
   widgetPos: any;
   toolbarIconSize: number;
   isWidgetVisible: boolean;
@@ -38,6 +39,7 @@ export function useEditorEvents(options: UseEditorEventsOptions) {
     savedVisualRangeRef,
     syncScrollEnabled,
     isKeyboardOpen,
+    keyboardOffset,
     widgetPos,
     toolbarIconSize,
     isWidgetVisible,
@@ -100,6 +102,7 @@ export function useEditorEvents(options: UseEditorEventsOptions) {
         const visibleHeight = calculateVisibleEditorHeight(editorRect.height, {
           isMobile: window.innerWidth < 1024,
           isKeyboardOpen,
+          keyboardOffset,
           widgetPos,
           toolbarIconSize,
         });
@@ -116,7 +119,7 @@ export function useEditorEvents(options: UseEditorEventsOptions) {
         }
       }
     },
-    [wysiwygRef, isKeyboardOpen, widgetPos, toolbarIconSize]
+    [wysiwygRef, isKeyboardOpen, keyboardOffset, widgetPos, toolbarIconSize]
   );
 
   const handleEditorScroll = useCallback(() => {

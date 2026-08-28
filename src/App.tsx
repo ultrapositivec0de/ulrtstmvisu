@@ -621,7 +621,8 @@ function App() {
     t,
     savedVisualRangeRef,
     focusVisualEditorEnd,
-    saveCursorPosition
+    saveCursorPosition,
+    scrollCaretIntoView
   });
 
   const {
@@ -644,6 +645,7 @@ function App() {
     savedVisualRangeRef,
     syncScrollEnabled,
     isKeyboardOpen,
+    keyboardOffset,
     widgetPos,
     toolbarIconSize,
     isWidgetVisible,

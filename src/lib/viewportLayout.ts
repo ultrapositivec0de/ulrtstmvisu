@@ -3,6 +3,7 @@ import React from 'react';
 export interface EditorBottomReservedOptions {
   isMobile: boolean;
   isKeyboardOpen: boolean;
+  keyboardOffset?: number;
   widgetPos?: string;
   toolbarIconSize?: number;
 }
@@ -13,12 +14,13 @@ export interface EditorBottomReservedOptions {
 export function calculateEditorBottomReserved({
   isMobile,
   isKeyboardOpen,
+  keyboardOffset = 0,
   widgetPos = 'bottom',
   toolbarIconSize = 18,
 }: EditorBottomReservedOptions): number {
   const dynamicWidgetHeight = toolbarIconSize + 24; // dynamically scales with icon size (12-32px -> 36-56px + padding)
   if (isMobile) {
-    return isKeyboardOpen ? dynamicWidgetHeight + 45 : dynamicWidgetHeight + 90;
+    return isKeyboardOpen ? keyboardOffset + dynamicWidgetHeight + 8 : dynamicWidgetHeight + 90;
   }
   return widgetPos === 'bottom' ? dynamicWidgetHeight + 60 : 40;
 }
@@ -107,9 +109,8 @@ export function getFloatingWidgetStyles({
     } else {
       // Place above bottom navigation bar or screen bottom, taking browser chrome and insets into account
       const bottomNavOffset = (isEditorFullScreen || isFullScreen) ? 16 : 76;
-      const targetTop = Math.max(offsetTop + 8, visualBottom - actualWidgetHeight - bottomNavOffset);
-      style.top = `${targetTop}px`;
-      style.bottom = 'auto';
+      style.top = 'auto';
+      style.bottom = `calc(env(safe-area-inset-bottom, 0px) + var(--browser-bottom-inset, 0px) + ${bottomNavOffset}px)`;
     }
   }
 

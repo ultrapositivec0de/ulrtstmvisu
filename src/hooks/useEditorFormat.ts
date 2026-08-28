@@ -17,6 +17,7 @@ export interface EditorFormatConfig {
   updateContentFromWysiwyg: (forceImmediate?: boolean) => void;
   promptDialog: (message: string, defaultValue?: string, title?: string, inputType?: "text" | "password") => Promise<string | null>;
   t: (key: any) => string;
+  scrollCaretIntoView?: (block?: ScrollLogicalPosition) => void;
 }
 
 export function useEditorFormat(config: EditorFormatConfig) {
@@ -32,7 +33,8 @@ export function useEditorFormat(config: EditorFormatConfig) {
     t,
     savedVisualRangeRef,
     focusVisualEditorEnd,
-    saveCursorPosition
+    saveCursorPosition,
+    scrollCaretIntoView
   } = config;
 
   const [activeFormats, setActiveFormats] = useState({
@@ -122,38 +124,31 @@ const insertHtmlAtCursor = useCallback((html: string) => {
           if (targetNode) {
             const el = targetNode.nodeType === Node.TEXT_NODE ? targetNode.parentElement : targetNode as HTMLElement;
             if (el && el !== wysiwygRef.current) {
-              const scrollElIntoEditor = (targetEl: HTMLElement) => {
-                if (!wysiwygRef.current) return;
-                const container = wysiwygRef.current;
-                const elRect = targetEl.getBoundingClientRect();
-                const containerRect = container.getBoundingClientRect();
-                if (elRect.top < containerRect.top || elRect.bottom > containerRect.bottom) {
-                  container.scrollTop += (elRect.top - containerRect.top) - (containerRect.height / 2) + (elRect.height / 2);
+              const doScroll = () => {
+                if (scrollCaretIntoView) {
+                  scrollCaretIntoView('nearest');
+                } else {
+                  el.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
                 }
               };
-              scrollElIntoEditor(el);
+              
+              doScroll();
               const images = wysiwygRef.current.querySelectorAll('img');
               images.forEach(img => {
                 if (!img.complete) {
                   img.addEventListener('load', () => {
                     if (wysiwygRef.current && wysiwygRef.current.contains(el)) {
-                      scrollElIntoEditor(el);
+                      doScroll();
                     }
                   }, { once: true });
                 }
               });
               setTimeout(() => {
                 if (wysiwygRef.current && wysiwygRef.current.contains(el)) {
-                  scrollElIntoEditor(el);
+                  doScroll();
                   wysiwygRef.current.focus({ preventScroll: true });
                 }
               }, 100);
-              setTimeout(() => {
-                if (wysiwygRef.current && wysiwygRef.current.contains(el)) {
-                  scrollElIntoEditor(el);
-                  wysiwygRef.current.focus({ preventScroll: true });
-                }
-              }, 300);
             }
           }
         }
