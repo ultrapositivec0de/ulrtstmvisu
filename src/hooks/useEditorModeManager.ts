@@ -425,53 +425,8 @@ export function useEditorModeManager({
           restoreVisualSelection();
         } else {
           restoreMarkdownCursorAndScroll();
-          return;
         }
-        if (editorRef.current) {
-          const cursor = useEditorStore.getState().cursor;
-          if (cursor) {
-            const text = editorRef.current.value;
-            const offset = getOffsetFromRowCol(text, cursor);
-            
-            isSyncingRef.current = true;
-            
-            const ta = editorRef.current;
-            ta.focus();
-            ta.setSelectionRange(offset, offset);
-            
-            const clone = ta.cloneNode() as HTMLTextAreaElement;
-            clone.style.visibility = 'hidden';
-            clone.style.position = 'absolute';
-            clone.style.overflow = 'hidden';
-            clone.style.height = '0px';
-            clone.style.width = ta.clientWidth + 'px';
-            clone.style.padding = window.getComputedStyle(ta).padding;
-            clone.style.paddingBottom = '0px';
-            clone.style.font = window.getComputedStyle(ta).font;
-            clone.style.lineHeight = window.getComputedStyle(ta).lineHeight;
-            clone.style.boxSizing = 'border-box';
-            clone.value = text.substring(0, offset);
-            document.body.appendChild(clone);
-            
-            const caretY = clone.scrollHeight;
-            document.body.removeChild(clone);
-            
-            ta.scrollTop = calculateCaretScrollTop(caretY, ta.clientHeight, {
-              isMobile: window.innerWidth < 1024,
-              isKeyboardOpen,
-              widgetPos,
-              toolbarIconSize: numIconSize,
-            });
-            
-            setTimeout(() => {
-              isSyncingRef.current = false;
-            }, 100);
-          } else {
-            isSyncingRef.current = false;
-          }
-        } else {
-          isSyncingRef.current = false;
-        }
+        isSyncingRef.current = false;
       }, 150);
     } else {
       saveVisualSelection();
