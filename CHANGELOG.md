@@ -1,4 +1,8 @@
 # Changelog
+## [2026-08-28] - Version 4.7.7 (ultrasteemeditor/4.7.7)
+### Added & Improved
+- **Release Updates**: Виправлення позиціонування віджету та скролінгу під час вставки таблиць.
+
 ## [2026-08-28] - Version 4.7.5 (ultrasteemeditor/4.7.5)
 ### Added & Improved
 - **Release Updates**: PWA Cache-First & Instant UI Shell Launch, Offline Asset Strategy & Cross-Platform Version Sync
