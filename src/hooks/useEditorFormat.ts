@@ -221,15 +221,98 @@ const insertHtmlAtCursor = useCallback((html: string) => {
     if (formatKey === 'phishy') {
       const before = text.slice(0, start);
       const after = text.slice(end);
+
+      const lastOpenDiv = Math.max(
+        before.lastIndexOf('<div class="phishy">'),
+        before.lastIndexOf("<div class='phishy'>")
+      );
+      const lastOpenSpan = Math.max(
+        before.lastIndexOf('<span class="phishy">'),
+        before.lastIndexOf("<span class='phishy'>")
+      );
+      const lastOpen = Math.max(lastOpenDiv, lastOpenSpan);
+      const lastClose = Math.max(
+        before.lastIndexOf('</div>'),
+        before.lastIndexOf('</span>')
+      );
+
+      const nextCloseDiv = after.indexOf('</div>');
+      const nextCloseSpan = after.indexOf('</span>');
+      const nextClose = (nextCloseDiv !== -1 && nextCloseSpan !== -1)
+        ? Math.min(nextCloseDiv, nextCloseSpan)
+        : (nextCloseDiv !== -1 ? nextCloseDiv : nextCloseSpan);
+
+      const nextOpenDiv = Math.min(
+        after.indexOf('<div class="phishy">') === -1 ? Infinity : after.indexOf('<div class="phishy">'),
+        after.indexOf("<div class='phishy'>") === -1 ? Infinity : after.indexOf("<div class='phishy'>")
+      );
+      const nextOpenSpan = Math.min(
+        after.indexOf('<span class="phishy">') === -1 ? Infinity : after.indexOf('<span class="phishy">'),
+        after.indexOf("<span class='phishy'>") === -1 ? Infinity : after.indexOf("<span class='phishy'>")
+      );
+      const nextOpen = Math.min(nextOpenDiv, nextOpenSpan);
+
+      const isEnclosedInPhishy = lastOpen !== -1 && (lastClose === -1 || lastClose < lastOpen) && nextClose !== -1 && (nextOpen === Infinity || nextOpen > nextClose);
+
       if (start !== end) {
-        const selectedText = text.slice(start, end).trim();
+        const selectedText = text.slice(start, end);
+        const trimmed = selectedText.trim();
+
+        // 1. If the selected text itself contains or is wrapped in phishy tags
+        const hasPhishyTags = /<div\s+class=["']phishy["']>|<\/div>|<span\s+class=["']phishy["']>|<\/span>/i.test(selectedText);
+        
+        if (hasPhishyTags) {
+          const unwrapped = selectedText
+            .replace(/<div\s+class=["']phishy["']\s*>\s*/gi, '')
+            .replace(/\s*<\/div>/gi, '')
+            .replace(/<span\s+class=["']phishy["']\s*>/gi, '')
+            .replace(/<\/span>/gi, '');
+          
+          const newText = before + unwrapped + after;
+          useEditorStore.getState().setContent(newText);
+          setActiveFormats(prev => ({ ...prev, phishy: false }));
+          setTimeout(() => {
+            if (!editorRef.current) return;
+            editorRef.current.focus({ preventScroll: true });
+            editorRef.current.setSelectionRange(start, start + unwrapped.length);
+            saveCursorPosition();
+          }, 0);
+          return;
+        }
+
+        // 2. If the selection is inside an enclosing phishy tag
+        if (isEnclosedInPhishy) {
+          const openTagLength = (lastOpen === lastOpenDiv)
+            ? (before.indexOf('>', lastOpen) - lastOpen + 1)
+            : (before.indexOf('>', lastOpen) - lastOpen + 1);
+          
+          const closeTagLength = (nextClose === nextCloseDiv) ? '</div>'.length : '</span>'.length;
+          const fullOpenIdx = lastOpen;
+          const fullCloseIdx = end + nextClose + closeTagLength;
+
+          const insideContent = text.slice(fullOpenIdx + openTagLength, end + nextClose).replace(/^\n+|\n+$/g, '');
+          const newText = text.slice(0, fullOpenIdx) + insideContent + text.slice(fullCloseIdx);
+          
+          useEditorStore.getState().setContent(newText);
+          setActiveFormats(prev => ({ ...prev, phishy: false }));
+          setTimeout(() => {
+            if (!editorRef.current) return;
+            editorRef.current.focus({ preventScroll: true });
+            editorRef.current.setSelectionRange(fullOpenIdx, fullOpenIdx + insideContent.length);
+            saveCursorPosition();
+          }, 0);
+          return;
+        }
+
+        // 3. Otherwise, wrap selection in phishy tag
         const prefixNl = (before === '' || before.endsWith('\n\n')) ? '' : before.endsWith('\n') ? '\n' : '\n\n';
         const suffixNl = (after === '' || after.startsWith('\n\n')) ? '' : after.startsWith('\n') ? '\n' : '\n\n';
-        const block = `${prefixNl}<div class="phishy">\n\n${selectedText || 'Червоний текст'}\n</div>${suffixNl}`;
+        const block = `${prefixNl}<div class="phishy">\n\n${trimmed || 'Червоний текст'}\n</div>${suffixNl}`;
         const newText = before + block + after;
         useEditorStore.getState().setContent(newText);
+        setActiveFormats(prev => ({ ...prev, phishy: true }));
         const newStart = start + prefixNl.length + '<div class="phishy">\n\n'.length;
-        const newEnd = newStart + (selectedText || 'Червоний текст').length;
+        const newEnd = newStart + (trimmed || 'Червоний текст').length;
         setTimeout(() => {
           if (!editorRef.current) return;
           editorRef.current.focus({ preventScroll: true });
@@ -238,17 +321,18 @@ const insertHtmlAtCursor = useCallback((html: string) => {
         }, 0);
         return;
       } else {
-        const lastOpenDiv = before.lastIndexOf('<div class="phishy">');
-        const lastCloseDiv = before.lastIndexOf('</div>');
-        const nextCloseDiv = after.indexOf('</div>');
-        const nextOpenDiv = after.indexOf('<div class="phishy">');
-        const isInsideDiv = lastOpenDiv !== -1 && (lastCloseDiv === -1 || lastCloseDiv < lastOpenDiv) && nextCloseDiv !== -1 && (nextOpenDiv === -1 || nextOpenDiv > nextCloseDiv);
-
-        if (isInsideDiv) {
-          const fullOpenIdx = lastOpenDiv;
-          const fullCloseIdx = start + nextCloseDiv + '</div>'.length;
-          const insideContent = text.slice(fullOpenIdx + '<div class="phishy">'.length, start + nextCloseDiv).replace(/^\n+|\n+$/g, '');
+        // start === end (collapsed cursor)
+        if (isEnclosedInPhishy) {
+          const openTagLength = (lastOpen === lastOpenDiv)
+            ? (before.indexOf('>', lastOpen) - lastOpen + 1)
+            : (before.indexOf('>', lastOpen) - lastOpen + 1);
+          
+          const closeTagLength = (nextClose === nextCloseDiv) ? '</div>'.length : '</span>'.length;
+          const fullOpenIdx = lastOpen;
+          const fullCloseIdx = start + nextClose + closeTagLength;
+          const insideContent = text.slice(fullOpenIdx + openTagLength, start + nextClose).replace(/^\n+|\n+$/g, '');
           const newText = text.slice(0, fullOpenIdx) + insideContent + text.slice(fullCloseIdx);
+          
           useEditorStore.getState().setContent(newText);
           setActiveFormats(prev => ({ ...prev, phishy: false }));
           setTimeout(() => {
@@ -259,6 +343,42 @@ const insertHtmlAtCursor = useCallback((html: string) => {
           }, 0);
           return;
         } else {
+          // Check if cursor is on a word on current line to format that word
+          const lineStart = text.lastIndexOf('\n', start - 1) + 1;
+          const lineEnd = text.indexOf('\n', start);
+          const actualLineEnd = lineEnd === -1 ? text.length : lineEnd;
+          const currentLine = text.substring(lineStart, actualLineEnd);
+          const caretInLine = start - lineStart;
+
+          const wordBoundaryRegex = /[\s.,!?;:"'()[\]{}*~`<>#_]/;
+          let wStart = caretInLine;
+          let wEnd = caretInLine;
+          while (wStart > 0 && !wordBoundaryRegex.test(currentLine[wStart - 1])) {
+            wStart--;
+          }
+          while (wEnd < currentLine.length && !wordBoundaryRegex.test(currentLine[wEnd])) {
+            wEnd++;
+          }
+
+          if (wStart < wEnd && caretInLine >= wStart && caretInLine <= wEnd) {
+            const word = currentLine.substring(wStart, wEnd);
+            const wordGlobalStart = lineStart + wStart;
+            const wordGlobalEnd = lineStart + wEnd;
+            const beforeWord = text.slice(0, wordGlobalStart);
+            const afterWord = text.slice(wordGlobalEnd);
+            const wrappedWord = `<span class="phishy">${word}</span>`;
+            const newText = beforeWord + wrappedWord + afterWord;
+            useEditorStore.getState().setContent(newText);
+            setActiveFormats(prev => ({ ...prev, phishy: true }));
+            setTimeout(() => {
+              if (!editorRef.current) return;
+              editorRef.current.focus({ preventScroll: true });
+              editorRef.current.setSelectionRange(wordGlobalStart, wordGlobalStart + wrappedWord.length);
+              saveCursorPosition();
+            }, 0);
+            return;
+          }
+
           const prefixNl = (before === '' || before.endsWith('\n\n')) ? '' : before.endsWith('\n') ? '\n' : '\n\n';
           const suffixNl = (after === '' || after.startsWith('\n\n')) ? '' : after.startsWith('\n') ? '\n' : '\n\n';
           const placeholder = 'Червоний текст';
@@ -425,6 +545,142 @@ const insertHtmlAtCursor = useCallback((html: string) => {
       }, 0);
     }
   }, [saveCursorPosition]);
+
+function unwrapPhishyFromRange(range: Range, wysiwyg: HTMLElement): boolean {
+  // 1. Check if range is inside an existing .phishy ancestor
+  let phishyAncestor: HTMLElement | null = null;
+  let temp: Node | null = range.commonAncestorContainer;
+  while (temp && temp !== wysiwyg) {
+    if (temp.nodeType === Node.ELEMENT_NODE && (temp as HTMLElement).classList.contains('phishy')) {
+      phishyAncestor = temp as HTMLElement;
+      break;
+    }
+    temp = temp.parentNode;
+  }
+
+  if (!phishyAncestor) {
+    let startTemp: Node | null = range.startContainer;
+    while (startTemp && startTemp !== wysiwyg) {
+      if (startTemp.nodeType === Node.ELEMENT_NODE && (startTemp as HTMLElement).classList.contains('phishy')) {
+        phishyAncestor = startTemp as HTMLElement;
+        break;
+      }
+      startTemp = startTemp.parentNode;
+    }
+  }
+
+  if (!phishyAncestor) {
+    let endTemp: Node | null = range.endContainer;
+    while (endTemp && endTemp !== wysiwyg) {
+      if (endTemp.nodeType === Node.ELEMENT_NODE && (endTemp as HTMLElement).classList.contains('phishy')) {
+        phishyAncestor = endTemp as HTMLElement;
+        break;
+      }
+      endTemp = endTemp.parentNode;
+    }
+  }
+
+  if (phishyAncestor) {
+    const parent = phishyAncestor.parentNode;
+    if (!parent) return false;
+
+    const phishyRange = document.createRange();
+    phishyRange.selectNodeContents(phishyAncestor);
+
+    const isWhole =
+      (range.compareBoundaryPoints(Range.START_TO_START, phishyRange) <= 0 &&
+        range.compareBoundaryPoints(Range.END_TO_END, phishyRange) >= 0) ||
+      range.toString().trim() === (phishyAncestor.textContent || '').trim();
+
+    if (isWhole) {
+      const frag = document.createDocumentFragment();
+      while (phishyAncestor.firstChild) {
+        frag.appendChild(phishyAncestor.firstChild);
+      }
+      const firstNode = frag.firstChild;
+      const lastNode = frag.lastChild;
+      parent.replaceChild(frag, phishyAncestor);
+
+      if (firstNode && lastNode) {
+        const newRange = document.createRange();
+        newRange.setStartBefore(firstNode);
+        newRange.setEndAfter(lastNode);
+        const sel = window.getSelection();
+        if (sel) {
+          sel.removeAllRanges();
+          sel.addRange(newRange);
+        }
+      }
+      return true;
+    } else {
+      // Partial selection inside phishyAncestor
+      const extracted = range.extractContents();
+
+      extracted.querySelectorAll?.('.phishy').forEach((el) => {
+        const p = el.parentNode;
+        if (p) {
+          while (el.firstChild) p.insertBefore(el.firstChild, el);
+          p.removeChild(el);
+        }
+      });
+
+      const firstNode = extracted.firstChild;
+      const lastNode = extracted.lastChild;
+      range.insertNode(extracted);
+
+      // Clean up empty .phishy elements in wysiwyg
+      wysiwyg.querySelectorAll('.phishy').forEach((el) => {
+        const txt = el.textContent?.replace(/\u200B/g, '').trim();
+        if (!txt && el.parentNode) {
+          el.parentNode.removeChild(el);
+        }
+      });
+
+      if (firstNode && lastNode) {
+        const newRange = document.createRange();
+        newRange.setStartBefore(firstNode);
+        newRange.setEndAfter(lastNode);
+        const sel = window.getSelection();
+        if (sel) {
+          sel.removeAllRanges();
+          sel.addRange(newRange);
+        }
+      }
+      return true;
+    }
+  }
+
+  // 2. Check if the range contains .phishy elements inside
+  const clone = range.cloneContents();
+  const insidePhishy = clone.querySelectorAll?.('.phishy');
+  if (insidePhishy && insidePhishy.length > 0) {
+    const extracted = range.extractContents();
+    extracted.querySelectorAll?.('.phishy').forEach((el) => {
+      const p = el.parentNode;
+      if (p) {
+        while (el.firstChild) p.insertBefore(el.firstChild, el);
+        p.removeChild(el);
+      }
+    });
+    const firstNode = extracted.firstChild;
+    const lastNode = extracted.lastChild;
+    range.insertNode(extracted);
+
+    if (firstNode && lastNode) {
+      const newRange = document.createRange();
+      newRange.setStartBefore(firstNode);
+      newRange.setEndAfter(lastNode);
+      const sel = window.getSelection();
+      if (sel) {
+        sel.removeAllRanges();
+        sel.addRange(newRange);
+      }
+    }
+    return true;
+  }
+
+  return false;
+}
 
   const fmt = useCallback((prefix: string, suffix: string = prefix) => {
     if (editorMode === 'visual') {
@@ -655,9 +911,19 @@ const insertHtmlAtCursor = useCallback((html: string) => {
           const text = getVisualSelectionHtml() || 'code block';
           insertHtmlAtCursor(`<pre><code>${text}</code></pre>`);
         } else if (prefix === '<div class="phishy">') {
-          const text = getVisualSelectionHtml() || '';
-          insertHtmlAtCursor(`<span class="phishy">${text || '&#8203;'}</span>`);
-          if (!text) {
+          const curSel = window.getSelection();
+          const currentRange = (curSel && curSel.rangeCount > 0) ? curSel.getRangeAt(0) : savedVisualRangeRef.current;
+
+          let unwrapped = false;
+          if (currentRange && wysiwygRef.current) {
+            unwrapped = unwrapPhishyFromRange(currentRange, wysiwygRef.current);
+          }
+
+          if (unwrapped) {
+            setActiveFormats(prev => ({ ...prev, phishy: false }));
+          } else {
+            const text = getVisualSelectionHtml() || '';
+            insertHtmlAtCursor(`<span class="phishy">${text || '&#8203;'}</span>`);
             setActiveFormats(prev => ({ ...prev, phishy: true }));
           }
         } else if (prefix.includes('text-left') || prefix === '<div class="text-left">\n') {

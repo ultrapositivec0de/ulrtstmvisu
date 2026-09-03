@@ -80,6 +80,30 @@ export function useEditorModeManager({
         const caretInLine = caretPos - lineStart;
         const selEndInLine = Math.min(actualLineEnd, selEnd) - lineStart;
 
+        const before = text.slice(0, caretPos);
+        const after = text.slice(selEnd);
+        const lastOpenPhishy = Math.max(
+          before.lastIndexOf('<div class="phishy">'),
+          before.lastIndexOf("<div class='phishy'>"),
+          before.lastIndexOf('<span class="phishy">'),
+          before.lastIndexOf("<span class='phishy'>")
+        );
+        const lastClosePhishy = Math.max(
+          before.lastIndexOf('</div>'),
+          before.lastIndexOf('</span>')
+        );
+        const nextClosePhishy = Math.min(
+          after.indexOf('</div>') === -1 ? Infinity : after.indexOf('</div>'),
+          after.indexOf('</span>') === -1 ? Infinity : after.indexOf('</span>')
+        );
+        const nextOpenPhishy = Math.min(
+          after.indexOf('<div class="phishy">') === -1 ? Infinity : after.indexOf('<div class="phishy">'),
+          after.indexOf("<div class='phishy'>") === -1 ? Infinity : after.indexOf("<div class='phishy'>"),
+          after.indexOf('<span class="phishy">') === -1 ? Infinity : after.indexOf('<span class="phishy">'),
+          after.indexOf("<span class='phishy'>") === -1 ? Infinity : after.indexOf("<span class='phishy'>")
+        );
+        const isEnclosedInPhishy = lastOpenPhishy !== -1 && (lastClosePhishy === -1 || lastClosePhishy < lastOpenPhishy) && nextClosePhishy !== Infinity && (nextOpenPhishy === Infinity || nextOpenPhishy > nextClosePhishy);
+
         const newFormats = {
           bold: isInsideTagInLine(currentLine, caretInLine, '**', selEndInLine),
           italic: isInsideTagInLine(currentLine, caretInLine, '*', selEndInLine),
@@ -87,7 +111,7 @@ export function useEditorModeManager({
           strikethrough: isInsideTagInLine(currentLine, caretInLine, '~~', selEndInLine),
           sub: isInsideTagInLine(currentLine, caretInLine, '<sub>', selEndInLine),
           sup: isInsideTagInLine(currentLine, caretInLine, '<sup>', selEndInLine),
-          phishy: isInsideTagInLine(currentLine, caretInLine, '<div class="phishy">', selEndInLine)
+          phishy: isEnclosedInPhishy || isInsideTagInLine(currentLine, caretInLine, '<div class="phishy">', selEndInLine) || isInsideTagInLine(currentLine, caretInLine, '<span class="phishy">', selEndInLine)
         };
 
         setActiveFormats((prev: any) => {

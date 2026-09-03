@@ -18,6 +18,8 @@ export function getAllFormatRangesInLine(line: string): FormatRange[] {
     { formatKey: 'sup', openTag: '<sup>', closeTag: '</sup>' },
     { formatKey: 'phishy', openTag: '<div class="phishy">', closeTag: '</div>' },
     { formatKey: 'phishy', openTag: '<span class="phishy">', closeTag: '</span>' },
+    { formatKey: 'phishy', openTag: "<div class='phishy'>", closeTag: '</div>' },
+    { formatKey: 'phishy', openTag: "<span class='phishy'>", closeTag: '</span>' },
   ];
 
   for (const { formatKey, openTag, closeTag } of htmlPairs) {
