@@ -253,21 +253,21 @@ export const EditorPane: React.FC<EditorPaneProps> = ({
 }) => {
   const getEditorBottomSpacingClass = () => {
     if (isKeyboardOpen) {
-      return "pb-44 mb-2 lg:pb-48 lg:mb-4";
+      return "pb-44 mb-2 lg:pb-20 lg:mb-2";
     }
     if (widgetPos === 'bottom') {
       // In both fullscreen and normal mode on desktop, reserve space so the editor stops safely above TamedWidget
-      return "pb-44 mb-[5.5rem] lg:pb-48 lg:mb-28";
+      return "pb-44 mb-[5.5rem] lg:pb-28 lg:mb-8";
     }
     if (widgetPos === 'floating') {
       return isEditorFullScreen || isFullScreen
-        ? "pb-44 mb-[5rem] lg:pb-48 lg:mb-16"
-        : "pb-44 mb-[5rem] lg:pb-36 lg:mb-16";
+        ? "pb-44 mb-[5rem] lg:pb-28 lg:mb-6"
+        : "pb-44 mb-[5rem] lg:pb-24 lg:mb-6";
     }
     // widgetPos === 'hidden'
     return isEditorFullScreen || isFullScreen
-      ? "pb-44 mb-2 lg:pb-48 lg:mb-4"
-      : "pb-44 mb-[5rem] lg:pb-36 lg:mb-4";
+      ? "pb-44 mb-2 lg:pb-16 lg:mb-2"
+      : "pb-44 mb-[5rem] lg:pb-16 lg:mb-2";
   };
 
   return (
