@@ -1,4 +1,4 @@
-const CACHE_NAME = 'steem-editor-pro-v4.7.9';
+const CACHE_NAME = 'steem-editor-pro-v4.8.0';
 const RELATIVE_ASSETS = [
   './',
   './index.html',

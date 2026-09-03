@@ -1,4 +1,8 @@
 # Changelog
+## [2026-09-03] - Version 4.8.0 (ultrasteemeditor/4.8.0)
+### Added & Improved
+- **Release Updates**: Оптимізація нижнього відступу редактора на ПК та оновлення залежностей (glob, yaeti/event-target-shim).
+
 ## [2026-09-03] - Version 4.7.9 (ultrasteemeditor/4.7.9)
 ### Added & Improved
 - **Release Updates**: Autoscroll Caret Clearance in Native & Desktop Modes, Phishy Block & Span Exit Fixes

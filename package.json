@@ -1,7 +1,7 @@
 {
   "name": "ultra-steem-editor",
   "private": true,
-  "version": "4.7.9",
+  "version": "4.8.0",
   "type": "module",
   "license": "Apache-2.0",
   "engines": {
@@ -88,7 +88,8 @@
     "vite": "^8.2.2"
   },
   "overrides": {
-    "glob": "^10.5.0"
+    "glob": "^13.0.6",
+    "yaeti": "npm:event-target-shim@^6.0.2"
   },
   "allowScripts": {
     "esbuild": true,

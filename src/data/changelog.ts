@@ -6,6 +6,13 @@ export interface ChangelogEntry {
 
 export const APP_CHANGELOG: ChangelogEntry[] = [
   {
+    version: "v4.8.0",
+    date: "2026-09-03",
+    changes: [
+      "Оптимізація нижнього відступу редактора на ПК та оновлення залежностей (glob, yaeti/event-target-shim)."
+    ]
+  },
+  {
     version: "v4.7.9",
     date: "2026-09-03",
     changes: [

@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { TagGroup } from '../types';
 
-export const DEFAULT_APP_AGENT = 'ultrasteemeditor/4.7.9';
+export const DEFAULT_APP_AGENT = 'ultrasteemeditor/4.8.0';
 
 export function usePostSettings() {
   // Reward Type: 'SP' (100% Power Up), '50' (50% SBD/STEEM & 50% SP), '0' (Decline Payout)
