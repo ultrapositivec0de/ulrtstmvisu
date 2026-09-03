@@ -1,4 +1,4 @@
-const CACHE_NAME = 'steem-editor-pro-v4.7.7';
+const CACHE_NAME = 'steem-editor-pro-v4.7.8';
 const ASSETS_TO_CACHE = [
   '/',
   '/index.html',
@@ -32,6 +32,7 @@ self.addEventListener('activate', (event) => {
       return Promise.all(
         cacheNames.map((cacheName) => {
           if (cacheName !== CACHE_NAME) {
+            console.log('[SW] Deleting old cache:', cacheName);
             return caches.delete(cacheName);
           }
         })
@@ -40,7 +41,14 @@ self.addEventListener('activate', (event) => {
   );
 });
 
-// Fetch handler: Cache-First for static assets & Stale-While-Revalidate for HTML/Shell
+// Allow client to trigger skipWaiting
+self.addEventListener('message', (event) => {
+  if (event.data && event.data.type === 'SKIP_WAITING') {
+    self.skipWaiting();
+  }
+});
+
+// Fetch handler: Intelligent routing avoiding overly aggressive HTML caching
 self.addEventListener('fetch', (event) => {
   if (event.request.method !== 'GET') return;
 
@@ -65,68 +73,76 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // 2. Navigation / HTML Document requests (Stale-While-Revalidate for instantaneous UI start)
+  // 2. Navigation / HTML Document requests: Network-First with Cache Fallback
+  // This guarantees users always get the latest version when online, while preserving 100% offline access
   if (event.request.mode === 'navigate' || url.pathname === '/' || url.pathname.endsWith('.html')) {
     event.respondWith(
-      caches.match(event.request).then((cachedResponse) => {
-        // Start background network revalidation
-        const fetchPromise = fetch(event.request)
-          .then((networkResponse) => {
-            if (networkResponse && networkResponse.status === 200) {
-              const cacheCopy = networkResponse.clone();
-              caches.open(CACHE_NAME).then((cache) => cache.put(event.request, cacheCopy));
-            }
-            return networkResponse;
-          })
-          .catch(() => {
-            // Offline fallback if fetch fails
-            return cachedResponse || caches.match('/index.html');
+      fetch(event.request)
+        .then((networkResponse) => {
+          if (networkResponse && networkResponse.status === 200) {
+            const cacheCopy = networkResponse.clone();
+            caches.open(CACHE_NAME).then((cache) => cache.put(event.request, cacheCopy));
+          }
+          return networkResponse;
+        })
+        .catch(() => {
+          // Offline fallback
+          return caches.match(event.request).then((cached) => {
+            return cached || caches.match('/index.html');
           });
-
-        // Return cached version instantly if available (0ms delay), otherwise wait for network
-        return cachedResponse || fetchPromise;
-      })
+        })
     );
     return;
   }
 
-  // 3. Static Assets (JS, CSS, Images, Icons, Audio, Web Worker scripts) -> Cache-First
-  const isStaticAsset = 
-    url.pathname.startsWith('/assets/') ||
-    /\.(js|css|png|jpg|jpeg|gif|svg|webp|ico|woff|woff2|ttf|wasm|json)$/i.test(url.pathname);
-
-  if (isStaticAsset) {
+  // 3. Vite content-hashed static assets (/assets/.*) -> Cache-First
+  const isHashedAsset = url.pathname.startsWith('/assets/');
+  if (isHashedAsset) {
     event.respondWith(
       caches.match(event.request).then((cachedResponse) => {
-        if (cachedResponse) {
-          return cachedResponse;
-        }
+        if (cachedResponse) return cachedResponse;
         return fetch(event.request).then((networkResponse) => {
           if (networkResponse && networkResponse.status === 200) {
             const cacheCopy = networkResponse.clone();
             caches.open(CACHE_NAME).then((cache) => cache.put(event.request, cacheCopy));
           }
           return networkResponse;
-        }).catch((err) => {
-          console.warn('Offline fetch failed for static asset:', event.request.url, err);
-          return cachedResponse;
         });
       })
     );
     return;
   }
 
-  // 4. Default fallback: Cache with network fallback
+  // 4. Non-hashed static files (manifest, icons, images): Stale-While-Revalidate
+  const isStaticFile = /\.(png|jpg|jpeg|gif|svg|webp|ico|json)$/i.test(url.pathname);
+  if (isStaticFile) {
+    event.respondWith(
+      caches.match(event.request).then((cachedResponse) => {
+        const fetchPromise = fetch(event.request).then((networkResponse) => {
+          if (networkResponse && networkResponse.status === 200) {
+            const cacheCopy = networkResponse.clone();
+            caches.open(CACHE_NAME).then((cache) => cache.put(event.request, cacheCopy));
+          }
+          return networkResponse;
+        }).catch(() => cachedResponse);
+
+        return cachedResponse || fetchPromise;
+      })
+    );
+    return;
+  }
+
+  // 5. Default: Network with Cache fallback
   event.respondWith(
-    caches.match(event.request).then((cachedResponse) => {
-      if (cachedResponse) return cachedResponse;
-      return fetch(event.request).then((networkResponse) => {
-        if (networkResponse && networkResponse.status === 200 && networkResponse.type === 'basic') {
-          const cacheCopy = networkResponse.clone();
-          caches.open(CACHE_NAME).then((cache) => cache.put(event.request, cacheCopy));
-        }
-        return networkResponse;
-      });
+    fetch(event.request).then((networkResponse) => {
+      if (networkResponse && networkResponse.status === 200 && networkResponse.type === 'basic') {
+        const cacheCopy = networkResponse.clone();
+        caches.open(CACHE_NAME).then((cache) => cache.put(event.request, cacheCopy));
+      }
+      return networkResponse;
+    }).catch(() => {
+      return caches.match(event.request);
     })
   );
 });
+

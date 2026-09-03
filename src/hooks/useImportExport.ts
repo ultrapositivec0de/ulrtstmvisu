@@ -59,9 +59,7 @@ export function useImportExport({ t, setContent, setPubTitle, setPubTags, setSys
       drafts.forEach((d: any) => {
         const safeTitle = (d.title || `draft-${d.id}`).replace(/[/\\?%*:|"<>]/g, '-');
         
-        let content = "";
-        if (d.title) content += `# ${d.title}\n\n`;
-        content += d.body || "";
+        let content = d.body || "";
         
         if (d.tags || d.category) {
           content += `\n\n---\n- **Tags**: ${d.tags || ""}\n- **Category**: ${d.category || ""}\n`;

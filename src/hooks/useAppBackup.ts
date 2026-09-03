@@ -171,15 +171,7 @@ export function useAppBackup({
       derivedTitle = firstLine.replace(/[#*`]/g, '').trim().substring(0, 150);
     }
     
-    let exportContent = "";
-    const hasH1 = firstLine.startsWith('# ');
-    if (derivedTitle && !hasH1) {
-      if (firstLine.replace(/[#*`]/g, '').trim() !== derivedTitle) {
-        exportContent += `# ${derivedTitle}\n\n`;
-      }
-    }
-    
-    exportContent += processContentForSteem(currentMarkdown);
+    let exportContent = processContentForSteem(currentMarkdown);
     
     if (pubTags) {
       exportContent += `\n\n---\n- **Tags**: ${pubTags}\n`;

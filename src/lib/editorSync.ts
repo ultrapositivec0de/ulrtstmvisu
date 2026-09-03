@@ -32,6 +32,28 @@ export function htmlToMarkdown(html: string): string {
   const doc = parser.parseFromString(html, 'text/html');
   const body = doc.body;
 
+  // Pre-merge consecutive sibling elements with .phishy class
+  const mergeAdjacentPhishy = (root: Element) => {
+    const children = Array.from(root.children);
+    for (let i = 0; i < children.length; i++) {
+      const child = children[i];
+      mergeAdjacentPhishy(child);
+      if (child.classList?.contains('phishy')) {
+        let next = child.nextElementSibling;
+        while (next && next.classList?.contains('phishy')) {
+          child.appendChild(document.createElement('br'));
+          while (next.firstChild) {
+            child.appendChild(next.firstChild);
+          }
+          const toRemove = next;
+          next = next.nextElementSibling;
+          toRemove.remove();
+        }
+      }
+    }
+  };
+  mergeAdjacentPhishy(body);
+
   const convertNode = (node: Node, insideList = false, insideTable = false): string => {
     if (node.nodeType === Node.TEXT_NODE) {
       let val = (node.nodeValue || '').replace(/\u200B/g, '');
@@ -62,13 +84,23 @@ export function htmlToMarkdown(html: string): string {
       inner += convertNode(child, insideList || tag === 'ul' || tag === 'ol', insideTable || tag === 'table');
     });
 
+    const formatHeading = (level: number, text: string) => {
+      const trimmed = text.trim();
+      if (!trimmed) return '';
+      // Clean leading # if user typed them inside visual heading to avoid duplicated ###
+      const cleaned = trimmed.replace(/^#+\s*/, '').trim();
+      if (!cleaned) return '';
+      const prefix = '#'.repeat(level);
+      return `\n${prefix} ${cleaned}\n`;
+    };
+
     switch (tag) {
-      case 'h1': return inner.trim() ? `\n# ${inner.trim()}\n` : '';
-      case 'h2': return inner.trim() ? `\n## ${inner.trim()}\n` : '';
-      case 'h3': return inner.trim() ? `\n### ${inner.trim()}\n` : '';
-      case 'h4': return inner.trim() ? `\n#### ${inner.trim()}\n` : '';
-      case 'h5': return inner.trim() ? `\n##### ${inner.trim()}\n` : '';
-      case 'h6': return inner.trim() ? `\n###### ${inner.trim()}\n` : '';
+      case 'h1': return formatHeading(1, inner);
+      case 'h2': return formatHeading(2, inner);
+      case 'h3': return formatHeading(3, inner);
+      case 'h4': return formatHeading(4, inner);
+      case 'h5': return formatHeading(5, inner);
+      case 'h6': return formatHeading(6, inner);
       case 'strong':
       case 'b': return applyInlineFormat(inner, '**', '**');
       case 'em':
@@ -85,11 +117,14 @@ export function htmlToMarkdown(html: string): string {
 
         const className = el.className || '';
         if (className.includes('phishy')) {
-          return applyInlineFormat(inner, '<div class="phishy">', '</div>');
+          const content = inner.replace(/^\n+|\n+$/g, '');
+          return `\n\n<div class="phishy">\n\n${content}\n</div>\n\n`;
         } else if (className.includes('text-blue')) {
-          return applyInlineFormat(inner, '<div class="text-blue">', '</div>');
+          const content = inner.replace(/^\n+|\n+$/g, '');
+          return `\n\n<div class="text-blue">\n\n${content}\n</div>\n\n`;
         } else if (className.includes('text-green')) {
-          return applyInlineFormat(inner, '<div class="text-green">', '</div>');
+          const content = inner.replace(/^\n+|\n+$/g, '');
+          return `\n\n<div class="text-green">\n\n${content}\n</div>\n\n`;
         }
         return inner;
       }
@@ -230,11 +265,14 @@ export function htmlToMarkdown(html: string): string {
         } else if (className.includes('text-center')) {
           return `\n<div class="text-center">\n${inner.trim()}\n</div>\n`;
         } else if (className.includes('phishy')) {
-          return `<div class="phishy">${inner}</div>`;
+          const content = inner.replace(/^\n+|\n+$/g, '');
+          return `\n\n<div class="phishy">\n\n${content}\n</div>\n\n`;
         } else if (className.includes('text-blue')) {
-          return `<div class="text-blue">${inner}</div>`;
+          const content = inner.replace(/^\n+|\n+$/g, '');
+          return `\n\n<div class="text-blue">\n\n${content}\n</div>\n\n`;
         } else if (className.includes('text-green')) {
-          return `<div class="text-green">${inner}</div>`;
+          const content = inner.replace(/^\n+|\n+$/g, '');
+          return `\n\n<div class="text-green">\n\n${content}\n</div>\n\n`;
         }
 
         if (className.includes('table-spacer') || el.hasAttribute('data-placeholder') || el.hasAttribute('data-empty')) {

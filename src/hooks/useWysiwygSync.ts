@@ -683,10 +683,12 @@ export function useWysiwygSync(options: UseWysiwygSyncOptions) {
       tempDiv.innerHTML = rawHtml;
 
       tempDiv.querySelectorAll('div.phishy, div.text-blue, div.text-green').forEach((div) => {
-        const span = document.createElement('span');
-        span.className = div.className;
-        span.innerHTML = div.innerHTML;
-        if (div.parentNode) div.parentNode.replaceChild(span, div);
+        div.querySelectorAll(':scope > p').forEach((p) => {
+          while (p.firstChild) {
+            div.insertBefore(p.firstChild, p);
+          }
+          div.removeChild(p);
+        });
       });
 
       tempDiv.querySelectorAll('li > p:only-child').forEach((p) => {

@@ -10,12 +10,25 @@ export function useSteemAuth() {
     return 'KEYCHAIN';
   });
 
-  const [username, setUsername] = useState(() => {
+  const [username, setUsernameState] = useState(() => {
     if (typeof window !== 'undefined') {
       return localStorage.getItem('steem_username') || '';
     }
     return '';
   });
+
+  const setUsername = useCallback((name: string | ((prev: string) => string)) => {
+    setUsernameState(prev => {
+      const nextVal = typeof name === 'function' ? name(prev) : name;
+      const cleanVal = (nextVal || '').trim().replace(/^@/, '');
+      if (typeof window !== 'undefined') {
+        if (cleanVal) {
+          localStorage.setItem('steem_username', cleanVal);
+        }
+      }
+      return cleanVal;
+    });
+  }, []);
 
   const [selectedVaultUser, setSelectedVaultUser] = useState('');
   const [showAccountPrompt, setShowAccountPrompt] = useState(() => {
@@ -78,11 +91,26 @@ export function useSteemAuth() {
       initVault();
     });
 
+    const handleKeychainReady = () => {
+      if ((window as any).steem_keychain) {
+        setAuthType(prev => (prev === 'VAULT' && !localStorage.getItem('steem_prefer_vault') ? 'KEYCHAIN' : prev));
+      }
+    };
+
+    if (typeof window !== 'undefined') {
+      window.addEventListener('steem_keychain_ready', handleKeychainReady);
+      window.addEventListener('load', handleKeychainReady);
+    }
+
     SecurityService.setStatusCallback((unlocked) => {
       setIsUnlocked(unlocked);
     });
 
     return () => {
+      if (typeof window !== 'undefined') {
+        window.removeEventListener('steem_keychain_ready', handleKeychainReady);
+        window.removeEventListener('load', handleKeychainReady);
+      }
       SecurityService.setStatusCallback(() => {});
     };
   }, [initVault]);

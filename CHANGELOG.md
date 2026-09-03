@@ -1,4 +1,12 @@
 # Changelog
+## [2026-09-03] - Version 4.7.8 (ultrasteemeditor/4.7.8)
+### Added & Improved
+- **Release Updates**: Cross-platform release synchronization and system improvements.
+
+## [2026-09-02] - Version 4.7.8 (ultrasteemeditor/4.7.8)
+### Added & Improved
+- **Release Updates**: Cross-platform release synchronization and system improvements.
+
 ## [2026-08-28] - Version 4.7.7 (ultrasteemeditor/4.7.7)
 ### Added & Improved
 - **Release Updates**: Виправлення позиціонування віджету та скролінгу під час вставки таблиць.

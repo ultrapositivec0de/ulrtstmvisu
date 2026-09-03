@@ -218,6 +218,67 @@ const insertHtmlAtCursor = useCallback((html: string) => {
 
     textarea.focus();
 
+    if (formatKey === 'phishy') {
+      const before = text.slice(0, start);
+      const after = text.slice(end);
+      if (start !== end) {
+        const selectedText = text.slice(start, end).trim();
+        const prefixNl = (before === '' || before.endsWith('\n\n')) ? '' : before.endsWith('\n') ? '\n' : '\n\n';
+        const suffixNl = (after === '' || after.startsWith('\n\n')) ? '' : after.startsWith('\n') ? '\n' : '\n\n';
+        const block = `${prefixNl}<div class="phishy">\n\n${selectedText || 'Червоний текст'}\n</div>${suffixNl}`;
+        const newText = before + block + after;
+        useEditorStore.getState().setContent(newText);
+        const newStart = start + prefixNl.length + '<div class="phishy">\n\n'.length;
+        const newEnd = newStart + (selectedText || 'Червоний текст').length;
+        setTimeout(() => {
+          if (!editorRef.current) return;
+          editorRef.current.focus({ preventScroll: true });
+          editorRef.current.setSelectionRange(newStart, newEnd);
+          saveCursorPosition();
+        }, 0);
+        return;
+      } else {
+        const lastOpenDiv = before.lastIndexOf('<div class="phishy">');
+        const lastCloseDiv = before.lastIndexOf('</div>');
+        const nextCloseDiv = after.indexOf('</div>');
+        const nextOpenDiv = after.indexOf('<div class="phishy">');
+        const isInsideDiv = lastOpenDiv !== -1 && (lastCloseDiv === -1 || lastCloseDiv < lastOpenDiv) && nextCloseDiv !== -1 && (nextOpenDiv === -1 || nextOpenDiv > nextCloseDiv);
+
+        if (isInsideDiv) {
+          const fullOpenIdx = lastOpenDiv;
+          const fullCloseIdx = start + nextCloseDiv + '</div>'.length;
+          const insideContent = text.slice(fullOpenIdx + '<div class="phishy">'.length, start + nextCloseDiv).replace(/^\n+|\n+$/g, '');
+          const newText = text.slice(0, fullOpenIdx) + insideContent + text.slice(fullCloseIdx);
+          useEditorStore.getState().setContent(newText);
+          setActiveFormats(prev => ({ ...prev, phishy: false }));
+          setTimeout(() => {
+            if (!editorRef.current) return;
+            editorRef.current.focus({ preventScroll: true });
+            editorRef.current.setSelectionRange(fullOpenIdx, fullOpenIdx + insideContent.length);
+            saveCursorPosition();
+          }, 0);
+          return;
+        } else {
+          const prefixNl = (before === '' || before.endsWith('\n\n')) ? '' : before.endsWith('\n') ? '\n' : '\n\n';
+          const suffixNl = (after === '' || after.startsWith('\n\n')) ? '' : after.startsWith('\n') ? '\n' : '\n\n';
+          const placeholder = 'Червоний текст';
+          const block = `${prefixNl}<div class="phishy">\n\n${placeholder}\n</div>${suffixNl}`;
+          const newText = before + block + after;
+          const newStart = start + prefixNl.length + '<div class="phishy">\n\n'.length;
+          const newEnd = newStart + placeholder.length;
+          useEditorStore.getState().setContent(newText);
+          setActiveFormats(prev => ({ ...prev, phishy: true }));
+          setTimeout(() => {
+            if (!editorRef.current) return;
+            editorRef.current.focus({ preventScroll: true });
+            editorRef.current.setSelectionRange(newStart, newEnd);
+            saveCursorPosition();
+          }, 0);
+          return;
+        }
+      }
+    }
+
     if (start !== end) {
       const selectedText = text.slice(start, end);
       const before = text.slice(0, start);
@@ -595,7 +656,7 @@ const insertHtmlAtCursor = useCallback((html: string) => {
           insertHtmlAtCursor(`<pre><code>${text}</code></pre>`);
         } else if (prefix === '<div class="phishy">') {
           const text = getVisualSelectionHtml() || '';
-          insertHtmlAtCursor(`<span class="phishy">${text}</span>`);
+          insertHtmlAtCursor(`<span class="phishy">${text || '&#8203;'}</span>`);
           if (!text) {
             setActiveFormats(prev => ({ ...prev, phishy: true }));
           }

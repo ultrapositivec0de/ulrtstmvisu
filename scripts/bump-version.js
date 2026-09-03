@@ -193,7 +193,31 @@ if (fs.existsSync(settingsModalPath)) {
   updatedFiles.push('src/components/modals/SettingsModal.tsx');
 }
 
-// 7. Update package-lock.json if available
+// 9. Update src/hooks/usePostSettings.ts (default app agent)
+const usePostSettingsPath = path.join(rootDir, 'src', 'hooks', 'usePostSettings.ts');
+if (fs.existsSync(usePostSettingsPath)) {
+  let usePostSettings = fs.readFileSync(usePostSettingsPath, 'utf8');
+  usePostSettings = usePostSettings.replace(
+    /ultrasteemeditor\/\d+\.\d+\.\d+/g,
+    `ultrasteemeditor/${newVersion}`
+  );
+  fs.writeFileSync(usePostSettingsPath, usePostSettings, 'utf8');
+  updatedFiles.push('src/hooks/usePostSettings.ts');
+}
+
+// 10. Update public/sw.js (Service Worker Cache Name)
+const swPath = path.join(rootDir, 'public', 'sw.js');
+if (fs.existsSync(swPath)) {
+  let swContent = fs.readFileSync(swPath, 'utf8');
+  swContent = swContent.replace(
+    /steem-editor-pro-v\d+\.\d+\.\d+/g,
+    `steem-editor-pro-v${newVersion}`
+  );
+  fs.writeFileSync(swPath, swContent, 'utf8');
+  updatedFiles.push('public/sw.js');
+}
+
+// 11. Update package-lock.json if available
 try {
   execSync('npm install --package-lock-only --legacy-peer-deps', { cwd: rootDir, stdio: 'ignore' });
   updatedFiles.push('package-lock.json');

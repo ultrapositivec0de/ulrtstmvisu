@@ -1,6 +1,8 @@
 import { useState, useEffect } from 'react';
 import { TagGroup } from '../types';
 
+export const DEFAULT_APP_AGENT = 'ultrasteemeditor/4.7.8';
+
 export function usePostSettings() {
   // Reward Type: 'SP' (100% Power Up), '50' (50% SBD/STEEM & 50% SP), '0' (Decline Payout)
   const [rewardType, setRewardType] = useState<'SP' | '50' | '0'>(() => {
@@ -14,7 +16,13 @@ export function usePostSettings() {
 
   // App identifier / User Agent
   const [appAgent, setAppAgent] = useState<string>(() => {
-    return localStorage.getItem('steem_app_agent') || 'ultrasteemeditor/4.7.5';
+    const saved = localStorage.getItem('steem_app_agent');
+    // If not set, or if it matches the default 'ultrasteemeditor/X.X.X' format, auto-upgrade to current version
+    if (!saved || /^ultrasteemeditor\/[0-9.]+$/i.test(saved.trim())) {
+      localStorage.setItem('steem_app_agent', DEFAULT_APP_AGENT);
+      return DEFAULT_APP_AGENT;
+    }
+    return saved;
   });
 
   // Beneficiaries list & inputs

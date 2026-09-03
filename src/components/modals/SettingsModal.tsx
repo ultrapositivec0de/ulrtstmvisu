@@ -13,12 +13,18 @@ import {
   Zap,
   ChevronDown,
   Terminal,
-  Type
+  Type,
+  Sparkles,
+  User,
+  Bot,
+  Code,
+  RotateCcw
 } from 'lucide-react';
 import { cn } from '../../lib/utils';
 import { Template, ImageItem } from '../../types';
 import { SecurityService } from '../../services/securityService';
 import { APP_CHANGELOG, getChangelogText } from '../../data/changelog';
+import { DEFAULT_APP_AGENT } from '../../hooks/usePostSettings';
 
 export interface SettingsModalProps {
   isOpen: boolean;
@@ -760,11 +766,11 @@ export const SettingsModal: React.FC<SettingsModalProps> = (props) => {
                        <div className="w-16 h-16 bg-cyan-500/10 rounded-2xl mx-auto flex items-center justify-center text-cyan-400 font-black text-2xl shadow-xl shadow-cyan-500/10">S</div>
                        <div>
                          <h3 className="text-xl font-black tracking-tight">SteemEditor <span className="text-cyan-400">Pro</span></h3>
-                         <p className="text-[10px] text-slate-500 uppercase font-black tracking-[0.2em] pt-1">Version 4.7.7 "Quantum"</p>
+                         <p className="text-[10px] text-slate-500 uppercase font-black tracking-[0.2em] pt-1">Version 4.7.8 "Quantum"</p>
                        </div>
                        <label className="text-[10px] font-black text-slate-500 uppercase tracking-[0.2em] px-1 pt-4 block border-t border-slate-800">Changelog & Updates</label>
                         <div className="mt-2 p-3 bg-slate-950 border border-cyan-500/20 rounded-xl text-left">
-                          <p className="text-xs text-slate-300 font-medium">New in v4.7.7: WYSIWYG State Persistence Hardening, Flush on Pagehide / VisibilityChange & Responsive 300ms Debounce</p>
+                          <p className="text-xs text-slate-300 font-medium">New in v4.7.8: Markdown & WYSIWYG Red Color Normalization, PWA Network-First Cache Strategy & Fair Human+AI Attribution</p>
                         </div>
                        
                        <div className="space-y-2 max-h-60 overflow-y-auto custom-scrollbar bg-slate-900 border border-slate-800 rounded-xl p-3">
@@ -803,7 +809,54 @@ export const SettingsModal: React.FC<SettingsModalProps> = (props) => {
                     </div>
 
                     <div className="space-y-4 pt-2 text-left">
-                       <div>
+                       {/* Credits & Development (Fair Transparency: Human + AI) */}
+                       <div className="space-y-3">
+                          <label className="text-[10px] font-black text-slate-500 uppercase tracking-[0.2em] px-1 flex items-center gap-1.5">
+                            <Sparkles size={12} className="text-cyan-400" /> {t('credits') || 'Авторство та розробка'}
+                          </label>
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                            {/* Human Role */}
+                            <div className="p-3.5 bg-slate-900 border border-slate-800 rounded-xl space-y-2 hover:border-slate-700/60 transition-all">
+                              <div className="flex items-center gap-2.5">
+                                <div className="p-2 bg-blue-500/10 text-blue-400 rounded-lg">
+                                  <User size={16} />
+                                </div>
+                                <div>
+                                  <span className="text-xs font-bold text-slate-200 block">{t('humanCredits') || 'Людина (Автор проєкту)'}</span>
+                                  <span className="text-[9px] text-slate-500 font-medium">{t('developer') || 'Розробник'} / Архітектор</span>
+                                </div>
+                              </div>
+                              <p className="text-[11px] text-slate-400 leading-snug">
+                                {t('humanTasks') || 'Ідея, концепція, творче спрямування, тестування, архітектурне бачення та асистування.'}
+                              </p>
+                            </div>
+
+                            {/* AI Role */}
+                            <div className="p-3.5 bg-slate-900 border border-slate-800 rounded-xl space-y-2 hover:border-slate-700/60 transition-all">
+                              <div className="flex items-center gap-2.5">
+                                <div className="p-2 bg-cyan-500/10 text-cyan-400 rounded-lg">
+                                  <Bot size={16} />
+                                </div>
+                                <div>
+                                  <span className="text-xs font-bold text-cyan-300 block">{t('aiCredits') || 'ШІ (Gemini AI / AI Studio)'}</span>
+                                  <span className="text-[9px] text-slate-500 font-medium">Технічна реалізація</span>
+                                </div>
+                              </div>
+                              <p className="text-[11px] text-slate-400 leading-snug">
+                                {t('aiTasks') || 'Написання коду, глибока технічна оптимізація, алгоритми та реалізація логіки.'}
+                              </p>
+                            </div>
+                          </div>
+                          
+                          <div className="p-2.5 bg-slate-950/60 border border-slate-800/80 rounded-xl flex items-center justify-between text-[10px] text-slate-400 px-3">
+                            <span className="flex items-center gap-1.5">
+                              <Code size={12} className="text-cyan-400" /> {t('license') || 'Ліцензія'}: Apache 2.0 (Open Source)
+                            </span>
+                            <span className="text-slate-500 font-mono text-[9px]">© 2026 SteemEditor Pro</span>
+                          </div>
+                       </div>
+
+                       <div className="pt-2">
                           <label className="text-[10px] font-black text-slate-500 uppercase tracking-[0.2em] px-1">Пакетний Аудит (NPM Packages)</label>
                           <div className="mt-2 space-y-2 max-h-64 overflow-y-auto custom-scrollbar pr-1">
                              {[
@@ -854,7 +907,22 @@ export const SettingsModal: React.FC<SettingsModalProps> = (props) => {
                             className="space-y-4 bg-slate-800/30 p-4 rounded-xl border border-slate-800 overflow-hidden"
                           >
                             <div>
-                              <label className="text-[10px] font-bold text-slate-500 uppercase mb-2 block">{t('appAgent')}</label>
+                              <div className="flex items-center justify-between mb-2">
+                                <label className="text-[10px] font-bold text-slate-500 uppercase block">{t('appAgent')}</label>
+                                {appAgent !== DEFAULT_APP_AGENT && (
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setAppAgent(DEFAULT_APP_AGENT);
+                                      localStorage.setItem('steem_app_agent', DEFAULT_APP_AGENT);
+                                    }}
+                                    className="text-[9px] text-cyan-400 hover:text-cyan-300 flex items-center gap-1 font-mono transition-colors"
+                                    title={DEFAULT_APP_AGENT}
+                                  >
+                                    <RotateCcw size={10} /> {DEFAULT_APP_AGENT}
+                                  </button>
+                                )}
+                              </div>
                               <input 
                                 type="text" 
                                 value={appAgent}
@@ -863,7 +931,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = (props) => {
                                   localStorage.setItem('steem_app_agent', e.target.value);
                                 }}
                                 className="w-full bg-slate-900 border border-slate-700 rounded-lg p-2.5 text-xs text-slate-200 outline-none focus:ring-1 focus:ring-cyan-500"
-                                placeholder="ultrasteemeditor/4.7.7"
+                                placeholder="ultrasteemeditor/4.7.8"
                               />
                             </div>
                           </motion.div>

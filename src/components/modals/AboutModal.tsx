@@ -3,13 +3,18 @@ import { motion } from 'motion/react';
 import { 
   X, 
   Shield, 
-  Info, 
   Terminal, 
   ChevronRight, 
   FileText, 
-  Copy 
+  Copy,
+  Sparkles,
+  User,
+  Bot,
+  Code,
+  RotateCcw
 } from 'lucide-react';
 import { cn } from '../../lib/utils';
+import { DEFAULT_APP_AGENT } from '../../hooks/usePostSettings';
 
 interface ChangelogEntry {
   version: string;
@@ -69,21 +74,68 @@ export const AboutModal: React.FC<AboutModalProps> = ({
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-8 text-left">
           {/* Credits Section */}
-          <div className="space-y-6">
+          <div className="space-y-4">
             <h3 className="text-xs font-bold text-cyan-400 uppercase tracking-widest flex items-center gap-2">
-              <Info size={18} /> {t('credits')}
+              <Sparkles size={16} /> {t('credits') || 'Авторство та розробка'}
             </h3>
-            <div className="space-y-4 text-xs text-slate-400">
-              <div>
-                <p className="font-bold text-slate-200">{t('author')}</p>
-                <p className="text-slate-400">@ultrapositive / ultrapositive.eth</p>
+            
+            <div className="space-y-3">
+              {/* Human Role */}
+              <div className="p-3 bg-slate-950/60 border border-slate-800 rounded-xl space-y-1.5">
+                <div className="flex items-center gap-2">
+                  <div className="p-1.5 bg-blue-500/10 text-blue-400 rounded-lg">
+                    <User size={14} />
+                  </div>
+                  <div>
+                    <span className="text-xs font-bold text-slate-200 block">{t('humanCredits') || 'Людина (Автор проєкту)'}</span>
+                    <span className="text-[9px] text-slate-500 font-medium">{t('developer') || 'Розробник'} / Архітектор</span>
+                  </div>
+                </div>
+                <p className="text-[10px] text-slate-400 leading-snug">
+                  {t('humanTasks') || 'Ідея, концепція, творче спрямування, тестування, архітектурне бачення та асистування.'}
+                </p>
               </div>
-              <div>
-                <p className="font-bold text-slate-200">{t('license')}</p>
-                <span className="text-slate-300 font-bold">Apache 2.0</span>
+
+              {/* AI Role */}
+              <div className="p-3 bg-slate-950/60 border border-slate-800 rounded-xl space-y-1.5">
+                <div className="flex items-center gap-2">
+                  <div className="p-1.5 bg-cyan-500/10 text-cyan-400 rounded-lg">
+                    <Bot size={14} />
+                  </div>
+                  <div>
+                    <span className="text-xs font-bold text-cyan-300 block">{t('aiCredits') || 'ШІ (Gemini AI / AI Studio)'}</span>
+                    <span className="text-[9px] text-slate-500 font-medium">Технічна розробка</span>
+                  </div>
+                </div>
+                <p className="text-[10px] text-slate-400 leading-snug">
+                  {t('aiTasks') || 'Написання коду, глибока технічна оптимізація, алгоритми та реалізація логіки.'}
+                </p>
               </div>
-              <div className="space-y-1.5 pt-2">
-                <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">{t('appAgent')}</label>
+
+              <div className="p-2 bg-slate-950/40 border border-slate-800/60 rounded-xl flex items-center justify-between text-[10px] text-slate-400 px-3">
+                <span className="flex items-center gap-1.5">
+                  <Code size={12} className="text-cyan-400" /> {t('license') || 'Ліцензія'}: Apache 2.0 (Open Source)
+                </span>
+                <span className="text-slate-500 font-mono text-[9px]">© 2026</span>
+              </div>
+
+              <div className="space-y-1.5 pt-1">
+                <div className="flex items-center justify-between">
+                  <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">{t('appAgent')}</label>
+                  {appAgent !== DEFAULT_APP_AGENT && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setAppAgent(DEFAULT_APP_AGENT);
+                        localStorage.setItem('steem_app_agent', DEFAULT_APP_AGENT);
+                      }}
+                      className="text-[9px] text-cyan-400 hover:text-cyan-300 flex items-center gap-1 font-mono transition-colors"
+                      title={DEFAULT_APP_AGENT}
+                    >
+                      <RotateCcw size={10} /> {DEFAULT_APP_AGENT}
+                    </button>
+                  )}
+                </div>
                 <div className="flex gap-2">
                   <input 
                     type="text" 

@@ -511,7 +511,7 @@ export default function Reader({
         );
 
         // Only Whitelist Filtering
-        if (config.onlyWhitelist && config.whiteList.length > 0) {
+        if (config.onlyWhitelist) {
           filtered = filtered.filter((p) =>
             config.whiteList.includes(p.author),
           );
@@ -791,7 +791,7 @@ export default function Reader({
         .filter((p: SteemPost) => {
           if (p.author === currentUser) return false;
           // Filtering logic is already applied to rawInboxData, but we re-apply for 'more' fetched nodes
-          if (config.onlyWhitelist && config.whiteList.length > 0) {
+          if (config.onlyWhitelist) {
             if (!config.whiteList.includes(p.author)) return false;
           } else {
             if (config.blackList.includes(p.author)) return false;
@@ -974,7 +974,7 @@ export default function Reader({
         [author, permlink],
       );
       const filteredReplies = [post, ...replies].filter((p) => {
-        if (config.onlyWhitelist && config.whiteList.length > 0) {
+        if (config.onlyWhitelist) {
           if (!config.whiteList.includes(p.author)) return false;
         } else {
           if (config.blackList.includes(p.author)) return false;
@@ -1008,7 +1008,7 @@ export default function Reader({
       );
       // Filter out muted users
       const filtered = result.filter((c) => {
-        if (config.onlyWhitelist && config.whiteList.length > 0) {
+        if (config.onlyWhitelist) {
           if (!config.whiteList.includes(c.author)) return false;
         } else {
           if (config.blackList.includes(c.author)) return false;
@@ -1328,7 +1328,7 @@ export default function Reader({
         );
       }
 
-      if (config.onlyWhitelist && config.whiteList.length > 0) {
+      if (config.onlyWhitelist) {
         filtered = filtered.filter((post) =>
           config.whiteList.includes(post.author),
         );

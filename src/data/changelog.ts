@@ -6,6 +6,16 @@ export interface ChangelogEntry {
 
 export const APP_CHANGELOG: ChangelogEntry[] = [
   {
+    version: "v4.7.8",
+    date: "2026-09-03",
+    changes: [
+      "Форматування Markdown & WYSIWYG: Сувора нормалізація червоного кольору через <div class=\"phishy\"> у чистому Markdown та коректний інлайн-ввід <span class=\"phishy\"> у візуальному режимі.",
+      "PWA & Service Worker: Оновлено стратегію кешування на Network-First для HTML та Stale-While-Revalidate для статичних файлів з надійним офлайн-доступом.",
+      "Прозорість та авторство: Оновлено блок «Авторство та розробка» з чітким та справедливим розділенням ролей людини та ШІ.",
+      "Cross-Platform Release Sync: Синхронізація версії застосунку v4.7.8 на всіх рівнях."
+    ]
+  },
+  {
     version: "v4.7.7",
     date: "2026-08-28",
     changes: [

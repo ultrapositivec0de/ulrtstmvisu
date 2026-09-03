@@ -552,7 +552,15 @@ export function useSteemGallery(config: SteemGalleryConfig) {
   const uploadExternalImage = useCallback(async (url: string, fileName: string = 'image.jpg') => {
     const hasKeychain = typeof window !== 'undefined' && !!(window as any).steem_keychain;
     const uploadAuthType = imageUploadAccount ? 'VAULT' : (hasKeychain ? 'KEYCHAIN' : 'VAULT');
-    let activeUser = imageUploadAccount || config.username || config.selectedVaultUser || (config.vaultAccounts.length > 0 ? config.vaultAccounts[0] : '');
+    let activeUser = imageUploadAccount;
+    
+    if (!activeUser) {
+      if (uploadAuthType === 'VAULT') {
+        activeUser = config.selectedVaultUser || (config.vaultAccounts.length > 0 ? config.vaultAccounts[0] : '');
+      } else {
+        activeUser = config.username;
+      }
+    }
     
     if (!activeUser) {
       if (uploadAuthType === 'VAULT') {
@@ -562,9 +570,8 @@ export function useSteemGallery(config: SteemGalleryConfig) {
       } else {
         const inputUser = await config.promptDialog(config.t('username'));
         if (!inputUser) return;
-        activeUser = inputUser.replace('@', '');
+        activeUser = inputUser.replace('@', '').trim();
         config.setUsername(activeUser);
-        localStorage.setItem('steem_username', activeUser);
       }
     }
 
@@ -654,7 +661,15 @@ export function useSteemGallery(config: SteemGalleryConfig) {
     
     const hasKeychain = typeof window !== 'undefined' && !!(window as any).steem_keychain;
     const uploadAuthType = imageUploadAccount ? 'VAULT' : (hasKeychain ? 'KEYCHAIN' : 'VAULT');
-    let activeUser = imageUploadAccount || config.username || config.selectedVaultUser || (config.vaultAccounts.length > 0 ? config.vaultAccounts[0] : '');
+    let activeUser = imageUploadAccount;
+    
+    if (!activeUser) {
+      if (uploadAuthType === 'VAULT') {
+        activeUser = config.selectedVaultUser || (config.vaultAccounts.length > 0 ? config.vaultAccounts[0] : '');
+      } else {
+        activeUser = config.username;
+      }
+    }
     
     if (!activeUser) {
       if (uploadAuthType === 'VAULT') {
@@ -664,9 +679,8 @@ export function useSteemGallery(config: SteemGalleryConfig) {
       } else {
         const inputUser = await config.promptDialog(config.t('username'));
         if (!inputUser) return;
-        activeUser = inputUser.replace('@', '');
+        activeUser = inputUser.replace('@', '').trim();
         config.setUsername(activeUser);
-        localStorage.setItem('steem_username', activeUser);
       }
     }
 

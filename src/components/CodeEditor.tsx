@@ -137,6 +137,62 @@ export const CodeEditor = forwardRef<HTMLTextAreaElement, CodeEditorProps>((prop
     };
   }, []);
 
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (props.onKeyDown) {
+      props.onKeyDown(e);
+      if (e.defaultPrevented) return;
+    }
+
+    if (e.key === 'Enter') {
+      const target = e.target as HTMLTextAreaElement;
+      const val = target.value;
+      const start = target.selectionStart;
+      const end = target.selectionEnd;
+      
+      if (start === end && start >= 1) {
+        // Find if we are on an empty line (i.e. prev char is newline, ignoring spaces)
+        let isPrevLineEmpty = false;
+        let pos = start - 1;
+        while (pos >= 0 && (val[pos] === ' ' || val[pos] === '\t')) pos--;
+        if (pos >= 0 && val[pos] === '\n') {
+          let pos2 = pos - 1;
+          while (pos2 >= 0 && (val[pos2] === ' ' || val[pos2] === '\t')) pos2--;
+          if (pos2 >= 0 && val[pos2] === '\n') {
+            isPrevLineEmpty = true;
+          }
+        }
+        
+        if (isPrevLineEmpty) {
+          const lastOpen = val.lastIndexOf('<div class="phishy">', start);
+          const lastClose = val.lastIndexOf('</div>', start);
+          if (lastOpen !== -1 && (lastClose === -1 || lastClose < lastOpen)) {
+            const nextClose = val.indexOf('</div>', start);
+            const nextOpen = val.indexOf('<div class="phishy">', start);
+            
+            if (nextClose !== -1 && (nextOpen === -1 || nextClose < nextOpen)) {
+              e.preventDefault();
+              
+              const textAfterCursorBeforeClose = val.slice(start, nextClose).trim();
+              let newVal = val.slice(0, pos) + '\n</div>\n\n';
+              const newStart = newVal.length;
+              
+              if (textAfterCursorBeforeClose.length > 0) {
+                newVal += `<div class="phishy">\n\n` + textAfterCursorBeforeClose + '\n</div>' + val.slice(nextClose + '</div>'.length);
+              } else {
+                newVal += val.slice(nextClose + '</div>'.length);
+              }
+              
+              target.value = newVal;
+              target.setSelectionRange(newStart, newStart);
+              flushChanges(target);
+              return;
+            }
+          }
+        }
+      }
+    }
+  };
+
   const handleChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     const val = e.target.value;
     const start = e.target.selectionStart;
@@ -246,6 +302,7 @@ export const CodeEditor = forwardRef<HTMLTextAreaElement, CodeEditorProps>((prop
       ref={handleRef}
       defaultValue={content}
       onChange={handleChange}
+      onKeyDown={handleKeyDown}
       onSelect={handleSelect}
       onKeyUp={handleKeyUp}
       onClick={handleClick}

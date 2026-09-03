@@ -863,6 +863,48 @@ export function useEditorEvents(options: UseEditorEventsOptions) {
                   currRight = currRight.parentNode;
                 }
                 if (isLeftEmpty && isRightEmpty) {
+                  const isPhishy = escapeTarget.classList.contains('phishy');
+                  if (isPhishy) {
+                    // For phishy: we require 2 consecutive empty lines before breaking out to <p>.
+                    // Check if there was already an empty line before the current one.
+                    let hadPriorEmptyLine = false;
+                    let prevLineHadText = false;
+                    let scanNode: Node | null = currLeft ? currLeft.previousSibling : null;
+                    while (scanNode && scanNode !== escapeTarget) {
+                      if (scanNode.nodeType === Node.ELEMENT_NODE && (scanNode as HTMLElement).tagName === 'BR') {
+                        if (!prevLineHadText) {
+                          hadPriorEmptyLine = true;
+                          break;
+                        }
+                        break;
+                      }
+                      if (hasText(scanNode)) {
+                        prevLineHadText = true;
+                        break;
+                      }
+                      scanNode = scanNode.previousSibling;
+                    }
+
+                    if (!hadPriorEmptyLine && !prevLineHadText) {
+                      hadPriorEmptyLine = true;
+                    }
+
+                    if (!hadPriorEmptyLine) {
+                      // 2nd Enter: allow inserting an empty line inside phishy block
+                      e.preventDefault();
+                      const br = document.createElement('br');
+                      range.insertNode(br);
+                      const newRange = document.createRange();
+                      newRange.setStartAfter(br);
+                      newRange.collapse(true);
+                      sel.removeAllRanges();
+                      sel.addRange(newRange);
+                      savedVisualRangeRef.current = newRange.cloneRange();
+                      updateContentFromWysiwyg();
+                      return;
+                    }
+                  }
+
                   e.preventDefault();
 
                   const rLeft = document.createRange();

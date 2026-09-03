@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import {
   Key,
@@ -6,7 +6,8 @@ import {
   Trash2,
   X,
   Plus,
-  Image as ImageIcon
+  Image as ImageIcon,
+  AtSign
 } from 'lucide-react';
 import { cn } from '../../lib/utils';
 import { SecurityService } from '../../services/securityService';
@@ -65,9 +66,14 @@ export const KeysModal: React.FC<KeysModalProps> = (props) => {
     t
   } = props;
 
+  const [tempUsername, setTempUsername] = useState(username || '');
   const [vaultSetupPin, setVaultSetupPin] = useState('');
   const [vaultSetupWif, setVaultSetupWif] = useState('');
   const [showVaultSetup, setShowVaultSetup] = useState(false);
+
+  useEffect(() => {
+    if (username) setTempUsername(username);
+  }, [username]);
 
   const [tempPexelsKey, setTempPexelsKey] = useState(pexelsApiKey || '');
   const [tempPixabayKey, setTempPixabayKey] = useState(pixabayApiKey || '');
@@ -103,6 +109,44 @@ export const KeysModal: React.FC<KeysModalProps> = (props) => {
               </div>
               
               <div className="p-6 space-y-6 overflow-y-auto custom-scrollbar">
+                {/* 1. Permanent Username Section */}
+                <div className="p-4 bg-slate-800/60 border border-slate-700/80 rounded-xl space-y-3 shadow-sm">
+                  <div className="flex items-center justify-between">
+                    <label className="text-[10px] font-bold text-slate-300 uppercase tracking-widest flex items-center gap-1.5">
+                      <AtSign size={13} className="text-cyan-400" />
+                      {t('username') || "Steem Username"}
+                    </label>
+                    <span className="text-[9px] font-semibold text-slate-400 bg-slate-900/60 border border-slate-700/50 px-2 py-0.5 rounded-full">
+                      {(typeof window !== 'undefined' && (window as any).steem_keychain) ? "🛡️ Keychain ready" : "Notifications & Reader"}
+                    </span>
+                  </div>
+                  <div className="flex gap-2">
+                    <div className="relative flex-1">
+                      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 font-bold text-sm">@</span>
+                      <input 
+                        type="text" 
+                        value={tempUsername}
+                        onChange={e => setTempUsername(e.target.value.toLowerCase().trim().replace(/^@/, ''))}
+                        className="w-full bg-slate-900 border border-slate-700 rounded-lg pl-7 pr-3 py-2 text-sm outline-none focus:ring-1 focus:ring-cyan-500 text-cyan-300 font-bold placeholder:text-slate-600"
+                        placeholder="username"
+                      />
+                    </div>
+                    <button 
+                      onClick={() => {
+                        const clean = tempUsername.trim().replace(/^@/, '');
+                        setUsername(clean);
+                        notify(t('saveSuccess') || "Збережено!");
+                      }}
+                      className="px-4 py-2 bg-cyan-600 hover:bg-cyan-500 text-white rounded-lg text-xs font-bold transition-all shadow-sm shrink-0"
+                    >
+                      {t('save') || "Зберегти"}
+                    </button>
+                  </div>
+                  <p className="text-[10px] text-slate-400 leading-relaxed">
+                    {t('usernameDesc') || "Вкажіть ваш обліковий запис Steem для публікацій через Keychain, завантаження сповіщень та коментарів."}
+                  </p>
+                </div>
+
                 <div className="p-4 bg-cyan-500/5 border border-cyan-500/20 rounded-xl text-sm text-cyan-100/70">
                   <p>{t('vaultWarning')}</p>
                 </div>

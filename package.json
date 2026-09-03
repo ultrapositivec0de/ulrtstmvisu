@@ -1,7 +1,7 @@
 {
   "name": "ultra-steem-editor",
   "private": true,
-  "version": "4.7.7",
+  "version": "4.7.8",
   "type": "module",
   "license": "Apache-2.0",
   "engines": {

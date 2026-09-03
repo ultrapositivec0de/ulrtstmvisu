@@ -192,7 +192,7 @@ export const translations = {
   "developer": "Розробник",
   "github": "GitHub",
   "license": "Ліцензія",
-  "copyright": "2024 SteemEditor Pro. Всі права захищені.",
+  "copyright": "2026 SteemEditor Pro. Всі права захищені.",
   "showInWidget": "Показувати у віджеті",
   "hideInWidget": "Приховати у віджеті",
   "opacity": "Прозорість",
