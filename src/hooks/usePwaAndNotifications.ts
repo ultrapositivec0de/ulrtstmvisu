@@ -206,7 +206,12 @@ export function usePwaAndNotifications({
 
     // Register Service Worker
     if (typeof window !== 'undefined' && 'serviceWorker' in navigator) {
-      navigator.serviceWorker.register('/sw.js')
+      // Resolve sw.js relative to current page base so it works on GitHub Pages subdirectories, root domains, and previews
+      const baseHref = document.baseURI || window.location.href;
+      const baseDir = baseHref.split('?')[0].split('#')[0].replace(/\/[^/]*$/, '/');
+      const swUrl = new URL('sw.js', baseDir).href;
+
+      navigator.serviceWorker.register(swUrl, { scope: baseDir })
         .then((reg) => {
           console.log('PWA Service Worker registered successfully:', reg.scope);
         })

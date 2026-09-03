@@ -134,3 +134,52 @@ export const getMarked = () => {
     }
   };
 };
+
+/**
+ * Normalizes HTML for the visual WYSIWYG editor.
+ * Mandate: <div class="phishy"> (as well as text-blue and text-green divs)
+ * must ONLY exist in pure Markdown code. Inside the visual editor, they must ONLY be spans!
+ */
+export function normalizeHtmlForVisualEditor(html: string): string {
+  if (!html || (!html.includes('phishy') && !html.includes('text-blue') && !html.includes('text-green'))) {
+    return html;
+  }
+  try {
+    const doc = new DOMParser().parseFromString(`<body>${html}</body>`, 'text/html');
+    const divs = doc.body.querySelectorAll('div.phishy, div.text-blue, div.text-green');
+    divs.forEach((div) => {
+      const cls = div.classList.contains('phishy')
+        ? 'phishy'
+        : div.classList.contains('text-blue')
+        ? 'text-blue'
+        : 'text-green';
+
+      const paragraphs = Array.from(div.querySelectorAll(':scope > p'));
+      if (paragraphs.length > 0) {
+        paragraphs.forEach((p) => {
+          const span = doc.createElement('span');
+          span.className = cls;
+          while (p.firstChild) {
+            span.appendChild(p.firstChild);
+          }
+          p.appendChild(span);
+          div.parentNode?.insertBefore(p, div);
+        });
+        div.parentNode?.removeChild(div);
+      } else {
+        const p = doc.createElement('p');
+        const span = doc.createElement('span');
+        span.className = cls;
+        while (div.firstChild) {
+          span.appendChild(div.firstChild);
+        }
+        p.appendChild(span);
+        div.parentNode?.replaceChild(p, div);
+      }
+    });
+    return doc.body.innerHTML;
+  } catch (err) {
+    console.warn('normalizeHtmlForVisualEditor error:', err);
+    return html;
+  }
+}

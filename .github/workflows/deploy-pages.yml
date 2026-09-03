@@ -36,8 +36,16 @@ jobs:
       - name: Install dependencies
         run: npm install --legacy-peer-deps
 
+      - name: Setup Pages
+        uses: actions/configure-pages@v5
+
       - name: Build static site
         run: npm run build
+
+      - name: Prepare GitHub Pages fallbacks (.nojekyll & 404.html)
+        run: |
+          touch dist/.nojekyll
+          cp dist/index.html dist/404.html
 
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v3

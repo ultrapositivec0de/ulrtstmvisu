@@ -1,23 +1,24 @@
-const CACHE_NAME = 'steem-editor-pro-v4.7.8';
-const ASSETS_TO_CACHE = [
-  '/',
-  '/index.html',
-  '/manifest.json',
-  '/favicon.png',
-  '/icon-192.png',
-  '/icon-512.png',
-  '/apple-touch-icon.png',
-  '/icon.png',
-  '/icon.svg',
-  '/lite.html'
+const CACHE_NAME = 'steem-editor-pro-v4.7.9';
+const RELATIVE_ASSETS = [
+  './',
+  './index.html',
+  './manifest.json',
+  './favicon.png',
+  './icon-192.png',
+  './icon-512.png',
+  './apple-touch-icon.png',
+  './icon.png',
+  './icon.svg',
+  './lite.html'
 ];
 
-// On install, pre-cache core shell assets safely
+// On install, pre-cache core shell assets safely using relative resolution
 self.addEventListener('install', (event) => {
   event.waitUntil(
     caches.open(CACHE_NAME).then((cache) => {
+      const urlsToCache = RELATIVE_ASSETS.map((asset) => new URL(asset, self.location).href);
       return Promise.allSettled(
-        ASSETS_TO_CACHE.map((url) =>
+        urlsToCache.map((url) =>
           cache.add(url).catch((err) => console.warn('Failed to pre-cache asset:', url, err))
         )
       );
@@ -73,9 +74,12 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
+  // Dynamic base URL for this service worker
+  const swBasePath = new URL('./', self.location).pathname;
+
   // 2. Navigation / HTML Document requests: Network-First with Cache Fallback
   // This guarantees users always get the latest version when online, while preserving 100% offline access
-  if (event.request.mode === 'navigate' || url.pathname === '/' || url.pathname.endsWith('.html')) {
+  if (event.request.mode === 'navigate' || url.pathname === swBasePath || url.pathname === '/' || url.pathname.endsWith('.html')) {
     event.respondWith(
       fetch(event.request)
         .then((networkResponse) => {
@@ -88,15 +92,15 @@ self.addEventListener('fetch', (event) => {
         .catch(() => {
           // Offline fallback
           return caches.match(event.request).then((cached) => {
-            return cached || caches.match('/index.html');
+            return cached || caches.match(new URL('./index.html', self.location).href) || caches.match(new URL('./', self.location).href);
           });
         })
     );
     return;
   }
 
-  // 3. Vite content-hashed static assets (/assets/.*) -> Cache-First
-  const isHashedAsset = url.pathname.startsWith('/assets/');
+  // 3. Vite content-hashed static assets (assets/.*) -> Cache-First
+  const isHashedAsset = url.pathname.includes('/assets/');
   if (isHashedAsset) {
     event.respondWith(
       caches.match(event.request).then((cachedResponse) => {

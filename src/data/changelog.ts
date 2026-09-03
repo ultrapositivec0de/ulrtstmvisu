@@ -6,13 +6,14 @@ export interface ChangelogEntry {
 
 export const APP_CHANGELOG: ChangelogEntry[] = [
   {
-    version: "v4.7.8",
+    version: "v4.7.9",
     date: "2026-09-03",
     changes: [
-      "Форматування Markdown & WYSIWYG: Сувора нормалізація червоного кольору через <div class=\"phishy\"> у чистому Markdown та коректний інлайн-ввід <span class=\"phishy\"> у візуальному режимі.",
-      "PWA & Service Worker: Оновлено стратегію кешування на Network-First для HTML та Stale-While-Revalidate для статичних файлів з надійним офлайн-доступом.",
-      "Прозорість та авторство: Оновлено блок «Авторство та розробка» з чітким та справедливим розділенням ролей людини та ШІ.",
-      "Cross-Platform Release Sync: Синхронізація версії застосунку v4.7.8 на всіх рівнях."
+      "Автоматичне прокручування тексту та каретки над віджетом (toolbar) у ПК та нативному режимі Tauri (WebKitGTK/Linux).",
+      "Точний розрахунок положення курсора getExactCaretYInTextarea та динамічний bottom clearance у CodeEditor та WYSIWYG.",
+      "Вихід з кольорових блоків тексту (phishy/blue/green) та inline-тегів у WYSIWYG та Code редакторах при натисканні Enter.",
+      "PWA Service Worker: Оновлено кеш до версії v4.7.9 для гарантованого оновлення статики у браузерах.",
+      "Cross-Platform Release Sync: Синхронізація версії застосунку v4.7.9 на всіх рівнях (Tauri, Neutralino, Web)."
     ]
   },
   {

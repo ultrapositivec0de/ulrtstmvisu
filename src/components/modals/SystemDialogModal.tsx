@@ -39,6 +39,11 @@ export const SystemDialogModal: React.FC<SystemDialogModalProps> = ({
           {systemDialog.type === 'prompt' && (
             <input
               autoFocus
+              ref={(input) => {
+                if (input) {
+                  setTimeout(() => input.focus(), 10);
+                }
+              }}
               type={systemDialog.inputType || "text"}
               defaultValue={systemDialog.defaultValue}
               placeholder={systemDialog.placeholder}

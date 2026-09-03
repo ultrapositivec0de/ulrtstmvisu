@@ -1,4 +1,15 @@
 # Changelog
+## [2026-09-03] - Version 4.7.9 (ultrasteemeditor/4.7.9)
+### Added & Improved
+- **Release Updates**: Autoscroll Caret Clearance in Native & Desktop Modes, Phishy Block & Span Exit Fixes
+
+## [2026-09-03] - Version 4.7.9 (ultrasteemeditor/4.7.9)
+### Added & Improved
+- **Autoscroll & Caret Clearance in Native & Desktop Modes**: Resolved issue where text caret was obscured under the bottom widget/toolbar in Tauri (Linux WebKitGTK) and desktop modes. Added `getExactCaretYInTextarea` and dynamic editor bottom spacing clearance ensuring the active typing line remains clearly visible above docked and floating toolbars.
+- **Block & Tag Exit**: Clean breakout on Enter from `<div class="phishy|text-blue|text-green">` blocks and active inline formatting tags in both WYSIWYG and Code editors.
+- **Cross-Platform Sync**: Synchronized version 4.7.9 across Web, Tauri (`tauri.conf.json`, `Cargo.toml`), and Neutralino (`neutralino.config.json`).
+- **Service Worker Cache**: Updated cache bucket to `steem-editor-pro-v4.7.9`.
+
 ## [2026-09-03] - Version 4.7.8 (ultrasteemeditor/4.7.8)
 ### Added & Improved
 - **Release Updates**: Cross-platform release synchronization and system improvements.

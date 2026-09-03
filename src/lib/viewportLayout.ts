@@ -22,7 +22,8 @@ export function calculateEditorBottomReserved({
   if (isMobile) {
     return isKeyboardOpen ? keyboardOffset + dynamicWidgetHeight + 8 : dynamicWidgetHeight + 90;
   }
-  return widgetPos === 'bottom' ? dynamicWidgetHeight + 60 : 40;
+  // Desktop mode: toolbar widget bottom-4 (16px) + dynamicWidgetHeight (36-56px) + comfortable breathing clearance (40-60px)
+  return widgetPos === 'bottom' ? dynamicWidgetHeight + 76 : (widgetPos === 'floating' ? 56 : 32);
 }
 
 /**
@@ -46,6 +47,55 @@ export function calculateCaretScrollTop(
 ): number {
   const visibleHeight = calculateVisibleEditorHeight(containerHeight, options);
   return Math.max(0, caretY - visibleHeight / 2);
+}
+
+let mirrorDiv: HTMLDivElement | null = null;
+
+/**
+ * Calculates exact vertical position (in pixels) of the caret inside a textarea,
+ * accounting for word wrapping, fonts, and line heights without causing layout thrashing.
+ */
+export function getExactCaretYInTextarea(ta: HTMLTextAreaElement, pos?: number): number {
+  if (typeof document === 'undefined' || !ta) return 0;
+
+  const caretPos = typeof pos === 'number' ? pos : ta.selectionStart;
+
+  if (!mirrorDiv) {
+    mirrorDiv = document.createElement('div');
+    mirrorDiv.setAttribute('aria-hidden', 'true');
+    mirrorDiv.style.position = 'fixed';
+    mirrorDiv.style.visibility = 'hidden';
+    mirrorDiv.style.top = '-9999px';
+    mirrorDiv.style.left = '-9999px';
+    mirrorDiv.style.pointerEvents = 'none';
+    mirrorDiv.style.whiteSpace = 'pre-wrap';
+    mirrorDiv.style.wordWrap = 'break-word';
+    mirrorDiv.style.overflowWrap = 'break-word';
+    document.body.appendChild(mirrorDiv);
+  }
+
+  const style = window.getComputedStyle(ta);
+  mirrorDiv.style.font = style.font;
+  mirrorDiv.style.fontFamily = style.fontFamily;
+  mirrorDiv.style.fontSize = style.fontSize;
+  mirrorDiv.style.fontWeight = style.fontWeight;
+  mirrorDiv.style.lineHeight = style.lineHeight;
+  mirrorDiv.style.letterSpacing = style.letterSpacing;
+  mirrorDiv.style.paddingTop = style.paddingTop;
+  mirrorDiv.style.paddingLeft = style.paddingLeft;
+  mirrorDiv.style.paddingRight = style.paddingRight;
+  mirrorDiv.style.border = style.border;
+  mirrorDiv.style.boxSizing = style.boxSizing;
+  mirrorDiv.style.width = `${ta.clientWidth}px`;
+
+  mirrorDiv.textContent = ta.value.substring(0, caretPos);
+
+  const span = document.createElement('span');
+  span.textContent = '\u200B';
+  mirrorDiv.appendChild(span);
+
+  const caretY = span.offsetTop + (parseFloat(style.lineHeight) || 24);
+  return caretY;
 }
 
 export interface FloatingWidgetStyleOptions {

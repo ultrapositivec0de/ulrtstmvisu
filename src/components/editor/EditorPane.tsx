@@ -9,6 +9,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import { CodeEditor } from '../CodeEditor';
 import { MobileStatsBar } from './StatusBar';
 import { TamedWidget } from './TamedWidget';
+import { normalizeHtmlForVisualEditor } from '../../utils/markdownParser';
 
 export interface EditorPaneProps {
   // refs
@@ -131,9 +132,11 @@ export interface EditorPaneProps {
   handleLink: () => void;
   importTable: () => void;
   TOOLS_MAP: any;
+  scrollCaretIntoView?: (block?: ScrollLogicalPosition) => void;
 }
 
 export const EditorPane: React.FC<EditorPaneProps> = ({
+  scrollCaretIntoView,
   editorPaneRef,
   editorRef,
   wysiwygRef,
@@ -248,6 +251,25 @@ export const EditorPane: React.FC<EditorPaneProps> = ({
   importTable,
   TOOLS_MAP
 }) => {
+  const getEditorBottomSpacingClass = () => {
+    if (isKeyboardOpen) {
+      return "pb-44 mb-2 lg:pb-48 lg:mb-4";
+    }
+    if (widgetPos === 'bottom') {
+      // In both fullscreen and normal mode on desktop, reserve space so the editor stops safely above TamedWidget
+      return "pb-44 mb-[5.5rem] lg:pb-48 lg:mb-28";
+    }
+    if (widgetPos === 'floating') {
+      return isEditorFullScreen || isFullScreen
+        ? "pb-44 mb-[5rem] lg:pb-48 lg:mb-16"
+        : "pb-44 mb-[5rem] lg:pb-36 lg:mb-16";
+    }
+    // widgetPos === 'hidden'
+    return isEditorFullScreen || isFullScreen
+      ? "pb-44 mb-2 lg:pb-48 lg:mb-4"
+      : "pb-44 mb-[5rem] lg:pb-36 lg:mb-4";
+  };
+
   return (
     <div 
       ref={editorPaneRef}
@@ -696,6 +718,10 @@ export const EditorPane: React.FC<EditorPaneProps> = ({
           id="main-editor"
           ref={editorRef}
           onDemandSyncEnabled={onDemandSyncEnabled}
+          widgetPos={widgetPos}
+          isKeyboardOpen={isKeyboardOpen}
+          keyboardOffset={keyboardOffset}
+          toolbarIconSize={toolbarIconSize}
           onChange={() => {
             saveCursorPosition();
           }}
@@ -721,11 +747,7 @@ export const EditorPane: React.FC<EditorPaneProps> = ({
             "flex-1 w-full bg-transparent text-base outline-none resize-none custom-scrollbar transition-all duration-700 editor-font overscroll-contain",
             (visualStyle === 'neon' && neonTextColored) ? "text-cyan-400 font-normal" : "text-slate-300",
             beautifyEnabled ? "px-4 lg:px-8 pt-4 lg:pt-6 max-w-[clamp(40rem,60vw,80rem)] mx-auto selection:bg-[rgb(var(--accent-color)/0.3)]" : "px-3 pt-3 lg:px-6 lg:pt-6",
-            isKeyboardOpen 
-              ? "pb-44 mb-2 lg:pb-48 lg:mb-4" 
-              : (isEditorFullScreen || isFullScreen
-                  ? "pb-44 mb-2 lg:pb-48 lg:mb-4"
-                  : (widgetPos === 'bottom' ? "pb-44 mb-[5rem] lg:pb-48 lg:mb-20" : "pb-44 mb-[5rem] lg:pb-36 lg:mb-4"))
+            getEditorBottomSpacingClass()
           )}
           placeholder={`${t('placeholder')}\n\n\n\n\nОМ АХ ХУМ СО ХА\n♡`}
         />
@@ -785,7 +807,7 @@ export const EditorPane: React.FC<EditorPaneProps> = ({
             }
             
             if (finalHtml) {
-              finalHtml = finalHtml.trim();
+              finalHtml = normalizeHtmlForVisualEditor(finalHtml.trim());
               if (finalHtml.startsWith('<p>') && finalHtml.endsWith('</p>') && (finalHtml.match(/<p>/g) || []).length === 1) {
                 finalHtml = finalHtml.substring(3, finalHtml.length - 4);
               }
@@ -857,6 +879,11 @@ export const EditorPane: React.FC<EditorPaneProps> = ({
 
             // Use the unified sync function from useWysiwygSync hook
             updateContentFromWysiwyg(false);
+            if (scrollCaretIntoView) {
+              requestAnimationFrame(() => {
+                scrollCaretIntoView('nearest');
+              });
+            }
           }}
           onFocus={() => {
             setIsEditorFocused(true);
@@ -879,6 +906,11 @@ export const EditorPane: React.FC<EditorPaneProps> = ({
           onKeyUp={() => {
             updateWysiwygEmptyStatus(wysiwygRef.current);
             saveVisualSelection();
+            if (scrollCaretIntoView) {
+              requestAnimationFrame(() => {
+                scrollCaretIntoView('nearest');
+              });
+            }
           }}
           onClick={(e) => {
             const trg = e.target as HTMLElement;
@@ -910,11 +942,7 @@ export const EditorPane: React.FC<EditorPaneProps> = ({
             "relative flex-1 w-full bg-transparent text-base outline-none overflow-y-auto custom-scrollbar transition-colors duration-700 editor-font prose prose-invert prose-cyan max-w-none wysiwyg-editor break-words overscroll-contain",
             (visualStyle === 'neon' && neonTextColored) ? "text-cyan-400 font-normal" : "text-slate-300",
             beautifyEnabled ? "px-4 lg:px-8 pt-4 lg:pt-6 max-w-4xl mx-auto selection:bg-[rgb(var(--accent-color)/0.3)]" : "px-4 pt-4 lg:px-6 lg:pt-6",
-            isKeyboardOpen 
-              ? "pb-44 mb-2 lg:pb-48 lg:mb-4" 
-              : (isEditorFullScreen || isFullScreen
-                  ? "pb-44 mb-2 lg:pb-48 lg:mb-4"
-                  : (widgetPos === 'bottom' ? "pb-44 mb-[5rem] lg:pb-48 lg:mb-20" : "pb-44 mb-[5rem] lg:pb-36 lg:mb-4"))
+            getEditorBottomSpacingClass()
           )}
           data-is-empty={useEditorStore.getState().content.trim() === '' ? 'true' : undefined}
           data-placeholder-title={t('visualTitlePlaceholder')}

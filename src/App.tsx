@@ -1393,6 +1393,7 @@ function App() {
                 handleLink={handleLink}
                 importTable={importTable}
                 TOOLS_MAP={TOOLS_MAP}
+                scrollCaretIntoView={scrollCaretIntoView}
               />
 
               {/* Preview Pane */}

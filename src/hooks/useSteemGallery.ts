@@ -587,12 +587,15 @@ export function useSteemGallery(config: SteemGalleryConfig) {
         );
         if (!pass) return;
         try {
+          config.setPubLog({ msg: '🔑 Перевірка PIN-коду...', type: 'loading' });
           await SecurityService.unlock(pass);
-          config.initVault();
+          await config.initVault();
           unlocked = true;
+          config.setPubLog({ msg: '', type: null });
         } catch (e: any) {
           pinErrorMsg = e.message || 'Incorrect PIN';
           config.notify(`❌ ${pinErrorMsg}`, 'error');
+          config.setPubLog({ msg: `❌ ${pinErrorMsg}`, type: 'error' });
         }
       }
     } else if (uploadAuthType === 'KEYCHAIN') {
@@ -634,10 +637,26 @@ export function useSteemGallery(config: SteemGalleryConfig) {
       const formData = new FormData();
       formData.append("file", file);
       const uploadUrl = `https://steemitimages.com/${activeUser}/${signature}`;
-      const response = await fetch(uploadUrl, { method: "POST", body: formData });
       
-      if (!response.ok) throw new Error(config.t('serverError') + response.status);
-      const data = await response.json();
+      const response = await fetch(uploadUrl, { method: "POST", body: formData });
+      if (!response.ok) {
+        let errText = '';
+        try {
+          errText = await response.text();
+        } catch {
+          errText = '';
+        }
+        throw new Error((config.t('serverError') || 'Server Error: ') + response.status + (errText ? ` (${errText.substring(0, 100)})` : ''));
+      }
+      
+      let data: any;
+      try {
+        data = await response.json();
+      } catch {
+        const rawText = await response.text();
+        throw new Error(`Invalid JSON response: ${rawText.substring(0, 100)}`);
+      }
+      
       const finalUrl = data.url || data.link || data.data?.url;
       
       if (finalUrl) {
@@ -655,8 +674,17 @@ export function useSteemGallery(config: SteemGalleryConfig) {
   }, [imageUploadAccount, config]);
 
   const handleFileUpload = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (isUploading) return;
-    const rawFiles = e.target.files; if (!rawFiles || rawFiles.length === 0) return;
+    const inputEl = e.target;
+    if (isUploading) {
+      if (inputEl) inputEl.value = '';
+      return;
+    }
+    
+    const rawFiles = inputEl?.files;
+    if (!rawFiles || rawFiles.length === 0) {
+      if (inputEl) inputEl.value = '';
+      return;
+    }
     const files = Array.from(rawFiles);
     
     const hasKeychain = typeof window !== 'undefined' && !!(window as any).steem_keychain;
@@ -672,6 +700,7 @@ export function useSteemGallery(config: SteemGalleryConfig) {
     }
     
     if (!activeUser) {
+      if (inputEl) inputEl.value = '';
       if (uploadAuthType === 'VAULT') {
         config.notify(config.t('needVaultAccount'), 'error');
         config.setActiveModal('keys');
@@ -694,18 +723,25 @@ export function useSteemGallery(config: SteemGalleryConfig) {
           undefined,
           'password'
         );
-        if (!pass) return;
+        if (!pass) {
+          if (inputEl) inputEl.value = '';
+          return;
+        }
         try {
+          config.setPubLog({ msg: '🔑 Перевірка PIN-коду...', type: 'loading' });
           await SecurityService.unlock(pass);
-          config.initVault();
+          await config.initVault();
           unlocked = true;
+          config.setPubLog({ msg: '', type: null });
         } catch (e: any) {
           pinErrorMsg = e.message || 'Incorrect PIN';
           config.notify(`❌ ${pinErrorMsg}`, 'error');
+          config.setPubLog({ msg: `❌ ${pinErrorMsg}`, type: 'error' });
         }
       }
     } else if (uploadAuthType === 'KEYCHAIN') {
       if (!(window as any).steem_keychain) {
+        if (inputEl) inputEl.value = '';
         config.notify(config.t('noKeychain'), 'error');
         return;
       }
@@ -716,6 +752,20 @@ export function useSteemGallery(config: SteemGalleryConfig) {
     
     const uploadVaultWithProgress = (file: File, signature: string, user: string, index: number): Promise<any> => {
       return new Promise((resolve, reject) => {
+        let isSettled = false;
+        const safeReject = (err: Error) => {
+          if (!isSettled) {
+            isSettled = true;
+            reject(err);
+          }
+        };
+        const safeResolve = (val: any) => {
+          if (!isSettled) {
+            isSettled = true;
+            resolve(val);
+          }
+        };
+
         const formData = new FormData();
         formData.append("file", file);
         const uploadUrl = `https://steemitimages.com/${user}/${signature}`;
@@ -733,103 +783,153 @@ export function useSteemGallery(config: SteemGalleryConfig) {
             });
           }
         };
-        xhr.onload = () => (xhr.status >= 200 && xhr.status < 300) ? resolve(JSON.parse(xhr.responseText)) : reject(new Error(config.t('serverError') + xhr.status));
-        xhr.onerror = () => reject(new Error("Network error"));
-        xhr.timeout = 300000;
+        xhr.onload = () => {
+          if (xhr.status >= 200 && xhr.status < 300) {
+            try {
+              const parsed = JSON.parse(xhr.responseText);
+              safeResolve(parsed);
+            } catch (err: any) {
+              safeReject(new Error(`Invalid JSON response: ${xhr.responseText ? xhr.responseText.substring(0, 100) : 'empty'}`));
+            }
+          } else {
+            let errorDetail: string;
+            try {
+              const errParsed = JSON.parse(xhr.responseText);
+              errorDetail = errParsed.message || errParsed.error || '';
+            } catch {
+              errorDetail = xhr.responseText ? xhr.responseText.substring(0, 100) : '';
+            }
+            safeReject(new Error(`${config.t('serverError') || 'Server Error: '}${xhr.status}${errorDetail ? ` (${errorDetail})` : ''}`));
+          }
+        };
+        xhr.onerror = () => safeReject(new Error("Network connection error"));
+        xhr.onabort = () => safeReject(new Error("Upload aborted"));
+        xhr.ontimeout = () => safeReject(new Error("Upload timed out (60s)"));
+        xhr.timeout = 60000;
         xhr.send(formData);
       });
     };
 
-    for (let i = 0; i < files.length; i++) {
-      const originalFile = files[i];
-      const sanitizedName = sanitizeFilename(originalFile.name);
-      const file = new File([originalFile], sanitizedName, { type: originalFile.type });
-      
-      if (i > 0) await new Promise(resolve => setTimeout(resolve, 500));
+    try {
+      for (let i = 0; i < files.length; i++) {
+        const originalFile = files[i];
+        const sanitizedName = sanitizeFilename(originalFile.name);
+        const file = new File([originalFile], sanitizedName, { type: originalFile.type });
+        
+        if (i > 0) await new Promise(resolve => setTimeout(resolve, 400));
 
-      try {
-        const exifTable = await getExifTableFromBlob(originalFile);
+        try {
+          const exifTable = await getExifTableFromBlob(originalFile);
 
-        let signature = '';
-        if (uploadAuthType === 'VAULT') {
-          const arrayBuffer = await file.arrayBuffer();
-          const fileBuffer = Buffer.from(arrayBuffer);
-          const prefix = Buffer.from("ImageSigningChallenge", 'utf8');
-          const dataToSign = Buffer.concat([prefix, fileBuffer]);
-          
-          let attempt = 0;
-          let uploaded = false;
-          while (attempt < 3 && !uploaded) {
-            attempt++;
-            try {
-              config.setPubLog({ 
-                msg: `[${i + 1}/${files.length}] ` + config.t('signingImage').replace('{name}', file.name) + (attempt > 1 ? ` (спроба ${attempt})` : ''), 
-                type: 'loading' 
-              });
-              signature = await SecurityService.signBuffer(dataToSign, activeUser);
-              const data = await uploadVaultWithProgress(file, signature, activeUser, i);
-              const url = data.url || data.link || data.data?.url;
-              if (url) {
-                setImages(prev => [
-                  ...prev.slice(0, i),
-                  { url, name: file.name, selected: false, exif: exifTable },
-                  ...prev.slice(i)
-                ]);
-                setSourceInput(prev => url + "\n" + prev);
-                successCount++;
-                uploaded = true;
-                if (i === 0) {
-                  insertImage(url, file.name, 'plain');
+          let signature = '';
+          if (uploadAuthType === 'VAULT') {
+            const arrayBuffer = await file.arrayBuffer();
+            const fileBuffer = Buffer.from(arrayBuffer);
+            const prefix = Buffer.from("ImageSigningChallenge", 'utf8');
+            const dataToSign = Buffer.concat([prefix, fileBuffer]);
+            
+            let attempt = 0;
+            let uploaded = false;
+            let lastErr: any = null;
+            while (attempt < 3 && !uploaded) {
+              attempt++;
+              try {
+                config.setPubLog({ 
+                  msg: `[${i + 1}/${files.length}] ` + config.t('signingImage').replace('{name}', file.name) + (attempt > 1 ? ` (спроба ${attempt}/3)` : ''), 
+                  type: 'loading' 
+                });
+                signature = await SecurityService.signBuffer(dataToSign, activeUser);
+                const data = await uploadVaultWithProgress(file, signature, activeUser, i);
+                const url = data.url || data.link || data.data?.url;
+                if (url) {
+                  setImages(prev => [
+                    ...prev.slice(0, i),
+                    { url, name: file.name, selected: false, exif: exifTable },
+                    ...prev.slice(i)
+                  ]);
+                  setSourceInput(prev => url + "\n" + prev);
+                  successCount++;
+                  uploaded = true;
+                  if (i === 0) {
+                    insertImage(url, file.name, 'plain');
+                  }
+                } else {
+                  throw new Error(data.message || data.error || 'No URL returned from image host');
                 }
+              } catch (err: any) {
+                lastErr = err;
+                console.warn(`Upload attempt ${attempt} failed for ${file.name}:`, err);
+                if (attempt >= 3) throw lastErr;
+                config.setPubLog({
+                  msg: `⚠️ Спроба ${attempt} не вдалася (${err.message || 'помилка'}). Повтор через ${attempt * 1.5}с...`,
+                  type: 'loading'
+                });
+                await new Promise(r => setTimeout(r, 1500 * attempt));
               }
-            } catch (err) {
-              if (attempt >= 3) throw err;
-              await new Promise(r => setTimeout(r, 1500 * attempt));
             }
-          }
-        } else {
-          config.setPubLog({ 
-            msg: `[${i + 1}/${files.length}] ` + config.t('uploadProgress').replace('{current}', (i + 1).toString()).replace('{total}', files.length.toString()).replace('{name}', file.name), 
-            type: 'loading' 
-          });
+          } else {
+            config.setPubLog({ 
+              msg: `[${i + 1}/${files.length}] ` + config.t('uploadProgress').replace('{current}', (i + 1).toString()).replace('{total}', files.length.toString()).replace('{name}', file.name), 
+              type: 'loading' 
+            });
 
-          signature = await SecurityService.signImageChallengeWithKeychain(file, activeUser);
-          
-          const formData = new FormData();
-          formData.append("file", file);
-          const resp = await fetch(`https://steemitimages.com/${activeUser}/${signature}`, { method: "POST", body: formData });
-          if (!resp.ok) throw new Error(config.t('serverError') + resp.status);
-          const data = await resp.json();
-          const url = data.url || data.link || data.data?.url;
-          if (url) {
-            setImages(prev => [
-              ...prev.slice(0, i),
-              { url, name: file.name, selected: false, exif: exifTable },
-              ...prev.slice(i)
-            ]);
-            setSourceInput(prev => url + "\n" + prev);
-            successCount++;
-            if (i === 0) {
-              insertImage(url, file.name, 'plain');
+            signature = await SecurityService.signImageChallengeWithKeychain(file, activeUser);
+            
+            const formData = new FormData();
+            formData.append("file", file);
+            const resp = await fetch(`https://steemitimages.com/${activeUser}/${signature}`, { method: "POST", body: formData });
+            if (!resp.ok) {
+              let errText = '';
+              try {
+                errText = await resp.text();
+              } catch {
+                errText = '';
+              }
+              throw new Error(`${config.t('serverError') || 'Server Error: '}${resp.status}${errText ? ` (${errText.substring(0, 100)})` : ''}`);
+            }
+            let data: any;
+            try {
+              data = await resp.json();
+            } catch {
+              const rawText = await resp.text();
+              throw new Error(`Invalid JSON response: ${rawText.substring(0, 100)}`);
+            }
+            const url = data.url || data.link || data.data?.url;
+            if (url) {
+              setImages(prev => [
+                ...prev.slice(0, i),
+                { url, name: file.name, selected: false, exif: exifTable },
+                ...prev.slice(i)
+              ]);
+              setSourceInput(prev => url + "\n" + prev);
+              successCount++;
+              if (i === 0) {
+                insertImage(url, file.name, 'plain');
+              }
+            } else {
+              throw new Error(data.message || data.error || 'No URL returned from image host');
             }
           }
+        } catch (err: any) {
+          console.error(`Error uploading file ${file.name}:`, err);
+          config.setPubLog({ msg: `❌ ${config.t('fileError') || 'File error'} ${i + 1}: ${file.name} - ${err.message}`, type: 'error' });
+          await new Promise(resolve => setTimeout(resolve, 2500));
         }
-      } catch (err: any) {
-        console.error(err);
-        config.setPubLog({ msg: `❌ ${config.t('fileError')} ${i + 1}: ${file.name} - ${err.message}`, type: 'error' });
-        await new Promise(resolve => setTimeout(resolve, 3000));
       }
-    }
-    
-    setIsUploading(false);
-    if (successCount > 0) {
-      config.setPubLog({ 
-        msg: config.t('uploadComplete').replace('{count}', successCount.toString()).replace('{total}', files.length.toString()), 
-        type: 'success' 
-      });
-      setTimeout(() => config.setPubLog({ msg: '', type: null }), 3000);
-      if (files.length > 1) {
-        config.setIsMiniGalleryOpen(true);
+    } finally {
+      if (inputEl) inputEl.value = '';
+      setIsUploading(false);
+      if (successCount > 0) {
+        config.setPubLog({ 
+          msg: config.t('uploadComplete').replace('{count}', successCount.toString()).replace('{total}', files.length.toString()), 
+          type: 'success' 
+        });
+        setTimeout(() => config.setPubLog({ msg: '', type: null }), 3000);
+        if (files.length > 1) {
+          config.setIsMiniGalleryOpen(true);
+        }
+      } else {
+        setTimeout(() => config.setPubLog({ msg: '', type: null }), 3000);
       }
     }
   }, [imageUploadAccount, config, isUploading, getExifTableFromBlob, insertImage]);

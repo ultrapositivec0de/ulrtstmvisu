@@ -683,12 +683,33 @@ export function useWysiwygSync(options: UseWysiwygSyncOptions) {
       tempDiv.innerHTML = rawHtml;
 
       tempDiv.querySelectorAll('div.phishy, div.text-blue, div.text-green').forEach((div) => {
-        div.querySelectorAll(':scope > p').forEach((p) => {
-          while (p.firstChild) {
-            div.insertBefore(p.firstChild, p);
+        const cls = div.classList.contains('phishy')
+          ? 'phishy'
+          : div.classList.contains('text-blue')
+          ? 'text-blue'
+          : 'text-green';
+        const paragraphs = Array.from(div.querySelectorAll(':scope > p'));
+        if (paragraphs.length > 0) {
+          paragraphs.forEach((p) => {
+            const span = document.createElement('span');
+            span.className = cls;
+            while (p.firstChild) {
+              span.appendChild(p.firstChild);
+            }
+            p.appendChild(span);
+            div.parentNode?.insertBefore(p, div);
+          });
+          div.parentNode?.removeChild(div);
+        } else {
+          const p = document.createElement('p');
+          const span = document.createElement('span');
+          span.className = cls;
+          while (div.firstChild) {
+            span.appendChild(div.firstChild);
           }
-          div.removeChild(p);
-        });
+          p.appendChild(span);
+          div.parentNode?.replaceChild(p, div);
+        }
       });
 
       tempDiv.querySelectorAll('li > p:only-child').forEach((p) => {

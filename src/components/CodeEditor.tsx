@@ -1,11 +1,16 @@
 import React, { forwardRef, useEffect, useRef } from 'react';
 import { useEditorStore, getRowColFromOffset } from '../store';
+import { calculateVisibleEditorHeight, getExactCaretYInTextarea } from '../lib/viewportLayout';
 
 interface CodeEditorProps extends React.TextareaHTMLAttributes<HTMLTextAreaElement> {
   selectionStart?: number | null;
   selectionEnd?: number | null;
   onScroll?: (e: React.UIEvent<HTMLTextAreaElement>) => void;
   onDemandSyncEnabled?: boolean;
+  widgetPos?: string;
+  isKeyboardOpen?: boolean;
+  keyboardOffset?: number | null;
+  toolbarIconSize?: number;
 }
 
 export const CodeEditor = forwardRef<HTMLTextAreaElement, CodeEditorProps>((props, ref) => {
@@ -137,7 +142,34 @@ export const CodeEditor = forwardRef<HTMLTextAreaElement, CodeEditorProps>((prop
     };
   }, []);
 
+  const ensureCaretVisibleInView = (target: HTMLTextAreaElement) => {
+    if (!target) return;
+    const isMobile = window.innerWidth < 1024;
+    const visibleHeight = calculateVisibleEditorHeight(target.clientHeight, {
+      isMobile,
+      isKeyboardOpen: !!props.isKeyboardOpen,
+      keyboardOffset: props.keyboardOffset || 0,
+      widgetPos: props.widgetPos || 'bottom',
+      toolbarIconSize: props.toolbarIconSize || 18,
+    });
+
+    const caretY = getExactCaretYInTextarea(target, target.selectionStart);
+    const caretRelativeY = caretY - target.scrollTop;
+
+    if (caretRelativeY > visibleHeight - 20) {
+      target.scrollTop = caretY - visibleHeight + 35;
+    } else if (caretRelativeY < 15) {
+      target.scrollTop = Math.max(0, caretY - 25);
+    }
+  };
+
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    requestAnimationFrame(() => {
+      if (localRef.current) {
+        ensureCaretVisibleInView(localRef.current);
+      }
+    });
+
     if (props.onKeyDown) {
       props.onKeyDown(e);
       if (e.defaultPrevented) return;
@@ -149,43 +181,86 @@ export const CodeEditor = forwardRef<HTMLTextAreaElement, CodeEditorProps>((prop
       const start = target.selectionStart;
       const end = target.selectionEnd;
       
-      if (start === end && start >= 1) {
-        // Find if we are on an empty line (i.e. prev char is newline, ignoring spaces)
-        let isPrevLineEmpty = false;
-        let pos = start - 1;
-        while (pos >= 0 && (val[pos] === ' ' || val[pos] === '\t')) pos--;
-        if (pos >= 0 && val[pos] === '\n') {
-          let pos2 = pos - 1;
-          while (pos2 >= 0 && (val[pos2] === ' ' || val[pos2] === '\t')) pos2--;
-          if (pos2 >= 0 && val[pos2] === '\n') {
-            isPrevLineEmpty = true;
-          }
-        }
-        
-        if (isPrevLineEmpty) {
-          const lastOpen = val.lastIndexOf('<div class="phishy">', start);
+      if (start === end) {
+        // Find if cursor is inside an unclosed <div class="(phishy|text-blue|text-green)"> block
+        const phishyOpen = val.lastIndexOf('<div class="phishy">', start);
+        const blueOpen = val.lastIndexOf('<div class="text-blue">', start);
+        const greenOpen = val.lastIndexOf('<div class="text-green">', start);
+        const lastOpen = Math.max(phishyOpen, blueOpen, greenOpen);
+
+        if (lastOpen !== -1) {
           const lastClose = val.lastIndexOf('</div>', start);
-          if (lastOpen !== -1 && (lastClose === -1 || lastClose < lastOpen)) {
+          if (lastClose === -1 || lastClose < lastOpen) {
             const nextClose = val.indexOf('</div>', start);
-            const nextOpen = val.indexOf('<div class="phishy">', start);
-            
+            const nextOpenPhishy = val.indexOf('<div class="phishy">', start);
+            const nextOpenBlue = val.indexOf('<div class="text-blue">', start);
+            const nextOpenGreen = val.indexOf('<div class="text-green">', start);
+            const validNextOpens = [nextOpenPhishy, nextOpenBlue, nextOpenGreen].filter((idx) => idx !== -1);
+            const nextOpen = validNextOpens.length > 0 ? Math.min(...validNextOpens) : -1;
+
             if (nextClose !== -1 && (nextOpen === -1 || nextClose < nextOpen)) {
-              e.preventDefault();
-              
-              const textAfterCursorBeforeClose = val.slice(start, nextClose).trim();
-              let newVal = val.slice(0, pos) + '\n</div>\n\n';
-              const newStart = newVal.length;
-              
-              if (textAfterCursorBeforeClose.length > 0) {
-                newVal += `<div class="phishy">\n\n` + textAfterCursorBeforeClose + '\n</div>' + val.slice(nextClose + '</div>'.length);
-              } else {
-                newVal += val.slice(nextClose + '</div>'.length);
+              // Check if current line up to cursor is empty (only whitespace since last newline)
+              let lineStart = start - 1;
+              while (lineStart >= 0 && val[lineStart] !== '\n') {
+                lineStart--;
               }
-              
-              target.value = newVal;
-              target.setSelectionRange(newStart, newStart);
-              flushChanges(target);
-              return;
+              const charsBeforeCursorOnLine = val.slice(lineStart + 1, start);
+              const isLineEmptyBeforeCursor = /^[ \t\r]*$/.test(charsBeforeCursorOnLine);
+
+              // Check if line after cursor up to next newline is also empty (or reaches </div>)
+              let lineEnd = start;
+              while (lineEnd < val.length && val[lineEnd] !== '\n') {
+                lineEnd++;
+              }
+              const charsAfterCursorOnLine = val.slice(start, lineEnd);
+              const isLineEmptyAfterCursor =
+                /^[ \t\r]*$/.test(charsAfterCursorOnLine) || charsAfterCursorOnLine.trim().startsWith('</div>');
+
+              if (isLineEmptyBeforeCursor && isLineEmptyAfterCursor) {
+                // Determine opening tag
+                const openMatch = val.slice(lastOpen).match(/^<div class="([^"]+)">/);
+                const tagType = openMatch ? openMatch[0] : '<div class="phishy">';
+
+                // Check if there is content before current line in the div
+                const contentBeforeLine = val
+                  .slice(lastOpen + tagType.length, lineStart >= 0 ? lineStart : start)
+                  .replace(/[\u200B\r\n\s]/g, '');
+
+                // Text after cursor before closing tag
+                const textAfterCursorBeforeClose = val.slice(lineEnd, nextClose).trim();
+
+                if (contentBeforeLine.length > 0) {
+                  // Exit the div!
+                  e.preventDefault();
+
+                  const cleanBefore = val.slice(0, lineStart >= 0 ? lineStart : start).replace(/[\r\n\s]+$/, '');
+                  let newVal = cleanBefore + '\n</div>\n\n';
+                  const newStart = newVal.length;
+
+                  if (textAfterCursorBeforeClose.length > 0) {
+                    newVal += `${tagType}\n\n${textAfterCursorBeforeClose}\n</div>\n\n` + val.slice(nextClose + '</div>'.length).replace(/^[\r\n]+/, '');
+                  } else {
+                    newVal += val.slice(nextClose + '</div>'.length).replace(/^[\r\n]+/, '');
+                  }
+
+                  target.value = newVal;
+                  target.setSelectionRange(newStart, newStart);
+                  flushChanges(target);
+                  return;
+                } else if (textAfterCursorBeforeClose.length === 0) {
+                  // The div is completely empty: exit and remove empty div
+                  e.preventDefault();
+                  const cleanBefore = val.slice(0, lastOpen).replace(/[\r\n\s]+$/, '');
+                  const cleanAfter = val.slice(nextClose + '</div>'.length).replace(/^[\r\n]+/, '');
+                  const newVal = (cleanBefore ? cleanBefore + '\n\n' : '') + cleanAfter;
+                  const newStart = (cleanBefore ? cleanBefore + '\n\n' : '').length;
+
+                  target.value = newVal;
+                  target.setSelectionRange(newStart, newStart);
+                  flushChanges(target);
+                  return;
+                }
+              }
             }
           }
         }
@@ -233,6 +308,10 @@ export const CodeEditor = forwardRef<HTMLTextAreaElement, CodeEditorProps>((prop
     if (props.onChange) {
       props.onChange(e);
     }
+
+    requestAnimationFrame(() => {
+      ensureCaretVisibleInView(e.target);
+    });
   };
 
   const updateCursorAndSelection = (target: HTMLTextAreaElement) => {
@@ -278,6 +357,9 @@ export const CodeEditor = forwardRef<HTMLTextAreaElement, CodeEditorProps>((prop
     if (props.onKeyUp) {
       props.onKeyUp(e);
     }
+    requestAnimationFrame(() => {
+      ensureCaretVisibleInView(e.currentTarget);
+    });
   };
 
   const handleClick = (e: React.MouseEvent<HTMLTextAreaElement>) => {
@@ -294,8 +376,19 @@ export const CodeEditor = forwardRef<HTMLTextAreaElement, CodeEditorProps>((prop
     }
   };
 
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  const { onChange, onSelect, onKeyUp, onClick, onBlur, onDemandSyncEnabled, ...rest } = props;
+  const {
+    onChange,
+    onSelect,
+    onKeyUp,
+    onClick,
+    onBlur,
+    onDemandSyncEnabled,
+    widgetPos,
+    isKeyboardOpen,
+    keyboardOffset,
+    toolbarIconSize,
+    ...rest
+  } = props;
 
   return (
     <textarea
