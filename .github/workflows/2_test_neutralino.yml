@@ -1,0 +1,79 @@
+name: NeutralinoJS Build
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-26.04
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Wait for binaries
+        run: |
+          cd neutralino-build
+          npx --yes @neutralinojs/neu update
+
+      - name: Build Neutralino App
+        run: npm run build:neu
+
+      - name: Get package version
+        id: package-version
+        shell: bash
+        run: |
+          VERSION=$(node -p "require('./package.json').version")
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+
+      - name: Prepare Neutralino Release Artifact
+        shell: bash
+        run: |
+          VERSION="${{ steps.package-version.outputs.version }}"
+          DIST_DIR="neutralino-build/dist"
+
+          echo "🔍 Перевірка вмісту каталогу dist:"
+          if [ -d "$DIST_DIR" ]; then
+            ls -R "$DIST_DIR"
+          else
+            echo "❌ Каталог $DIST_DIR не існує! Перевірте попередній крок збірки (neu build)."
+            exit 1
+          fi
+
+          # Шукаємо будь-який zip файл усередині neutralino-build/dist
+          ZIP_FILE=$(find "$DIST_DIR" -type f -name "*.zip" | head -n 1)
+
+          if [ -n "$ZIP_FILE" ]; then
+            TARGET_FILE="$DIST_DIR/ultra-steem-editor-v${VERSION}-neutralino.zip"
+            echo "📦 Знайдено файл: $ZIP_FILE"
+            echo "➡️ Перейменовуємо на: $TARGET_FILE"
+            mv -f "$ZIP_FILE" "$TARGET_FILE"
+            ls -la "$TARGET_FILE"
+          else
+            echo "❌ Жодного .zip файлу не знайдено в $DIST_DIR!"
+            echo "Ось що згенерувала збірка:"
+            find "$DIST_DIR" -maxdepth 3
+            exit 1
+          fi
+
+      - name: Upload Neutralino Binaries to GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: "v${{ steps.package-version.outputs.version }}"
+          name: "Release v${{ steps.package-version.outputs.version }}"
+          draft: true
+          files: |
+            neutralino-build/dist/ultra-steem-editor-v${{ steps.package-version.outputs.version }}-neutralino.zip
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
