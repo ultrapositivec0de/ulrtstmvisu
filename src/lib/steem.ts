@@ -75,6 +75,41 @@ export const getClient = (nodeOverride?: string) => {
 };
 
 /**
+ * Перевірка наявності або оновлення (редагування) допису/коментаря в блокчейні Steem за автором та permlink.
+ * Якщо передано expectedBodySnippet, перевіряється, чи містить тіло допису на блокчейні нові дані.
+ */
+export const verifyPostOnChain = async (
+  author: string, 
+  permlink: string, 
+  retries = 3, 
+  delayMs = 1200,
+  expectedBodySnippet?: string | null
+): Promise<boolean> => {
+  if (!author || !permlink) return false;
+  for (let i = 0; i < retries; i++) {
+    try {
+      const res = await callWithFallback('condenser_api.get_content', [author, permlink]);
+      if (res && (res.id > 0 || (res.author === author && res.permlink === permlink && res.body && res.body.trim().length > 0))) {
+        if (expectedBodySnippet && expectedBodySnippet.trim().length > 0) {
+          const cleanSnippet = expectedBodySnippet.trim().substring(0, 80);
+          if (res.body && res.body.includes(cleanSnippet)) {
+            return true;
+          }
+        } else {
+          return true;
+        }
+      }
+    } catch (e) {
+      console.warn(`[verifyPostOnChain] Attempt ${i + 1} failed:`, e);
+    }
+    if (i < retries - 1) {
+      await new Promise(resolve => setTimeout(resolve, delayMs));
+    }
+  }
+  return false;
+};
+
+/**
  * Broadcasts operations with an explicit timeout and automatic fallback
  * to alternative RPC nodes if the active node hangs or throws network errors.
  */
@@ -84,6 +119,12 @@ export const broadcastWithFallback = async (ops: any[], privateKey: any, timeout
     current,
     ...STEEM_NODES.filter(n => n !== current)
   ];
+
+  // Extract author, permlink, and body snippet if payload contains a comment operation
+  const commentOp = ops.find(op => Array.isArray(op) && op[0] === 'comment');
+  const author = commentOp ? commentOp[1]?.author : null;
+  const permlink = commentOp ? commentOp[1]?.permlink : null;
+  const bodySnippet = commentOp ? commentOp[1]?.body : null;
 
   let lastError: any = null;
 
@@ -107,6 +148,18 @@ export const broadcastWithFallback = async (ops: any[], privateKey: any, timeout
     } catch (err: any) {
       lastError = err;
       const msg = err?.message || '';
+
+      // Check if post was actually created or edited on blockchain despite node error or timeout
+      if (author && permlink) {
+        console.warn(`[Steem Broadcast] Node ${node} broadcast warning/error: "${msg}". Verifying on blockchain...`);
+        const verified = await verifyPostOnChain(author, permlink, 2, 1000, bodySnippet);
+        if (verified) {
+          console.log(`[Steem Broadcast] Post/edit @${author}/${permlink} verified on blockchain despite RPC node timeout!`);
+          activeNode = node;
+          return { success: true, verifiedOnChain: true, author, permlink };
+        }
+      }
+
       // Critical blockchain rejection errors that should not be retried across nodes
       if (
         msg.includes('missing required posting authority') ||
@@ -120,6 +173,16 @@ export const broadcastWithFallback = async (ops: any[], privateKey: any, timeout
         throw err;
       }
       console.warn(`Broadcast failed or timed out on node ${node}: ${msg}. Attempting next node...`);
+    }
+  }
+
+  // Final verification check before throwing last error
+  if (author && permlink) {
+    console.warn(`[Steem Broadcast] All node attempts finished with errors. Performing final verification on blockchain...`);
+    const verified = await verifyPostOnChain(author, permlink, 3, 1200, bodySnippet);
+    if (verified) {
+      console.log(`[Steem Broadcast] Post/edit @${author}/${permlink} verified on blockchain during final check!`);
+      return { success: true, verifiedOnChain: true, author, permlink };
     }
   }
 

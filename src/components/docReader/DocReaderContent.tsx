@@ -29,6 +29,7 @@ export const DocReaderContent: React.FC<DocReaderContentProps> = ({
   beautifyEnabled = false
 }) => {
   const [renderedHtml, setRenderedHtml] = useState<string>('');
+  const contentContainerRef = React.useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
     if (!content) {
@@ -66,6 +67,19 @@ export const DocReaderContent: React.FC<DocReaderContentProps> = ({
       isCancelled = true;
     };
   }, [content, headings]);
+
+  // Ensure DOM heading elements have matching IDs after render
+  useEffect(() => {
+    if (!contentContainerRef.current || !renderedHtml) return;
+    const headingEls = Array.from(contentContainerRef.current.querySelectorAll('h1, h2, h3, h4, h5, h6'))
+      .filter(el => !el.closest('pre, code'));
+    
+    headingEls.forEach((el, idx) => {
+      const corresponding = headings[idx];
+      const targetId = corresponding ? corresponding.id : `heading-${idx}`;
+      el.setAttribute('id', targetId);
+    });
+  }, [renderedHtml, headings]);
 
   // Width class based on global beautifyEnabled
   const widthClass = useMemo(() => {
@@ -123,6 +137,7 @@ export const DocReaderContent: React.FC<DocReaderContentProps> = ({
       {/* Main Content Render */}
       {content ? (
         <div 
+          ref={contentContainerRef}
           className={cn(
             "doc-reader-body markdown-body max-w-none break-words",
             "[&_h1]:scroll-mt-20 [&_h2]:scroll-mt-20 [&_h3]:scroll-mt-20 [&_h4]:scroll-mt-20 [&_h5]:scroll-mt-20 [&_h6]:scroll-mt-20",

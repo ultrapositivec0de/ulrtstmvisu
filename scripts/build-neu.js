@@ -12,6 +12,8 @@ const neuBuildDir = path.join(rootDir, 'neutralino-build');
 const neuResourcesDir = path.join(neuBuildDir, 'resources');
 const neuJsDir = path.join(neuResourcesDir, 'js');
 const neuJsFile = path.join(neuJsDir, 'neutralino.js');
+const distOutDir = path.join(neuBuildDir, 'dist');
+const tmpDir = path.join(neuBuildDir, '.tmp');
 
 function zipFolderWithFflate(sourceDir, targetZipPath) {
   const filesObj = {};
@@ -33,36 +35,67 @@ function zipFolderWithFflate(sourceDir, targetZipPath) {
   fs.writeFileSync(targetZipPath, zippedBuffer);
 }
 
+// 0. Ensure @electron/asar crawlfs glob fix for Node 22/24 promisify compatibility
+const crawlfsPath = path.join(rootDir, 'node_modules/@electron/asar/lib/crawlfs.js');
+if (fs.existsSync(crawlfsPath)) {
+  let crawlfsCode = fs.readFileSync(crawlfsPath, 'utf8');
+  if (crawlfsCode.includes('const glob = (0, util_1.promisify)(glob_1.glob);')) {
+    crawlfsCode = crawlfsCode.replace(
+      'const glob = (0, util_1.promisify)(glob_1.glob);',
+      'const glob = typeof glob_1.glob === "function" && glob_1.glob.constructor.name === "AsyncFunction" ? glob_1.glob : (0, util_1.promisify)(glob_1.glob);'
+    );
+    fs.writeFileSync(crawlfsPath, crawlfsCode, 'utf8');
+    console.log('🩹 [Neutralino Build] Patched @electron/asar crawlfs for Node 22+ async glob compatibility');
+  }
+}
+
 console.log('🚀 [Neutralino Build] Starting build pipeline...');
 
 // 1. Build Vite application
 console.log('📦 [Neutralino Build] Compiling Vite application...');
 execSync('npm run build', { cwd: rootDir, stdio: 'inherit' });
 
-// 2. Ensure neutralino-build/resources directory exists
-if (!fs.existsSync(neuResourcesDir)) {
-  fs.mkdirSync(neuResourcesDir, { recursive: true });
+// 2. Clean previous build artifacts
+console.log('🧹 [Neutralino Build] Cleaning previous build artifacts...');
+if (fs.existsSync(neuResourcesDir)) {
+  fs.rmSync(neuResourcesDir, { recursive: true, force: true });
+}
+if (fs.existsSync(distOutDir)) {
+  fs.rmSync(distOutDir, { recursive: true, force: true });
+}
+if (fs.existsSync(tmpDir)) {
+  fs.rmSync(tmpDir, { recursive: true, force: true });
 }
 
-// 3. Ensure neutralino-build/dist output directory exists
-const distOutDir = path.join(neuBuildDir, 'dist');
-if (!fs.existsSync(distOutDir)) {
-  fs.mkdirSync(distOutDir, { recursive: true });
-}
+fs.mkdirSync(neuResourcesDir, { recursive: true });
+fs.mkdirSync(distOutDir, { recursive: true });
 
-// Backup neutralino.js if already present in neutralino-build/resources/js/
+// 3. Backup neutralino.js if present in dev-neu
 let neutralinoJsBackup = null;
-if (fs.existsSync(neuJsFile)) {
-  neutralinoJsBackup = fs.readFileSync(neuJsFile);
-} else if (fs.existsSync(path.join(rootDir, 'dev-neu/resources/js/neutralino.js'))) {
+if (fs.existsSync(path.join(rootDir, 'dev-neu/resources/js/neutralino.js'))) {
   neutralinoJsBackup = fs.readFileSync(path.join(rootDir, 'dev-neu/resources/js/neutralino.js'));
 }
 
-// 4. Copy all dist/ files into neutralino-build/resources/
+// 4. Copy Vite dist files to neutralino-build/resources/
 console.log('📂 [Neutralino Build] Copying web assets to neutralino-build/resources/...');
 fs.cpSync(distDir, neuResourcesDir, { recursive: true });
 
-// 5. Restore/Ensure neutralino.js
+// 5. Clean web/PWA-specific files from resources (not needed for Neutralino desktop)
+console.log('🧹 [Neutralino Build] Removing web/PWA-specific files from resources...');
+const pwaFilesToRemove = [
+  'sw.js',
+  'manifest.json',
+  'manifest.webmanifest',
+  'registerSW.js',
+];
+for (const item of fs.readdirSync(neuResourcesDir)) {
+  if (pwaFilesToRemove.includes(item) || item.startsWith('workbox-') || item.startsWith('sw-')) {
+    const itemPath = path.join(neuResourcesDir, item);
+    fs.rmSync(itemPath, { recursive: true, force: true });
+  }
+}
+
+// 6. Restore/Ensure neutralino.js
 if (neutralinoJsBackup) {
   if (!fs.existsSync(neuJsDir)) {
     fs.mkdirSync(neuJsDir, { recursive: true });
@@ -70,7 +103,7 @@ if (neutralinoJsBackup) {
   fs.writeFileSync(neuJsFile, neutralinoJsBackup);
 }
 
-// 6. Ensure icon.png exists in neutralino-build/resources/
+// 7. Ensure icon.png exists in neutralino-build/resources/
 const iconSrc = fs.existsSync(path.join(rootDir, 'public/icon.png'))
   ? path.join(rootDir, 'public/icon.png')
   : path.join(rootDir, 'app-icon.png');
@@ -78,7 +111,7 @@ if (fs.existsSync(iconSrc)) {
   fs.copyFileSync(iconSrc, path.join(neuResourcesDir, 'icon.png'));
 }
 
-// 7. Inject neutralino.js script tag into neutralino-build/resources/index.html if missing
+// 8. Inject neutralino.js script tag into neutralino-build/resources/index.html if missing
 const indexHtmlPath = path.join(neuResourcesDir, 'index.html');
 if (fs.existsSync(indexHtmlPath)) {
   let html = fs.readFileSync(indexHtmlPath, 'utf8');
@@ -89,7 +122,7 @@ if (fs.existsSync(indexHtmlPath)) {
   }
 }
 
-// 8. Ensure neutralino binaries are present
+// 9. Ensure neutralino binaries are present and executable
 const binDir = path.join(neuBuildDir, 'bin');
 if (!fs.existsSync(binDir) || fs.readdirSync(binDir).length === 0) {
   console.log('📥 [Neutralino Build] Downloading Neutralino binaries (neu update)...');
@@ -100,7 +133,15 @@ if (!fs.existsSync(binDir) || fs.readdirSync(binDir).length === 0) {
   }
 }
 
-// 9. Run neu build --release
+if (fs.existsSync(binDir)) {
+  for (const binFile of fs.readdirSync(binDir)) {
+    try {
+      fs.chmodSync(path.join(binDir, binFile), 0o755);
+    } catch (_) {}
+  }
+}
+
+// 10. Run neu build --release
 console.log('⚡ [Neutralino Build] Running Neutralino binary bundler (neu build --release)...');
 try {
   execSync('npx --yes @neutralinojs/neu build --release', { cwd: neuBuildDir, stdio: 'inherit' });
@@ -108,7 +149,7 @@ try {
   console.warn('⚠️ [Neutralino Build] Warning during neu build:', err.message);
 }
 
-// 10. Tag and version release zip files
+// 11. Tag and version release zip files
 const pkgPath = path.join(rootDir, 'package.json');
 const pkgVersion = fs.existsSync(pkgPath) ? JSON.parse(fs.readFileSync(pkgPath, 'utf8')).version : '1.0.0';
 
@@ -116,37 +157,22 @@ const defaultZip = path.join(distOutDir, 'ultra-steem-editor-release.zip');
 const versionedZip = path.join(distOutDir, `ultra-steem-editor-v${pkgVersion}-neutralino.zip`);
 const versionedReleaseZip = path.join(distOutDir, `ultra-steem-editor-v${pkgVersion}-neutralino-release.zip`);
 
-const existingZips = fs.readdirSync(distOutDir).filter((f) => f.endsWith('.zip'));
-let sourceZip = null;
+const builtAppFolder = path.join(distOutDir, 'ultra-steem-editor');
 
 if (fs.existsSync(defaultZip)) {
-  sourceZip = defaultZip;
-} else if (existingZips.length > 0) {
-  sourceZip = path.join(distOutDir, existingZips[0]);
-}
-
-if (sourceZip && fs.existsSync(sourceZip)) {
-  fs.copyFileSync(sourceZip, versionedZip);
-  fs.copyFileSync(sourceZip, versionedReleaseZip);
-  if (sourceZip !== defaultZip) {
-    fs.copyFileSync(sourceZip, defaultZip);
-  }
+  fs.copyFileSync(defaultZip, versionedZip);
+  fs.copyFileSync(defaultZip, versionedReleaseZip);
   console.log(`🏷️ [Neutralino Build] Created versioned release artifact: ${path.basename(versionedZip)}`);
-  console.log(`🏷️ [Neutralino Build] Created versioned release artifact: ${path.basename(versionedReleaseZip)}`);
+} else if (fs.existsSync(builtAppFolder)) {
+  console.log('📦 [Neutralino Build] Creating release zip from built Neutralino app directory...');
+  zipFolderWithFflate(builtAppFolder, defaultZip);
+  fs.copyFileSync(defaultZip, versionedZip);
+  fs.copyFileSync(defaultZip, versionedReleaseZip);
+  console.log(`🏷️ [Neutralino Build] Created versioned release artifact: ${path.basename(versionedZip)}`);
 } else {
-  console.log('📦 [Neutralino Build] Generating zip artifact with fflate...');
-  const distEntries = fs.readdirSync(distOutDir).filter((f) => !f.endsWith('.zip'));
-  let zipSourceDir = distOutDir;
-  if (distEntries.length === 1 && fs.statSync(path.join(distOutDir, distEntries[0])).isDirectory()) {
-    zipSourceDir = path.join(distOutDir, distEntries[0]);
-  } else if (distEntries.length === 0) {
-    zipSourceDir = neuBuildDir;
-  }
-
-  zipFolderWithFflate(zipSourceDir, versionedZip);
-  fs.copyFileSync(versionedZip, versionedReleaseZip);
-  fs.copyFileSync(versionedZip, defaultZip);
-  console.log(`🏷️ [Neutralino Build] Created versioned zip artifact via fflate: ${path.basename(versionedZip)}`);
+  console.error('❌ [Neutralino Build] Neutralino build failed to generate output in neutralino-build/dist/ultra-steem-editor!');
+  process.exit(1);
 }
 
-console.log('✅ [Neutralino Build] Neutralino binaries generated successfully in neutralino-build/dist/');
+console.log('✅ [Neutralino Build] Neutralino package generated successfully in neutralino-build/dist/');
+

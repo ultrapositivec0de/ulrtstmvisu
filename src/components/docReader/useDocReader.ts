@@ -121,8 +121,14 @@ export function useDocReader({
     const lines = source.content.split('\n');
 
     let headingIdx = 0;
+    let inCodeBlock = false;
     for (let i = 0; i < lines.length; i++) {
       const line = lines[i].trim();
+      if (line.startsWith('```')) {
+        inCodeBlock = !inCodeBlock;
+        continue;
+      }
+      if (inCodeBlock) continue;
       
       // Markdown headings (# Heading)
       const mdMatch = line.match(/^(#{1,6})\s+(.+)$/);
@@ -199,7 +205,15 @@ export function useDocReader({
   const scrollToHeading = useCallback((headingId: string) => {
     const el = document.getElementById(headingId);
     if (el) {
-      el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      if (scrollContainerRef.current && scrollContainerRef.current.contains(el)) {
+        const container = scrollContainerRef.current;
+        const containerRect = container.getBoundingClientRect();
+        const elRect = el.getBoundingClientRect();
+        const relativeTop = elRect.top - containerRect.top + container.scrollTop;
+        container.scrollTo({ top: Math.max(0, relativeTop - 24), behavior: 'smooth' });
+      } else {
+        el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }
       setActiveHeadingId(headingId);
     }
   }, []);

@@ -1,7 +1,7 @@
 import { useState, useCallback, Dispatch, SetStateAction } from 'react';
 import { QueueItem, AuthType } from '../types';
 import { SecurityService } from '../services/securityService';
-import { getClient } from '../lib/steem';
+import { getClient, verifyPostOnChain } from '../lib/steem';
 
 export const STORAGE_KEY_QUEUE = 'steem_queue_v2';
 
@@ -76,12 +76,13 @@ export function useSteemQueue(config: SteemQueueConfig) {
     tags: string, 
     auth: AuthType,
     rewardType: 'SP' | '50' | '0' = '50',
-    beneficiaries: {account: string, weight: number}[] = []
+    beneficiaries: {account: string, weight: number}[] = [],
+    customPermlink?: string
   ) => {
     const finalBody = processContentForSteem(body);
     const tagsArray = tags.split(' ').map(t => t.trim()).filter(t => t);
     const parentPermlink = tagsArray[0] || 'blog';
-    const permlink = createPermlinkUA(title);
+    const permlink = customPermlink?.trim() || createPermlinkUA(title);
     
     const meta = JSON.stringify({ 
       tags: tagsArray, 
@@ -111,14 +112,26 @@ export function useSteemQueue(config: SteemQueueConfig) {
       return new Promise((resolve, reject) => {
         // @ts-ignore
         if (!window.steem_keychain) return reject(new Error(config.t('noKeychain')));
-        const timeoutId = setTimeout(() => {
-          reject(new Error("Keychain request timed out (60s). Please check Keychain extension."));
+        const timeoutId = setTimeout(async () => {
+          const isPublished = await verifyPostOnChain(author, permlink, 3, 1200, finalBody);
+          if (isPublished) {
+            resolve({ success: true, verifiedOnChain: true });
+          } else {
+            reject(new Error("Keychain request timed out (60s). Please check Keychain extension."));
+          }
         }, 60000);
         // @ts-ignore
-        window.steem_keychain.requestPost(author, title, finalBody, parentPermlink, '', meta, permlink, JSON.stringify(options), (res: any) => {
+        window.steem_keychain.requestPost(author, title, finalBody, parentPermlink, '', meta, permlink, JSON.stringify(options), async (res: any) => {
           clearTimeout(timeoutId);
           if (res.success) resolve(res);
-          else reject(new Error(res.message));
+          else {
+            const isPublished = await verifyPostOnChain(author, permlink, 2, 1000, finalBody);
+            if (isPublished) {
+              resolve({ success: true, verifiedOnChain: true, message: res.message });
+            } else {
+              reject(new Error(res.message));
+            }
+          }
         });
       });
     } else {

@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Buffer } from 'buffer';
-import { getClient } from '../lib/steem';
+import { getClient, verifyPostOnChain } from '../lib/steem';
 import { SecurityService } from '../services/securityService';
 import { AuthType } from '../types';
 
@@ -167,9 +167,13 @@ export function useReaderBlockchainActions({
           throw new Error("Steem Keychain extension not found! Please install it.");
         }
         await new Promise((resolve, reject) => {
-          (window as any).steem_keychain.requestPost(activeUser, '', body, parentPermlink, parentAuthor, meta, permlink, '', (res: any) => {
+          (window as any).steem_keychain.requestPost(activeUser, '', body, parentPermlink, parentAuthor, meta, permlink, '', async (res: any) => {
             if (res.success) resolve(res);
-            else reject(new Error(res.message || "Keychain request failed"));
+            else {
+              const isPublished = await verifyPostOnChain(activeUser, permlink, 2, 1000, body);
+              if (isPublished) resolve(res);
+              else reject(new Error(res.message || "Keychain request failed"));
+            }
           });
         });
       } else {
