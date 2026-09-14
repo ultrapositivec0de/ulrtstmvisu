@@ -307,7 +307,8 @@ export function htmlToMarkdown(html: string): string {
   return md
     .replace(/\u200B/g, '')
     .replace(/\r\n/g, '\n')
-    .replace(/\n{3,}/g, () => '\n\n')
+    // Allow multiple intentional empty lines (up to 6 newlines) instead of collapsing down to \n\n
+    .replace(/\n{7,}/g, '\n\n\n\n\n\n')
     .replace(/(\|[^\n]+\|)(\n{3,})(\|[^\n]+\|)/g, (match, r1, nl, r2) => {
       const count = nl.length - 1;
       return `${r1}${nl.substring(0, count)}${r2}`;

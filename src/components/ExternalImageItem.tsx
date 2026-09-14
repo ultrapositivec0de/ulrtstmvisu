@@ -69,9 +69,15 @@ const ExternalImageItem = React.memo(({
           "absolute inset-x-0 bottom-0 bg-slate-950/90 backdrop-blur-sm px-1 py-1.5 flex flex-row items-center justify-center gap-1 transition-all z-10",
           "lg:opacity-0 lg:group-hover:opacity-100"
         )}>
-          <button onMouseDown={(e) => e.preventDefault()} onClick={(e) => { e.stopPropagation(); onInsert(photo, 'left'); }} className="p-1.5 bg-slate-800 flex-1 rounded hover:bg-cyan-600 outline-none text-white transition-colors flex justify-center items-center" title={t('insert')}><AlignLeft size={12} /></button>
-          <button onMouseDown={(e) => e.preventDefault()} onClick={(e) => { e.stopPropagation(); onInsert(photo, 'plain'); }} className="p-1.5 bg-slate-800 flex-1 rounded hover:bg-cyan-600 outline-none text-white transition-colors flex justify-center items-center" title={t('insert')}><FileText size={12} /></button>
-          <button onMouseDown={(e) => e.preventDefault()} onClick={(e) => { e.stopPropagation(); onInsert(photo, 'right'); }} className="p-1.5 bg-slate-800 flex-1 rounded hover:bg-cyan-600 outline-none text-white transition-colors flex justify-center items-center" title={t('insert')}><AlignRight size={12} /></button>
+          <button onMouseDown={(e) => e.preventDefault()} onClick={(e) => { e.stopPropagation(); onInsert(photo, 'left'); }} className="p-1.5 bg-slate-800 flex-1 rounded hover:bg-cyan-600 outline-none text-white transition-colors flex justify-center items-center" title={t('insert')}>
+            <AlignLeft className="shrink-0" style={{ width: 'calc(var(--gallery-icon-size, 16px) * 0.8)', height: 'calc(var(--gallery-icon-size, 16px) * 0.8)' }} />
+          </button>
+          <button onMouseDown={(e) => e.preventDefault()} onClick={(e) => { e.stopPropagation(); onInsert(photo, 'plain'); }} className="p-1.5 bg-slate-800 flex-1 rounded hover:bg-cyan-600 outline-none text-white transition-colors flex justify-center items-center" title={t('insert')}>
+            <FileText className="shrink-0" style={{ width: 'calc(var(--gallery-icon-size, 16px) * 0.8)', height: 'calc(var(--gallery-icon-size, 16px) * 0.8)' }} />
+          </button>
+          <button onMouseDown={(e) => e.preventDefault()} onClick={(e) => { e.stopPropagation(); onInsert(photo, 'right'); }} className="p-1.5 bg-slate-800 flex-1 rounded hover:bg-cyan-600 outline-none text-white transition-colors flex justify-center items-center" title={t('insert')}>
+            <AlignRight className="shrink-0" style={{ width: 'calc(var(--gallery-icon-size, 16px) * 0.8)', height: 'calc(var(--gallery-icon-size, 16px) * 0.8)' }} />
+          </button>
         </div>
       </div>
       

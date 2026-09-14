@@ -196,64 +196,68 @@ export const Header: React.FC<HeaderProps> = (props) => {
 
   return (
 <header 
-        className="border-b border-slate-800 bg-slate-900 flex items-center px-2 sm:px-4 z-[200] relative shrink-0"
+        id="main-header"
+        className="border-b border-slate-800 bg-slate-900 flex items-center justify-between px-2 sm:px-4 z-[200] relative shrink-0 transition-[min-height] duration-150 gap-1 sm:gap-2"
         style={{
           paddingTop: 'env(safe-area-inset-top, 0px)',
-          minHeight: 'calc(3.5rem + env(safe-area-inset-top, 0px))',
+          minHeight: 'calc(var(--header-height, 3.5rem) + env(safe-area-inset-top, 0px))',
           paddingLeft: 'max(0.5rem, env(safe-area-inset-left, 0px))',
           paddingRight: 'max(0.5rem, env(safe-area-inset-right, 0px))'
         }}
       >
-        <div className="flex items-center gap-1.5 xs:gap-3 shrink-0">
-          <div className="flex items-center gap-1 xs:gap-2">
+        <div className="flex items-center gap-1 sm:gap-2 shrink-0">
+          <div className="flex items-center gap-1 sm:gap-2">
             <button 
+              id="header-logo-button"
               onClick={() => setIsSMenuOpen(true)}
-              className="w-8 h-8 xs:w-10 xs:h-10 bg-gradient-to-br from-cyan-500 to-blue-600 rounded-lg xs:rounded-xl flex items-center justify-center text-white font-black shrink-0 shadow-lg shadow-cyan-500/20 hover:scale-105 active:scale-95 transition-all text-lg xs:text-xl"
+              className="w-8 h-8 sm:w-9 sm:h-9 bg-gradient-to-br from-cyan-500 to-blue-600 rounded-lg sm:rounded-xl flex items-center justify-center text-white font-black shrink-0 shadow-lg shadow-cyan-500/20 hover:scale-105 active:scale-95 transition-all text-base sm:text-xl"
             >
               <span className={cn("logo-s", visualStyle === 'neon' && "neon-icon-glow")}>S</span>
             </button>
             <div className="flex flex-col">
-              <span className={cn("font-black text-xs xs:text-lg hidden sm:inline-block tracking-tighter leading-none shrink-0 italic", visualStyle === 'neon' && "neon-icon-glow")}>Steem<span className="text-cyan-400">Editor</span></span>
-              <span className="text-[7px] xs:text-[9px] font-bold text-slate-500 tracking-widest uppercase hidden sm:block">Professional Pro</span>
+              <span className={cn("font-black text-xs sm:text-lg hidden sm:inline-block tracking-tighter leading-none shrink-0 italic", visualStyle === 'neon' && "neon-icon-glow")}>Steem<span className="text-cyan-400">Editor</span></span>
+              <span className="text-[7px] sm:text-[9px] font-bold text-slate-500 tracking-widest uppercase hidden sm:block">Professional Pro</span>
             </div>
           </div>
 
-          <div className="h-6 w-px bg-slate-800 mx-0.5 xs:mx-1 hidden md:block" />
+          <div className="h-6 w-px bg-slate-800 mx-0.5 sm:mx-1 hidden md:block shrink-0" />
 
           {/* View Toggler */}
           <div className="flex bg-slate-800 p-0.5 rounded-lg border border-slate-700 shrink-0">
             <button 
+              id="view-toggle-editor"
               onClick={() => setActiveView('editor')}
               className={cn(
-                "px-3 py-1 text-[10px] font-bold rounded transition-colors flex items-center gap-1.5",
+                "px-2 sm:px-3 py-1 text-[10px] font-bold rounded transition-colors flex items-center gap-1 sm:gap-1.5",
                 activeView === 'editor' ? "bg-cyan-600 text-white shadow-none neon-tab-glow" : "text-slate-500 hover:text-slate-300"
               )}
+              title={t('editor')}
             >
-              <Edit3 size={16} className={cn(visualStyle === 'neon' && "neon-icon-glow")} /> <span className="hidden xs:inline">{t('editor')}</span>
+              <Edit3 className={cn("shrink-0", visualStyle === 'neon' && "neon-icon-glow")} style={{ width: 'var(--header-icon-size, 16px)', height: 'var(--header-icon-size, 16px)' }} />
+              <span className="hidden sm:inline">{t('editor')}</span>
             </button>
             <button 
+              id="view-toggle-reader"
               onClick={() => {
                 setActiveView('reader');
                 markAllAsRead();
               }}
               className={cn(
-                "px-3 py-1 text-[10px] font-bold rounded transition-colors flex items-center gap-1.5 relative",
+                "px-2 sm:px-3 py-1 text-[10px] font-bold rounded transition-colors flex items-center gap-1 sm:gap-1.5 relative",
                 activeView === 'reader' ? "bg-cyan-600 text-white shadow-none neon-tab-glow" : "text-slate-500 hover:text-slate-300"
               )}
+              title={t('reader')}
             >
-              <Globe size={16} className={cn(visualStyle === 'neon' && "neon-icon-glow")} /> <span className="hidden xs:inline">{t('reader')}</span>
+              <Globe className={cn("shrink-0", visualStyle === 'neon' && "neon-icon-glow")} style={{ width: 'var(--header-icon-size, 16px)', height: 'var(--header-icon-size, 16px)' }} />
+              <span className="hidden sm:inline">{t('reader')}</span>
             </button>
           </div>
-        </div>
 
-        <div className="h-6 w-px bg-slate-800 mx-2 hidden md:block shrink-0" />
-
-        {/* Center: Formatting Tools */}
-        {activeView === 'editor' && (
-          <div className="flex-1 min-w-0 px-1 flex items-center justify-start lg:justify-center relative group/tools">
-            {/* Format menu trigger */}
+          {/* Mobile Format menu trigger (grouped immediately with editor controls to eliminate overlap) */}
+          {activeView === 'editor' && (
             <div className="relative mobile-tools-container shrink-0 lg:hidden">
               <button
+                id="mobile-format-tools-btn"
                 onMouseDown={(e) => e.preventDefault()}
                 onClick={(e) => {
                   e.stopPropagation();
@@ -266,16 +270,16 @@ export const Header: React.FC<HeaderProps> = (props) => {
                     setShowLangMenu(false);
                   }
                 }}
-                className="flex shrink-0 items-center justify-center bg-slate-800/30 px-2 sm:px-3 py-1.5 rounded-xl border border-slate-700/30 text-slate-400 hover:text-white hover:bg-slate-700/50 transition-all gap-1.5 h-9"
+                className="flex shrink-0 items-center justify-center bg-slate-800/40 px-2 sm:px-2.5 py-1 rounded-xl border border-slate-700/40 text-slate-300 hover:text-white hover:bg-slate-700/50 transition-all gap-1 h-8 sm:h-9"
                 title={t('formatting') || "Formatting Tools"}
               >
-                <Type size={16} className="shrink-0" />
-                <ChevronDown size={14} className={cn("transition-transform duration-200 shrink-0", showMobileToolsOpen && "rotate-180")} />
+                <Type className="shrink-0" style={{ width: 'var(--header-icon-size, 16px)', height: 'var(--header-icon-size, 16px)' }} />
+                <ChevronDown size={12} className={cn("transition-transform duration-200 shrink-0 opacity-70", showMobileToolsOpen && "rotate-180")} />
               </button>
 
               {/* Tools Dropdown */}
               <div className={cn(
-                "fixed top-14 left-2 right-2 sm:absolute sm:top-full sm:left-0 sm:right-auto mt-2 bg-slate-800 border border-slate-700 p-2.5 rounded-xl shadow-2xl z-[150] flex-col gap-2.5 max-w-[95vw] sm:w-max max-h-[75vh] overflow-y-auto custom-scrollbar mx-auto sm:mx-0",
+                "fixed top-14 left-2 right-2 sm:absolute sm:top-full sm:left-0 sm:right-auto mt-2 bg-slate-800 border border-slate-700 p-2.5 rounded-xl shadow-2xl z-[250] flex-col gap-2.5 max-w-[95vw] sm:w-max max-h-[75vh] overflow-y-auto custom-scrollbar mx-auto sm:mx-0",
                 showMobileToolsOpen ? "flex" : "hidden"
               )}>
                 {/* Group 1 */}
@@ -328,42 +332,45 @@ export const Header: React.FC<HeaderProps> = (props) => {
                 </div>
               </div>
             </div>
+          )}
+        </div>
 
-            {/* Desktop Formatting Tools (Scrollable) */}
-            <div className="hidden lg:flex flex-1 overflow-hidden relative"
-              onWheel={(e) => {
-                const container = e.currentTarget.querySelector('.tools-scroll-container');
-                if (container && e.deltaY !== 0) container.scrollLeft += e.deltaY;
-              }}
-            >
-              <div className="tools-scroll-container mx-auto flex items-center justify-start gap-1 bg-slate-800/30 p-1 rounded-xl border border-slate-700/30 overflow-x-auto no-scrollbar scroll-smooth whitespace-nowrap w-full lg:w-auto">
-                <IconButton icon={Bold} onClick={() => fmt('**')} title={t('bold')} className="shrink-0 size-8" active={activeFormats.bold} />
-                <IconButton icon={Italic} onClick={() => fmt('*')} title={t('italic')} className="shrink-0 size-8" active={activeFormats.italic} />
-                <IconButton icon={Strikethrough} onClick={() => fmt('~~')} title={t('strike')} className="shrink-0 size-8" active={activeFormats.strikethrough} />
-                <div className="h-4 w-px bg-slate-700 mx-0.5 shrink-0" />
-                <button type="button" onMouseDown={(e) => e.preventDefault()} onPointerDown={(e) => e.preventDefault()} onClick={() => fmtLine('# ')} title={t('h1')} className="size-8 flex items-center justify-center hover:bg-slate-700 rounded-lg text-[10px] font-black text-slate-400 shrink-0">H1</button>
-                <button type="button" onMouseDown={(e) => e.preventDefault()} onPointerDown={(e) => e.preventDefault()} onClick={() => fmtLine('## ')} title={t('h2')} className="size-8 flex items-center justify-center hover:bg-slate-700 rounded-lg text-[10px] font-black text-slate-400 shrink-0">H2</button>
-                <button type="button" onMouseDown={(e) => e.preventDefault()} onPointerDown={(e) => e.preventDefault()} onClick={() => fmtLine('### ')} title={t('h3')} className="size-8 flex items-center justify-center hover:bg-slate-700 rounded-lg text-[10px] font-black text-slate-400 shrink-0">H3</button>
-                <div className="h-4 w-px bg-slate-700 mx-0.5 shrink-0" />
-                <IconButton icon={AlignLeft} onClick={() => fmt('<div class="text-left">\n', '\n</div>')} title={t('leftText')} className="shrink-0 size-8" />
-                <IconButton icon={AlignCenter} onClick={() => fmt('<center>\n', '\n</center>')} title="Center" className="shrink-0 size-8" />
-                <IconButton icon={AlignRight} onClick={() => fmt('<div class="text-right">\n', '\n</div>')} title={t('rightText')} className="shrink-0 size-8" />
-                <IconButton icon={AlignJustify} onClick={() => fmt('<div class="text-justify">\n', '\n</div>')} title="Justify" className="shrink-0 size-8" />
-                <div className="h-4 w-px bg-slate-700 mx-0.5 shrink-0" />
-                <IconButton icon={Quote} onClick={() => fmtLine('> ')} title={t('quote')} className="shrink-0 size-8" />
-                <IconButton icon={LinkIcon} onClick={handleLink} title={t('link')} className="shrink-0 size-8" />
-                <IconButton icon={Minus} onClick={() => insertAtCursor('\n\n---\n\n', 'end')} title={t('hr')} className="shrink-0 size-8" />
-                <button type="button" onMouseDown={(e) => e.preventDefault()} onPointerDown={(e) => e.preventDefault()} onClick={() => fmt('<div class="phishy">', '</div>')} title={t('redText')} className={cn("size-8 flex items-center justify-center hover:bg-slate-700 rounded-lg text-[10px] font-black shrink-0 transition-colors", activeFormats.phishy ? "bg-red-500/20 text-red-400 ring-1 ring-red-500/50" : "text-red-500")}>A</button>
-                <IconButton icon={Terminal} onClick={() => fmt('`')} title={t('inlineCode')} className="shrink-0 size-8" active={activeFormats.code} />
-                <IconButton icon={Code} onClick={() => fmt('```\n', '\n```')} title={t('codeBlock')} className="shrink-0 size-8" />
-                <IconButton icon={Indent} onClick={handleIndent} title={t('indent')} className="shrink-0 size-8" />
-                <IconButton icon={LayoutGrid} onClick={(e) => TOOLS_MAP['Table']?.action(e)} title={t('table')} className="shrink-0 size-8" />
-                <IconButton icon={SplitSquareHorizontal} onClick={() => insertAtCursor('| Head |\n| --- |\n', 'end')} title="1 Col" className="shrink-0 size-8" />
-                <IconButton icon={TableIcon} onClick={importTable} title={t('importTable')} className="shrink-0 size-8" />
-                <div className="h-4 w-px bg-slate-700 mx-0.5 shrink-0" />
-                <IconButton icon={AtSign} onClick={() => setActiveModal('mentions')} title={t('mentions')} className="shrink-0 size-8" />
-                <IconButton icon={FileText} onClick={() => setActiveModal('templates')} title={t('templates')} className="shrink-0 size-8" />
-              </div>
+        {/* Center: Desktop Formatting Tools (Scrollable, visible on large screens) */}
+        {activeView === 'editor' && (
+          <div 
+            className="hidden lg:flex flex-1 min-w-0 px-2 items-center justify-center relative group/tools overflow-hidden"
+            onWheel={(e) => {
+              const container = e.currentTarget.querySelector('.tools-scroll-container');
+              if (container && e.deltaY !== 0) container.scrollLeft += e.deltaY;
+            }}
+          >
+            <div className="tools-scroll-container mx-auto flex items-center justify-start gap-1 bg-slate-800/30 p-1 rounded-xl border border-slate-700/30 overflow-x-auto no-scrollbar scroll-smooth whitespace-nowrap w-full lg:w-auto">
+              <IconButton icon={Bold} onClick={() => fmt('**')} title={t('bold')} className="shrink-0 size-8" active={activeFormats.bold} />
+              <IconButton icon={Italic} onClick={() => fmt('*')} title={t('italic')} className="shrink-0 size-8" active={activeFormats.italic} />
+              <IconButton icon={Strikethrough} onClick={() => fmt('~~')} title={t('strike')} className="shrink-0 size-8" active={activeFormats.strikethrough} />
+              <div className="h-4 w-px bg-slate-700 mx-0.5 shrink-0" />
+              <button type="button" onMouseDown={(e) => e.preventDefault()} onPointerDown={(e) => e.preventDefault()} onClick={() => fmtLine('# ')} title={t('h1')} className="size-8 flex items-center justify-center hover:bg-slate-700 rounded-lg text-[10px] font-black text-slate-400 shrink-0">H1</button>
+              <button type="button" onMouseDown={(e) => e.preventDefault()} onPointerDown={(e) => e.preventDefault()} onClick={() => fmtLine('## ')} title={t('h2')} className="size-8 flex items-center justify-center hover:bg-slate-700 rounded-lg text-[10px] font-black text-slate-400 shrink-0">H2</button>
+              <button type="button" onMouseDown={(e) => e.preventDefault()} onPointerDown={(e) => e.preventDefault()} onClick={() => fmtLine('### ')} title={t('h3')} className="size-8 flex items-center justify-center hover:bg-slate-700 rounded-lg text-[10px] font-black text-slate-400 shrink-0">H3</button>
+              <div className="h-4 w-px bg-slate-700 mx-0.5 shrink-0" />
+              <IconButton icon={AlignLeft} onClick={() => fmt('<div class="text-left">\n', '\n</div>')} title={t('leftText')} className="shrink-0 size-8" />
+              <IconButton icon={AlignCenter} onClick={() => fmt('<center>\n', '\n</center>')} title="Center" className="shrink-0 size-8" />
+              <IconButton icon={AlignRight} onClick={() => fmt('<div class="text-right">\n', '\n</div>')} title={t('rightText')} className="shrink-0 size-8" />
+              <IconButton icon={AlignJustify} onClick={() => fmt('<div class="text-justify">\n', '\n</div>')} title="Justify" className="shrink-0 size-8" />
+              <div className="h-4 w-px bg-slate-700 mx-0.5 shrink-0" />
+              <IconButton icon={Quote} onClick={() => fmtLine('> ')} title={t('quote')} className="shrink-0 size-8" />
+              <IconButton icon={LinkIcon} onClick={handleLink} title={t('link')} className="shrink-0 size-8" />
+              <IconButton icon={Minus} onClick={() => insertAtCursor('\n\n---\n\n', 'end')} title={t('hr')} className="shrink-0 size-8" />
+              <button type="button" onMouseDown={(e) => e.preventDefault()} onPointerDown={(e) => e.preventDefault()} onClick={() => fmt('<div class="phishy">', '</div>')} title={t('redText')} className={cn("size-8 flex items-center justify-center hover:bg-slate-700 rounded-lg text-[10px] font-black shrink-0 transition-colors", activeFormats.phishy ? "bg-red-500/20 text-red-400 ring-1 ring-red-500/50" : "text-red-500")}>A</button>
+              <IconButton icon={Terminal} onClick={() => fmt('`')} title={t('inlineCode')} className="shrink-0 size-8" active={activeFormats.code} />
+              <IconButton icon={Code} onClick={() => fmt('```\n', '\n```')} title={t('codeBlock')} className="shrink-0 size-8" />
+              <IconButton icon={Indent} onClick={handleIndent} title={t('indent')} className="shrink-0 size-8" />
+              <IconButton icon={LayoutGrid} onClick={(e) => TOOLS_MAP['Table']?.action(e)} title={t('table')} className="shrink-0 size-8" />
+              <IconButton icon={SplitSquareHorizontal} onClick={() => insertAtCursor('| Head |\n| --- |\n', 'end')} title="1 Col" className="shrink-0 size-8" />
+              <IconButton icon={TableIcon} onClick={importTable} title={t('importTable')} className="shrink-0 size-8" />
+              <div className="h-4 w-px bg-slate-700 mx-0.5 shrink-0" />
+              <IconButton icon={AtSign} onClick={() => setActiveModal('mentions')} title={t('mentions')} className="shrink-0 size-8" />
+              <IconButton icon={FileText} onClick={() => setActiveModal('templates')} title={t('templates')} className="shrink-0 size-8" />
             </div>
           </div>
         )}
@@ -371,9 +378,10 @@ export const Header: React.FC<HeaderProps> = (props) => {
         <div className="h-6 w-px bg-slate-800 mx-2 hidden md:block shrink-0" />
 
         {/* Right side: Notifications, Pub, etc */}
-        <div className="flex items-center gap-1 xs:gap-1.5 shrink-0 ml-auto">
+        <div className="flex items-center gap-1 sm:gap-1.5 shrink-0 ml-auto">
           <div className="relative notification-container shrink-0">
             <button 
+              id="notification-bell-btn"
               onClick={(e) => {
                 e.stopPropagation();
                 const nextState = !showNotificationList;
@@ -386,11 +394,11 @@ export const Header: React.FC<HeaderProps> = (props) => {
                 }
               }}
               className={cn(
-                "size-8 xs:size-9 flex items-center justify-center rounded-xl transition-all relative",
+                "size-8 sm:size-9 flex items-center justify-center rounded-xl transition-all relative",
                 notifEnabled ? "bg-[rgb(var(--accent-color)/0.1)] text-[rgb(var(--accent-color))]" : "text-slate-500 hover:text-white"
               )}
             >
-              <Bell size={18} className={cn(visibleNotifications.some(n => !n.isRead) ? "animate-swing" : "")} />
+              <Bell className={cn("shrink-0", visibleNotifications.some(n => !n.isRead) ? "animate-swing" : "")} style={{ width: 'var(--header-icon-size, 18px)', height: 'var(--header-icon-size, 18px)' }} />
               {visibleNotifications.some(n => !n.isRead) && (
                 <span className={cn(
                   "absolute top-0 right-0 w-3.5 h-3.5 rounded-full border border-slate-950 flex items-center justify-center animate-pulse z-10 text-[7px] text-black font-black bg-[rgb(var(--accent-color))]"
@@ -467,7 +475,11 @@ export const Header: React.FC<HeaderProps> = (props) => {
                 }}
                 className="p-1.5 text-slate-500 hover:text-white transition-all shrink-0"
               >
-                {isDarkMode ? <Sun size={18} /> : <Moon size={18} />}
+                {isDarkMode ? (
+                  <Sun className="shrink-0" style={{ width: 'var(--header-icon-size, 18px)', height: 'var(--header-icon-size, 18px)' }} />
+                ) : (
+                  <Moon className="shrink-0" style={{ width: 'var(--header-icon-size, 18px)', height: 'var(--header-icon-size, 18px)' }} />
+                )}
               </button>
               <div className="h-4 w-px bg-slate-700 mx-1" />
               <div className="relative shrink-0 lang-menu-container">
@@ -522,6 +534,7 @@ export const Header: React.FC<HeaderProps> = (props) => {
 
           <div className="relative shrink-0 z-50 mobile-tools-container">
              <button 
+                id="mobile-tools-layers-btn"
                 onMouseDown={(e) => e.preventDefault()}
                 onClick={(e) => {
                   e.stopPropagation();
@@ -534,10 +547,10 @@ export const Header: React.FC<HeaderProps> = (props) => {
                     setShowLangMenu(false);
                   }
                 }}
-                className="lg:hidden flex items-center justify-center bg-slate-800/30 rounded-xl border border-slate-700/30 text-slate-400 hover:text-white hover:bg-slate-700/50 transition-all size-8 xs:size-9"
+                className="lg:hidden flex items-center justify-center bg-slate-800/30 rounded-xl border border-slate-700/30 text-slate-400 hover:text-white hover:bg-slate-700/50 transition-all size-8 sm:size-9"
                 title="Tools"
              >
-                <Layers size={18} />
+                <Layers className="shrink-0" style={{ width: 'var(--header-icon-size, 18px)', height: 'var(--header-icon-size, 18px)' }} />
              </button>
              <div className={cn(
                 "absolute lg:static top-full right-0 mt-2 lg:mt-0 bg-slate-800 lg:bg-slate-800/30 border border-slate-700 lg:border-slate-700/30 p-2 lg:p-1 rounded-xl shadow-2xl lg:shadow-none min-w-max flex-col lg:flex-row items-center gap-1 lg:gap-1.5 z-50",
@@ -597,6 +610,7 @@ export const Header: React.FC<HeaderProps> = (props) => {
 
           <div className="relative shrink-0 z-40 mobile-tools-container">
              <button 
+                id="mobile-tools-files-btn"
                 onMouseDown={(e) => e.preventDefault()}
                 onClick={(e) => {
                   e.stopPropagation();
@@ -609,10 +623,10 @@ export const Header: React.FC<HeaderProps> = (props) => {
                     setShowLangMenu(false);
                   }
                 }}
-                className="lg:hidden flex items-center justify-center bg-slate-800/30 rounded-xl border border-slate-700/30 text-slate-400 hover:text-white hover:bg-slate-700/50 transition-all size-8 xs:size-9"
+                className="lg:hidden flex items-center justify-center bg-slate-800/30 rounded-xl border border-slate-700/30 text-slate-400 hover:text-white hover:bg-slate-700/50 transition-all size-8 sm:size-9"
                 title="Files"
              >
-                <FilePlus size={18} />
+                <FilePlus className="shrink-0" style={{ width: 'var(--header-icon-size, 18px)', height: 'var(--header-icon-size, 18px)' }} />
              </button>
              <div className={cn(
                 "absolute lg:static top-full right-0 mt-2 lg:mt-0 bg-slate-800 lg:bg-slate-800/30 border border-slate-700 lg:border-slate-700/30 p-2 lg:p-1 rounded-xl shadow-2xl lg:shadow-none min-w-max flex-col lg:flex-row items-stretch lg:items-center gap-1.5 z-40",
@@ -652,7 +666,7 @@ export const Header: React.FC<HeaderProps> = (props) => {
              </div>
           </div>
 
-          <div className="h-6 w-px bg-slate-800 mx-0.5 xs:mx-1 shrink-0" />
+          <div className="h-6 w-px bg-slate-800 mx-0.5 sm:mx-1 shrink-0" />
 
           <div className="flex items-center gap-1 bg-slate-800/30 p-1 rounded-xl border border-slate-700/30 shrink-0">
             {!isPwaInstalled && !isTauriEnv() && !isNeutralinoEnv() && (

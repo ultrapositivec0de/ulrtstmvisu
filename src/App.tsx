@@ -51,8 +51,9 @@ import { AccountPromptModal } from './components/modals/AccountPromptModal';
 import { GlobalEditorStyles } from './components/common/GlobalEditorStyles';
 import { TableSelectorPopup } from './components/editor/TableSelectorPopup';
 import { NotificationToast } from './components/common/NotificationToast';
-import { SystemDialogModal } from './components/modals';
+import { SystemDialogModal, AudioPresetsModal } from './components/modals';
 import { createToolsMap } from './components/editor/toolsMap';
+import { useTypingSound } from './services/audio/useTypingSound';
 
 // Global environment setups
 if (typeof window !== 'undefined') {
@@ -117,6 +118,10 @@ function App() {
   const [isWidgetMenuOpen, setIsWidgetMenuOpen] = useState(false);
   const [showTableSelector, setShowTableSelector] = useState(false);
 
+  // 5.1 Audio Typing Synth Hook & Modal State
+  const typingSound = useTypingSound();
+  const [isAudioPresetsModalOpen, setIsAudioPresetsModalOpen] = useState(false);
+
   // 6. Theme, Styling & Custom CSS Variables
   const {
     isDarkMode,
@@ -133,6 +138,17 @@ function App() {
     setEditorFontSize,
     toolbarIconSize,
     setToolbarIconSize,
+    uiScalePreset,
+    setUiScalePreset,
+    applyUiScalePreset,
+    headerIconSize,
+    setHeaderIconSize,
+    headerHeight,
+    setHeaderHeight,
+    headerHeightAuto,
+    setHeaderHeightAuto,
+    galleryIconSize,
+    setGalleryIconSize,
     wysiwygSpacing,
     setWysiwygSpacing,
     isSpacingMenuOpen,
@@ -579,6 +595,9 @@ function App() {
     username,
     rewardType,
     beneficiaries,
+    vaultPin,
+    initVault,
+    promptDialog,
     performBroadcast,
     processContentForSteem,
     addToQueue,
@@ -1295,6 +1314,8 @@ function App() {
                 isDarkMode={isDarkMode}
                 t={t}
                 editorMode={editorMode}
+                typingSound={typingSound}
+                onOpenAudioPresetsModal={() => setIsAudioPresetsModalOpen(true)}
                 isLivePreviewEnabled={isLivePreviewEnabled}
                 onDemandSyncEnabled={onDemandSyncEnabled}
                 beautifyEnabled={beautifyEnabled}
@@ -1536,6 +1557,17 @@ function App() {
         setEditorFontSize={setEditorFontSize}
         toolbarIconSize={toolbarIconSize}
         setToolbarIconSize={setToolbarIconSize}
+        uiScalePreset={uiScalePreset}
+        setUiScalePreset={setUiScalePreset}
+        applyUiScalePreset={applyUiScalePreset}
+        headerIconSize={headerIconSize}
+        setHeaderIconSize={setHeaderIconSize}
+        headerHeight={headerHeight}
+        setHeaderHeight={setHeaderHeight}
+        headerHeightAuto={headerHeightAuto}
+        setHeaderHeightAuto={setHeaderHeightAuto}
+        galleryIconSize={galleryIconSize}
+        setGalleryIconSize={setGalleryIconSize}
         wysiwygSpacing={wysiwygSpacing}
         setWysiwygSpacing={setWysiwygSpacing}
         widgetPos={widgetPos}
@@ -1616,6 +1648,25 @@ function App() {
         tableImportFormat={tableImportFormat}
         setTableImportFormat={setTableImportFormat}
         insertAtCursor={insertAtCursor}
+      />
+
+      {/* Audio Typing Synth Presets Modal */}
+      <AudioPresetsModal
+        isOpen={isAudioPresetsModalOpen}
+        onClose={() => setIsAudioPresetsModalOpen(false)}
+        settings={typingSound.settings}
+        activePreset={typingSound.activePreset}
+        allPresets={typingSound.allPresets}
+        volume={typingSound.volume}
+        favoritePresetIds={typingSound.favoritePresetIds}
+        toggleEnabled={typingSound.toggleEnabled}
+        setVolume={typingSound.setVolume}
+        setActivePreset={typingSound.setActivePreset}
+        toggleFavoritePreset={typingSound.toggleFavoritePreset}
+        addCustomPreset={typingSound.addCustomPreset}
+        deleteCustomPreset={typingSound.deleteCustomPreset}
+        previewPreset={typingSound.previewPreset}
+        updateSettings={typingSound.updateSettings}
       />
 
       {/* System Dialog Confirmation / Input */}

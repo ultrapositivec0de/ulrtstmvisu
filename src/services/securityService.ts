@@ -1,6 +1,7 @@
 import * as dsteem from '@blazeapps/dsteem';
 import { Buffer } from 'buffer';
 import { get, set, del } from 'idb-keyval';
+import { broadcastWithFallback } from '../lib/steem';
 
 // Storage keys
 const STORAGE_KEY_ACCOUNTS = 'steem_vault_accounts_v3';
@@ -294,7 +295,7 @@ export class SecurityService {
         author,
         permlink
       }];
-      return await client.broadcast.sendOperations([op], privateKey);
+      return await broadcastWithFallback([op], privateKey);
     } catch(err: any) {
       console.error(err);
       throw new Error(`Broadcast logic failed: ${err.message || 'Unknown network error'}`, { cause: err });
@@ -318,7 +319,7 @@ export class SecurityService {
         ops.push(['comment_options', options]);
       }
       
-      return await client.broadcast.sendOperations(ops, privateKey);
+      return await broadcastWithFallback(ops, privateKey);
     } catch (e: any) {
       throw new Error('Publish error: ' + e.message, { cause: e });
     }
@@ -335,7 +336,8 @@ export class SecurityService {
     
     try {
       const privateKey = getDSteem().PrivateKey.fromString(wif);
-      return await client.broadcast.vote(vote, privateKey);
+      const op = ['vote', vote];
+      return await broadcastWithFallback([op], privateKey);
     } catch (e: any) {
       throw new Error('Vote error: ' + e.message, { cause: e });
     }

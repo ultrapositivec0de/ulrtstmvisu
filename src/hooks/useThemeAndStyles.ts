@@ -64,6 +64,42 @@ export const FONT_OPTIONS: FontOption[] = [
   { id: 'raleway', label: 'Raleway', family: '"Raleway", ui-sans-serif, system-ui, sans-serif' },
 ];
 
+export type UiScalePreset = 'compact' | 'normal' | 'large' | 'touch' | 'custom';
+
+export interface UiScaleConfig {
+  headerIconSize: number;
+  headerHeight: number;
+  galleryIconSize: number;
+  toolbarIconSize: number;
+}
+
+export const UI_SCALE_PRESETS: Record<Exclude<UiScalePreset, 'custom'>, UiScaleConfig> = {
+  compact: {
+    headerIconSize: 16,
+    headerHeight: 50,
+    galleryIconSize: 14,
+    toolbarIconSize: 16,
+  },
+  normal: {
+    headerIconSize: 18,
+    headerHeight: 56,
+    galleryIconSize: 16,
+    toolbarIconSize: 20,
+  },
+  large: {
+    headerIconSize: 20,
+    headerHeight: 62,
+    galleryIconSize: 18,
+    toolbarIconSize: 24,
+  },
+  touch: {
+    headerIconSize: 22,
+    headerHeight: 68,
+    galleryIconSize: 20,
+    toolbarIconSize: 26,
+  },
+};
+
 export function useThemeAndStyles() {
   const [isDarkMode, setIsDarkMode] = useState(() => localStorage.getItem('steem_dark_mode') !== 'false');
   const [visualStyle, setVisualStyle] = useState<'standard' | 'neon'>(() => (localStorage.getItem('steem_visual_style') as 'standard' | 'neon') || 'standard');
@@ -75,10 +111,60 @@ export function useThemeAndStyles() {
     const saved = localStorage.getItem('steem_editor_font_size');
     return saved ? parseInt(saved, 10) : 16;
   });
+
+  // UI Scale & Sizing states
+  const [uiScalePreset, setUiScalePreset] = useState<UiScalePreset>(() => {
+    const saved = localStorage.getItem('steem_ui_scale_preset') as UiScalePreset | null;
+    if (saved && (saved in UI_SCALE_PRESETS || saved === 'custom')) {
+      return saved;
+    }
+    const isMobile = typeof window !== 'undefined' && (window.innerWidth < 768 || window.matchMedia('(pointer: coarse)').matches);
+    return isMobile ? 'touch' : 'normal';
+  });
+
+  const [headerIconSize, setHeaderIconSize] = useState<number>(() => {
+    const saved = localStorage.getItem('steem_ui_header_icon_size');
+    if (saved) return parseInt(saved, 10);
+    const preset = (localStorage.getItem('steem_ui_scale_preset') as UiScalePreset) || (typeof window !== 'undefined' && (window.innerWidth < 768 || window.matchMedia('(pointer: coarse)').matches) ? 'touch' : 'normal');
+    return (preset in UI_SCALE_PRESETS ? UI_SCALE_PRESETS[preset as keyof typeof UI_SCALE_PRESETS].headerIconSize : 18);
+  });
+
+  const [headerHeightAuto, setHeaderHeightAuto] = useState<boolean>(() => {
+    const saved = localStorage.getItem('steem_ui_header_height_auto');
+    return saved !== null ? saved === 'true' : true;
+  });
+
+  const [headerHeight, setHeaderHeight] = useState<number>(() => {
+    const saved = localStorage.getItem('steem_ui_header_height');
+    if (saved) return parseInt(saved, 10);
+    const preset = (localStorage.getItem('steem_ui_scale_preset') as UiScalePreset) || (typeof window !== 'undefined' && (window.innerWidth < 768 || window.matchMedia('(pointer: coarse)').matches) ? 'touch' : 'normal');
+    return (preset in UI_SCALE_PRESETS ? UI_SCALE_PRESETS[preset as keyof typeof UI_SCALE_PRESETS].headerHeight : 56);
+  });
+
+  const [galleryIconSize, setGalleryIconSize] = useState<number>(() => {
+    const saved = localStorage.getItem('steem_ui_gallery_icon_size');
+    if (saved) return parseInt(saved, 10);
+    const preset = (localStorage.getItem('steem_ui_scale_preset') as UiScalePreset) || (typeof window !== 'undefined' && (window.innerWidth < 768 || window.matchMedia('(pointer: coarse)').matches) ? 'touch' : 'normal');
+    return (preset in UI_SCALE_PRESETS ? UI_SCALE_PRESETS[preset as keyof typeof UI_SCALE_PRESETS].galleryIconSize : 16);
+  });
+
   const [toolbarIconSize, setToolbarIconSize] = useState<number>(() => {
     const saved = localStorage.getItem('steem_toolbar_icon_size');
     return saved ? parseInt(saved, 10) : 20;
   });
+
+  const applyUiScalePreset = (preset: UiScalePreset) => {
+    setUiScalePreset(preset);
+    localStorage.setItem('steem_ui_scale_preset', preset);
+    if (preset !== 'custom') {
+      const config = UI_SCALE_PRESETS[preset];
+      setHeaderIconSize(config.headerIconSize);
+      setHeaderHeight(config.headerHeight);
+      setGalleryIconSize(config.galleryIconSize);
+      setToolbarIconSize(config.toolbarIconSize);
+    }
+  };
+
   const [wysiwygSpacing, setWysiwygSpacing] = useState<number>(() => {
     const saved = localStorage.getItem('steem_wysiwyg_spacing');
     return saved ? parseInt(saved, 10) : 6;
@@ -119,6 +205,26 @@ export function useThemeAndStyles() {
   }, [editorFontSize]);
 
   useEffect(() => {
+    localStorage.setItem('steem_ui_scale_preset', uiScalePreset);
+  }, [uiScalePreset]);
+
+  useEffect(() => {
+    localStorage.setItem('steem_ui_header_icon_size', String(headerIconSize));
+  }, [headerIconSize]);
+
+  useEffect(() => {
+    localStorage.setItem('steem_ui_header_height', String(headerHeight));
+  }, [headerHeight]);
+
+  useEffect(() => {
+    localStorage.setItem('steem_ui_header_height_auto', String(headerHeightAuto));
+  }, [headerHeightAuto]);
+
+  useEffect(() => {
+    localStorage.setItem('steem_ui_gallery_icon_size', String(galleryIconSize));
+  }, [galleryIconSize]);
+
+  useEffect(() => {
     localStorage.setItem('steem_toolbar_icon_size', String(toolbarIconSize));
   }, [toolbarIconSize]);
 
@@ -126,7 +232,7 @@ export function useThemeAndStyles() {
     localStorage.setItem('steem_wysiwyg_spacing', String(wysiwygSpacing));
   }, [wysiwygSpacing]);
 
-  // Update CSS variables for theme color, font, font size, toolbar sizing, and WYSIWYG spacing
+  // Update CSS variables for theme color, font, font size, toolbar sizing, UI scaling, and WYSIWYG spacing
   useEffect(() => {
     const theme = activeAssortment.find(t => t.name === themeColor) || activeAssortment[0];
     document.documentElement.style.setProperty('--accent-color', theme.rgb);
@@ -136,11 +242,34 @@ export function useThemeAndStyles() {
     document.documentElement.style.setProperty('--font-editor', font.family);
     document.documentElement.style.setProperty('--editor-font-size', `${editorFontSize}px`);
 
+    // UI Scale tokens
+    const computedHeaderHeight = headerHeightAuto 
+      ? Math.max(48, headerIconSize + 36)
+      : headerHeight;
+    const computedHeaderBtnSize = Math.max(32, headerIconSize + 14);
+
+    document.documentElement.style.setProperty('--header-icon-size', `${headerIconSize}px`);
+    document.documentElement.style.setProperty('--header-btn-size', `${computedHeaderBtnSize}px`);
+    document.documentElement.style.setProperty('--header-height', `${computedHeaderHeight}px`);
+    document.documentElement.style.setProperty('--gallery-icon-size', `${galleryIconSize}px`);
+
     document.documentElement.style.setProperty('--toolbar-icon-size', `${toolbarIconSize}px`);
     document.documentElement.style.setProperty('--toolbar-btn-size', `${toolbarIconSize + 16}px`);
     document.documentElement.style.setProperty('--toolbar-btn-font-size', `${Math.round(toolbarIconSize * 0.85)}px`);
     document.documentElement.style.setProperty('--wysiwyg-spacing', `${wysiwygSpacing}px`);
-  }, [themeColor, activeAssortment, editorFont, fontOptions, editorFontSize, toolbarIconSize, wysiwygSpacing]);
+  }, [
+    themeColor, 
+    activeAssortment, 
+    editorFont, 
+    fontOptions, 
+    editorFontSize, 
+    toolbarIconSize, 
+    wysiwygSpacing,
+    headerIconSize,
+    headerHeight,
+    headerHeightAuto,
+    galleryIconSize
+  ]);
 
   return {
     isDarkMode,
@@ -155,6 +284,18 @@ export function useThemeAndStyles() {
     setEditorFont,
     editorFontSize,
     setEditorFontSize,
+    // UI Scaling
+    uiScalePreset,
+    setUiScalePreset,
+    applyUiScalePreset,
+    headerIconSize,
+    setHeaderIconSize,
+    headerHeight,
+    setHeaderHeight,
+    headerHeightAuto,
+    setHeaderHeightAuto,
+    galleryIconSize,
+    setGalleryIconSize,
     toolbarIconSize,
     setToolbarIconSize,
     wysiwygSpacing,

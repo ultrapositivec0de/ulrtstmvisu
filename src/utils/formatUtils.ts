@@ -8,9 +8,127 @@ export interface FormatRange {
   contentEnd: number;
 }
 
+export interface TechnicalZoneCheck {
+  inTechnicalZone: boolean;
+  zoneType?: 'html_tag' | 'table_separator' | 'table_pipe' | 'code_fence' | 'horizontal_rule' | 'markdown_link_url';
+  safeOffset?: number;
+}
+
+/**
+ * Checks whether an offset in markdown text is inside a technical syntax zone
+ * where injecting cursor markers or applying inline markdown formatting would
+ * corrupt the syntax (e.g. inside HTML tags, table separators, code fences, etc.)
+ */
+export function isOffsetInTechnicalZone(markdown: string, offset: number): TechnicalZoneCheck {
+  if (offset < 0 || offset > markdown.length) {
+    return { inTechnicalZone: false };
+  }
+
+  // 1. Check if inside an HTML tag `<...>`
+  const lastLt = markdown.lastIndexOf('<', offset);
+  const nextGt = markdown.indexOf('>', offset);
+  if (lastLt !== -1 && (nextGt !== -1 || offset === markdown.length)) {
+    const textBetween = markdown.substring(lastLt, nextGt !== -1 ? nextGt + 1 : markdown.length);
+    if (/^<[!/]?[a-zA-Z0-9_-]+(\s+[^>]*)?>?$/.test(textBetween)) {
+      return { 
+        inTechnicalZone: true, 
+        zoneType: 'html_tag',
+        safeOffset: nextGt !== -1 ? nextGt + 1 : lastLt
+      };
+    }
+  }
+
+  // 2. Check line-specific technical zones
+  const lineStart = markdown.lastIndexOf('\n', offset - 1) + 1;
+  const lineEnd = markdown.indexOf('\n', offset);
+  const actualLineEnd = lineEnd === -1 ? markdown.length : lineEnd;
+  const currentLine = markdown.substring(lineStart, actualLineEnd);
+  const colInLine = offset - lineStart;
+
+  // 2a. Table separator row: | --- | --- | or |:---|---:|
+  if (/^\|?(\s*:?-+:?\s*\|?)+\s*$/.test(currentLine.trim()) && currentLine.includes('-')) {
+    return { 
+      inTechnicalZone: true, 
+      zoneType: 'table_separator',
+      safeOffset: lineStart
+    };
+  }
+
+  // 2b. Table border pipe '|' in table rows
+  if ((currentLine.trim().startsWith('|') || currentLine.trim().endsWith('|')) && currentLine.includes('|')) {
+    if (colInLine >= 0 && colInLine < currentLine.length && currentLine[colInLine] === '|') {
+      return {
+        inTechnicalZone: true,
+        zoneType: 'table_pipe',
+        safeOffset: offset + 1 < markdown.length ? offset + 1 : offset
+      };
+    }
+  }
+
+  // 2c. Markdown code fence: ``` or ~~~
+  if (/^\s*(```|~~~)/.test(currentLine)) {
+    return {
+      inTechnicalZone: true,
+      zoneType: 'code_fence',
+      safeOffset: actualLineEnd + 1 <= markdown.length ? actualLineEnd + 1 : lineStart
+    };
+  }
+
+  // 2d. Horizontal Rule: ---, ***, ___
+  if (/^\s*([-*_]\s*){3,}\s*$/.test(currentLine)) {
+    return {
+      inTechnicalZone: true,
+      zoneType: 'horizontal_rule',
+      safeOffset: actualLineEnd + 1 <= markdown.length ? actualLineEnd + 1 : lineStart
+    };
+  }
+
+  // 2e. Inside Markdown Link/Image URL: [text](http...|...) or ![alt](http...|...)
+  const beforeInLine = currentLine.substring(0, colInLine);
+  const afterInLine = currentLine.substring(colInLine);
+  const lastOpenParen = beforeInLine.lastIndexOf('](');
+  if (lastOpenParen !== -1) {
+    const nextCloseParen = afterInLine.indexOf(')');
+    if (nextCloseParen !== -1) {
+      return {
+        inTechnicalZone: true,
+        zoneType: 'markdown_link_url',
+        safeOffset: lineStart + lastOpenParen
+      };
+    }
+  }
+
+  return { inTechnicalZone: false };
+}
+
 export function getAllFormatRangesInLine(line: string): FormatRange[] {
   const ranges: FormatRange[] = [];
   if (!line) return ranges;
+
+  // Mask positions that are inside HTML tags or markdown link URLs or code spans so delimiter checks don't misfire
+  const isIgnored = new Array(line.length).fill(false);
+
+  // 1. Mark HTML tags <...>
+  let inLt = -1;
+  for (let i = 0; i < line.length; i++) {
+    if (line[i] === '<' && (i === 0 || line[i - 1] !== '\\')) {
+      inLt = i;
+    } else if (line[i] === '>' && inLt !== -1) {
+      for (let j = inLt; j <= i; j++) isIgnored[j] = true;
+      inLt = -1;
+    }
+  }
+
+  // 2. Mark Markdown link URLs: ](...)
+  let linkParenStart = -1;
+  for (let i = 0; i < line.length - 1; i++) {
+    if (line[i] === ']' && line[i + 1] === '(' && (i === 0 || line[i - 1] !== '\\')) {
+      linkParenStart = i + 1;
+    } else if (line[i] === ')' && linkParenStart !== -1) {
+      for (let j = linkParenStart; j <= i; j++) isIgnored[j] = true;
+      linkParenStart = -1;
+    }
+  }
 
   // 1. Paired HTML-like tags: <sub>, <sup>, <div class="phishy">, <span class="phishy">
   const htmlPairs: Array<{ formatKey: 'sub' | 'sup' | 'phishy'; openTag: string; closeTag: string }> = [
@@ -58,22 +176,25 @@ export function getAllFormatRangesInLine(line: string): FormatRange[] {
   while (cSearch < line.length) {
     const idx = line.indexOf('`', cSearch);
     if (idx === -1) break;
-    if (idx === 0 || line[idx - 1] !== '\\') {
+    if ((idx === 0 || line[idx - 1] !== '\\') && !isIgnored[idx]) {
       codeIdxs.push(idx);
     }
     cSearch = idx + 1;
   }
   for (let i = 0; i < codeIdxs.length; i += 2) {
     if (i + 1 < codeIdxs.length) {
+      const startCode = codeIdxs[i];
+      const endCode = codeIdxs[i + 1];
       ranges.push({
         formatKey: 'code',
         openTag: '`',
         closeTag: '`',
-        openIdx: codeIdxs[i],
-        closeIdx: codeIdxs[i + 1],
-        contentStart: codeIdxs[i] + 1,
-        contentEnd: codeIdxs[i + 1],
+        openIdx: startCode,
+        closeIdx: endCode,
+        contentStart: startCode + 1,
+        contentEnd: endCode,
       });
+      for (let j = startCode; j <= endCode; j++) isIgnored[j] = true;
     }
   }
 
@@ -83,7 +204,7 @@ export function getAllFormatRangesInLine(line: string): FormatRange[] {
   while (sSearch < line.length) {
     const idx = line.indexOf('~~', sSearch);
     if (idx === -1) break;
-    if (idx === 0 || line[idx - 1] !== '\\') {
+    if ((idx === 0 || line[idx - 1] !== '\\') && !isIgnored[idx] && !isIgnored[idx + 1]) {
       strikeIdxs.push(idx);
     }
     sSearch = idx + 2;
@@ -106,13 +227,13 @@ export function getAllFormatRangesInLine(line: string): FormatRange[] {
   const starRuns: Array<{ start: number; end: number; len: number }> = [];
   let i = 0;
   while (i < line.length) {
-    if (line[i] === '*') {
+    if (line[i] === '*' && !isIgnored[i]) {
       if (i > 0 && line[i - 1] === '\\') {
         i++;
         continue;
       }
       const rStart = i;
-      while (i < line.length && line[i] === '*') {
+      while (i < line.length && line[i] === '*' && !isIgnored[i]) {
         i++;
       }
       starRuns.push({ start: rStart, end: i, len: i - rStart });
@@ -212,13 +333,13 @@ export function getAllFormatRangesInLine(line: string): FormatRange[] {
   const underRuns: Array<{ start: number; end: number; len: number }> = [];
   let j = 0;
   while (j < line.length) {
-    if (line[j] === '_') {
+    if (line[j] === '_' && !isIgnored[j]) {
       if (j > 0 && line[j - 1] === '\\') {
         j++;
         continue;
       }
       const rStart = j;
-      while (j < line.length && line[j] === '_') {
+      while (j < line.length && line[j] === '_' && !isIgnored[j]) {
         j++;
       }
       underRuns.push({ start: rStart, end: j, len: j - rStart });

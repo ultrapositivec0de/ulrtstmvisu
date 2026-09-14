@@ -1,5 +1,4 @@
 import React from 'react';
-import { motion } from 'motion/react';
 import { 
   X, 
   Shield, 
@@ -13,6 +12,7 @@ import {
   Code,
   RotateCcw
 } from 'lucide-react';
+import { BaseModal } from './BaseModal';
 import { cn } from '../../lib/utils';
 import { DEFAULT_APP_AGENT } from '../../hooks/usePostSettings';
 
@@ -44,26 +44,23 @@ export const AboutModal: React.FC<AboutModalProps> = ({
   if (!isOpen) return null;
 
   return (
-    <div key="modal-about" className="fixed inset-0 z-[300] flex items-center justify-center p-4">
-      <motion.div 
-        initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-        className="absolute inset-0 bg-slate-950/90"
+    <BaseModal
+      isOpen={isOpen}
+      onClose={onClose}
+      size="2xl"
+      hideHeader
+      modalKey="modal-about"
+      bodyClassName="p-6 sm:p-8 relative"
+    >
+      <button 
         onClick={onClose}
-      />
-      <motion.div 
-        initial={{ scale: 0.9, opacity: 0, y: 20 }} 
-        animate={{ scale: 1, opacity: 1, y: 0 }} 
-        exit={{ scale: 0.9, opacity: 0, y: 20 }}
-        className="relative bg-slate-900 border border-slate-800 rounded-3xl shadow-none p-8 max-w-2xl w-full max-h-[90vh] overflow-y-auto custom-scrollbar"
+        className="absolute top-6 right-6 p-1.5 text-[var(--text-muted)] hover:text-[var(--text-main)] hover:bg-[var(--border-color)] rounded-xl transition-colors z-10"
+        aria-label="Close"
       >
-        <button 
-          onClick={onClose}
-          className="absolute top-6 right-6 text-slate-500 hover:text-white"
-        >
-          <X size={24} />
-        </button>
+        <X size={20} />
+      </button>
 
-        <div className="text-center mb-8">
+      <div className="text-center mb-8">
           <div className="w-20 h-20 bg-cyan-500 rounded-2xl flex items-center justify-center text-white text-4xl font-bold mx-auto mb-6 shadow-none">U</div>
           <h2 className="text-3xl font-bold mb-2 tracking-tight">Ultra Steem <span className="text-cyan-400">Editor</span></h2>
           <p className="text-slate-400 text-sm max-w-sm mx-auto leading-relaxed mb-4">{t('aboutDesc')}</p>
@@ -236,7 +233,6 @@ export const AboutModal: React.FC<AboutModalProps> = ({
              </div>
           </div>
         </div>
-      </motion.div>
-    </div>
+    </BaseModal>
   );
 };

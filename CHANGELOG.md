@@ -1,4 +1,18 @@
 # Changelog
+## [2026-09-14] - Version 4.8.5 (ultrasteemeditor/4.8.5)
+### Added & Improved
+- **Technical Syntax Protection & Caret Safety**: Prevented accidental markdown formatting injection and marker pollution inside HTML tags (`<... >`), markdown table separator rows (`| --- |`), code fences (```` ``` ````), and link URLs.
+- **Bidirectional Table & Block Cursor Synchronization**: Enhanced cursor marker preservation across DOM and Markdown transformations to ensure caret positioning remains accurate without losing syntax or dropping characters.
+- **Masked Format Parser**: Upgraded markdown delimiter matching with syntax masking to isolate raw formatting marks from URLs and HTML tag attributes.
+
+## [2026-09-14] - Version 4.8.4 (ultrasteemeditor/4.8.4)
+### Added & Improved
+- Crystal Bell (FM Synthesis) Acoustic Refinement: Integrated master studio dynamics compressor and limiter to prevent high-frequency intermodulation distortion; implemented acoustic register differentiation across octaves (C4–E4 singing bowl resonance, G4–C5 singing bell, D5–C6 crystal chime with airy 2.76x harmonic sparkle) and dynamic FM modulation envelope.
+- Organic Water Drops (Liquid Cavitation Model): Replaced mechanical tone sweep with physical dual-formant cavity resonance (1.48x secondary harmonic), non-linear pitch rise with soft bubble detachment tail, and warm 2800 Hz low-pass filtering for soft, organic droplet acoustics.
+- Authentic Geiger Counter Radiation Clicks: Replaced tonal oscillation with ultra-short (2.5–3.5 ms) electrostatic ionization discharge micro-spikes and bandpass filtering (4800–6500 Hz) for genuine dry Geiger-Müller counter clicks.
+- Master Audio Pipeline Anti-Clipping: Added studio-grade DynamicsCompressorNode to master bus for pristine polyphonic voice summation during rapid typing.
+- Cross-Platform Release Synchronization: Synchronized version across package.json, Tauri, Cargo.toml, Service Worker cache, metadata, and application settings.
+
 ## [2026-09-03] - Version 4.8.0 (ultrasteemeditor/4.8.0)
 ### Added & Improved
 - **Release Updates**: Оптимізація нижнього відступу редактора на ПК та оновлення залежностей (glob, yaeti/event-target-shim).

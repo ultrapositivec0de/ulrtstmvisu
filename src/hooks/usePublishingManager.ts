@@ -19,6 +19,9 @@ export interface UsePublishingManagerOptions {
   username: string;
   rewardType: 'SP' | '50' | '0';
   beneficiaries: any[];
+  vaultPin?: string;
+  initVault?: () => Promise<void>;
+  promptDialog?: (message: string, defaultValue?: string, title?: string, inputType?: 'text' | 'password') => Promise<string | null>;
   performBroadcast: (
     activeUser: string,
     title: string,
@@ -51,6 +54,9 @@ export function usePublishingManager(options: UsePublishingManagerOptions) {
     username,
     rewardType,
     beneficiaries,
+    vaultPin,
+    initVault,
+    promptDialog,
     performBroadcast,
     processContentForSteem,
     addToQueue,
@@ -186,6 +192,25 @@ export function usePublishingManager(options: UsePublishingManagerOptions) {
       return;
     }
 
+    // Pre-validate and unlock vault prior to setting loading state to avoid stuck spinners
+    if (authType === 'VAULT' && SecurityService.isLocked()) {
+      let pin = vaultPin?.trim() || '';
+      if (!pin && promptDialog) {
+        pin = (await promptDialog(t('enterPin'), '', undefined, 'password')) || '';
+      }
+      if (!pin) {
+        setPubLog({ msg: t('pinRequired') || 'PIN required', type: 'error' });
+        return;
+      }
+      try {
+        await SecurityService.unlock(pin);
+        if (initVault) await initVault();
+      } catch (e: any) {
+        setPubLog({ msg: `❌ ${e.message || t('pinError')}`, type: 'error' });
+        return;
+      }
+    }
+
     setPubLog({ msg: t('publishing'), type: 'loading' });
     
     try {
@@ -210,6 +235,9 @@ export function usePublishingManager(options: UsePublishingManagerOptions) {
     rewardType,
     beneficiaries,
     setActiveModal,
+    vaultPin,
+    initVault,
+    promptDialog,
   ]);
 
   const handleAddToQueue = useCallback(() => {

@@ -1,6 +1,6 @@
 import React from 'react';
-import { motion } from 'motion/react';
-import { Tags, LayoutGrid, Plus, X } from 'lucide-react';
+import { Tags, LayoutGrid, Plus } from 'lucide-react';
+import { BaseModal } from './BaseModal';
 import { cn } from '../../lib/utils';
 
 interface Community {
@@ -30,43 +30,29 @@ export const TagPresetsModal: React.FC<TagPresetsModalProps> = ({
   commonTags,
   t
 }) => {
-  if (!isOpen) return null;
-
   return (
-    <div key="modal-tag-presets" className="fixed inset-0 z-[200] flex items-center justify-center p-4">
-      <motion.div 
-        initial={{ opacity: 0 }} 
-        animate={{ opacity: 1 }} 
-        exit={{ opacity: 0 }}
-        className="absolute inset-0 bg-slate-950/90"
-        onClick={onClose}
-      />
-      <motion.div 
-        initial={{ scale: 0.9, opacity: 0, y: 20 }}
-        animate={{ scale: 1, opacity: 1, y: 0 }}
-        exit={{ scale: 0.9, opacity: 0, y: 20 }}
-        className="relative w-full sm:max-w-2xl bg-slate-900 border border-slate-800 rounded-2xl shadow-none overflow-hidden flex flex-col max-h-[90vh] sm:max-h-[80vh]"
-      >
-        <div className="p-4 sm:p-6 border-b border-slate-800 flex justify-between items-center bg-slate-800/30 shrink-0">
-          <h2 className="text-lg sm:text-xl font-bold flex items-center gap-2">
-            <Tags className="text-cyan-400" /> {t('tagPresets')}
-          </h2>
-          <button onClick={onClose} className="text-slate-500 hover:text-white">
-            <X />
-          </button>
-        </div>
-        
-        <div className="p-6 overflow-y-auto custom-scrollbar space-y-8">
-          <section>
-            <h3 className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-4 flex items-center gap-2">
-              <LayoutGrid size={18} /> {t('communities')}
-            </h3>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              {communities.map((comm, cIdx) => (
+    <BaseModal
+      isOpen={isOpen}
+      onClose={onClose}
+      size="2xl"
+      icon={Tags}
+      title={t('tagPresets')}
+      modalKey="modal-tag-presets"
+      bodyClassName="flex flex-col flex-1 overflow-hidden"
+    >
+      <div className="p-5 sm:p-6 overflow-y-auto custom-scrollbar space-y-6 flex-1">
+        <section>
+          <h3 className="text-xs font-bold text-[var(--text-muted)] uppercase tracking-widest mb-3.5 flex items-center gap-2">
+            <LayoutGrid size={16} /> {t('communities')}
+          </h3>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            {communities.map((comm, cIdx) => {
+              const allSelected = comm.tags.length > 0 && comm.tags.every(t => pubTags.includes(t));
+              const someSelected = comm.tags.some(t => pubTags.includes(t));
+              return (
                 <div 
                   key={comm.id || `comm-${cIdx}`}
                   onClick={() => {
-                    const allSelected = comm.tags.every(t => pubTags.includes(t));
                     if (allSelected) {
                       setPubTags(prev => {
                         const tags = prev.split(' ').filter(t => t.trim());
@@ -83,24 +69,25 @@ export const TagPresetsModal: React.FC<TagPresetsModalProps> = ({
                     }
                   }}
                   className={cn(
-                    "flex flex-col items-start p-4 border rounded-xl transition-all bg-slate-800/50 border-slate-700 cursor-pointer hover:border-cyan-500/50",
-                    comm.tags.every(t => pubTags.includes(t)) ? "border-cyan-500 bg-cyan-500/10" : (comm.tags.some(t => pubTags.includes(t)) && "border-cyan-500/50 bg-cyan-500/5")
+                    "flex flex-col items-start p-3.5 border rounded-xl transition-all bg-[var(--bg-main)]/60 border-[var(--border-color)] cursor-pointer hover:border-cyan-500/50",
+                    allSelected ? "border-cyan-500 bg-cyan-500/10" : (someSelected && "border-cyan-500/50 bg-cyan-500/5")
                   )}
                 >
-                  <span className="font-bold text-sm text-slate-200 mb-2">{comm.name}</span>
+                  <span className="font-bold text-xs sm:text-sm text-[var(--text-main)] mb-2">{comm.name}</span>
                   <div className="flex flex-wrap gap-1">
                     {comm.tags.filter(Boolean).map((tag, tIdx) => (
                       <button
+                        type="button"
                         key={`preset-comm-${comm.id || cIdx}-tag-${tag}-${tIdx}`}
                         onClick={(e) => {
                           e.stopPropagation();
                           toggleTag(tag);
                         }}
                         className={cn(
-                          "text-[9px] px-2 py-0.5 rounded-full border transition-all",
+                          "text-[10px] px-2 py-0.5 rounded-full border transition-all font-medium",
                           pubTags.includes(tag)
-                            ? "bg-cyan-600 border-cyan-500 text-white"
-                            : "bg-slate-900 border-slate-800 text-slate-500 hover:border-slate-600"
+                            ? "bg-cyan-600 border-cyan-500 text-white shadow-xs"
+                            : "bg-[var(--bg-card)] border-[var(--border-color)] text-[var(--text-muted)] hover:border-slate-500"
                         )}
                       >
                         #{tag}
@@ -108,48 +95,51 @@ export const TagPresetsModal: React.FC<TagPresetsModalProps> = ({
                     ))}
                   </div>
                 </div>
-              ))}
-            </div>
-          </section>
-          
-          <section>
-            <h3 className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-4 flex items-center gap-2">
-              <Plus size={18} /> {t('commonTags')}
-            </h3>
-            <div className="flex flex-wrap gap-2">
-              {commonTags.filter(Boolean).map((tag, tIdx) => (
-                <button 
-                  key={`preset-common-tag-${tag}-${tIdx}`}
-                  onClick={() => toggleTag(tag)}
-                  className={cn(
-                    "px-3 py-1.5 rounded-full text-xs font-medium border transition-all",
-                    pubTags.includes(tag) 
-                      ? "bg-cyan-600 border-cyan-500 text-white" 
-                      : "bg-slate-800 border-slate-700 text-slate-400 hover:border-slate-500"
-                  )}
-                >
-                  #{tag}
-                </button>
-              ))}
-            </div>
-          </section>
-        </div>
+              );
+            })}
+          </div>
+        </section>
         
-        <div className="p-6 bg-slate-800/30 border-t border-slate-800 flex justify-between items-center">
-          <button 
-            onClick={() => setPubTags('')}
-            className="px-4 py-2 text-xs font-bold text-red-400 hover:text-red-300 transition-colors"
-          >
-            {t('clear')}
-          </button>
-          <button 
-            onClick={onClose}
-            className="px-6 py-2 bg-cyan-600 hover:bg-cyan-500 text-white font-bold rounded-lg text-sm transition-all"
-          >
-            {t('done')}
-          </button>
-        </div>
-      </motion.div>
-    </div>
+        <section>
+          <h3 className="text-xs font-bold text-[var(--text-muted)] uppercase tracking-widest mb-3 flex items-center gap-2">
+            <Plus size={16} /> {t('commonTags')}
+          </h3>
+          <div className="flex flex-wrap gap-2">
+            {commonTags.filter(Boolean).map((tag, tIdx) => (
+              <button 
+                type="button"
+                key={`preset-common-tag-${tag}-${tIdx}`}
+                onClick={() => toggleTag(tag)}
+                className={cn(
+                  "px-3 py-1.5 rounded-full text-xs font-medium border transition-all cursor-pointer",
+                  pubTags.includes(tag) 
+                    ? "bg-cyan-600 border-cyan-500 text-white shadow-xs" 
+                    : "bg-[var(--bg-card)] border-[var(--border-color)] text-[var(--text-muted)] hover:border-slate-500 hover:text-[var(--text-main)]"
+                )}
+              >
+                #{tag}
+              </button>
+            ))}
+          </div>
+        </section>
+      </div>
+      
+      <div className="p-4 sm:p-5 bg-[var(--bg-main)]/40 border-t border-[var(--modal-border)] flex justify-between items-center shrink-0">
+        <button 
+          type="button"
+          onClick={() => setPubTags('')}
+          className="px-3.5 py-2 text-xs font-bold text-red-400 hover:text-red-300 transition-colors rounded-lg hover:bg-red-500/10 cursor-pointer"
+        >
+          {t('clear')}
+        </button>
+        <button 
+          type="button"
+          onClick={onClose}
+          className="px-5 py-2 bg-cyan-600 hover:bg-cyan-500 text-white font-bold rounded-xl text-xs sm:text-sm transition-all shadow-md shadow-cyan-900/20 active:scale-[0.98] cursor-pointer"
+        >
+          {t('done')}
+        </button>
+      </div>
+    </BaseModal>
   );
 };

@@ -1,0 +1,714 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Zen Audio Synth Demo</title>
+    <style>
+        :root {
+            --bg-color: #1a1b26;
+            --panel-color: #24283b;
+            --text-color: #a9b1d6;
+            --accent-color: #7aa2f7;
+            --orb-color: #2ac3de;
+        }
+
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            height: 100vh;
+            overflow: hidden;
+            user-select: none;
+        }
+
+        h1 {
+            font-weight: 300;
+            letter-spacing: 2px;
+            margin-top: 20px;
+            color: var(--accent-color);
+        }
+
+        .container {
+            display: flex;
+            gap: 40px;
+            margin-top: 30px;
+            align-items: flex-start;
+        }
+
+        /* Панель налаштувань */
+        .controls {
+            background: var(--panel-color);
+            padding: 25px;
+            border-radius: 15px;
+            width: 300px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+        }
+
+        .control-group {
+            margin-bottom: 20px;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 8px;
+            font-size: 0.9rem;
+            font-weight: 600;
+        }
+
+        select, input[type="range"] {
+            width: 100%;
+            background: #13141f;
+            color: var(--text-color);
+            border: 1px solid #414868;
+            padding: 8px;
+            border-radius: 6px;
+            outline: none;
+        }
+
+        select:focus {
+            border-color: var(--accent-color);
+        }
+
+        button {
+            background: var(--accent-color);
+            color: #1a1b26;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: bold;
+            width: 100%;
+            transition: 0.2s;
+        }
+
+        button:hover {
+            opacity: 0.9;
+            transform: translateY(-2px);
+        }
+
+        /* Canvas для відображення */
+        .visualizer {
+            position: relative;
+            width: 400px;
+            height: 400px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        canvas {
+            border-radius: 50%;
+            box-shadow: 0 0 50px rgba(42, 195, 222, 0.1);
+            transition: transform 0.1s ease-out;
+        }
+
+        .status {
+            margin-top: 10px;
+            font-size: 0.8rem;
+            color: #565f89;
+            text-align: center;
+        }
+
+        .hint {
+            margin-top: 20px;
+            font-size: 0.85rem;
+            color: #565f89;
+            text-align: center;
+            max-width: 600px;
+        }
+    </style>
+</head>
+<body>
+<!-- Поле введення (приховане або візуальне) -->
+<div style="margin-top: 90px; width: 400px;">
+    <label style="display: block; margin-bottom: 5px;">Ваші нотатки (автозбереження):</label>
+    <textarea
+        id="autoSaveText"
+        rows="5"
+        style="width: 80%; padding: 10px; border-radius: 8px; border: 1px solid #24283b; background: #13141f; color: #a9b1d6; font-family: monospace;"
+        placeholder="Напишіть тут щось..."
+    ></textarea>
+</div>
+
+<script>
+    // 1. Відновлення тексту при завантаженні
+    const savedText = localStorage.getItem('zen_autosave_text');
+    if (savedText) {
+        document.getElementById('autoSaveText').value = savedText;
+    }
+
+    // 2. Автозбереження при зміні
+    const textArea = document.getElementById('autoSaveText');
+    textArea.addEventListener('input', (e) => {
+        localStorage.setItem('zen_autosave_text', e.target.value);
+        statusText.textContent = "Збережено в кеш!";
+        setTimeout(() => statusText.textContent = "Натисніть будь-яку клавішу або клікніть", 2000);
+    });
+</script>
+    <h1>Zen Audio Synth</h1>
+
+    <div class="container">
+        <!-- Панель керування -->
+        <div class="controls">
+            <div class="control-group">
+                <label>Звук клавіш (FM-синтез)</label>
+                <select id="keyMode">
+                    <option value="bell">Дзвіночки (FM)</option>
+                    <option value="bubbles">Краплі (Slide)</option>
+                    <option value="geiger">Дозиметр (Noise)</option>
+                    <option value="silent">Вимкнено</option>
+                </select>
+            </div>
+            <div class="control-group">
+                <label>Гучність клавіш</label>
+                <input type="range" id="keyVol" min="0" max="1" step="0.01" value="0.5">
+            </div>
+
+            <div class="control-group">
+                <label>Фоновий ембієнт</label>
+                <select id="bgMode">
+                    <option value="off">Вимкнено</option>
+                    <option value="drone">Фокус (Drone)</option>
+                    <option value="rain">Космічний дощ</option>
+                    <option value="bowl">Співаючі чаші</option>
+                </select>
+            </div>
+            <div class="control-group">
+                <label>Гучність фону</label>
+                <input type="range" id="bgVol" min="0" max="1" step="0.01" value="0.3">
+            </div>
+
+            <div class="status" id="statusText">Натисніть будь-яку клавішу або клікніть</div>
+        </div>
+
+<!-- Поле введення (приховане або візуальне) -->
+<div style="margin-top: 20px; width: 600px;">
+    <label style="display: block; margin-bottom: 5px;">Ваші нотатки (автозбереження):</label>
+    <textarea
+        id="autoSaveText"
+        rows="5"
+        style="width: 100%; padding: 10px; border-radius: 8px; border: 1px solid #24283b; background: #13141f; color: #a9b1d6; font-family: monospace;"
+        placeholder="Напишіть тут щось..."
+    ></textarea>
+</div>
+
+<script>
+    // 1. Відновлення тексту при завантаженні
+    const savedText = localStorage.getItem('zen_autosave_text');
+    if (savedText) {
+        document.getElementById('autoSaveText').value = savedText;
+    }
+
+    // 2. Автозбереження при зміні
+    const textArea = document.getElementById('autoSaveText');
+    textArea.addEventListener('input', (e) => {
+        localStorage.setItem('zen_autosave_text', e.target.value);
+        statusText.textContent = "Збережено в кеш!";
+        setTimeout(() => statusText.textContent = "Натисніть будь-яку клавішу або клікніть", 2000);
+    });
+</script>
+
+        <!-- Візуалізатор -->
+        <div class="visualizer">
+            <canvas id="orbCanvas" width="300" height="300"></canvas>
+        </div>
+    </div>
+
+    <div class="hint">
+        Натискайте клавіші на клавіатурі або клікайте мишкою по екрану.<br>
+        Звук генерується математично в реальному часі (Web Audio API).
+    </div>
+
+<script>
+/**
+ * AUDIO ENGINE
+ * Використовує Web Audio API для генерації звуку без файлів.
+ */
+class AudioEngine {
+    constructor() {
+        this.ctx = null;
+        this.masterGain = null;
+        this.bgNode = null;
+        this.bgGain = null;
+        this.isRunning = false;
+
+        // Налаштування
+        this.keyMode = 'bell';
+        this.keyVol = 0.5;
+        this.bgMode = 'off';
+        this.bgVol = 0.3;
+
+        // Пентатоніка
+        this.pentatonic = [261.63, 293.66, 329.63, 392.00, 440.00, 523.25, 587.33, 659.25, 783.99, 880.00, 1046.50];
+    }
+
+    init() {
+        if (this.ctx) return;
+        const AudioContext = window.AudioContext || window.webkitAudioContext;
+        this.ctx = new AudioContext();
+        this.masterGain = this.ctx.createGain();
+        this.masterGain.gain.value = 1.0;
+        this.masterGain.connect(this.ctx.destination);
+        this.isRunning = true;
+    }
+
+    // --- КЕРУВАННЯ ФОНОВИМ ЗВУКОМ ---
+    setBgMode(mode) {
+        this.bgMode = mode;
+        this.stopBg();
+        if (mode !== 'off') {
+            this.startBg();
+        }
+    }
+
+    setBgVolume(vol) {
+        this.bgVol = vol;
+        if (this.bgGain) {
+            // Плавне згасання/зростання
+            this.bgGain.gain.setTargetAtTime(vol, this.ctx.currentTime, 0.1);
+        }
+    }
+
+    stopBg() {
+        if (this.bgNode) {
+            try {
+                this.bgNode.stop();
+                this.bgNode.disconnect();
+            } catch(e) {}
+            this.bgNode = null;
+        }
+        if (this.bgGain) {
+            this.bgGain.disconnect();
+            this.bgGain = null;
+        }
+    }
+
+    startBg() {
+        if (!this.ctx) this.init();
+        this.bgGain = this.ctx.createGain();
+        this.bgGain.gain.value = 0;
+        this.bgGain.connect(this.masterGain);
+
+        if (this.bgMode === 'drone') {
+            this._createDrone();
+        } else if (this.bgMode === 'rain') {
+            this._createRain();
+        } else if (this.bgMode === 'bowl') {
+            this._createBowl();
+        }
+
+        // Плавний вхід
+        this.bgGain.gain.setTargetAtTime(this.bgVol, this.ctx.currentTime, 1.0);
+    }
+
+    _createDrone() {
+        // Два осцилятори з бітінгом
+        const osc1 = this.ctx.createOscillator();
+        const osc2 = this.ctx.createOscillator();
+        const gain = this.ctx.createGain();
+
+        osc1.type = 'sine';
+        osc2.type = 'sine';
+        osc1.frequency.value = 75;
+        osc2.frequency.value = 75.5; // Бітінг 0.5 Гц
+
+        osc1.connect(gain);
+        osc2.connect(gain);
+        gain.connect(this.bgGain);
+
+        osc1.start();
+        osc2.start();
+        this.bgNode = { stop: () => { osc1.stop(); osc2.stop(); gain.disconnect(); } };
+    }
+
+    _createRain() {
+        // Шум + фільтр
+        const bufferSize = this.ctx.sampleRate * 2;
+        const buffer = this.ctx.createBuffer(1, bufferSize, this.ctx.sampleRate);
+        const data = buffer.getChannelData(0);
+        for (let i = 0; i < bufferSize; i++) {
+            data[i] = Math.random() * 2 - 1;
+        }
+
+        const noise = this.ctx.createBufferSource();
+        noise.buffer = buffer;
+        noise.loop = true;
+
+        const filter = this.ctx.createBiquadFilter();
+        filter.type = 'lowpass';
+        filter.frequency.value = 400;
+
+        // LFO для фільтру
+        const lfo = this.ctx.createOscillator();
+        lfo.type = 'sine';
+        lfo.frequency.value = 0.2;
+        const lfoGain = this.ctx.createGain();
+        lfoGain.gain.value = 300; // Рух фільтру
+
+        lfo.connect(lfoGain);
+        lfoGain.connect(filter.frequency);
+
+        noise.connect(filter);
+        filter.connect(this.bgGain);
+
+        noise.start();
+        lfo.start();
+        this.bgNode = { stop: () => { noise.stop(); lfo.stop(); filter.disconnect(); lfoGain.disconnect(); } };
+    }
+
+    _createBowl() {
+        // Аддитивний синтез
+        const freqs = [110, 220, 330, 440, 550];
+        const nodes = [];
+
+        freqs.forEach((f, i) => {
+            const osc = this.ctx.createOscillator();
+            const gain = this.ctx.createGain();
+            osc.type = 'sine';
+            osc.frequency.value = f;
+            gain.gain.value = 0.1 / (i + 1);
+
+            osc.connect(gain);
+            gain.connect(this.bgGain);
+            osc.start();
+            nodes.push({osc, gain});
+        });
+
+        this.bgNode = {
+            stop: () => nodes.forEach(n => { n.osc.stop(); n.gain.disconnect(); })
+        };
+    }
+
+    // --- ЗВУКІ КЛЮЧІВ ---
+    playKey(char, isBackspace = false, isEnter = false) {
+        if (!this.ctx) this.init();
+        if (this.ctx.state === 'suspended') this.ctx.resume();
+
+        const now = this.ctx.currentTime;
+        const vol = this.keyVol;
+        if (vol <= 0) return;
+
+        if (this.keyMode === 'silent') return;
+
+        if (isBackspace) {
+            this._playBackspace(now, vol);
+        } else if (isEnter) {
+            this._playEnter(now, vol);
+        } else {
+            this._playKeySound(char, now, vol);
+        }
+    }
+
+    _playKeySound(char, now, vol) {
+        if (this.keyMode === 'geiger') {
+            this._playGeiger(now, vol);
+        } else if (this.keyMode === 'bubbles') {
+            this._playBubble(now, vol);
+        } else if (this.keyMode === 'bell') {
+            this._playBell(char, now, vol);
+        }
+    }
+
+    _playBell(char, now, vol) {
+        // FM Синтез для дзвіночків
+        const osc = this.ctx.createOscillator();
+        const mod = this.ctx.createOscillator();
+        const modGain = this.ctx.createGain();
+        const gain = this.ctx.createGain();
+
+        const freq = this.pentatonic[char.charCodeAt(0) % this.pentatonic.length];
+        const modFreq = freq * 1.5; // Негармонічна модуляція
+
+        // Налаштування FM-синтезу (Дзвіночки)
+        // Носій (Carrier)
+        osc.type = 'sine';
+        osc.frequency.value = freq;
+
+        // Модулятор (Modulator) - створює металевий тембр
+        mod.type = 'sine';
+        mod.frequency.value = modFreq;
+        modGain.gain.value = freq * 0.5; // Глибина модуляції
+
+        // З'єднання: Модулятор -> Частота носія
+        mod.connect(modGain);
+        modGain.connect(osc.frequency);
+
+        // Обгортка гучності (Envelope) для дзвіночка: швидка атака, повільне затухання
+        gain.gain.setValueAtTime(0, now);
+        gain.gain.linearRampToValueAtTime(vol * 0.6, now + 0.01); // Атака
+        gain.gain.exponentialRampToValueAtTime(0.001, now + 1.5); // Затухання (довге)
+
+        // З'єднання з виходом
+        osc.connect(gain);
+        gain.connect(this.masterGain);
+
+        // Запуск та зупинка
+        osc.start(now);
+        mod.start(now);
+        osc.stop(now + 1.6);
+        mod.stop(now + 1.6);
+
+        // Очистка вузлів після завершення (важливо для пам'яті)
+        setTimeout(() => {
+            osc.disconnect();
+            mod.disconnect();
+            gain.disconnect();
+            modGain.disconnect();
+        }, 1700);
+    }
+
+    _playBubble(now, vol) {
+        // Краплі води: Швидкий слайд частоти вгору
+        const osc = this.ctx.createOscillator();
+        const gain = this.ctx.createGain();
+
+        osc.type = 'sine';
+        const baseFreq = 800 + Math.random() * 400; // Випадкова база
+
+        // Частота зростає від base до base*2 за 0.05 сек
+        osc.frequency.setValueAtTime(baseFreq, now);
+        osc.frequency.exponentialRampToValueAtTime(baseFreq * 1.8, now + 0.05);
+
+        // Обгортка: дуже коротка
+        gain.gain.setValueAtTime(0, now);
+        gain.gain.linearRampToValueAtTime(vol * 0.8, now + 0.01);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.06);
+
+        osc.connect(gain);
+        gain.connect(this.masterGain);
+
+        osc.start(now);
+        osc.stop(now + 0.07);
+
+        setTimeout(() => {
+            osc.disconnect();
+            gain.disconnect();
+        }, 100);
+    }
+
+    _playGeiger(now, vol) {
+        // Дозиметр: Випадковий шумний тріск
+        const osc = this.ctx.createOscillator();
+        const gain = this.ctx.createGain();
+
+        osc.type = 'triangle'; // Трикутна хвиля для різкості
+        const freq = 1800 + Math.random() * 700;
+        osc.frequency.value = freq;
+
+        // Дуже коротка обгортка
+        gain.gain.setValueAtTime(0, now);
+        gain.gain.linearRampToValueAtTime(vol * 0.5, now + 0.005);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.05);
+
+        osc.connect(gain);
+        gain.connect(this.masterGain);
+
+        osc.start(now);
+        osc.stop(now + 0.06);
+
+        setTimeout(() => {
+            osc.disconnect();
+            gain.disconnect();
+        }, 100);
+    }
+
+    _playBackspace(now, vol) {
+        // Звук видалення: спад частоти
+        const osc = this.ctx.createOscillator();
+        const gain = this.ctx.createGain();
+
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(280, now);
+        osc.frequency.exponentialRampToValueAtTime(90, now + 0.1);
+
+        gain.gain.setValueAtTime(vol * 0.4, now);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.1);
+
+        osc.connect(gain);
+        gain.connect(this.masterGain);
+
+        osc.start(now);
+        osc.stop(now + 0.11);
+
+        setTimeout(() => {
+            osc.disconnect();
+            gain.disconnect();
+        }, 150);
+    }
+
+    _playEnter(now, vol) {
+        // Звук Enter: Дзвіночок з реверберацією (імітація)
+        const osc = this.ctx.createOscillator();
+        const gain = this.ctx.createGain();
+
+        osc.type = 'sine';
+        osc.frequency.value = 1450;
+
+        // Дуже довге затухання
+        gain.gain.setValueAtTime(0, now);
+        gain.gain.linearRampToValueAtTime(vol * 0.5, now + 0.02);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + 2.0);
+
+        osc.connect(gain);
+        gain.connect(this.masterGain);
+
+        osc.start(now);
+        osc.stop(now + 2.1);
+
+        setTimeout(() => {
+            osc.disconnect();
+            gain.disconnect();
+        }, 2200);
+    }
+}
+
+// --- ІНІЦІАЛІЗАЦІЯ ТА ЛОГІКА ---
+
+const engine = new AudioEngine();
+const canvas = document.getElementById('orbCanvas');
+const ctx = canvas.getContext('2d');
+const statusText = document.getElementById('statusText');
+
+// Елементи UI
+const keyModeSelect = document.getElementById('keyMode');
+const keyVolSlider = document.getElementById('keyVol');
+const bgModeSelect = document.getElementById('bgMode');
+const bgVolSlider = document.getElementById('bgVol');
+
+// Оновлення налаштувань
+keyModeSelect.addEventListener('change', (e) => {
+    engine.keyMode = e.target.value;
+    statusText.textContent = `Режим клавіш: ${e.target.options[e.target.selectedIndex].text}`;
+});
+
+keyVolSlider.addEventListener('input', (e) => {
+    engine.keyVol = parseFloat(e.target.value);
+});
+
+bgModeSelect.addEventListener('change', (e) => {
+    engine.setBgMode(e.target.value);
+    statusText.textContent = `Фон: ${e.target.options[e.target.selectedIndex].text}`;
+});
+
+bgVolSlider.addEventListener('input', (e) => {
+    const val = parseFloat(e.target.value);
+    engine.setBgVolume(val);
+});
+
+// Анімація Orb
+let orbScale = 1.0;
+let targetScale = 1.0;
+
+function drawOrb() {
+    const w = canvas.width;
+    const h = canvas.height;
+    const cx = w / 2;
+    const cy = h / 2;
+
+    // Інтерполяція
+    orbScale += (targetScale - orbScale) * 0.1;
+
+    // Дихання (синус)
+    const breathe = 1.0 + 0.05 * Math.sin(Date.now() / 500);
+    const finalScale = orbScale * breathe;
+
+    const radius = Math.min(w, h) / 3 * finalScale;
+
+    // Очистка
+    ctx.clearRect(0, 0, w, h);
+
+    // Малювання кільць (імітація градієнта)
+    const colors = ['#2ac3de', '#1a1b26', '#24283b'];
+
+    for (let i = 0; i < 6; i++) {
+        const r = radius * (1 - i * 0.15);
+        if (r <= 0) continue;
+
+        ctx.beginPath();
+        ctx.arc(cx, cy, r, 0, Math.PI * 2);
+
+        // Прозорість зменшується від центру
+        const alpha = 0.8 - i * 0.1;
+        ctx.strokeStyle = `rgba(42, 195, 222, ${alpha})`;
+        ctx.lineWidth = 2 + i * 0.5;
+        ctx.stroke();
+    }
+
+    requestAnimationFrame(drawOrb);
+}
+
+// Запуск анімації
+drawOrb();
+
+// Обробка подій клавіатури
+window.addEventListener('keydown', (e) => {
+    // Ініціалізація аудіо при першому натисканні (політика браузерів)
+    if (!engine.isRunning) {
+        engine.init();
+        statusText.textContent = "Аудіо активовано!";
+    }
+
+    // Анімація Orb
+    targetScale = 1.3;
+    setTimeout(() => { targetScale = 1.0; }, 100);
+
+    const char = e.key.length === 1 ? e.key : null;
+    const isBackspace = e.key === 'Backspace';
+    const isEnter = e.key === 'Enter';
+
+    if (char || isBackspace || isEnter) {
+        engine.playKey(char || '', isBackspace, isEnter);
+    }
+});
+
+// Обробка кліків мишею (для мобільних або тесту)
+window.addEventListener('mousedown', (e) => {
+    if (e.target.tagName === 'SELECT' || e.target.tagName === 'INPUT' || e.target.tagName === 'BUTTON') return;
+
+    if (!engine.isRunning) {
+        engine.init();
+    }
+
+    targetScale = 1.3;
+    setTimeout(() => { targetScale = 1.0; }, 100);
+
+    // Випадковий звук "дзвіночка" при кліку
+    const randomChar = String.fromCharCode(65 + Math.floor(Math.random() * 26));
+    engine.playKey(randomChar);
+});
+
+</script>
+<!-- Поле введення (приховане або візуальне) -->
+<div style="margin-top: 20px; width: 600px;">
+    <label style="display: block; margin-bottom: 5px;">Ваші нотатки (автозбереження):</label>
+    <textarea
+        id="autoSaveText"
+        rows="5"
+        style="width: 100%; padding: 10px; border-radius: 8px; border: 1px solid #24283b; background: #13141f; color: #a9b1d6; font-family: monospace;"
+        placeholder="Напишіть тут щось..."
+    ></textarea>
+</div>
+
+<script>
+    // 1. Відновлення тексту при завантаженні
+    const savedText = localStorage.getItem('zen_autosave_text');
+    if (savedText) {
+        document.getElementById('autoSaveText').value = savedText;
+    }
+
+    // 2. Автозбереження при зміні
+    const textArea = document.getElementById('autoSaveText');
+    textArea.addEventListener('input', (e) => {
+        localStorage.setItem('zen_autosave_text', e.target.value);
+        statusText.textContent = "Збережено в кеш!";
+        setTimeout(() => statusText.textContent = "Натисніть будь-яку клавішу або клікніть", 2000);
+    });
+</script>
+</body>
+</html>

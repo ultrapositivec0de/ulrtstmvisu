@@ -1,3 +1,4 @@
+export * from './BaseModal';
 export * from './AboutModal';
 export * from './DraftsModal';
 export * from './KeysModal';
@@ -15,3 +16,4 @@ export * from './TagPresetsModal';
 export * from './TemplatesModal';
 export * from './UnlockPinModal';
 export * from './AccountPromptModal';
+export * from './AudioPresetsModal';

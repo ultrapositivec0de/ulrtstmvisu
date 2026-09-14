@@ -4,6 +4,7 @@ import { htmlToMarkdown } from '../lib/editorSync';
 import { processContentForSteem } from './useSteemQueue';
 import { getMarked } from '../utils/markdownParser';
 import { getNodePath, getNodeByPath } from '../utils/domUtils';
+import { isOffsetInTechnicalZone } from '../utils/formatUtils';
 
 export interface ActiveFormats {
   bold: boolean;
@@ -13,6 +14,50 @@ export interface ActiveFormats {
   sub: boolean;
   sup: boolean;
   phishy: boolean;
+}
+
+function insertMarkerIntoNode(node: Node, offset: number, marker: string) {
+  if (node.nodeType === Node.TEXT_NODE) {
+    const text = node.nodeValue || '';
+    const safeOff = Math.min(Math.max(0, offset), text.length);
+    node.nodeValue = text.slice(0, safeOff) + marker + text.slice(safeOff);
+    return;
+  }
+
+  if (node.nodeType === Node.ELEMENT_NODE) {
+    const el = node as HTMLElement;
+    const tag = el.tagName ? el.tagName.toUpperCase() : '';
+
+    if (tag === 'TABLE' || tag === 'TBODY' || tag === 'THEAD') {
+      const rows = el.querySelectorAll('tr');
+      const targetRow = rows[Math.min(Math.max(0, offset), rows.length - 1)] || rows[0];
+      if (targetRow) {
+        const cells = targetRow.querySelectorAll('th, td');
+        const targetCell = cells[0];
+        if (targetCell) {
+          insertMarkerIntoNode(targetCell, 0, marker);
+          return;
+        }
+      }
+    } else if (tag === 'TR') {
+      const cells = el.querySelectorAll('th, td');
+      const targetCell = cells[Math.min(Math.max(0, offset), cells.length - 1)] || cells[0];
+      if (targetCell) {
+        insertMarkerIntoNode(targetCell, 0, marker);
+        return;
+      }
+    } else if (tag === 'UL' || tag === 'OL') {
+      const items = el.querySelectorAll('li');
+      const targetLi = items[Math.min(Math.max(0, offset), items.length - 1)] || items[0];
+      if (targetLi) {
+        insertMarkerIntoNode(targetLi, 0, marker);
+        return;
+      }
+    }
+
+    const idx = Math.min(Math.max(0, offset), el.childNodes.length);
+    el.insertBefore(document.createTextNode(marker), el.childNodes[idx] || null);
+  }
 }
 
 export const findDomPositionForMarkdownOffset = (
@@ -662,55 +707,35 @@ export function useWysiwygSync(options: UseWysiwygSyncOptions) {
       if (pos) {
         const safeStart = Math.max(0, Math.min(pos.start, textContent.length));
         const safeEnd = Math.max(0, Math.min(pos.end, textContent.length));
-        if (safeStart === safeEnd) {
-          textWithMarkers = textContent.slice(0, safeStart) + MARKER_START + textContent.slice(safeStart);
-        } else {
-          const first = Math.min(safeStart, safeEnd);
-          const second = Math.max(safeStart, safeEnd);
-          textWithMarkers =
-            textContent.slice(0, first) +
-            MARKER_START +
-            textContent.slice(first, second) +
-            MARKER_END +
-            textContent.slice(second);
+        const isStartInTech = isOffsetInTechnicalZone(textContent, safeStart).inTechnicalZone;
+        const isEndInTech = isOffsetInTechnicalZone(textContent, safeEnd).inTechnicalZone;
+
+        if (!isStartInTech && !isEndInTech) {
+          if (safeStart === safeEnd) {
+            textWithMarkers = textContent.slice(0, safeStart) + MARKER_START + textContent.slice(safeStart);
+          } else {
+            const first = Math.min(safeStart, safeEnd);
+            const second = Math.max(safeStart, safeEnd);
+            textWithMarkers =
+              textContent.slice(0, first) +
+              MARKER_START +
+              textContent.slice(first, second) +
+              MARKER_END +
+              textContent.slice(second);
+          }
         }
       }
 
       const processed = processContentForSteem(textWithMarkers);
-      let rawHtml = await m.parse(processed);
+      // Protect multiple blank lines so marked does not discard them
+      const protectedContent = processed.replace(/\n{3,}/g, (match) => {
+        const extraCount = match.length - 2;
+        return '\n\n' + '<p class="editor-blank-line"><br></p>\n\n'.repeat(extraCount);
+      });
+      let rawHtml = await m.parse(protectedContent);
 
       const tempDiv = document.createElement('div');
       tempDiv.innerHTML = rawHtml;
-
-      tempDiv.querySelectorAll('div.phishy, div.text-blue, div.text-green').forEach((div) => {
-        const cls = div.classList.contains('phishy')
-          ? 'phishy'
-          : div.classList.contains('text-blue')
-          ? 'text-blue'
-          : 'text-green';
-        const paragraphs = Array.from(div.querySelectorAll(':scope > p'));
-        if (paragraphs.length > 0) {
-          paragraphs.forEach((p) => {
-            const span = document.createElement('span');
-            span.className = cls;
-            while (p.firstChild) {
-              span.appendChild(p.firstChild);
-            }
-            p.appendChild(span);
-            div.parentNode?.insertBefore(p, div);
-          });
-          div.parentNode?.removeChild(div);
-        } else {
-          const p = document.createElement('p');
-          const span = document.createElement('span');
-          span.className = cls;
-          while (div.firstChild) {
-            span.appendChild(div.firstChild);
-          }
-          p.appendChild(span);
-          div.parentNode?.replaceChild(p, div);
-        }
-      });
 
       tempDiv.querySelectorAll('li > p:only-child').forEach((p) => {
         const parent = p.parentNode;
@@ -944,27 +969,12 @@ export function useWysiwygSync(options: UseWysiwygSyncOptions) {
             try {
               if (clonedStartNode === clonedEndNode && clonedStartNode.nodeType === Node.TEXT_NODE) {
                 const text = clonedStartNode.nodeValue || '';
-                const sOff = Math.min(range.startOffset, text.length);
-                const eOff = Math.min(range.endOffset, text.length);
+                const sOff = Math.min(Math.max(0, range.startOffset), text.length);
+                const eOff = Math.min(Math.max(0, range.endOffset), text.length);
                 clonedStartNode.nodeValue = text.slice(0, sOff) + '\x01' + text.slice(sOff, eOff) + '\x02' + text.slice(eOff);
               } else {
-                if (clonedEndNode.nodeType === Node.TEXT_NODE) {
-                  const text = clonedEndNode.nodeValue || '';
-                  const eOff = Math.min(range.endOffset, text.length);
-                  clonedEndNode.nodeValue = text.slice(0, eOff) + '\x02' + text.slice(eOff);
-                } else {
-                  const idx = Math.min(range.endOffset, clonedEndNode.childNodes.length);
-                  clonedEndNode.insertBefore(document.createTextNode('\x02'), clonedEndNode.childNodes[idx] || null);
-                }
-
-                if (clonedStartNode.nodeType === Node.TEXT_NODE) {
-                  const text = clonedStartNode.nodeValue || '';
-                  const sOff = Math.min(range.startOffset, text.length);
-                  clonedStartNode.nodeValue = text.slice(0, sOff) + '\x01' + text.slice(sOff);
-                } else {
-                  const idx = Math.min(range.startOffset, clonedStartNode.childNodes.length);
-                  clonedStartNode.insertBefore(document.createTextNode('\x01'), clonedStartNode.childNodes[idx] || null);
-                }
+                insertMarkerIntoNode(clonedEndNode, range.endOffset, '\x02');
+                insertMarkerIntoNode(clonedStartNode, range.startOffset, '\x01');
               }
 
               clonedWysiwyg

@@ -25,7 +25,7 @@ import { SecurityService } from '../../services/securityService';
 import ImageItemComp from '../ImageItem';
 import ExternalImageItem from '../ExternalImageItem';
 
-export const TextWrapIcon = ({ size = 24, className = "" }: { size?: number; className?: string }) => (
+export const TextWrapIcon = ({ size = 24, className = "", style }: { size?: number; className?: string; style?: React.CSSProperties }) => (
   <svg 
     xmlns="http://www.w3.org/2000/svg" 
     width={size} 
@@ -37,6 +37,7 @@ export const TextWrapIcon = ({ size = 24, className = "" }: { size?: number; cla
     strokeLinecap="round" 
     strokeLinejoin="round" 
     className={className}
+    style={style}
   >
     <path d="M3 6h18" />
     <path d="M3 12h15a3 3 0 1 1 0 6h-4" />
@@ -45,7 +46,7 @@ export const TextWrapIcon = ({ size = 24, className = "" }: { size?: number; cla
   </svg>
 );
 
-export const ImageCaptionIcon = ({ size = 24, className = "" }: { size?: number; className?: string }) => (
+export const ImageCaptionIcon = ({ size = 24, className = "", style }: { size?: number; className?: string; style?: React.CSSProperties }) => (
   <svg 
     xmlns="http://www.w3.org/2000/svg" 
     width={size} 
@@ -57,6 +58,7 @@ export const ImageCaptionIcon = ({ size = 24, className = "" }: { size?: number;
     strokeLinecap="round" 
     strokeLinejoin="round" 
     className={className}
+    style={style}
   >
     <rect width="18" height="10" x="3" y="3" rx="2" />
     <path d="M7 8h.01" />
@@ -205,7 +207,7 @@ export const Sidebar: React.FC<SidebarProps> = (props) => {
             <motion.aside 
               {...getSidebarMotionConfig()}
               className={cn(
-                "border-r border-slate-800 bg-slate-900 flex flex-col z-30 absolute lg:relative h-full pb-16 lg:pb-0 shadow-2xl lg:shadow-none transition-all duration-300 overflow-visible",
+                "border-r border-slate-800 bg-slate-900 flex flex-col z-40 lg:z-30 absolute lg:relative h-full pb-16 lg:pb-0 shadow-2xl lg:shadow-none transition-all duration-300 overflow-visible",
                 isGalleryCollapsed ? "w-16" : "w-[clamp(20rem,25vw,30rem)]"
               )}
             >
@@ -218,7 +220,11 @@ export const Sidebar: React.FC<SidebarProps> = (props) => {
                       className="p-1.5 rounded-lg bg-slate-800/50 hover:bg-slate-800 text-slate-400 hover:text-white transition-colors"
                       title={isGalleryCollapsed ? t('expandGallery') : t('collapseGallery')}
                     >
-                      {isGalleryCollapsed ? <PanelLeftOpen size={16} /> : <PanelLeftClose size={16} />}
+                      {isGalleryCollapsed ? (
+                        <PanelLeftOpen className="shrink-0" style={{ width: 'var(--gallery-icon-size, 16px)', height: 'var(--gallery-icon-size, 16px)' }} />
+                      ) : (
+                        <PanelLeftClose className="shrink-0" style={{ width: 'var(--gallery-icon-size, 16px)', height: 'var(--gallery-icon-size, 16px)' }} />
+                      )}
                     </button>
                   </div>
 
@@ -259,16 +265,16 @@ export const Sidebar: React.FC<SidebarProps> = (props) => {
                       <button 
                         onMouseDown={(e) => e.preventDefault()}
                         onClick={() => setGalleryView('grid')} 
-                        className={cn("p-1 rounded", galleryView === 'grid' ? "text-cyan-400 bg-cyan-400/10" : "text-slate-600")}
+                        className={cn("p-1 rounded flex items-center justify-center", galleryView === 'grid' ? "text-cyan-400 bg-cyan-400/10" : "text-slate-600")}
                       >
-                        <LayoutGrid size={14} />
+                        <LayoutGrid className="shrink-0" style={{ width: 'var(--gallery-icon-size, 14px)', height: 'var(--gallery-icon-size, 14px)' }} />
                       </button>
                       <button 
                         onMouseDown={(e) => e.preventDefault()}
                         onClick={() => setGalleryView('list')} 
-                        className={cn("p-1 rounded", galleryView === 'list' ? "text-cyan-400 bg-cyan-400/10" : "text-slate-600")}
+                        className={cn("p-1 rounded flex items-center justify-center", galleryView === 'list' ? "text-cyan-400 bg-cyan-400/10" : "text-slate-600")}
                       >
-                        <ListIcon size={14} />
+                        <ListIcon className="shrink-0" style={{ width: 'var(--gallery-icon-size, 14px)', height: 'var(--gallery-icon-size, 14px)' }} />
                       </button>
                     </div>
                   </div>
@@ -288,7 +294,7 @@ export const Sidebar: React.FC<SidebarProps> = (props) => {
                           className="p-1 rounded bg-slate-800/50 hover:bg-slate-800 text-slate-500 transition-all"
                           title={t('settings')}
                         >
-                          <ChevronDown size={16} />
+                          <ChevronDown className="shrink-0" style={{ width: 'var(--gallery-icon-size, 16px)', height: 'var(--gallery-icon-size, 16px)' }} />
                         </button>
                       </div>
                     )}
@@ -316,7 +322,7 @@ export const Sidebar: React.FC<SidebarProps> = (props) => {
                                   >
                                     {isUploading ? (
                                       <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                                    ) : <ImageIcon size={16} />}
+                                    ) : <ImageIcon className="shrink-0" style={{ width: 'var(--gallery-icon-size, 16px)', height: 'var(--gallery-icon-size, 16px)' }} />}
                                     <span className="truncate">{t('insert')}</span>
                                   </button>
 
@@ -333,7 +339,7 @@ export const Sidebar: React.FC<SidebarProps> = (props) => {
                                       className="p-1 rounded bg-slate-800/50 hover:bg-slate-800 text-cyan-400 transition-all ml-1 shrink-0"
                                       title={t('settings')}
                                     >
-                                      <ChevronUp size={16} />
+                                      <ChevronUp className="shrink-0" style={{ width: 'var(--gallery-icon-size, 16px)', height: 'var(--gallery-icon-size, 16px)' }} />
                                     </button>
                                   </div>
                                 </div>
@@ -458,7 +464,7 @@ export const Sidebar: React.FC<SidebarProps> = (props) => {
                                   className={cn("flex items-center justify-center px-2 py-1.5 rounded-lg border transition-colors flex-1 min-w-0", isTextWrapEnabled ? "bg-cyan-900/30 border-cyan-800 text-cyan-400" : "bg-slate-800/30 border-slate-700/30 text-slate-500 hover:bg-slate-800/50 hover:text-slate-300")}
                                   title={t('textWrap')}
                                 >
-                                  <TextWrapIcon size={15} className="shrink-0" />
+                                  <TextWrapIcon className="shrink-0" style={{ width: 'var(--gallery-icon-size, 15px)', height: 'var(--gallery-icon-size, 15px)' }} />
                                 </button>
 
                                 <button
@@ -466,7 +472,7 @@ export const Sidebar: React.FC<SidebarProps> = (props) => {
                                   className={cn("flex items-center justify-center px-2 py-1.5 rounded-lg border transition-colors flex-1 min-w-0", gridWithCaptions ? "bg-cyan-900/30 border-cyan-800 text-cyan-400" : "bg-slate-800/30 border-slate-700/30 text-slate-500 hover:bg-slate-800/50 hover:text-slate-300")}
                                   title={t('addCaption') || "Add Caption"}
                                 >
-                                  <ImageCaptionIcon size={15} className="shrink-0" />
+                                  <ImageCaptionIcon className="shrink-0" style={{ width: 'var(--gallery-icon-size, 15px)', height: 'var(--gallery-icon-size, 15px)' }} />
                                 </button>
                               </div>
 
@@ -477,11 +483,17 @@ export const Sidebar: React.FC<SidebarProps> = (props) => {
                                       key={p}
                                       onClick={() => setSingleCaptionAlign(p)}
                                       className={cn(
-                                        "p-1.5 rounded transition-all", 
+                                        "p-1.5 rounded transition-all flex items-center justify-center", 
                                         singleCaptionAlign === p ? "bg-cyan-600 text-white shadow-sm" : "text-slate-500 hover:text-slate-300 active:scale-95"
                                       )}
                                     >
-                                      {p === 'left' ? <AlignLeft size={15} /> : p === 'center' ? <AlignCenter size={15} /> : <AlignRight size={15} />}
+                                      {p === 'left' ? (
+                                        <AlignLeft className="shrink-0" style={{ width: 'var(--gallery-icon-size, 15px)', height: 'var(--gallery-icon-size, 15px)' }} />
+                                      ) : p === 'center' ? (
+                                        <AlignCenter className="shrink-0" style={{ width: 'var(--gallery-icon-size, 15px)', height: 'var(--gallery-icon-size, 15px)' }} />
+                                      ) : (
+                                        <AlignRight className="shrink-0" style={{ width: 'var(--gallery-icon-size, 15px)', height: 'var(--gallery-icon-size, 15px)' }} />
+                                      )}
                                     </button>
                                   ))}
                                 </div>
@@ -494,7 +506,7 @@ export const Sidebar: React.FC<SidebarProps> = (props) => {
                                   className="flex-1 px-3 py-1.5 bg-slate-800 hover:bg-cyan-900 disabled:opacity-50 border border-slate-700 hover:border-cyan-700 text-cyan-400 rounded-lg text-[10px] font-bold transition-colors flex items-center justify-center gap-1.5 min-w-0"
                                   title={t('createGrid')}
                                 >
-                                  <LayoutGrid size={12} className="shrink-0" /> ({galleryMode === 'local' ? images.filter(i => i.selected).length : pexelsResults.filter(p => p.selected).length})
+                                  <LayoutGrid className="shrink-0" style={{ width: 'var(--gallery-icon-size, 12px)', height: 'var(--gallery-icon-size, 12px)' }} /> ({galleryMode === 'local' ? images.filter(i => i.selected).length : pexelsResults.filter(p => p.selected).length})
                                 </button>
                               </div>
 
@@ -504,12 +516,24 @@ export const Sidebar: React.FC<SidebarProps> = (props) => {
                                       key={l}
                                       onClick={() => setGridLayout(l)}
                                       className={cn(
-                                        "p-1.5 shrink-0 rounded transition-all flex-1 sm:flex-none flex justify-center", 
+                                        "p-1.5 shrink-0 rounded transition-all flex-1 sm:flex-none flex justify-center items-center", 
                                         gridLayout === l ? "bg-cyan-600 text-white shadow-sm" : "text-slate-500 hover:text-slate-300 active:scale-95"
                                       )}
                                       title={l === 'col' ? 'В стовпчик (не таблиця)' : l === 'col-table' ? 'Стовпчик в таблиці (зверху вниз)' : l === 'grid-2' ? 'Плитка (2x2)' : l === 'row' ? 'В один рядок (таблиця)' : l === 'col-img-text' ? 'Текст праворуч' : 'Текст ліворуч'}
                                     >
-                                      {l === 'col' ? <ListIcon size={15} /> : l === 'col-table' ? <Rows size={15} /> : l === 'grid-2' ? <LayoutGrid size={15} /> : l === 'row' ? <Columns size={15} /> : l === 'col-img-text' ? <PanelLeft size={15} /> : <PanelRight size={15} />}
+                                      {l === 'col' ? (
+                                        <ListIcon className="shrink-0" style={{ width: 'var(--gallery-icon-size, 15px)', height: 'var(--gallery-icon-size, 15px)' }} />
+                                      ) : l === 'col-table' ? (
+                                        <Rows className="shrink-0" style={{ width: 'var(--gallery-icon-size, 15px)', height: 'var(--gallery-icon-size, 15px)' }} />
+                                      ) : l === 'grid-2' ? (
+                                        <LayoutGrid className="shrink-0" style={{ width: 'var(--gallery-icon-size, 15px)', height: 'var(--gallery-icon-size, 15px)' }} />
+                                      ) : l === 'row' ? (
+                                        <Columns className="shrink-0" style={{ width: 'var(--gallery-icon-size, 15px)', height: 'var(--gallery-icon-size, 15px)' }} />
+                                      ) : l === 'col-img-text' ? (
+                                        <PanelLeft className="shrink-0" style={{ width: 'var(--gallery-icon-size, 15px)', height: 'var(--gallery-icon-size, 15px)' }} />
+                                      ) : (
+                                        <PanelRight className="shrink-0" style={{ width: 'var(--gallery-icon-size, 15px)', height: 'var(--gallery-icon-size, 15px)' }} />
+                                      )}
                                     </button>
                                   ))}
                               </div>
@@ -521,7 +545,7 @@ export const Sidebar: React.FC<SidebarProps> = (props) => {
                   </div>
 
                   <div className="relative mb-2 shrink-0">
-                    <Search size={16} className="absolute left-2 top-1/2 -translate-y-1/2 text-slate-500" />
+                    <Search className="absolute left-2 top-1/2 -translate-y-1/2 text-slate-500 shrink-0" style={{ width: 'var(--gallery-icon-size, 16px)', height: 'var(--gallery-icon-size, 16px)' }} />
                     <input 
                       type="text"
                       placeholder={

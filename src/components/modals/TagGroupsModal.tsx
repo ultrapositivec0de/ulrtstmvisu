@@ -1,6 +1,6 @@
 import React from 'react';
-import { motion } from 'motion/react';
-import { Tags, Trash2, X } from 'lucide-react';
+import { Tags, Trash2 } from 'lucide-react';
+import { BaseModal } from './BaseModal';
 import { cn } from '../../lib/utils';
 
 export interface TagGroup {
@@ -32,103 +32,101 @@ export const TagGroupsModal: React.FC<TagGroupsModalProps> = ({
   confirmDialog,
   t
 }) => {
-  if (!isOpen) return null;
-
   return (
-    <div key="modal-tag-groups" className="fixed inset-0 z-[200] flex items-center justify-center p-4">
-      <motion.div 
-        initial={{ opacity: 0 }} 
-        animate={{ opacity: 1 }} 
-        exit={{ opacity: 0 }}
-        className="absolute inset-0 bg-slate-950/90"
-        onClick={onClose}
-      />
-      <motion.div 
-        initial={{ scale: 0.9, opacity: 0 }}
-        animate={{ scale: 1, opacity: 1 }}
-        exit={{ scale: 0.9, opacity: 0 }}
-        className="relative w-full sm:max-w-md bg-slate-900 border border-slate-800 rounded-2xl shadow-none overflow-hidden"
+    <BaseModal
+      isOpen={isOpen}
+      onClose={onClose}
+      size="md"
+      icon={Tags}
+      title={t('tagGroups')}
+      modalKey="modal-tag-groups"
+      bodyClassName="p-5 sm:p-6 space-y-4"
+    >
+      <button 
+        onClick={async () => {
+          const name = await promptDialog(t('addTagGroup'));
+          if (!name) return;
+          const tags = await promptDialog(t('tagsPlaceholder'));
+          if (!tags) return;
+          const newGroup: TagGroup = {
+            id: Date.now().toString(),
+            name,
+            tags: tags.split(/\s+/).filter(Boolean)
+          };
+          setTagGroups([...tagGroups, newGroup]);
+        }}
+        className="w-full py-2.5 bg-cyan-600 hover:bg-cyan-500 rounded-xl transition-colors font-bold text-xs sm:text-sm text-white shadow-md shadow-cyan-900/20 active:scale-[0.98] cursor-pointer"
       >
-        <div className="p-4 sm:p-6 border-b border-slate-800 flex justify-between items-center bg-slate-800/30">
-          <h2 className="text-lg sm:text-xl font-bold flex items-center gap-2">
-            <Tags className="text-cyan-400" /> {t('tagGroups')}
-          </h2>
-          <button onClick={onClose} className="text-slate-500 hover:text-white">
-            <X />
-          </button>
-        </div>
-        <div className="p-4 sm:p-6 space-y-4">
-          <button 
-            onClick={async () => {
-              const name = await promptDialog(t('addTagGroup'));
-              if (!name) return;
-              const tags = await promptDialog(t('tagsPlaceholder'));
-              if (!tags) return;
-              const newGroup: TagGroup = {
-                id: Date.now().toString(),
-                name,
-                tags: tags.split(/\s+/).filter(Boolean)
-              };
-              setTagGroups([...tagGroups, newGroup]);
-            }}
-            className="w-full py-2 bg-cyan-600 rounded-lg hover:bg-cyan-500 transition-colors font-bold text-sm"
+        {t('addTagGroup')}
+      </button>
+
+      <div className="space-y-2 max-h-[55vh] overflow-y-auto custom-scrollbar pr-1">
+        {tagGroups.map((group, gIdx) => (
+          <div 
+            key={group.id || `group-${gIdx}`} 
+            className="p-3 bg-[var(--bg-main)]/50 border border-[var(--border-color)] rounded-xl group hover:border-cyan-500/30 transition-colors"
           >
-            {t('addTagGroup')}
-          </button>
-          <div className="space-y-2 max-h-[60vh] sm:max-h-[50vh] overflow-y-auto custom-scrollbar pr-1">
-            {tagGroups.map((group, gIdx) => (
-              <div key={group.id || `group-${gIdx}`} className="p-3 bg-slate-800 rounded-lg group">
-                <div className="flex justify-between items-center mb-1">
+            <div className="flex justify-between items-center mb-2">
+              <button 
+                onClick={() => {
+                  const currentTags = pubTags.split(/\s+/).filter(Boolean);
+                  const nextTags = [...currentTags];
+                  group.tags.forEach(tag => {
+                    if (!nextTags.includes(tag)) nextTags.push(tag);
+                  });
+                  setPubTags(nextTags.join(' '));
+                }}
+                className="font-bold text-xs sm:text-sm text-[var(--text-main)] hover:text-cyan-400 transition-colors text-left"
+              >
+                {group.name} <span className="text-[var(--text-muted)] font-normal text-xs">({t('applyGroup')})</span>
+              </button>
+              <button 
+                onClick={async () => {
+                  if (await confirmDialog(t('delete') + '?')) {
+                    setTagGroups(tagGroups.filter(g => g.id !== group.id));
+                  }
+                }}
+                className="text-[var(--text-muted)] hover:text-red-400 opacity-80 sm:opacity-0 group-hover:opacity-100 transition-opacity p-1 cursor-pointer"
+                title={t('delete')}
+              >
+                <Trash2 size={16} />
+              </button>
+            </div>
+
+            <div className="flex flex-wrap gap-1.5">
+              {group.tags.filter(Boolean).map((tag, tIdx) => {
+                const isSelected = pubTags.split(/\s+/).includes(tag);
+                return (
                   <button 
+                    key={`group-${group.id || gIdx}-tag-${tag}-${tIdx}`}
                     onClick={() => {
                       const currentTags = pubTags.split(/\s+/).filter(Boolean);
-                      const nextTags = [...currentTags];
-                      group.tags.forEach(tag => {
-                        if (!nextTags.includes(tag)) nextTags.push(tag);
-                      });
-                      setPubTags(nextTags.join(' '));
-                    }}
-                    className="font-bold text-sm hover:text-cyan-400 transition-colors"
-                  >
-                    {group.name} ({t('applyGroup')})
-                  </button>
-                  <button 
-                    onClick={async () => {
-                      if (await confirmDialog(t('delete') + '?')) {
-                        setTagGroups(tagGroups.filter(g => g.id !== group.id));
+                      if (currentTags.includes(tag)) {
+                        setPubTags(currentTags.filter(t => t !== tag).join(' '));
+                      } else {
+                        setPubTags([...currentTags, tag].join(' '));
                       }
                     }}
-                    className="text-slate-500 hover:text-red-400 opacity-0 group-hover:opacity-100 transition-opacity"
+                    className={cn(
+                      "text-xs px-2.5 py-1 rounded-lg transition-colors font-medium cursor-pointer",
+                      isSelected 
+                        ? "bg-cyan-600 text-white shadow-sm" 
+                        : "bg-[var(--bg-card)] text-[var(--text-muted)] hover:text-[var(--text-main)] border border-[var(--border-color)]"
+                    )}
                   >
-                    <Trash2 size={18} />
+                    #{tag}
                   </button>
-                </div>
-                <div className="flex flex-wrap gap-1">
-                  {group.tags.filter(Boolean).map((tag, tIdx) => (
-                    <button 
-                      key={`group-${group.id || gIdx}-tag-${tag}-${tIdx}`}
-                      onClick={() => {
-                        const currentTags = pubTags.split(/\s+/).filter(Boolean);
-                        if (currentTags.includes(tag)) {
-                          setPubTags(currentTags.filter(t => t !== tag).join(' '));
-                        } else {
-                          setPubTags([...currentTags, tag].join(' '));
-                        }
-                      }}
-                      className={cn(
-                        "text-[10px] px-2 py-0.5 rounded transition-colors",
-                        pubTags.includes(tag) ? "bg-cyan-600 text-white" : "bg-slate-700 text-slate-300 hover:bg-slate-600"
-                      )}
-                    >
-                      #{tag}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            ))}
+                );
+              })}
+            </div>
           </div>
-        </div>
-      </motion.div>
-    </div>
+        ))}
+        {tagGroups.length === 0 && (
+          <p className="text-center text-xs text-[var(--text-muted)] py-6">
+            {t('noTagGroups') || "Немає збережених груп тегів"}
+          </p>
+        )}
+      </div>
+    </BaseModal>
   );
 };

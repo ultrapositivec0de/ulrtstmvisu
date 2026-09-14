@@ -23,12 +23,19 @@
   --safe-left: env(safe-area-inset-left, 0px);
   --safe-right: env(safe-area-inset-right, 0px);
 
-  /* Visual Viewport & Virtual Keyboard & Browser Toolbar Dynamics */
-  --vv-height: 100dvh;
-  --keyboard-offset: 0px;
-  --browser-bottom-inset: 0px;
-  --viewport-bottom-offset: 0px;
-  --safe-bottom-total: calc(env(safe-area-inset-bottom, 0px) + var(--browser-bottom-inset, 0px));
+  /* Unified Modal & Surface Tokens */
+  --modal-bg: #0f172a; /* slate-900 */
+  --modal-border: #334155; /* slate-700 - crisp luminous edge */
+  --modal-backdrop: transparent; /* transparent backdrop to keep workspace and editor fully visible */
+  --modal-header-border: #1e293b;
+  --modal-radius: 1.25rem; /* 20px */
+  --modal-shadow: 0 25px 70px rgba(0, 0, 0, 0.55), 0 0 0 1px rgba(255, 255, 255, 0.1);
+
+  /* Unified Stacking Context (Z-Index Tokens) */
+  --z-focus-fullscreen: 200;
+  --z-modal: 500;
+  --z-modal-critical: 1000;
+  --z-toast: 2000;
 }
 
 html, body, #root {
@@ -54,8 +61,8 @@ html, body, #root {
 }
 
 /* AIS_FOCUS_MODE_CSS_START */
-div#root:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(2) > div:nth-of-type(1) {
-  font-weight: normal;
+div#root:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(2) > main:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(4) > button:nth-of-type(1) {
+  position: relative;
 }
 /* AIS_FOCUS_MODE_CSS_END */
 
@@ -64,8 +71,22 @@ div#root:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-t
   --bg-sidebar: #f8fafc; /* slate-50 */
   --bg-card: #f1f5f9; /* slate-100 */
   --text-main: #0f172a; /* slate-900 */
-  --text-muted: #475569; /* slate-600 */
-  --border-color: #e2e8f0; /* slate-200 */
+  --text-muted: #334155; /* slate-700 - high readability */
+  --border-color: #cbd5e1; /* slate-300 - clear distinct borders */
+  --modal-bg: #ffffff;
+  --modal-border: #cbd5e1;
+  --modal-backdrop: transparent; /* transparent backdrop to keep workspace and editor fully visible */
+  --modal-header-border: #e2e8f0;
+  --modal-shadow: 0 25px 70px rgba(15, 23, 42, 0.18), 0 0 0 1px rgba(15, 23, 42, 0.08);
+}
+
+/* Modal Surface Utility Classes */
+.modal-surface {
+  background-color: var(--modal-bg);
+  border-color: var(--modal-border);
+}
+.modal-backdrop-surface {
+  background-color: var(--modal-backdrop);
 }
 
 /* Light Theme Overrides for hardcoded slate utilities */
@@ -127,8 +148,23 @@ div#root:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-t
 .theme-light .text-slate-200 { color: #020617 !important; }
 .theme-light .text-slate-300 { color: #0f172a !important; }
 .theme-light .text-slate-400 { color: var(--text-muted) !important; }
-.theme-light .text-slate-500 { color: #64748b !important; }
-.theme-light .text-slate-600 { color: #94a3b8 !important; }
+.theme-light .text-slate-500 { color: #475569 !important; }
+.theme-light .text-slate-600 { color: #334155 !important; }
+
+/* Light mode inputs & textareas styling: clear background, border and focus ring */
+.theme-light input:not([type="checkbox"]):not([type="radio"]),
+.theme-light select,
+.theme-light textarea {
+  background-color: #ffffff;
+  border-color: #cbd5e1;
+  color: #0f172a;
+}
+.theme-light input:not([type="checkbox"]):not([type="radio"]):focus,
+.theme-light select:focus,
+.theme-light textarea:focus {
+  border-color: #0891b2;
+  box-shadow: 0 0 0 1px #0891b2;
+}
 
 /* In light theme, "white" text should generally be dark (for cards, labels, etc.) */
 .theme-light .text-white { color: #020617 !important; }
@@ -162,6 +198,11 @@ div#root:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-t
   --text-main: #f0f0ff;
   --text-muted: #6366f199;
   --border-color: rgba(var(--accent-rgb), 0.25);
+  --modal-bg: #080820;
+  --modal-border: rgba(var(--accent-rgb), 0.35);
+  --modal-backdrop: transparent;
+  --modal-header-border: rgba(var(--accent-rgb), 0.2);
+  --modal-shadow: 0 0 35px rgba(var(--accent-rgb), 0.25), 0 25px 70px rgba(0, 0, 0, 0.85);
 }
 
 .theme-neon body {

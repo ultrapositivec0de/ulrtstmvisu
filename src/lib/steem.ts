@@ -2,13 +2,19 @@ import * as dsteem from '@blazeapps/dsteem';
 
 export const STEEM_NODES = [
   'https://api.steemit.com',
-  'https://api.justyy.com'
+  'https://api.justyy.com',
+  'https://api.steemyy.com'
 ];
 
 let activeNode = STEEM_NODES[0];
 let lastProbe = 0;
 
 export const getActiveNode = () => activeNode;
+export const setActiveNode = (node: string) => {
+  if (STEEM_NODES.includes(node)) {
+    activeNode = node;
+  }
+};
 
 /**
  * Побудова послідовної перевірки нод. Повертає першу робочу ноду.
@@ -50,12 +56,12 @@ export const probeNodes = async (force = false) => {
   return activeNode;
 };
 
-export const getClient = () => {
-  const node = getActiveNode();
+export const getClient = (nodeOverride?: string) => {
+  const node = nodeOverride || getActiveNode();
   try {
     const ClientClass = (dsteem as any).Client;
     if (ClientClass) {
-      return new ClientClass(node, { timeout: 10000 });
+      return new ClientClass(node, { timeout: 15000 });
     }
   } catch (err) {
     console.warn("Internal dsteem failed, fallback", err);
@@ -64,8 +70,60 @@ export const getClient = () => {
   const dsteemExternal = (window as any).dsteem;
   if (!dsteemExternal) return null;
   return new dsteemExternal.Client(node, {
-    timeout: 10000
+    timeout: 15000
   });
+};
+
+/**
+ * Broadcasts operations with an explicit timeout and automatic fallback
+ * to alternative RPC nodes if the active node hangs or throws network errors.
+ */
+export const broadcastWithFallback = async (ops: any[], privateKey: any, timeoutMs = 25000): Promise<any> => {
+  const current = getActiveNode();
+  const nodesToTry = [
+    current,
+    ...STEEM_NODES.filter(n => n !== current)
+  ];
+
+  let lastError: any = null;
+
+  for (const node of nodesToTry) {
+    try {
+      const client = getClient(node);
+      if (!client) continue;
+
+      let timer: any = null;
+      const timeoutPromise = new Promise((_, reject) => {
+        timer = setTimeout(() => {
+          reject(new Error(`Broadcast timeout (${Math.round(timeoutMs / 1000)}s) on node: ${node}`));
+        }, timeoutMs);
+      });
+
+      const broadcastPromise = client.broadcast.sendOperations(ops, privateKey);
+      const res = await Promise.race([broadcastPromise, timeoutPromise]);
+      if (timer) clearTimeout(timer);
+      activeNode = node; // Update active node to the working one
+      return res;
+    } catch (err: any) {
+      lastError = err;
+      const msg = err?.message || '';
+      // Critical blockchain rejection errors that should not be retried across nodes
+      if (
+        msg.includes('missing required posting authority') ||
+        msg.includes('missing required active authority') ||
+        msg.includes('has already used that permlink') ||
+        msg.includes('author is not found') ||
+        msg.includes('You may only post once every') ||
+        msg.includes('Invalid Posting Key') ||
+        msg.includes('Account: @')
+      ) {
+        throw err;
+      }
+      console.warn(`Broadcast failed or timed out on node ${node}: ${msg}. Attempting next node...`);
+    }
+  }
+
+  throw lastError || new Error("All Steem RPC nodes failed during broadcast.");
 };
 
 /**

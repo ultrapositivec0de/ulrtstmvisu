@@ -6,6 +6,59 @@ export interface ChangelogEntry {
 
 export const APP_CHANGELOG: ChangelogEntry[] = [
   {
+    version: "v4.8.5",
+    date: "2026-09-14",
+    changes: [
+      "Technical Syntax Protection & Caret Safety: Prevented accidental markdown formatting injection and marker pollution inside HTML tags, markdown table separator rows, code fences, and link URLs.",
+      "Bidirectional Table & Block Cursor Synchronization: Enhanced cursor marker preservation across DOM and Markdown transformations to ensure caret positioning remains accurate without losing syntax or dropping characters.",
+      "Masked Format Parser: Upgraded markdown delimiter matching with syntax masking to isolate raw formatting marks from URLs and HTML tag attributes."
+    ]
+  },
+  {
+    version: "v4.8.4",
+    date: "2026-09-14",
+    changes: [
+      "Crystal Bell (FM Synthesis) Acoustic Refinement: Integrated master studio dynamics compressor and limiter to prevent high-frequency intermodulation distortion; implemented acoustic register differentiation across octaves (C4–E4 singing bowl resonance, G4–C5 singing bell, D5–C6 crystal chime with airy 2.76x harmonic sparkle) and dynamic FM modulation envelope.",
+      "Organic Water Drops (Liquid Cavitation Model): Replaced mechanical tone sweep with physical dual-formant cavity resonance (1.48x secondary harmonic), non-linear pitch rise with soft bubble detachment tail, and warm 2800 Hz low-pass filtering for soft, organic droplet acoustics.",
+      "Authentic Geiger Counter Radiation Clicks: Replaced tonal oscillation with ultra-short (2.5–3.5 ms) electrostatic ionization discharge micro-spikes and bandpass filtering (4800–6500 Hz) for genuine dry Geiger-Müller counter clicks.",
+      "Master Audio Pipeline Anti-Clipping: Added studio-grade DynamicsCompressorNode to master bus for pristine polyphonic voice summation during rapid typing.",
+      "Cross-Platform Release Synchronization: Synchronized version across package.json, Tauri, Cargo.toml, Service Worker cache, metadata, and application settings."
+    ]
+  },
+  {
+    version: "v4.8.3",
+    date: "2026-09-13",
+    changes: [
+      "Автентичний FM-синтез Crystal Bell (FM Дзвіночки): усунено пропуск клавіш при швидкому наборі (скасовано ліміт блокування поліфонії), впроваджено постійний індекс модуляції 0.5x та м'яку криву гучності для усунення різких піків; точне гармонійне чергування пентатоніки (C4–C6) без дисонансів.",
+      "Реалістичний Geiger Counter (Дозиметр): переведено на високочастотну гостру трикутну хвилю з випадковою девіацією (1800–2500 Гц) та мікроімпульсною обвідною для автентичного сухого тріску дозиметра без змазування шумовими буферами.",
+      "Water Drops (Краплі води / Bubbles): точна фізична модель кавітації з експоненційним зльотом частоти у 1.8 раза за 50 мс та швидким природним згасанням краплі.",
+      "Звукова семантика дій клавіш: спадний акустичний жест для Backspace (ковзання 280 -> 90 Гц) та ревербераційний дзвоник (1450 Гц) для Enter.",
+      "Оптимізація інтерфейсу: віджет звуку прибрано з верхнього хедера і збережено виключно на робочій панелі перемикання режимів редактора."
+    ]
+  },
+  {
+    version: "v4.8.2",
+    date: "2026-09-13",
+    changes: [
+      "Audio Typing Synth (Акустичний супровід набору тексту): процедурний Web Audio API синтезатор клавіш без використання сторонніх файлів та мережевого трафіку. Підтримує фізичні клавіатури, віртуальні сенсорні клавіатури смартфонів (touch/IME beforeinput) та тач-кнопки.",
+      "Zero-GC архітектура та енергозбереження: пулінг аудіо-нод без навантаження на Garbage Collector, кешовані буфери шуму, авто-призупинення аудіоканалу (suspend) через 4 сек бездіяльності для збереження заряду батареї. Усталено вимкнено для повної тиші на старті.",
+      "6 автентичних процедурних пресетів: Cherry MX Blue, Vintage Typewriter, Deep Thock, Cyber Neon, Water Bubble, Soft Chiclet із підтримкою детермінованого 32-бітного хешування pitch-shift для кожної літери, кирилиці, латиниці, пробілу, Enter та Backspace.",
+      "Менеджер пресетів та система обраних (Favorites ⭐): фільтрація за обраними пресетами, живий тест (preview), повзунок гучності, імпорт власних JSON-пресетів та завантаження еталонного шаблону для кастомізації.",
+      "Швидкий віджет керування: доступний в один клік у хедері та безпосередньо на панелі режимів редактора з миттєвим увімкненням/вимкненням та спливаючим меню швидких налаштувань."
+    ]
+  },
+  {
+    version: "v4.8.1",
+    date: "2026-09-13",
+    changes: [
+      "Адаптивний хедер та захист від накладання іконок: на компактних екранах випадаючий список інструментів форматування (\"T\") перенесено до лівої групи поруч із перемикачем режимів редактора. Виключено накладання на дзвіночок сповіщень та праве меню дій.",
+      "Віконний режим для модальних діалогів: повністю вимкнено глуху заливку та розмиття фону. Робочий простір і редактор тепер залишаються повністю видимими під діалоговими вікнами.",
+      "Захист цілісності тегів (Tag Integrity): клавіша Backspace більше не видаляє теги (списки, цитати, червоний/синій/зелений текст, вирівнювання), поки всередині залишається хоч один символ.",
+      "Безпечне видалення порожніх рядків: виправлено випадкове видалення тексту при натисканні Backspace/Delete на межах між параграфами та списками.",
+      "Точна синхронізація порожніх рядків між Markdown і WYSIWYG без схлопування потрійних переносів (\\n\\n\\n) та без втрати відступів автора."
+    ]
+  },
+  {
     version: "v4.8.0",
     date: "2026-09-03",
     changes: [

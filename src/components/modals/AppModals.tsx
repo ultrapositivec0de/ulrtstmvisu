@@ -154,6 +154,17 @@ export interface AppModalsProps {
   setEditorFontSize: (s: number) => void;
   toolbarIconSize: number;
   setToolbarIconSize: (s: number) => void;
+  uiScalePreset?: any;
+  setUiScalePreset?: (preset: any) => void;
+  applyUiScalePreset?: (preset: any) => void;
+  headerIconSize?: number;
+  setHeaderIconSize?: (size: number) => void;
+  headerHeight?: number;
+  setHeaderHeight?: (height: number) => void;
+  headerHeightAuto?: boolean;
+  setHeaderHeightAuto?: (auto: boolean) => void;
+  galleryIconSize?: number;
+  setGalleryIconSize?: (size: number) => void;
   wysiwygSpacing: number;
   setWysiwygSpacing: (s: number) => void;
   widgetPos: 'bottom' | 'floating' | 'hidden';
@@ -300,6 +311,17 @@ export const AppModals: React.FC<AppModalsProps> = (props) => {
     setEditorFontSize,
     toolbarIconSize,
     setToolbarIconSize,
+    uiScalePreset,
+    setUiScalePreset,
+    applyUiScalePreset,
+    headerIconSize,
+    setHeaderIconSize,
+    headerHeight,
+    setHeaderHeight,
+    headerHeightAuto,
+    setHeaderHeightAuto,
+    galleryIconSize,
+    setGalleryIconSize,
     wysiwygSpacing,
     setWysiwygSpacing,
     widgetPos,
@@ -580,6 +602,17 @@ export const AppModals: React.FC<AppModalsProps> = (props) => {
           setEditorFontSize={setEditorFontSize}
           toolbarIconSize={toolbarIconSize}
           setToolbarIconSize={setToolbarIconSize}
+          uiScalePreset={uiScalePreset}
+          setUiScalePreset={setUiScalePreset}
+          applyUiScalePreset={applyUiScalePreset}
+          headerIconSize={headerIconSize}
+          setHeaderIconSize={setHeaderIconSize}
+          headerHeight={headerHeight}
+          setHeaderHeight={setHeaderHeight}
+          headerHeightAuto={headerHeightAuto}
+          setHeaderHeightAuto={setHeaderHeightAuto}
+          galleryIconSize={galleryIconSize}
+          setGalleryIconSize={setGalleryIconSize}
           wysiwygSpacing={wysiwygSpacing}
           setWysiwygSpacing={setWysiwygSpacing}
           widgetPos={widgetPos}

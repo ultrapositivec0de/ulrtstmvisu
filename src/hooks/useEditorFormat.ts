@@ -1,7 +1,7 @@
 import { useCallback, useState } from 'react';
 import { useEditorStore } from '../store';
 import { getMarked } from '../utils/markdownParser';
-import { getAllFormatRangesInLine, FormatRange } from '../utils/formatUtils';
+import { getAllFormatRangesInLine, FormatRange, isOffsetInTechnicalZone } from '../utils/formatUtils';
 
 
 export interface EditorFormatConfig {
@@ -400,6 +400,15 @@ const insertHtmlAtCursor = useCallback((html: string) => {
     }
 
     if (start !== end) {
+      const startTech = isOffsetInTechnicalZone(text, start);
+      const endTech = isOffsetInTechnicalZone(text, end);
+      if (
+        (startTech.inTechnicalZone && (startTech.zoneType === 'html_tag' || startTech.zoneType === 'table_separator' || startTech.zoneType === 'code_fence' || startTech.zoneType === 'markdown_link_url')) ||
+        (endTech.inTechnicalZone && (endTech.zoneType === 'html_tag' || endTech.zoneType === 'table_separator' || endTech.zoneType === 'code_fence' || endTech.zoneType === 'markdown_link_url'))
+      ) {
+        return;
+      }
+
       const selectedText = text.slice(start, end);
       const before = text.slice(0, start);
       const after = text.slice(end);
@@ -425,6 +434,11 @@ const insertHtmlAtCursor = useCallback((html: string) => {
     }
 
     const caretPos = start;
+    const techCheck = isOffsetInTechnicalZone(text, caretPos);
+    if (techCheck.inTechnicalZone && (techCheck.zoneType === 'html_tag' || techCheck.zoneType === 'table_separator' || techCheck.zoneType === 'code_fence' || techCheck.zoneType === 'markdown_link_url')) {
+      return;
+    }
+
     const lineStart = text.lastIndexOf('\n', caretPos - 1) + 1;
     const lineEnd = text.indexOf('\n', caretPos);
     const actualLineEnd = lineEnd === -1 ? text.length : lineEnd;

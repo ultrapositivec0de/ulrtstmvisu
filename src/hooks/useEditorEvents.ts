@@ -575,6 +575,229 @@ export function useEditorEvents(options: UseEditorEventsOptions) {
         return;
       }
 
+      // Backspace and Delete protection: Tag integrity & safe empty line deletion
+      if ((e.key === 'Backspace' || e.key === 'Delete') && !isMod) {
+        const sel = window.getSelection();
+        if (sel && sel.rangeCount > 0 && wysiwygRef.current) {
+          const range = sel.getRangeAt(0);
+
+          if (sel.isCollapsed) {
+            const startNode = range.startContainer;
+            const startOffset = range.startOffset;
+
+            // Check if caret is at the start of container
+            const isAtStartOf = (container: HTMLElement): boolean => {
+              try {
+                const preRange = document.createRange();
+                preRange.setStart(container, 0);
+                preRange.setEnd(startNode, startOffset);
+                const textBefore = (preRange.cloneContents().textContent || '').replace(/[\u200B\s\n]/g, '');
+                const hasMedia = !!preRange.cloneContents().querySelector?.('img, iframe, video, hr, table');
+                return textBefore.length === 0 && !hasMedia;
+              } catch {
+                return false;
+              }
+            };
+
+            // Check if caret is at the end of container
+            const isAtEndOf = (container: HTMLElement): boolean => {
+              try {
+                const postRange = document.createRange();
+                postRange.setStart(startNode, startOffset);
+                postRange.setEnd(container, container.childNodes.length);
+                const textAfter = (postRange.cloneContents().textContent || '').replace(/[\u200B\s\n]/g, '');
+                const hasMedia = !!postRange.cloneContents().querySelector?.('img, iframe, video, hr, table');
+                return textAfter.length === 0 && !hasMedia;
+              } catch {
+                return false;
+              }
+            };
+
+            // Find immediate block element
+            let blockElement: HTMLElement | null =
+              startNode.nodeType === Node.TEXT_NODE ? startNode.parentElement : (startNode as HTMLElement);
+            while (
+              blockElement &&
+              blockElement.parentElement &&
+              blockElement.parentElement !== wysiwygRef.current &&
+              !['P', 'DIV', 'LI', 'BLOCKQUOTE', 'H1', 'H2', 'H3', 'H4', 'H5', 'H6', 'CENTER', 'PRE', 'TABLE', 'TR', 'TD', 'TH'].includes(blockElement.tagName)
+            ) {
+              blockElement = blockElement.parentElement;
+            }
+
+            // Find special or styled container (list item, phishy, pull-*, text-*, blockquote, pre, center, table)
+            const findSpecialContainer = (start: Node | null): HTMLElement | null => {
+              let curr: Node | null = start;
+              if (curr && curr.nodeType === Node.TEXT_NODE) curr = curr.parentElement;
+              while (curr && curr !== wysiwygRef.current) {
+                if (curr.nodeType === Node.ELEMENT_NODE) {
+                  const el = curr as HTMLElement;
+                  const tag = el.tagName.toUpperCase();
+                  if (['LI', 'BLOCKQUOTE', 'PRE', 'CENTER', 'TABLE', 'TR', 'TD', 'TH'].includes(tag)) {
+                    return el;
+                  }
+                  if (['H1', 'H2', 'H3', 'H4', 'H5', 'H6'].includes(tag)) {
+                    return el;
+                  }
+                  if (el.classList.contains('phishy') || el.classList.contains('text-blue') || el.classList.contains('text-green')) {
+                    return el;
+                  }
+                  const classes = Array.from(el.classList);
+                  if (classes.some((c) => c.startsWith('pull-') || c.startsWith('text-'))) {
+                    return el;
+                  }
+                }
+                curr = curr.parentElement;
+              }
+              return null;
+            };
+
+            const specialContainer = findSpecialContainer(startNode);
+
+            // ----------------------------------------------------
+            // BACKSPACE
+            // ----------------------------------------------------
+            if (e.key === 'Backspace') {
+              // 1. User is on an empty line or empty paragraph
+              if (blockElement && blockElement !== wysiwygRef.current) {
+                const blockText = (blockElement.textContent || '').replace(/[\u200B\s\n]/g, '');
+                const hasMedia = !!blockElement.querySelector?.('img, iframe, video, hr, table');
+                const isBlockEmpty = blockText.length === 0 && !hasMedia;
+
+                if (isBlockEmpty) {
+                  // If it's an empty LI inside a list
+                  if (blockElement.tagName === 'LI') {
+                    e.preventDefault();
+                    const ulOrOl = blockElement.parentElement;
+                    const prevLi = blockElement.previousElementSibling;
+                    const nextLi = blockElement.nextElementSibling;
+                    blockElement.remove();
+
+                    if (prevLi) {
+                      const newRange = document.createRange();
+                      newRange.selectNodeContents(prevLi);
+                      newRange.collapse(false);
+                      sel.removeAllRanges();
+                      sel.addRange(newRange);
+                      savedVisualRangeRef.current = newRange.cloneRange();
+                    } else if (nextLi) {
+                      const newRange = document.createRange();
+                      newRange.selectNodeContents(nextLi);
+                      newRange.collapse(true);
+                      sel.removeAllRanges();
+                      sel.addRange(newRange);
+                      savedVisualRangeRef.current = newRange.cloneRange();
+                    } else if (ulOrOl) {
+                      const p = document.createElement('p');
+                      p.innerHTML = '<br>';
+                      ulOrOl.replaceWith(p);
+                      const newRange = document.createRange();
+                      newRange.selectNodeContents(p);
+                      newRange.collapse(true);
+                      sel.removeAllRanges();
+                      sel.addRange(newRange);
+                      savedVisualRangeRef.current = newRange.cloneRange();
+                    }
+                    updateContentFromWysiwyg();
+                    return;
+                  }
+
+                  // If it's a special container that is empty (all text was removed from it)
+                  if (specialContainer && specialContainer === blockElement) {
+                    e.preventDefault();
+                    const p = document.createElement('p');
+                    p.innerHTML = '<br>';
+                    specialContainer.replaceWith(p);
+                    const newRange = document.createRange();
+                    newRange.selectNodeContents(p);
+                    newRange.collapse(true);
+                    sel.removeAllRanges();
+                    sel.addRange(newRange);
+                    savedVisualRangeRef.current = newRange.cloneRange();
+                    updateContentFromWysiwyg();
+                    return;
+                  }
+
+                  // If it's a standard empty paragraph (<p><br></p>) between elements
+                  const prevSibling = blockElement.previousElementSibling;
+                  if (prevSibling) {
+                    e.preventDefault();
+                    blockElement.remove();
+                    const newRange = document.createRange();
+                    newRange.selectNodeContents(prevSibling);
+                    newRange.collapse(false);
+                    sel.removeAllRanges();
+                    sel.addRange(newRange);
+                    savedVisualRangeRef.current = newRange.cloneRange();
+                    updateContentFromWysiwyg();
+                    return;
+                  }
+                }
+              }
+
+              // 2. User is inside a special container that STILL HAS TEXT
+              if (specialContainer && isAtStartOf(specialContainer)) {
+                const containerText = (specialContainer.textContent || '').replace(/[\u200B\s\n]/g, '');
+                const hasMedia = !!specialContainer.querySelector?.('img, iframe, video, hr, table');
+                const hasContent = containerText.length > 0 || hasMedia;
+
+                if (hasContent) {
+                  // TAG INTEGRITY RULE: Never destroy the tag while it contains text
+                  if (specialContainer.tagName === 'LI') {
+                    // If first item in list, prevent backspacing out to destroy the UL
+                    if (!specialContainer.previousElementSibling) {
+                      e.preventDefault();
+                      return;
+                    }
+                  } else {
+                    // For phishy, pull-*, blockquote, center, heading, table, etc.:
+                    // Prevent destroying the tag when cursor is at start of text!
+                    e.preventDefault();
+                    return;
+                  }
+                }
+              }
+            }
+
+            // ----------------------------------------------------
+            // DELETE
+            // ----------------------------------------------------
+            if (e.key === 'Delete') {
+              if (blockElement && isAtEndOf(blockElement)) {
+                const nextSibling = blockElement.nextElementSibling as HTMLElement | null;
+                if (nextSibling) {
+                  const nextText = (nextSibling.textContent || '').replace(/[\u200B\s\n]/g, '');
+                  const nextHasMedia = !!nextSibling.querySelector?.('img, iframe, video, hr, table');
+                  const nextIsEmpty = nextText.length === 0 && !nextHasMedia;
+
+                  if (nextIsEmpty) {
+                    // Safely remove empty line after current block
+                    e.preventDefault();
+                    nextSibling.remove();
+                    updateContentFromWysiwyg();
+                    return;
+                  } else {
+                    // Next sibling has content. Check if it's a special container
+                    const isNextSpecial =
+                      ['UL', 'OL', 'TABLE', 'BLOCKQUOTE', 'PRE', 'CENTER', 'H1', 'H2', 'H3', 'H4', 'H5', 'H6'].includes(nextSibling.tagName) ||
+                      nextSibling.classList.contains('phishy') ||
+                      nextSibling.classList.contains('text-blue') ||
+                      nextSibling.classList.contains('text-green') ||
+                      Array.from(nextSibling.classList).some((c) => c.startsWith('pull-') || c.startsWith('text-'));
+
+                    if (isNextSpecial) {
+                      // Prevent browser from destroying next container's structure
+                      e.preventDefault();
+                      return;
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+
       // 1. Single Enter on Heading breakout
       if ((e.key === 'Enter' || e.keyCode === 13) && !isMod && !e.shiftKey) {
         if (tryHeadingEnterBreakout(e.shiftKey)) {

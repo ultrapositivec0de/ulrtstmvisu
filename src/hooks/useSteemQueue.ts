@@ -111,8 +111,12 @@ export function useSteemQueue(config: SteemQueueConfig) {
       return new Promise((resolve, reject) => {
         // @ts-ignore
         if (!window.steem_keychain) return reject(new Error(config.t('noKeychain')));
+        const timeoutId = setTimeout(() => {
+          reject(new Error("Keychain request timed out (60s). Please check Keychain extension."));
+        }, 60000);
         // @ts-ignore
         window.steem_keychain.requestPost(author, title, finalBody, parentPermlink, '', meta, permlink, JSON.stringify(options), (res: any) => {
+          clearTimeout(timeoutId);
           if (res.success) resolve(res);
           else reject(new Error(res.message));
         });

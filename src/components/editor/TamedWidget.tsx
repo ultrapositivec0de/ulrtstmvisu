@@ -199,13 +199,13 @@ export const TamedWidget: React.FC<TamedWidgetProps> = (props) => {
   return (
     <>
 {/* Tamed Widget - With 3 distinct modes (hidden, bottom, floating) and fixed mobile positioning */}
-              {(isWidgetVisible || widgetPos === 'bottom') && widgetPos !== 'hidden' && !activeModal && (window.innerWidth >= 1024 || !isSidebarOpen) && (
+              {(isWidgetVisible || widgetPos === 'bottom') && widgetPos !== 'hidden' && !activeModal && (
                   <div 
                     key="steem-widget"
                     ref={widgetRef}
                     style={getFloatingWidgetStyles({
                       widgetPos,
-                      isMobile: window.innerWidth < 1024,
+                      isMobile: typeof window !== 'undefined' ? window.innerWidth < 1024 : false,
                       floatingPos,
                       editorPaneEl: editorPaneRef.current,
                       widgetEl: widgetRef.current,
@@ -217,13 +217,14 @@ export const TamedWidget: React.FC<TamedWidgetProps> = (props) => {
                       isEditorFullScreen,
                     })}
                     className={cn(
-                      "steem-widget-container z-[150] p-1 flex items-center gap-1",
+                      "steem-widget-container z-[150] p-1 items-center gap-1",
                       widgetNoBorder 
                         ? "shadow-none border-none border-transparent py-0 px-0 bg-slate-900"
                         : "bg-slate-900 border border-white/10 rounded-3xl p-1 shadow-none",
-                      widgetPos === 'floating' && window.innerWidth >= 1024 
+                      widgetPos === 'floating' 
                         ? "fixed" 
-                        : "fixed sm:absolute bottom-4 left-2 right-2 sm:left-4 sm:right-4 rounded-3xl mx-auto max-w-2xl"
+                        : "fixed sm:absolute bottom-4 left-2 right-2 sm:left-4 sm:right-4 rounded-3xl mx-auto max-w-2xl",
+                      isSidebarOpen ? "hidden lg:flex" : "flex"
                     )}
                   >
                     <button 

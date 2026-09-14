@@ -10,6 +10,8 @@ import { CodeEditor } from '../CodeEditor';
 import { MobileStatsBar } from './StatusBar';
 import { TamedWidget } from './TamedWidget';
 import { normalizeHtmlForVisualEditor } from '../../utils/markdownParser';
+import { AudioControlWidget } from '../audio/AudioControlWidget';
+import { useTypingSound } from '../../services/audio/useTypingSound';
 
 export interface EditorPaneProps {
   // refs
@@ -133,10 +135,14 @@ export interface EditorPaneProps {
   importTable: () => void;
   TOOLS_MAP: any;
   scrollCaretIntoView?: (block?: ScrollLogicalPosition) => void;
+  typingSound?: ReturnType<typeof useTypingSound>;
+  onOpenAudioPresetsModal?: () => void;
 }
 
 export const EditorPane: React.FC<EditorPaneProps> = ({
   scrollCaretIntoView,
+  typingSound,
+  onOpenAudioPresetsModal,
   editorPaneRef,
   editorRef,
   wysiwygRef,
@@ -470,6 +476,16 @@ export const EditorPane: React.FC<EditorPaneProps> = ({
                 <span className="w-1.5 h-1.5 rounded-full bg-[rgb(var(--accent-color))] shrink-0" />
               )}
             </button>
+          )}
+
+          {/* Audio Typing Synth Widget */}
+          {typingSound && onOpenAudioPresetsModal && (
+            <AudioControlWidget
+              sound={typingSound}
+              onOpenPresetsModal={onOpenAudioPresetsModal}
+              visualStyle={visualStyle}
+              isDarkMode={isDarkMode}
+            />
           )}
 
           {/* Visual Spacing and Icon Size Popover */}
@@ -951,57 +967,95 @@ export const EditorPane: React.FC<EditorPaneProps> = ({
         />
       )}
 
-      {/* Table Action Menu */}
-      {activeTable && tableRect && editorMode === 'visual' && (
-        <div 
-          className={cn("fixed z-[160] flex flex-col gap-1.5 p-1.5 rounded-xl",
-            isTableMenuExpanded || isTableMenuPinned ? "bg-slate-900 border border-slate-700/50 shadow-none" : "bg-transparent shadow-none"
-          )}
-          style={{
-            top: tableRect.top + 10,
-            left: Math.max(8, tableRect.left - 48),
-          }}
-          onMouseEnter={() => !isTableMenuPinned && setIsTableMenuExpanded(true)}
-          onMouseLeave={() => !isTableMenuPinned && setIsTableMenuExpanded(false)}
-        >
-          {isTableMenuExpanded || isTableMenuPinned ? (
-            <>
+      {/* Table Action Menu (Positioned ABOVE the table to avoid covering cells) */}
+      {activeTable && tableRect && editorMode === 'visual' && !activeModal && !isMiniGalleryOpen && (() => {
+        const paneRect = editorPaneRef.current?.getBoundingClientRect();
+        const paneLeft = paneRect ? paneRect.left : 0;
+        const minAllowedLeft = paneLeft + 8;
+        const menuLeft = Math.max(minAllowedLeft, tableRect.left);
+        // Position directly ABOVE the table top border:
+        // Header height is ~60px, so clamp top to ensure it stays visible under header
+        const idealTop = tableRect.top - 42;
+        const menuTop = Math.max(64, idealTop);
+
+        return (
+          <div 
+            className={cn(
+              "fixed z-[35] flex items-center transition-all duration-150",
+              isTableMenuExpanded || isTableMenuPinned 
+                ? "flex-row gap-1 p-1 bg-slate-900/95 border border-slate-700/80 rounded-xl shadow-xl backdrop-blur-md" 
+                : "bg-transparent shadow-none"
+            )}
+            style={{
+              top: menuTop,
+              left: menuLeft,
+              display: (tableRect.bottom < 70 || tableRect.top > (typeof window !== 'undefined' ? window.innerHeight - 30 : 800)) ? 'none' : undefined,
+            }}
+            onMouseEnter={() => !isTableMenuPinned && setIsTableMenuExpanded(true)}
+            onMouseLeave={() => !isTableMenuPinned && setIsTableMenuExpanded(false)}
+          >
+            {isTableMenuExpanded || isTableMenuPinned ? (
+              <>
+                <button 
+                  type="button"
+                  onClick={() => {
+                    const newPinned = !isTableMenuPinned;
+                    setIsTableMenuPinned(newPinned);
+                    localStorage.setItem('steem_table_menu_pinned', newPinned.toString());
+                  }} 
+                  className={cn("p-1.5 rounded-lg transition-colors flex items-center justify-center cursor-pointer", isTableMenuPinned ? "text-cyan-400 bg-cyan-900/40" : "text-slate-400 hover:text-white hover:bg-slate-800")}
+                  title={isTableMenuPinned ? "Unpin Table Menu" : "Pin Table Menu"}
+                >
+                  <Settings size={15} />
+                </button>
+                <div className="h-4 w-px bg-slate-700/70 mx-0.5" />
+                <button 
+                  type="button"
+                  onClick={deleteActiveTableRow} 
+                  className="p-1.5 text-slate-400 hover:text-white hover:bg-red-500/80 rounded-lg transition-colors flex items-center gap-1 cursor-pointer text-xs" 
+                  title="Delete Row"
+                >
+                  <Trash2 size={15} />
+                  <span className="hidden sm:inline text-[11px] text-slate-300">Рядок</span>
+                </button>
+                <button 
+                  type="button"
+                  onClick={deleteActiveTableCol} 
+                  className="p-1.5 text-slate-400 hover:text-white hover:bg-red-500/80 rounded-lg transition-colors flex items-center gap-1 cursor-pointer text-xs" 
+                  title="Delete Column"
+                >
+                  <Trash2 size={15} className="rotate-90" />
+                  <span className="hidden sm:inline text-[11px] text-slate-300">Колонка</span>
+                </button>
+                <div className="h-4 w-px bg-slate-700/70 mx-0.5" />
+                <button 
+                  type="button"
+                  onClick={deleteActiveTable} 
+                  className="p-1.5 text-red-400 hover:text-white hover:bg-red-600 rounded-lg transition-colors flex items-center gap-1 cursor-pointer text-xs font-medium" 
+                  title="Delete Entire Table"
+                >
+                  <Trash2 size={15} />
+                  <span className="hidden sm:inline text-[11px]">Таблиця</span>
+                </button>
+              </>
+            ) : (
               <button 
-                onClick={() => {
-                  const newPinned = !isTableMenuPinned;
-                  setIsTableMenuPinned(newPinned);
-                  localStorage.setItem('steem_table_menu_pinned', newPinned.toString());
-                }} 
-                className={cn("p-2 rounded-lg transition-colors flex items-center justify-center", isTableMenuPinned ? "text-cyan-400 bg-cyan-900/40" : "text-slate-400 hover:text-white hover:bg-slate-800")}
-                title="Pin Menu"
+                type="button"
+                onClick={() => setIsTableMenuExpanded(true)}
+                className="px-2 py-1 text-slate-300 bg-slate-900/90 border border-slate-700/70 hover:text-white hover:bg-slate-800 rounded-lg transition-all shadow-md flex items-center gap-1.5 cursor-pointer text-xs backdrop-blur-sm" 
+                title="Опції таблиці"
               >
-                <Settings size={16} />
+                <Settings size={14} className="text-cyan-400" />
+                <span className="text-[11px] font-medium text-slate-300">Таблиця</span>
               </button>
-              <div className="h-px w-full bg-slate-800" />
-              <button onClick={deleteActiveTableRow} className="p-2 text-slate-400 hover:text-white hover:bg-red-500/80 rounded-lg transition-colors flex items-center justify-center" title="Delete Row">
-                <Trash2 size={16} />
-              </button>
-              <button onClick={deleteActiveTableCol} className="p-2 text-slate-400 hover:text-white hover:bg-red-500/80 rounded-lg transition-colors flex items-center justify-center" title="Delete Column">
-                <Trash2 size={16} className="rotate-90" />
-              </button>
-              <button onClick={deleteActiveTable} className="p-2 text-red-400 hover:text-white hover:bg-red-600 rounded-lg transition-colors flex items-center justify-center" title="Delete Table">
-                <Trash2 size={18} />
-              </button>
-            </>
-          ) : (
-            <button 
-              className="p-2 text-slate-400 bg-slate-900 border border-slate-700/50 hover:text-white hover:bg-slate-800 rounded-lg transition-colors shadow-none flex items-center justify-center" 
-              title="Table Settings"
-            >
-              <Settings size={18} className="opacity-70" />
-            </button>
-          )}
-        </div>
-      )}
+            )}
+          </div>
+        );
+      })()}
 
       {/* Compact Mini-Gallery Strip */}
       <AnimatePresence>
-        {isMiniGalleryOpen && images.length > 0 && !activeModal && (window.innerWidth >= 1024 || !isSidebarOpen) && (
+        {isMiniGalleryOpen && images.length > 0 && !activeModal && (
           <motion.div
             key="mini-gallery-strip"
             initial={{ opacity: 0, y: 15, scale: 0.96 }}
@@ -1010,7 +1064,7 @@ export const EditorPane: React.FC<EditorPaneProps> = ({
             transition={{ duration: 0.15 }}
             style={{
               bottom: getMiniGalleryBottomStyle({
-                isMobile: window.innerWidth < 1024,
+                isMobile: typeof window !== 'undefined' ? window.innerWidth < 1024 : false,
                 isKeyboardOpen,
                 keyboardOffset,
                 isFullScreen,
@@ -1019,10 +1073,9 @@ export const EditorPane: React.FC<EditorPaneProps> = ({
               }),
             }}
             className={cn(
-              "z-[155] p-2 flex flex-col gap-1.5 bg-slate-900/95 backdrop-blur-md border border-cyan-500/30 rounded-2xl shadow-2xl transition-all",
-              window.innerWidth < 1024 
-                ? "fixed left-3 right-3 max-w-lg mx-auto" 
-                : "absolute left-4 right-4 max-w-2xl mx-auto"
+              "z-[155] p-2 flex-col gap-1.5 bg-slate-900/95 backdrop-blur-md border border-cyan-500/30 rounded-2xl shadow-2xl transition-all",
+              "fixed left-3 right-3 max-w-lg mx-auto lg:absolute lg:left-4 lg:right-4 lg:max-w-2xl bottom-4",
+              isSidebarOpen ? "hidden lg:flex" : "flex"
             )}
           >
             <div className="flex items-center justify-between px-1">
