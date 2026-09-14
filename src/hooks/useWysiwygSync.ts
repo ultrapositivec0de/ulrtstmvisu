@@ -346,7 +346,7 @@ export const findDomPositionForMarkdownOffset = (
 
 export interface UseWysiwygSyncOptions {
   wysiwygRef: React.RefObject<HTMLDivElement | null>;
-  editorMode: 'markdown' | 'visual';
+  editorMode: 'markdown' | 'visual' | 'reading';
   isEditorFocused?: boolean;
   onDemandSyncEnabled?: boolean;
   scrollCaretIntoView: (block?: ScrollLogicalPosition) => void;

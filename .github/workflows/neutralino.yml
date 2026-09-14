@@ -19,8 +19,10 @@ jobs:
         with:
           node-version: 24
 
-      - name: Install dependencies
-        run: npm install
+      - name: Install dependencies and system utilities
+        run: |
+          sudo apt-get update && sudo apt-get install -y zip unzip
+          npm install
 
       - name: Wait for binaries
         run: |
@@ -42,13 +44,28 @@ jobs:
         run: |
           VERSION="${{ steps.package-version.outputs.version }}"
           DIST_DIR="neutralino-build/dist"
+          TARGET_FILE="$DIST_DIR/ultra-steem-editor-v${VERSION}-neutralino.zip"
+
+          echo "🔍 Inspecting $DIST_DIR contents:"
           if [ -d "$DIST_DIR" ]; then
-            cd "$DIST_DIR"
-            if [ -f "ultra-steem-editor-release.zip" ]; then
-              mv -f "ultra-steem-editor-release.zip" "ultra-steem-editor-v${VERSION}-neutralino.zip"
-              rm -f ultra-steem-editor-*-release.zip
-              echo "Created versioned Neutralino release artifact:"
-              ls -la "ultra-steem-editor-v${VERSION}-neutralino.zip"
+            ls -la "$DIST_DIR"
+          else
+            echo "❌ Directory $DIST_DIR does not exist!"
+            exit 1
+          fi
+
+          if [ -f "$TARGET_FILE" ]; then
+            echo "✅ Target artifact ready: $TARGET_FILE"
+            ls -la "$TARGET_FILE"
+          else
+            ANY_ZIP=$(find "$DIST_DIR" -type f -name "*.zip" | head -n 1)
+            if [ -n "$ANY_ZIP" ]; then
+              echo "📦 Found zip file: $ANY_ZIP -> Copying to $TARGET_FILE"
+              cp -f "$ANY_ZIP" "$TARGET_FILE"
+              ls -la "$TARGET_FILE"
+            else
+              echo "❌ No zip artifact found in $DIST_DIR after build step!"
+              exit 1
             fi
           fi
 

@@ -2,8 +2,8 @@ import React from 'react';
 import { cn } from '../../lib/utils';
 import { useEditorStore } from '../../store';
 import { 
-  Eye, Terminal, Minimize2, Maximize2, RefreshCw, EyeOff, Sparkles, Type, 
-  MoveVertical, X, Check, Images, Plus, Settings, Trash2 
+  Eye, Terminal, BookOpen, Minimize2, Maximize2, RefreshCw, EyeOff, Sparkles, Type, 
+  MoveVertical, X, Check, Images, Plus, Settings, Trash2, ListTree, FolderOpen 
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { CodeEditor } from '../CodeEditor';
@@ -12,6 +12,7 @@ import { TamedWidget } from './TamedWidget';
 import { normalizeHtmlForVisualEditor } from '../../utils/markdownParser';
 import { AudioControlWidget } from '../audio/AudioControlWidget';
 import { useTypingSound } from '../../services/audio/useTypingSound';
+import { DocReaderContainer } from '../docReader';
 
 export interface EditorPaneProps {
   // refs
@@ -31,7 +32,7 @@ export interface EditorPaneProps {
   visualStyle: string;
   isDarkMode: boolean;
   t: (key: any) => string;
-  editorMode: 'visual' | 'markdown';
+  editorMode: 'visual' | 'markdown' | 'reading';
   isLivePreviewEnabled: boolean;
   onDemandSyncEnabled: boolean;
   beautifyEnabled: boolean;
@@ -71,9 +72,15 @@ export interface EditorPaneProps {
   menuDirection: 'up' | 'down';
   widgetOpacity: number;
   lang: string;
+  pubTitle?: string;
+  setPubTitle?: (val: string) => void;
+  pubTags?: string;
+  setPubTags?: (val: string) => void;
+  drafts?: any[];
+  saveDraft?: (status?: 'working' | 'ready') => void;
 
   // setters / handlers
-  handleSetEditorMode: (mode: 'visual' | 'markdown') => void;
+  handleSetEditorMode: (mode: 'visual' | 'markdown' | 'reading') => void;
   toggleEditorFullScreen: () => void;
   setOnDemandSyncEnabled: (val: boolean) => void;
   notify: (msg: string, type?: any) => void;
@@ -197,6 +204,12 @@ export const EditorPane: React.FC<EditorPaneProps> = ({
   menuDirection,
   widgetOpacity,
   lang,
+  pubTitle,
+  setPubTitle,
+  pubTags,
+  setPubTags,
+  drafts,
+  saveDraft,
   handleSetEditorMode,
   toggleEditorFullScreen,
   setOnDemandSyncEnabled,
@@ -257,6 +270,9 @@ export const EditorPane: React.FC<EditorPaneProps> = ({
   importTable,
   TOOLS_MAP
 }) => {
+  const [isTOCOpen, setIsTOCOpen] = React.useState(false);
+  const [isSourceDrawerOpen, setIsSourceDrawerOpen] = React.useState(false);
+
   const getEditorBottomSpacingClass = () => {
     if (isKeyboardOpen) {
       return "pb-44 mb-2 lg:pb-20 lg:mb-2";
@@ -338,6 +354,62 @@ export const EditorPane: React.FC<EditorPaneProps> = ({
                 {t('markdownCode')}
               </span>
             </button>
+            <button 
+              onMouseDown={(e) => e.preventDefault()}
+              onClick={() => handleSetEditorMode('reading')}
+              className={cn(
+                "px-3 py-1 text-[10px] sm:text-xs font-bold rounded transition-colors flex items-center gap-1.5",
+                editorMode === 'reading' 
+                  ? "bg-cyan-600 text-white shadow-sm" 
+                  : (isDarkMode || visualStyle === 'neon' ? "text-slate-500 hover:text-slate-300" : "text-slate-600 hover:text-slate-900")
+              )}
+              title="Перейти в повноцінний режим читання документа"
+            >
+              <BookOpen size={12} />
+              <span className={cn(
+                isLivePreviewEnabled ? "hidden xl:inline" : "hidden sm:inline"
+              )}>
+                {lang === 'uk' ? 'Читання' : 'Reader'}
+              </span>
+            </button>
+
+            {/* Reader Specific Navigation & Source Buttons */}
+            {editorMode === 'reading' && (
+              <div className="flex items-center gap-1 ml-1 pl-1.5 border-l border-slate-700/60">
+                <button
+                  onMouseDown={(e) => e.preventDefault()}
+                  onClick={() => setIsTOCOpen(prev => !prev)}
+                  className={cn(
+                    "px-2 py-1 text-[10px] sm:text-xs font-bold rounded transition-colors flex items-center gap-1 border",
+                    isTOCOpen 
+                      ? "bg-cyan-600 text-white border-cyan-500 shadow-sm" 
+                      : (isDarkMode || visualStyle === 'neon' 
+                          ? "bg-slate-900 border-slate-800 text-slate-300 hover:text-white hover:bg-slate-800" 
+                          : "bg-white border-slate-300 text-slate-700 hover:text-slate-900 hover:bg-slate-100")
+                  )}
+                  title="Зміст / Структура документа"
+                >
+                  <ListTree size={12} className={isTOCOpen ? "text-white" : "text-cyan-400"} />
+                  <span className="hidden sm:inline">Зміст</span>
+                </button>
+                <button
+                  onMouseDown={(e) => e.preventDefault()}
+                  onClick={() => setIsSourceDrawerOpen(prev => !prev)}
+                  className={cn(
+                    "px-2 py-1 text-[10px] sm:text-xs font-bold rounded transition-colors flex items-center gap-1 border",
+                    isSourceDrawerOpen 
+                      ? "bg-cyan-600 text-white border-cyan-500 shadow-sm" 
+                      : (isDarkMode || visualStyle === 'neon' 
+                          ? "bg-slate-900 border-slate-800 text-slate-300 hover:text-white hover:bg-slate-800" 
+                          : "bg-white border-slate-300 text-slate-700 hover:text-slate-900 hover:bg-slate-100")
+                  )}
+                  title="Джерело документа (Чернетки / Файли)"
+                >
+                  <FolderOpen size={12} className={isSourceDrawerOpen ? "text-white" : "text-cyan-400"} />
+                  <span className="hidden sm:inline">Джерело</span>
+                </button>
+              </div>
+            )}
             <button
               onMouseDown={(e) => e.preventDefault()}
               onClick={toggleEditorFullScreen}
@@ -767,6 +839,56 @@ export const EditorPane: React.FC<EditorPaneProps> = ({
           )}
           placeholder={`${t('placeholder')}\n\n\n\n\nОМ АХ ХУМ СО ХА\n♡`}
         />
+      ) : editorMode === 'reading' ? (
+        <DocReaderContainer
+          currentEditorContent={useEditorStore.getState().content}
+          currentEditorTitle={pubTitle || ''}
+          currentEditorTags={pubTags || ''}
+          drafts={drafts || []}
+          onLoadIntoEditor={async (newTitle, newTags, newContent) => {
+            const currentContent = useEditorStore.getState().content || '';
+            if (currentContent.trim() && currentContent !== newContent) {
+              const shouldSave = await confirmDialog(
+                "У редакторі є набраний текст. Зберегти його у чернетки перед завантаженням нового документа?",
+                "Збереження тексту"
+              );
+              if (shouldSave) {
+                if (saveDraft) {
+                  saveDraft('working');
+                }
+                notify("Поточний текст збережено у чернетки!", "success");
+              } else {
+                const confirmOverwrite = await confirmDialog(
+                  "Завантажити новий документ та перезаписати поточний текст в редакторі без збереження?",
+                  "Підтвердження перезапису"
+                );
+                if (!confirmOverwrite) {
+                  return;
+                }
+              }
+            }
+
+            if (setPubTitle) setPubTitle(newTitle);
+            if (setPubTags) setPubTags(newTags);
+            useEditorStore.getState().setContent(newContent);
+            handleSetEditorMode('visual');
+          }}
+          onSwitchToEditMode={(mode = 'visual') => {
+            handleSetEditorMode(mode);
+          }}
+          onExitReadingMode={() => {
+            handleSetEditorMode('visual');
+          }}
+          isTOCOpen={isTOCOpen}
+          setIsTOCOpen={setIsTOCOpen}
+          isSourceDrawerOpen={isSourceDrawerOpen}
+          setIsSourceDrawerOpen={setIsSourceDrawerOpen}
+          isDarkMode={isDarkMode}
+          visualStyle={visualStyle}
+          editorFontSize={editorFontSize}
+          wysiwygSpacing={wysiwygSpacing}
+          beautifyEnabled={beautifyEnabled}
+        />
       ) : (
         <div
           ref={wysiwygRef}
@@ -1055,7 +1177,7 @@ export const EditorPane: React.FC<EditorPaneProps> = ({
 
       {/* Compact Mini-Gallery Strip */}
       <AnimatePresence>
-        {isMiniGalleryOpen && images.length > 0 && !activeModal && (
+        {isMiniGalleryOpen && images.length > 0 && !activeModal && editorMode !== 'reading' && (
           <motion.div
             key="mini-gallery-strip"
             initial={{ opacity: 0, y: 15, scale: 0.96 }}
@@ -1158,65 +1280,67 @@ export const EditorPane: React.FC<EditorPaneProps> = ({
       </AnimatePresence>
 
       {/* Tamed Widget */}
-      <TamedWidget
-        toolsMap={TOOLS_MAP}
-        widgetPos={widgetPos}
-        setWidgetPos={setWidgetPos}
-        isWidgetVisible={isWidgetVisible}
-        setIsWidgetVisible={setIsWidgetVisible}
-        isWidgetMenuOpen={isWidgetMenuOpen}
-        setIsWidgetMenuOpen={setIsWidgetMenuOpen}
-        editorMode={editorMode}
-        activeFormats={activeFormats}
-        fmt={fmt}
-        fmtLine={fmtLine}
-        handleIndent={handleIndent}
-        handleLink={handleLink}
-        importTable={importTable}
-        showMobileTools1={showMobileTools1}
-        setShowMobileTools1={setShowMobileTools1}
-        showMobileTools2={showMobileTools2}
-        setShowMobileTools2={setShowMobileTools2}
-        setShowMobileToolsOpen={setShowMobileToolsOpen}
-        showMobileToolsOpen={showMobileToolsOpen}
-        setActiveModal={setActiveModal}
-        setSettingsTab={setSettingsTab}
-        insertAtCursor={insertAtCursor}
-        editorRef={editorRef}
-        wysiwygRef={wysiwygRef}
-        isSyncingRef={isSyncingRef}
-        getMarked={getMarked}
-        setContent={setContent}
-        confirmDialog={confirmDialog}
-        updateWysiwygEmptyStatus={updateWysiwygEmptyStatus}
-        activeModal={activeModal}
-        isEditorFullScreen={isEditorFullScreen}
-        isFullScreen={isFullScreen}
-        widgetNoBorder={widgetNoBorder}
-        performanceMode={performanceMode}
-        floatingPos={floatingPos}
-        editorPaneRef={editorPaneRef}
-        widgetRef={widgetRef}
-        toolbarIconSize={toolbarIconSize}
-        offsetTop={offsetTop}
-        viewportHeight={viewportHeight}
-        isKeyboardOpen={isKeyboardOpen}
-        isSidebarOpen={isSidebarOpen}
-        scrollRef={scrollRef}
-        lockedToolsWidth={lockedToolsWidth}
-        setLockedToolsWidth={setLockedToolsWidth}
-        enabledTools={enabledTools}
-        setEnabledTools={setEnabledTools}
-        handleWidgetAction={handleWidgetAction}
-        menuDirection={menuDirection}
-        widgetOpacity={widgetOpacity}
-        setWidgetOpacity={setWidgetOpacity}
-        setWidgetNoBorder={setWidgetNoBorder}
-        lang={lang}
-        moveTool={moveTool}
-        toggleTool={toggleTool}
-        t={t}
-      />
+      {editorMode !== 'reading' && (
+        <TamedWidget
+          toolsMap={TOOLS_MAP}
+          widgetPos={widgetPos}
+          setWidgetPos={setWidgetPos}
+          isWidgetVisible={isWidgetVisible}
+          setIsWidgetVisible={setIsWidgetVisible}
+          isWidgetMenuOpen={isWidgetMenuOpen}
+          setIsWidgetMenuOpen={setIsWidgetMenuOpen}
+          editorMode={editorMode}
+          activeFormats={activeFormats}
+          fmt={fmt}
+          fmtLine={fmtLine}
+          handleIndent={handleIndent}
+          handleLink={handleLink}
+          importTable={importTable}
+          showMobileTools1={showMobileTools1}
+          setShowMobileTools1={setShowMobileTools1}
+          showMobileTools2={showMobileTools2}
+          setShowMobileTools2={setShowMobileTools2}
+          setShowMobileToolsOpen={setShowMobileToolsOpen}
+          showMobileToolsOpen={showMobileToolsOpen}
+          setActiveModal={setActiveModal}
+          setSettingsTab={setSettingsTab}
+          insertAtCursor={insertAtCursor}
+          editorRef={editorRef}
+          wysiwygRef={wysiwygRef}
+          isSyncingRef={isSyncingRef}
+          getMarked={getMarked}
+          setContent={setContent}
+          confirmDialog={confirmDialog}
+          updateWysiwygEmptyStatus={updateWysiwygEmptyStatus}
+          activeModal={activeModal}
+          isEditorFullScreen={isEditorFullScreen}
+          isFullScreen={isFullScreen}
+          widgetNoBorder={widgetNoBorder}
+          performanceMode={performanceMode}
+          floatingPos={floatingPos}
+          editorPaneRef={editorPaneRef}
+          widgetRef={widgetRef}
+          toolbarIconSize={toolbarIconSize}
+          offsetTop={offsetTop}
+          viewportHeight={viewportHeight}
+          isKeyboardOpen={isKeyboardOpen}
+          isSidebarOpen={isSidebarOpen}
+          scrollRef={scrollRef}
+          lockedToolsWidth={lockedToolsWidth}
+          setLockedToolsWidth={setLockedToolsWidth}
+          enabledTools={enabledTools}
+          setEnabledTools={setEnabledTools}
+          handleWidgetAction={handleWidgetAction}
+          menuDirection={menuDirection}
+          widgetOpacity={widgetOpacity}
+          setWidgetOpacity={setWidgetOpacity}
+          setWidgetNoBorder={setWidgetNoBorder}
+          lang={lang}
+          moveTool={moveTool}
+          toggleTool={toggleTool}
+          t={t}
+        />
+      )}
     </div>
   );
 };

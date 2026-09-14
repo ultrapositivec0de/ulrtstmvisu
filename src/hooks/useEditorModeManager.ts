@@ -40,8 +40,9 @@ export function useEditorModeManager({
   htmlToMarkdown,
   setContent,
 }: UseEditorModeManagerProps) {
-  const [editorMode, setEditorMode] = useState<'visual' | 'markdown'>(() => {
-    return (localStorage.getItem('steem_editor_mode') as 'visual' | 'markdown') || 'visual';
+  const [editorMode, setEditorMode] = useState<'visual' | 'markdown' | 'reading'>(() => {
+    const saved = localStorage.getItem('steem_editor_mode') as 'visual' | 'markdown' | 'reading';
+    return saved === 'visual' || saved === 'markdown' || saved === 'reading' ? saved : 'visual';
   });
 
   const cursorPositionRef = useRef<{ start: number; end: number } | null>(null);
@@ -318,7 +319,7 @@ export function useEditorModeManager({
     }
   }, [editorMode, syncCursorMarkdownToVisual, restoreMarkdownCursorAndScroll, wysiwygRef]);
 
-  const handleSetEditorMode = useCallback((mode: 'visual' | 'markdown') => {
+  const handleSetEditorMode = useCallback((mode: 'visual' | 'markdown' | 'reading') => {
     if (editorMode === mode) return;
 
     isTransitioningModeRef.current = true;
@@ -335,6 +336,36 @@ export function useEditorModeManager({
       sup: false,
       phishy: false
     });
+
+    if (mode === 'reading') {
+      // Sync latest content before entering reading mode
+      if (editorMode === 'visual') {
+        saveVisualSelection();
+        isSyncingRef.current = true;
+        const syncResult = syncCursorVisualToMarkdown();
+        if (syncResult && syncResult.md) {
+          if (syncResult.md !== useEditorStore.getState().content) {
+            setContent(syncResult.md);
+          }
+        } else if (wysiwygRef.current) {
+          const md = htmlToMarkdown(wysiwygRef.current.innerHTML);
+          if (md !== useEditorStore.getState().content) {
+            setContent(md);
+          }
+        }
+      } else if (editorMode === 'markdown') {
+        saveCursorPosition();
+        if (editorRef.current && editorRef.current.value !== useEditorStore.getState().content) {
+          setContent(editorRef.current.value);
+        }
+      }
+      setEditorMode('reading');
+      setTimeout(() => {
+        isTransitioningModeRef.current = false;
+        isSyncingRef.current = false;
+      }, 100);
+      return;
+    }
 
     if (mode === 'visual') {
       let start = 0;

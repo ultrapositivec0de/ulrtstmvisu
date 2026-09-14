@@ -130,12 +130,21 @@ export function useTypingSound() {
 
   const lastPhysicalKeyDownTimeRef = useRef<number>(0);
 
-  // Listeners for physical typing and mobile touch input
+  // Listeners for physical typing, user gesture wake-up, and mobile touch input
   useEffect(() => {
     if (!settings.enabled) return;
 
+    // Wake audio context on first user interaction anywhere (required by WebKitGTK / browser policy)
+    const handleGestureWake = () => {
+      audioContextManager.ensureRunning().catch(() => {});
+    };
+
+    window.addEventListener('pointerdown', handleGestureWake, { passive: true });
+    window.addEventListener('click', handleGestureWake, { passive: true });
+
     // 1. Physical Keyboard listener
     const handleKeyDown = (e: KeyboardEvent) => {
+      handleGestureWake();
       // Ignore IME composing sessions (handled via beforeinput)
       if (e.isComposing) return;
 
@@ -203,6 +212,8 @@ export function useTypingSound() {
     window.addEventListener('beforeinput', handleBeforeInput as EventListener, { passive: true, capture: true });
 
     return () => {
+      window.removeEventListener('pointerdown', handleGestureWake);
+      window.removeEventListener('click', handleGestureWake);
       window.removeEventListener('keydown', handleKeyDown, { capture: true });
       window.removeEventListener('beforeinput', handleBeforeInput as EventListener, { capture: true });
     };

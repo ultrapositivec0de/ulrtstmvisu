@@ -44,6 +44,7 @@ import { Header } from './components/header/Header';
 import { Sidebar } from './components/sidebar/Sidebar';
 import { EditorPane } from './components/editor/EditorPane';
 import { PreviewPane } from './components/editor/PreviewPane';
+import { DocReaderContainer } from './components/docReader';
 import { DesktopStatsFooter } from './components/editor/StatusBar';
 import { AppModals } from './components/modals/AppModals';
 import { MobileBottomBar } from './components/common/MobileBottomBar';
@@ -108,6 +109,7 @@ function App() {
   const { systemDialog, setSystemDialog, confirmDialog, promptDialog } = useDialogs({ t });
 
   // 4. Editor Store State
+  const content = useEditorStore(state => state.content);
   const setContent = useEditorStore(state => state.setContent);
   // stats is now handled internally by components to prevent root re-renders
   // const stats = useEditorStore(state => state.stats);
@@ -1297,7 +1299,7 @@ function App() {
             (isEditorFullScreen || isFullScreen || isKeyboardOpen) ? "pb-0 lg:pb-0" : "pb-[calc(4rem+env(safe-area-inset-bottom,0px))] lg:pb-0"
           )}>
             <div className="flex-1 flex overflow-hidden">
-              {/* Markdown / Visual Editor Pane */}
+              {/* Markdown / Visual / Reader Editor Pane */}
               <EditorPane
                 editorPaneRef={editorPaneRef}
                 editorRef={editorRef}
@@ -1355,6 +1357,12 @@ function App() {
                 menuDirection={menuDirection}
                 widgetOpacity={widgetOpacity}
                 lang={lang}
+                pubTitle={pubTitle}
+                setPubTitle={setPubTitle}
+                pubTags={pubTags}
+                setPubTags={setPubTags}
+                drafts={drafts}
+                saveDraft={saveDraft}
                 handleSetEditorMode={handleSetEditorMode}
                 toggleEditorFullScreen={toggleEditorFullScreen}
                 setOnDemandSyncEnabled={setOnDemandSyncEnabled}

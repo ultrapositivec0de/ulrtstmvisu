@@ -10,7 +10,7 @@ export interface EditorFormatConfig {
   focusVisualEditorEnd: () => void;
   saveCursorPosition: () => void;
   wysiwygRef: React.RefObject<HTMLDivElement | null>;
-  editorMode: 'visual' | 'markdown';
+  editorMode: 'visual' | 'markdown' | 'reading';
   getSelectionOrWord: () => { text: string; s: number; e: number };
   getVisualSelectionHtml: () => string | null;
   restoreVisualSelection: (shouldExpandWord?: boolean) => void;
