@@ -9,6 +9,24 @@ export function initNeutralino() {
       const { Neutralino } = window as any;
       Neutralino.init();
       console.log('[Neutralino] Core client successfully initialized.');
+      
+      // Safety check: ensure initial window fits within available monitor work area
+      if (Neutralino.window) {
+        setTimeout(async () => {
+          try {
+            const availHeight = window.screen?.availHeight || 700;
+            const availWidth = window.screen?.availWidth || 1024;
+            if (window.innerHeight > availHeight - 50 || window.outerHeight > availHeight - 50) {
+              const targetHeight = Math.max(550, Math.min(700, availHeight - 80));
+              const targetWidth = Math.max(800, Math.min(1024, availWidth - 40));
+              await Neutralino.window.setSize({ width: targetWidth, height: targetHeight });
+              await Neutralino.window.center();
+            }
+          } catch {
+            /* ignore window sizing errors on unsupported platforms */
+          }
+        }, 150);
+      }
     } catch (e) {
       console.error('[Neutralino] Failed to execute Neutralino.init():', e);
     }

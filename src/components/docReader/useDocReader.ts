@@ -181,8 +181,9 @@ export function useDocReader({
     const el = scrollContainerRef.current;
     if (!el) return;
 
-    // Find active heading in view
+    // Find active heading in view relative to container top boundary
     if (headings.length > 0) {
+      const containerRect = el.getBoundingClientRect();
       const headingElements = headings
         .map(h => ({ id: h.id, el: document.getElementById(h.id) }))
         .filter((item): item is { id: string; el: HTMLElement } => item.el !== null);
@@ -190,7 +191,8 @@ export function useDocReader({
       let currentActiveId: string | null = null;
       for (const item of headingElements) {
         const rect = item.el.getBoundingClientRect();
-        if (rect.top <= 160) {
+        const relativeTop = rect.top - containerRect.top;
+        if (relativeTop <= 100) {
           currentActiveId = item.id;
         } else {
           break;
@@ -205,14 +207,15 @@ export function useDocReader({
   const scrollToHeading = useCallback((headingId: string) => {
     const el = document.getElementById(headingId);
     if (el) {
-      if (scrollContainerRef.current && scrollContainerRef.current.contains(el)) {
-        const container = scrollContainerRef.current;
+      const container = scrollContainerRef.current;
+      if (container && container.contains(el)) {
         const containerRect = container.getBoundingClientRect();
         const elRect = el.getBoundingClientRect();
         const relativeTop = elRect.top - containerRect.top + container.scrollTop;
-        container.scrollTo({ top: Math.max(0, relativeTop - 24), behavior: 'smooth' });
+        // 70px offset provides padding below top navigation bars
+        container.scrollTo({ top: Math.max(0, relativeTop - 70), behavior: 'smooth' });
       } else {
-        el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        el.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
       }
       setActiveHeadingId(headingId);
     }
