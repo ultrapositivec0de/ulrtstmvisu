@@ -41,7 +41,11 @@ export function useTableOperations({
 
   const updateTableRect = useCallback(() => {
     if (activeTable) {
-      setTableRect(activeTable.getBoundingClientRect());
+      requestAnimationFrame(() => {
+        if (activeTable) {
+          setTableRect(activeTable.getBoundingClientRect());
+        }
+      });
     } else {
       setTableRect(null);
     }
@@ -49,10 +53,10 @@ export function useTableOperations({
 
   useEffect(() => {
     updateTableRect();
-    window.addEventListener('resize', updateTableRect);
+    window.addEventListener('resize', updateTableRect, { passive: true });
     const scrollContainer = wysiwygRef.current;
-    if (scrollContainer) {
-      scrollContainer.addEventListener('scroll', updateTableRect);
+    if (scrollContainer && activeTable) {
+      scrollContainer.addEventListener('scroll', updateTableRect, { passive: true });
     }
     return () => {
       window.removeEventListener('resize', updateTableRect);

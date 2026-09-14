@@ -1075,11 +1075,26 @@ function App() {
     saveDraftHook(currentMarkdown, status, notify, t);
   };
 
-  const handleEditPost = (post: SteemPost) => {
+  const handleEditPost = async (post: SteemPost) => {
+    const currentMarkdown = syncWysiwygToContentIfVisual();
+    if (currentMarkdown && currentMarkdown.trim() !== '' && currentMarkdown.trim() !== post.body.trim()) {
+      const saveFirst = await confirmDialog(
+        t('saveDraftBeforeNew') || "Зберегти поточний допис як чернетку перед відкриттям цього допису?",
+        t('saveDraft') || "Зберегти чернетку"
+      );
+      if (saveFirst) {
+        saveDraft('working');
+      }
+    }
+
     setPubTitle(post.title);
     setContent(post.body);
     setPubTags(JSON.parse(post.json_metadata || '{}').tags?.join(' ') || post.category);
     setActiveView('editor');
+    lastSyncContentRef.current = post.body;
+    setTimeout(() => {
+      syncCursorMarkdownToVisual();
+    }, 50);
     notify(t('editor'), 'success');
   };
 

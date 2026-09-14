@@ -273,6 +273,20 @@ export const EditorPane: React.FC<EditorPaneProps> = ({
   const [isTOCOpen, setIsTOCOpen] = React.useState(false);
   const [isSourceDrawerOpen, setIsSourceDrawerOpen] = React.useState(false);
 
+  const scrollSaveTimeoutRef = React.useRef<any>(null);
+  const handleWysiwygScroll = React.useCallback(() => {
+    if (scrollSaveTimeoutRef.current) clearTimeout(scrollSaveTimeoutRef.current);
+    scrollSaveTimeoutRef.current = setTimeout(() => {
+      if (wysiwygRef.current) {
+        try {
+          localStorage.setItem('steem_editor_scroll', String(wysiwygRef.current.scrollTop));
+        } catch (e) {
+          /* ignore */
+        }
+      }
+    }, 250);
+  }, [wysiwygRef]);
+
   const getEditorBottomSpacingClass = () => {
     if (isKeyboardOpen) {
       return "pb-44 mb-2 lg:pb-20 lg:mb-2";
@@ -832,7 +846,7 @@ export const EditorPane: React.FC<EditorPaneProps> = ({
             showWidget(e.clientX, e.clientY);
           }}
           className={cn(
-            "flex-1 w-full bg-transparent text-base outline-none resize-none custom-scrollbar transition-all duration-700 editor-font overscroll-contain",
+            "flex-1 w-full bg-transparent text-base outline-none resize-none custom-scrollbar editor-font overscroll-contain",
             (visualStyle === 'neon' && neonTextColored) ? "text-cyan-400 font-normal" : "text-slate-300",
             beautifyEnabled ? "px-4 lg:px-8 pt-4 lg:pt-6 max-w-[clamp(40rem,60vw,80rem)] mx-auto selection:bg-[rgb(var(--accent-color)/0.3)]" : "px-3 pt-3 lg:px-6 lg:pt-6",
             getEditorBottomSpacingClass()
@@ -1032,11 +1046,7 @@ export const EditorPane: React.FC<EditorPaneProps> = ({
             setIsEditorFocused(false);
             updateContentFromWysiwyg(true);
           }}
-          onScroll={() => {
-            if (wysiwygRef.current) {
-              localStorage.setItem('steem_editor_scroll', String(wysiwygRef.current.scrollTop));
-            }
-          }}
+          onScroll={handleWysiwygScroll}
           onMouseUp={(e) => {
             showWidget(e.clientX, e.clientY);
             saveVisualSelection();
@@ -1077,7 +1087,7 @@ export const EditorPane: React.FC<EditorPaneProps> = ({
             saveVisualSelection();
           }}
           className={cn(
-            "relative flex-1 w-full bg-transparent text-base outline-none overflow-y-auto custom-scrollbar transition-colors duration-700 editor-font prose prose-invert prose-cyan max-w-none wysiwyg-editor break-words overscroll-contain",
+            "relative flex-1 w-full bg-transparent text-base outline-none overflow-y-auto custom-scrollbar editor-font prose prose-invert prose-cyan max-w-none wysiwyg-editor break-words overscroll-contain",
             (visualStyle === 'neon' && neonTextColored) ? "text-cyan-400 font-normal" : "text-slate-300",
             beautifyEnabled ? "px-4 lg:px-8 pt-4 lg:pt-6 max-w-4xl mx-auto selection:bg-[rgb(var(--accent-color)/0.3)]" : "px-4 pt-4 lg:px-6 lg:pt-6",
             getEditorBottomSpacingClass()
