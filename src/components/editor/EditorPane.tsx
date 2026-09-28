@@ -1,6 +1,7 @@
 import React from 'react';
 import { cn } from '../../lib/utils';
 import { useEditorStore } from '../../store';
+import { useDeviceStore } from '../../store/deviceStore';
 import { 
   Eye, Terminal, BookOpen, Minimize2, Maximize2, RefreshCw, EyeOff, Sparkles, Type, 
   MoveVertical, X, Check, Images, Plus, Settings, Trash2, ListTree, FolderOpen 
@@ -270,6 +271,7 @@ export const EditorPane: React.FC<EditorPaneProps> = ({
   importTable,
   TOOLS_MAP
 }) => {
+  const isMobileLayout = useDeviceStore(s => s.isMobileLayout);
   const [isTOCOpen, setIsTOCOpen] = React.useState(false);
   const [isSourceDrawerOpen, setIsSourceDrawerOpen] = React.useState(false);
 
@@ -318,7 +320,7 @@ export const EditorPane: React.FC<EditorPaneProps> = ({
       } : {}}
       className={cn(
         "flex-1 flex flex-col min-w-0 border-r border-slate-800 transition-all relative",
-        activeMobileTab !== 'editor' && "hidden lg:flex",
+        (isMobileLayout && activeMobileTab !== 'editor') ? "hidden" : "flex",
         isEditorFullScreen && "bg-slate-950 p-0 fixed inset-0 z-[250]"
       )}
     >
@@ -1115,7 +1117,7 @@ export const EditorPane: React.FC<EditorPaneProps> = ({
             className={cn(
               "fixed z-[35] flex items-center transition-all duration-150",
               isTableMenuExpanded || isTableMenuPinned 
-                ? "flex-row gap-1 p-1 bg-slate-900/95 border border-slate-700/80 rounded-xl shadow-xl backdrop-blur-md" 
+                ? "flex-row gap-1 p-1 bg-[var(--bg-overlay-surface)] border border-[var(--border-subtle)] rounded-xl shadow-xl backdrop-blur-dynamic" 
                 : "bg-transparent shadow-none"
             )}
             style={{
@@ -1174,11 +1176,11 @@ export const EditorPane: React.FC<EditorPaneProps> = ({
               <button 
                 type="button"
                 onClick={() => setIsTableMenuExpanded(true)}
-                className="px-2 py-1 text-slate-300 bg-slate-900/90 border border-slate-700/70 hover:text-white hover:bg-slate-800 rounded-lg transition-all shadow-md flex items-center gap-1.5 cursor-pointer text-xs backdrop-blur-sm" 
+                className="px-2 py-1 text-[var(--text-main)] bg-[var(--bg-overlay-surface)] border border-[var(--border-subtle)] hover:bg-[var(--bg-card)] rounded-lg transition-all shadow-md flex items-center gap-1.5 cursor-pointer text-xs backdrop-blur-dynamic" 
                 title="Опції таблиці"
               >
                 <Settings size={14} className="text-cyan-400" />
-                <span className="text-[11px] font-medium text-slate-300">Таблиця</span>
+                <span className="text-[11px] font-medium text-[var(--text-main)]">Таблиця</span>
               </button>
             )}
           </div>
@@ -1196,27 +1198,28 @@ export const EditorPane: React.FC<EditorPaneProps> = ({
             transition={{ duration: 0.15 }}
             style={{
               bottom: getMiniGalleryBottomStyle({
-                isMobile: typeof window !== 'undefined' ? window.innerWidth < 1024 : false,
+                isMobile: isMobileLayout,
                 isKeyboardOpen,
                 keyboardOffset,
                 isFullScreen,
                 isEditorFullScreen,
                 widgetPos,
               }),
+              touchAction: 'none',
             }}
             className={cn(
-              "z-[155] p-2 flex-col gap-1.5 bg-slate-900/95 backdrop-blur-md border border-cyan-500/30 rounded-2xl shadow-2xl transition-all",
+              "z-[155] p-2 flex-col gap-1.5 bg-[var(--bg-overlay-surface)] backdrop-blur-dynamic border border-cyan-500/30 rounded-2xl shadow-2xl transition-all select-none overscroll-contain",
               "fixed left-3 right-3 max-w-lg mx-auto lg:absolute lg:left-4 lg:right-4 lg:max-w-2xl bottom-4",
-              isSidebarOpen ? "hidden lg:flex" : "flex"
+              (isSidebarOpen && isMobileLayout) ? "hidden" : "flex"
             )}
           >
-            <div className="flex items-center justify-between px-1">
+            <div className="flex items-center justify-between px-1 select-none">
               <div className="flex items-center gap-2">
                 <span className="text-xs font-bold text-cyan-400 flex items-center gap-1.5">
                   <Images size={14} />
                   {t('miniGallery')} ({images.length})
                 </span>
-                <span className="text-[10px] text-slate-400 hidden sm:inline">
+                <span className="text-[10px] text-[var(--text-muted)] hidden sm:inline">
                   • {t('tapToInsert')}
                 </span>
               </div>
@@ -1235,7 +1238,7 @@ export const EditorPane: React.FC<EditorPaneProps> = ({
                   type="button"
                   onMouseDown={(e) => e.preventDefault()}
                   onClick={() => setIsMiniGalleryOpen(false)}
-                  className="p-1 text-slate-400 hover:text-white rounded-md hover:bg-slate-800 transition-colors"
+                  className="p-1 text-[var(--text-muted)] hover:text-[var(--text-main)] rounded-md hover:bg-slate-800/40 dark:hover:bg-slate-800 transition-colors"
                   title={t('close')}
                 >
                   <X size={14} />
@@ -1244,8 +1247,8 @@ export const EditorPane: React.FC<EditorPaneProps> = ({
             </div>
 
             <div 
-              className="flex items-center gap-2 overflow-x-auto py-1 px-0.5 no-scrollbar scroll-smooth"
-              style={{ scrollbarWidth: 'none' }}
+              className="flex items-center gap-2 overflow-x-auto py-1 px-0.5 no-scrollbar scroll-smooth overscroll-contain select-none"
+              style={{ scrollbarWidth: 'none', touchAction: 'pan-x' }}
             >
               {images.filter(img => Boolean(img && (img.url || img.name))).map((img, idx) => (
                 <button

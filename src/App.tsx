@@ -9,6 +9,7 @@ import { probeNodes } from './lib/steem';
 import { Language, SteemPost } from './types';
 import { Buffer } from 'buffer';
 import { useEditorStore } from './store';
+import { useDeviceStore } from './store/deviceStore';
 import Reader from './components/Reader';
 import { htmlToMarkdown, convertBareImageUrlsToMarkdown, isImageAndProxyUrl } from './lib/editorSync';
 import { getMiniGalleryBottomStyle } from './lib/viewportLayout';
@@ -220,6 +221,7 @@ function App() {
   });
   const [tableSelectorPos, setTableSelectorPos] = useState<{x: number, y: number, direction: 'up' | 'down'} | null>(null);
   const { viewportHeight: vvHeight, keyboardOffset, isKeyboardOpen, offsetTop, viewportHeight } = useVisualViewport();
+  const showMobileBottomBar = useDeviceStore(s => s.showMobileBottomBar);
   
   const [floatingPos, setFloatingPos] = useState<{ x: number, y: number } | null>(null);
   const [isWidgetVisible, setIsWidgetVisible] = useState(false);
@@ -1309,10 +1311,12 @@ function App() {
           />
 
           {/* Main Pane Container */}
-          <main className={cn(
-            "flex-1 flex flex-col min-w-0 bg-slate-950 relative transition-all",
-            (isEditorFullScreen || isFullScreen || isKeyboardOpen) ? "pb-0 lg:pb-0" : "pb-[calc(4rem+env(safe-area-inset-bottom,0px))] lg:pb-0"
-          )}>
+          <main 
+            className="flex-1 flex flex-col min-w-0 bg-slate-950 relative transition-all"
+            style={{
+              paddingBottom: (isEditorFullScreen || isFullScreen) ? '0px' : 'var(--app-content-bottom-padding, 0px)'
+            }}
+          >
             <div className="flex-1 flex overflow-hidden">
               {/* Markdown / Visual / Reader Editor Pane */}
               <EditorPane

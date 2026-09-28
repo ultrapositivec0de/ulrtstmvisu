@@ -3,6 +3,8 @@ import { Edit3, Eye, Rocket, Image as ImageIcon, Settings } from 'lucide-react';
 import { cn } from '../../lib/utils';
 import { useEditorStore } from '../../store';
 
+import { useDeviceStore } from '../../store/deviceStore';
+
 export interface MobileBottomBarProps {
   isEditorFullScreen: boolean;
   isFullScreen: boolean;
@@ -17,6 +19,7 @@ export interface MobileBottomBarProps {
   isSidebarOpen: boolean;
   setIsSidebarOpen: (open: boolean | ((prev: boolean) => boolean)) => void;
   setSettingsTab: (tab: any) => void;
+  isMobileLayout?: boolean;
   t: (key: any) => string;
 }
 
@@ -34,12 +37,21 @@ export const MobileBottomBar: React.FC<MobileBottomBarProps> = ({
   isSidebarOpen,
   setIsSidebarOpen,
   setSettingsTab,
+  isMobileLayout: propIsMobileLayout,
   t,
 }) => {
+  const showMobileBottomBar = useDeviceStore(s => s.showMobileBottomBar);
+  const storeIsMobileLayout = useDeviceStore(s => s.isMobileLayout);
+  const isMobileLayout = propIsMobileLayout !== undefined ? propIsMobileLayout : storeIsMobileLayout;
+
+  if (!showMobileBottomBar || !isMobileLayout) {
+    return null;
+  }
+
   return (
     <nav 
       className={cn(
-        "lg:hidden fixed left-0 right-0 bg-slate-900 border-t border-slate-800 grid grid-cols-5 items-center px-1 z-[70] shadow-[0_-4px_20px_rgba(0,0,0,0.5)] transition-all duration-200",
+        "fixed left-0 right-0 bg-slate-900 border-t border-slate-800 grid grid-cols-5 items-center px-1 z-[70] shadow-[0_-4px_20px_rgba(0,0,0,0.5)] transition-all duration-200",
         (isEditorFullScreen || isFullScreen || isKeyboardOpen) ? "translate-y-full opacity-0 pointer-events-none" : "translate-y-0 opacity-100"
       )}
       style={{

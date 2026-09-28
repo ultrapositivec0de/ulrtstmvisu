@@ -28,6 +28,7 @@ import { SecurityService } from '../../services/securityService';
 import { APP_CHANGELOG, getChangelogText } from '../../data/changelog';
 import { DEFAULT_APP_AGENT } from '../../hooks/usePostSettings';
 import { UiScalePreset } from '../../hooks/useThemeAndStyles';
+import { useDeviceStore } from '../../store/deviceStore';
 
 export interface SettingsModalProps {
   isOpen: boolean;
@@ -588,8 +589,9 @@ export const SettingsModal: React.FC<SettingsModalProps> = (props) => {
                 </div>
                 <button
                   onClick={() => {
-                    const isMobile = typeof window !== 'undefined' && (window.innerWidth < 768 || window.matchMedia('(pointer: coarse)').matches);
-                    applyUiScalePreset?.(isMobile ? 'touch' : 'normal');
+                    const devState = useDeviceStore.getState();
+                    const isTouchOrMobile = devState.isMobileLayout || devState.formFactor === 'phone' || devState.isTouchDevice;
+                    applyUiScalePreset?.(isTouchOrMobile ? 'touch' : 'normal');
                     setHeaderHeightAuto?.(true);
                   }}
                   className="text-[10px] text-cyan-400 hover:text-cyan-300 flex items-center gap-1 font-semibold px-2 py-1 rounded bg-cyan-500/10 border border-cyan-500/20 transition-all cursor-pointer"

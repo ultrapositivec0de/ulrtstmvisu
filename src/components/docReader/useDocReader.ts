@@ -176,37 +176,63 @@ export function useDocReader({
   const [scrollProgress, setScrollProgress] = useState(0);
   const [activeHeadingId, setActiveHeadingId] = useState<string | null>(null);
   const scrollContainerRef = useRef<HTMLDivElement | null>(null);
+  const isProgrammaticScrollingRef = useRef(false);
+  const programmaticScrollTimeoutRef = useRef<any>(null);
+  const rafIdRef = useRef<number | null>(null);
 
   const handleScroll = useCallback(() => {
-    const el = scrollContainerRef.current;
-    if (!el) return;
+    if (isProgrammaticScrollingRef.current) return;
 
-    // Find active heading in view relative to container top boundary
-    if (headings.length > 0) {
-      const containerRect = el.getBoundingClientRect();
-      const headingElements = headings
-        .map(h => ({ id: h.id, el: document.getElementById(h.id) }))
-        .filter((item): item is { id: string; el: HTMLElement } => item.el !== null);
+    if (rafIdRef.current !== null) {
+      cancelAnimationFrame(rafIdRef.current);
+    }
 
-      let currentActiveId: string | null = null;
-      for (const item of headingElements) {
-        const rect = item.el.getBoundingClientRect();
-        const relativeTop = rect.top - containerRect.top;
-        if (relativeTop <= 100) {
-          currentActiveId = item.id;
-        } else {
-          break;
+    rafIdRef.current = requestAnimationFrame(() => {
+      const el = scrollContainerRef.current;
+      if (!el) return;
+
+      // Calculate scroll progress percentage
+      const totalScrollable = el.scrollHeight - el.clientHeight;
+      if (totalScrollable > 0) {
+        const progress = Math.min(100, Math.max(0, Math.round((el.scrollTop / totalScrollable) * 100)));
+        setScrollProgress(progress);
+      }
+
+      // Find active heading in view relative to container top boundary
+      if (headings.length > 0) {
+        const containerRect = el.getBoundingClientRect();
+        const headingElements = headings
+          .map(h => ({ id: h.id, el: document.getElementById(h.id) }))
+          .filter((item): item is { id: string; el: HTMLElement } => item.el !== null);
+
+        let currentActiveId: string | null = null;
+        for (const item of headingElements) {
+          const rect = item.el.getBoundingClientRect();
+          const relativeTop = rect.top - containerRect.top;
+          if (relativeTop <= 110) {
+            currentActiveId = item.id;
+          } else {
+            break;
+          }
+        }
+        if (currentActiveId) {
+          setActiveHeadingId(prev => (prev === currentActiveId ? prev : currentActiveId));
         }
       }
-      if (currentActiveId) {
-        setActiveHeadingId(prev => (prev === currentActiveId ? prev : currentActiveId));
-      }
-    }
+    });
   }, [headings]);
 
   const scrollToHeading = useCallback((headingId: string) => {
     const el = document.getElementById(headingId);
     if (el) {
+      isProgrammaticScrollingRef.current = true;
+      if (programmaticScrollTimeoutRef.current) {
+        clearTimeout(programmaticScrollTimeoutRef.current);
+      }
+      programmaticScrollTimeoutRef.current = setTimeout(() => {
+        isProgrammaticScrollingRef.current = false;
+      }, 500);
+
       const container = scrollContainerRef.current;
       if (container && container.contains(el)) {
         const containerRect = container.getBoundingClientRect();
@@ -215,10 +241,17 @@ export function useDocReader({
         // 70px offset provides padding below top navigation bars
         container.scrollTo({ top: Math.max(0, relativeTop - 70), behavior: 'smooth' });
       } else {
-        el.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        el.scrollIntoView({ behavior: 'smooth', block: 'start' });
       }
       setActiveHeadingId(headingId);
     }
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      if (rafIdRef.current !== null) cancelAnimationFrame(rafIdRef.current);
+      if (programmaticScrollTimeoutRef.current) clearTimeout(programmaticScrollTimeoutRef.current);
+    };
   }, []);
 
   // 7. Load into editor and switch to edit mode

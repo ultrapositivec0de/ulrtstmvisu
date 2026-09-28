@@ -1,0 +1,114 @@
+=== THEME TRANSPARENCY & HARDCODED COLOR AUDIT ===
+
+1. BACKDROP-BLUR USAGES (32 items):
+  src/index.css:642 -> /* Disable expensive backdrop-blur GPU layers */
+  src/index.css:665 -> .perf-mode [class*="backdrop-blur"],
+  src/index.css:666 -> .perf-mode .backdrop-blur-sm,
+  src/index.css:667 -> .perf-mode .backdrop-blur-md,
+  src/index.css:668 -> .perf-mode .backdrop-blur-lg,
+  src/index.css:669 -> .perf-mode .backdrop-blur-\[1px\] {
+  src/index.css:673 -> .theme-light.perf-mode [class*="backdrop-blur"],
+  src/index.css:674 -> .theme-light.perf-mode .backdrop-blur-sm,
+  src/index.css:675 -> .theme-light.perf-mode .backdrop-blur-md,
+  src/index.css:676 -> .theme-light.perf-mode .backdrop-blur-lg,
+  src/index.css:677 -> .theme-light.perf-mode .backdrop-blur-\[1px\] {
+  src/components/Reader.tsx:205 -> <div className="absolute inset-0 z-10 bg-slate-900/40 backdrop-blur-[1px] flex items-center justify-center rounded">
+  src/components/Reader.tsx:1615 -> <div className="border-b border-slate-800 bg-slate-900/50 backdrop-blur-md">
+  src/components/Reader.tsx:1896 -> <div className="p-4 border-b border-slate-800 flex items-center justify-between bg-slate-900/50 backdrop-blur-md">
+  src/components/Reader.tsx:3525 -> <div className="flex flex-col sm:flex-row items-center justify-between gap-4 bg-slate-900/80 p-4 rounded-xl border border-slate-800/50 backdrop-blur-md sticky top-0 z-20 shadow-2xl">
+  src/components/Reader.tsx:4501 -> <div className="bg-slate-900/90 backdrop-blur-md border border-slate-700 rounded-full py-1.5 px-3 flex items-center gap-3 shadow-2xl shadow-cyan-500/20 w-fit mx-auto">
+  src/components/Reader.tsx:4541 -> <div className="bg-slate-900 border border-slate-700 rounded-2xl p-4 shadow-2xl space-y-3 animate-in zoom-in-95 backdrop-blur-md bg-slate-900/95 ring-1 ring-white/5 flex flex-col overflow-hidden max-h-[60vh]">
+  src/components/Reader.tsx:4706 -> <div className="absolute inset-0 bg-slate-900/50 backdrop-blur-sm z-10 flex items-center justify-center">
+  src/components/ExternalImageItem.tsx:69 -> "absolute inset-x-0 bottom-0 bg-slate-950/90 backdrop-blur-sm px-1 py-1.5 flex flex-row items-center justify-center gap-1 transition-all z-10",
+  src/components/ImageItem.tsx:84 -> "absolute inset-x-0 bottom-0 bg-slate-950/90 backdrop-blur-sm px-1 py-1.5 flex flex-row items-center justify-center gap-1 transition-all z-10",
+  src/components/ImageItem.tsx:154 -> "bg-slate-900/80 hover:bg-slate-700 backdrop-blur-sm rounded text-white transition-colors flex items-center justify-center",
+  src/components/ImageItem.tsx:171 -> "bg-slate-900/80 hover:bg-slate-700 backdrop-blur-sm rounded text-white transition-colors flex items-center justify-center",
+  src/components/audio/AudioControlWidget.tsx:131 -> ? "bg-slate-900/95 backdrop-blur-md border-slate-800 text-slate-100"
+  src/components/audio/AudioControlWidget.tsx:132 -> : "bg-white/95 backdrop-blur-md border-slate-200 text-slate-900 shadow-slate-300/50"
+  src/components/modals/AppModals.tsx:690 -> <div className="p-4 bg-slate-900/95 backdrop-blur-md border border-cyan-500/30 rounded-2xl shadow-2xl shadow-cyan-950/50 flex flex-col gap-3">
+  src/components/docReader/DocReaderSettingsMenu.tsx:47 -> className="fixed inset-0 bg-black/60 backdrop-blur-sm transition-opacity"
+  src/components/docReader/DocReaderToolbar.tsx:40 -> "sticky top-0 z-30 w-full border-b backdrop-blur-md transition-colors",
+  src/components/editor/EditorPane.tsx:1118 -> ? "flex-row gap-1 p-1 bg-slate-900/95 border border-slate-700/80 rounded-xl shadow-xl backdrop-blur-md"
+  src/components/editor/EditorPane.tsx:1177 -> className="px-2 py-1 text-slate-300 bg-slate-900/90 border border-slate-700/70 hover:text-white hover:bg-slate-800 rounded-lg transition-all shadow-md flex items-center gap-1.5 cursor-pointer text-xs backdrop-blur-sm"
+  src/components/editor/EditorPane.tsx:1208 -> "z-[155] p-2 flex-col gap-1.5 bg-slate-900/95 backdrop-blur-md border border-cyan-500/30 rounded-2xl shadow-2xl transition-all",
+  src/components/editor/EditorPane.tsx:1277 -> <div className="absolute inset-0 bg-emerald-950/80 backdrop-blur-xs flex items-center justify-center text-emerald-400">
+  src/data/changelog.ts:279 -> "GPU Resource Optimization: Refactored heavy CSS effects, including conditional backdrop-blur and transparency, to dynamically disable/simplify on performance-limited modes. This significantly reduces GPU load and enhances responsiveness on lower-end devices.",
+
+2. TOP HARDCODED BACKGROUNDS (382 items):
+  bg-slate-800: 136 occurrences
+  bg-slate-900: 65 occurrences
+  bg-slate-950: 37 occurrences
+  bg-slate-800/50: 22 occurrences
+  bg-slate-900/50: 15 occurrences
+  bg-slate-800/30: 15 occurrences
+  bg-slate-950/40: 12 occurrences
+  bg-slate-950/50: 8 occurrences
+  bg-slate-900/40: 7 occurrences
+  bg-slate-800/80: 7 occurrences
+  bg-slate-800/60: 6 occurrences
+  bg-slate-800/40: 6 occurrences
+  bg-slate-900/95: 5 occurrences
+  bg-slate-900/30: 4 occurrences
+  bg-slate-950/60: 4 occurrences
+  bg-black: 4 occurrences
+  bg-white/5: 4 occurrences
+  bg-slate-900/60: 3 occurrences
+  bg-slate-900/80: 3 occurrences
+  bg-slate-900/90: 3 occurrences
+  bg-slate-800/20: 3 occurrences
+  bg-slate-900/10: 2 occurrences
+  bg-slate-950/30: 2 occurrences
+  bg-slate-950/90: 2 occurrences
+  bg-slate-950/20: 1 occurrences
+
+Detailed Samples:
+  src/index.css:93 [bg-slate-950] -> .theme-light .bg-slate-950 { background-color: var(--bg-main) !important; }
+  src/index.css:94 [bg-slate-950] -> .theme-light .bg-slate-950\/50 { background-color: rgba(255, 255, 255, 0.5) !important; }
+  src/index.css:95 [bg-slate-950] -> .theme-light .bg-slate-950\/80 { background-color: rgba(255, 255, 255, 0.8) !important; }
+  src/index.css:98 [bg-slate-900] -> .theme-light .bg-slate-900\/30 { background-color: rgba(248, 250, 252, 0.3) !important; }
+  src/index.css:99 [bg-slate-900] -> .theme-light .bg-slate-900\/90 { background-color: rgba(255, 255, 255, 0.9) !important; }
+  src/index.css:100 [bg-slate-900] -> .theme-light .bg-slate-900\/40 { background-color: rgba(255, 255, 255, 0.4) !important; }
+  src/index.css:101 [bg-slate-900] -> .theme-light .bg-slate-900\/60 { background-color: rgba(248, 250, 252, 0.6) !important; }
+  src/index.css:103 [bg-slate-800] -> .theme-light .bg-slate-800\/20 { background-color: rgba(241, 245, 249, 0.2) !important; }
+  src/index.css:104 [bg-slate-800] -> .theme-light .bg-slate-800\/80 { background-color: rgba(241, 245, 249, 0.8) !important; }
+  src/index.css:105 [bg-slate-800] -> .theme-light .bg-slate-800\/90 { background-color: rgba(241, 245, 249, 0.9) !important; }
+  src/index.css:106 [bg-slate-800] -> .theme-light .bg-slate-800\/95 { background-color: rgba(241, 245, 249, 0.95) !important; }
+  src/index.css:132 [bg-slate-900] -> .theme-light .bg-slate-900 { background-color: var(--bg-sidebar) !important; }
+  src/index.css:133 [bg-slate-900] -> .theme-light .bg-slate-900\/50 { background-color: rgba(248, 250, 252, 0.5) !important; }
+  src/index.css:134 [bg-slate-900] -> .theme-light .bg-slate-900\/80 { background-color: rgba(248, 250, 252, 0.8) !important; }
+  src/index.css:135 [bg-slate-800] -> .theme-light .bg-slate-800 { background-color: var(--bg-card) !important; }
+  src/index.css:136 [bg-slate-800] -> .theme-light .bg-slate-800\/50 { background-color: rgba(241, 245, 249, 0.5) !important; }
+  src/index.css:137 [bg-slate-800] -> .theme-light .bg-slate-800\/40 { background-color: rgba(241, 245, 249, 0.4) !important; }
+  src/index.css:138 [bg-slate-800] -> .theme-light .bg-slate-800\/30 { background-color: rgba(241, 245, 249, 0.3) !important; }
+  src/index.css:139 [bg-slate-800] -> .theme-light .bg-slate-800\/10 { background-color: rgba(241, 245, 249, 0.1) !important; }
+  src/index.css:187 [bg-slate-800] -> .theme-light .hover\:bg-slate-800:hover { background-color: #e2e8f0 !important; }
+  src/index.css:188 [bg-slate-900] -> .theme-light .hover\:bg-slate-900:hover { background-color: #f1f5f9 !important; }
+  src/index.css:214 [bg-slate-950] -> .theme-neon .bg-slate-950 { background-color: var(--bg-main) !important; }
+  src/index.css:215 [bg-slate-900] -> .theme-neon .bg-slate-900 { background-color: var(--bg-sidebar) !important; }
+  src/index.css:216 [bg-slate-800] -> .theme-neon .bg-slate-800 {
+  src/index.css:300 [bg-slate-800] -> @apply bg-slate-800 rounded-full hover:bg-slate-700 transition-colors;
+  src/index.css:422 [bg-slate-800] -> .markdown-body code, .wysiwyg-editor code { @apply bg-slate-800 px-1.5 py-0.5 rounded text-sm font-m
+  src/index.css:423 [bg-slate-900] -> .markdown-body pre, .wysiwyg-editor pre { @apply bg-slate-900 p-4 rounded-xl mb-4 overflow-x-auto bo
+  src/index.css:427 [bg-slate-900] -> .markdown-body th, .wysiwyg-editor th { @apply bg-slate-900 font-bold; }
+  src/index.css:447 [bg-slate-900/30] -> @apply p-4 border border-dashed border-slate-700/50 rounded-xl bg-slate-900/30 text-[11px] text-slat
+  src/index.css:452 [bg-slate-900] -> .theme-light .bg-slate-900\/90 { background-color: rgba(255, 255, 255, 0.9) !important; }
+  src/index.css:453 [bg-slate-900] -> .theme-light .bg-slate-900\/40 { background-color: rgba(248, 250, 252, 0.4) !important; }
+  src/index.css:462 [bg-slate-950] -> .theme-light .bg-slate-950\/60 { background-color: rgba(255, 255, 255, 0.6) !important; }
+  src/App.tsx:1153 [bg-slate-950] -> visualStyle === 'neon' ? "theme-neon bg-slate-950 text-cyan-400" : (isDarkMode ? "bg-slate-950 text-
+  src/App.tsx:1153 [bg-slate-950] -> visualStyle === 'neon' ? "theme-neon bg-slate-950 text-cyan-400" : (isDarkMode ? "bg-slate-950 text-
+  src/App.tsx:1226 [bg-slate-900] -> <div className={cn("flex-1 overflow-hidden bg-slate-900 flex flex-col", activeView !== 'reader' && "
+  src/App.tsx:1313 [bg-slate-950] -> "flex-1 flex flex-col min-w-0 bg-slate-950 relative transition-all",
+  src/components/Reader.tsx:205 [bg-slate-900/40] -> <div className="absolute inset-0 z-10 bg-slate-900/40 backdrop-blur-[1px] flex items-center justify-
+  src/components/Reader.tsx:224 [bg-slate-950] -> className="w-full bg-slate-950 border border-slate-800 rounded p-3 text-[12px] min-h-[120px] max-h-[
+  src/components/Reader.tsx:1614 [bg-slate-950] -> <div className="flex flex-col h-full bg-slate-950 text-slate-100 overflow-hidden font-sans">
+  src/components/Reader.tsx:1615 [bg-slate-900/50] -> <div className="border-b border-slate-800 bg-slate-900/50 backdrop-blur-md">
+  src/components/Reader.tsx:1637 [bg-slate-800] -> className="w-full bg-slate-800 border border-slate-700 rounded-lg py-2 pl-10 pr-4 focus:ring-2 focus
+  src/components/Reader.tsx:1645 [bg-slate-800] -> <div className="flex items-center bg-slate-800 rounded-lg border border-slate-700 overflow-hidden h-
+  src/components/Reader.tsx:1687 [bg-slate-800] -> <div className="flex items-center gap-1.5 p-1 bg-slate-800 rounded-lg border border-slate-700">
+  src/components/Reader.tsx:1715 [bg-slate-800] -> <div className="flex items-center gap-2 px-3 py-1 bg-slate-800 rounded-lg border border-slate-700 h-
+  src/components/Reader.tsx:1778 [bg-slate-800] -> className="ml-2 w-7 h-7 flex items-center justify-center text-slate-500 hover:text-slate-300 hover:b
+  src/components/Reader.tsx:1791 [bg-slate-800] -> <div className="flex items-center gap-1 bg-slate-800 rounded-lg border border-slate-700 p-0.5">
+  src/components/Reader.tsx:1797 [bg-slate-800] -> className="px-2 py-1 bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-slate-200 rounded tex
+  src/components/Reader.tsx:1806 [bg-slate-800] -> className="px-2 py-1 bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-slate-200 rounded tex
+  src/components/Reader.tsx:1820 [bg-slate-800] -> className="p-1.5 text-slate-400 hover:bg-slate-800 rounded-lg hover:text-white transition-colors"
+  src/components/Reader.tsx:1831 [bg-slate-800] -> <div className="flex items-center gap-1 bg-slate-800 rounded-lg px-2 py-1 border border-slate-700">

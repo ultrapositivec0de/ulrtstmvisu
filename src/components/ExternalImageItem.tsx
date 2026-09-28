@@ -27,7 +27,7 @@ const ExternalImageItem = React.memo(({
       <div 
         onMouseDown={(e) => e.preventDefault()}
         className={cn(
-          "relative rounded-lg overflow-hidden border border-slate-800 hover:border-cyan-500 hover:ring-1 hover:ring-cyan-500/50 transition-all cursor-pointer bg-slate-900 shadow-sm flex-none aspect-square w-full"
+          "relative rounded-lg overflow-hidden border border-[var(--border-color)] hover:border-cyan-500 hover:ring-1 hover:ring-cyan-500/50 transition-all cursor-pointer bg-[var(--bg-card)] shadow-sm flex-none aspect-square w-full"
         )}
         onClick={(e) => { e.stopPropagation(); onInsert(photo, 'plain'); }}
         title={t('insert')}
@@ -47,14 +47,14 @@ const ExternalImageItem = React.memo(({
     <div 
       onMouseDown={(e) => e.preventDefault()}
       className={cn(
-        "group relative rounded-lg overflow-hidden border transition-all cursor-pointer bg-slate-900 flex flex-col shadow-sm flex-none",
+        "group relative rounded-lg overflow-hidden border transition-all cursor-pointer bg-[var(--bg-card)] flex flex-col shadow-sm flex-none",
         galleryView === 'grid' ? "w-full min-h-[140px]" : "flex-row items-center p-1.5 gap-2 min-h-[50px]",
-        photo.selected ? "border-cyan-500 ring-1 ring-cyan-500/20" : "border-slate-800 hover:border-slate-700"
+        photo.selected ? "border-cyan-500 ring-1 ring-cyan-500/20" : "border-[var(--border-color)] hover:border-slate-400 dark:hover:border-slate-700"
       )}
       onClick={() => onToggle(idx)}
     >
       <div className={cn(
-        "overflow-hidden relative flex-none bg-slate-950",
+        "overflow-hidden relative flex-none bg-[var(--bg-main)]",
         galleryView === 'grid' ? "aspect-square w-full" : "w-10 h-10 rounded"
       )}>
         <img 
@@ -66,16 +66,16 @@ const ExternalImageItem = React.memo(({
         />
         
         <div className={cn(
-          "absolute inset-x-0 bottom-0 bg-slate-950/90 backdrop-blur-sm px-1 py-1.5 flex flex-row items-center justify-center gap-1 transition-all z-10",
+          "absolute inset-x-0 bottom-0 bg-[var(--bg-overlay-surface)] backdrop-blur-dynamic border-t border-[var(--border-subtle)] px-1 py-1.5 flex flex-row items-center justify-center gap-1 transition-all z-10",
           "lg:opacity-0 lg:group-hover:opacity-100"
         )}>
-          <button onMouseDown={(e) => e.preventDefault()} onClick={(e) => { e.stopPropagation(); onInsert(photo, 'left'); }} className="p-1.5 bg-slate-800 flex-1 rounded hover:bg-cyan-600 outline-none text-white transition-colors flex justify-center items-center" title={t('insert')}>
+          <button onMouseDown={(e) => e.preventDefault()} onClick={(e) => { e.stopPropagation(); onInsert(photo, 'left'); }} className="p-1.5 bg-slate-800/80 dark:bg-slate-800 flex-1 rounded hover:bg-cyan-600 hover:text-white outline-none text-slate-100 dark:text-white transition-colors flex justify-center items-center shadow-xs" title={t('insert')}>
             <AlignLeft className="shrink-0" style={{ width: 'calc(var(--gallery-icon-size, 16px) * 0.8)', height: 'calc(var(--gallery-icon-size, 16px) * 0.8)' }} />
           </button>
-          <button onMouseDown={(e) => e.preventDefault()} onClick={(e) => { e.stopPropagation(); onInsert(photo, 'plain'); }} className="p-1.5 bg-slate-800 flex-1 rounded hover:bg-cyan-600 outline-none text-white transition-colors flex justify-center items-center" title={t('insert')}>
+          <button onMouseDown={(e) => e.preventDefault()} onClick={(e) => { e.stopPropagation(); onInsert(photo, 'plain'); }} className="p-1.5 bg-slate-800/80 dark:bg-slate-800 flex-1 rounded hover:bg-cyan-600 hover:text-white outline-none text-slate-100 dark:text-white transition-colors flex justify-center items-center shadow-xs" title={t('insert')}>
             <FileText className="shrink-0" style={{ width: 'calc(var(--gallery-icon-size, 16px) * 0.8)', height: 'calc(var(--gallery-icon-size, 16px) * 0.8)' }} />
           </button>
-          <button onMouseDown={(e) => e.preventDefault()} onClick={(e) => { e.stopPropagation(); onInsert(photo, 'right'); }} className="p-1.5 bg-slate-800 flex-1 rounded hover:bg-cyan-600 outline-none text-white transition-colors flex justify-center items-center" title={t('insert')}>
+          <button onMouseDown={(e) => e.preventDefault()} onClick={(e) => { e.stopPropagation(); onInsert(photo, 'right'); }} className="p-1.5 bg-slate-800/80 dark:bg-slate-800 flex-1 rounded hover:bg-cyan-600 hover:text-white outline-none text-slate-100 dark:text-white transition-colors flex justify-center items-center shadow-xs" title={t('insert')}>
             <AlignRight className="shrink-0" style={{ width: 'calc(var(--gallery-icon-size, 16px) * 0.8)', height: 'calc(var(--gallery-icon-size, 16px) * 0.8)' }} />
           </button>
         </div>
@@ -83,10 +83,10 @@ const ExternalImageItem = React.memo(({
       
       <div className={cn(
         "min-w-0 flex flex-col justify-center shrink-0 overflow-hidden",
-        galleryView === 'grid' ? "p-1.5 bg-slate-900" : "flex-1"
+        galleryView === 'grid' ? "p-1.5 bg-[var(--bg-card)]" : "flex-1"
       )}>
-        <p className="text-[9px] font-medium text-slate-300 truncate leading-tight">{photo.author}</p>
-        <p className="text-[7px] text-slate-500 uppercase tracking-tighter">{photo.source}</p>
+        <p className="text-[9px] font-medium text-[var(--text-main)] truncate leading-tight">{photo.author}</p>
+        <p className="text-[7px] text-[var(--text-muted)] uppercase tracking-tighter">{photo.source}</p>
       </div>
     </div>
   );

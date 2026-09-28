@@ -1,5 +1,5 @@
 // src/services/nativeService.ts
-export const isTauri = () => typeof window !== 'undefined' && '__TAURI__' in window;
+export const isTauri = () => typeof window !== 'undefined' && ('__TAURI__' in window || '__TAURI_INTERNALS__' in window);
 export const isNeutralino = () => typeof window !== 'undefined' && 'Neutralino' in window;
 
 // Initialize Neutralino client safely
@@ -14,11 +14,11 @@ export function initNeutralino() {
       if (Neutralino.window) {
         setTimeout(async () => {
           try {
-            const availHeight = window.screen?.availHeight || 700;
-            const availWidth = window.screen?.availWidth || 1024;
+            const availHeight = window.screen?.availHeight || 768;
+            const availWidth = window.screen?.availWidth || 1366;
             if (window.innerHeight > availHeight - 50 || window.outerHeight > availHeight - 50) {
-              const targetHeight = Math.max(550, Math.min(700, availHeight - 80));
-              const targetWidth = Math.max(800, Math.min(1024, availWidth - 40));
+              const targetHeight = Math.max(600, Math.min(900, availHeight - 80));
+              const targetWidth = Math.max(900, Math.min(1440, availWidth - 40));
               await Neutralino.window.setSize({ width: targetWidth, height: targetHeight });
               await Neutralino.window.center();
             }

@@ -121,5 +121,6 @@ export interface KeySoundTriggerOptions {
   code?: string;
   inputType?: string;
   isVirtual?: boolean;
+  isRepeat?: boolean;
   forceToneOffset?: number;
 }

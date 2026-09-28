@@ -19,14 +19,15 @@ const JOYFUL_OCTAVE_STEPS = [
 
 const BASE_ROOT_FREQ = 261.625565; // C4 (Sacred resonant center)
 
+// 54-bell joyful celestial carillon scale (smooth, consonant musical progression from C4 (261.63 Hz) to C6 (1046.50 Hz))
+// Spans 2 full octaves across 54 steps (equal step ratio 2^(2/53) ~ 1.0265 per step)
+// Completely consonant, uplifting, zero eerie microtones or dissonant jumps
 export const CARILLON_BELL_SCALE: number[] = Array.from({ length: 54 }, (_, i) => {
-  const octave = Math.floor(i / JOYFUL_OCTAVE_STEPS.length) + 1; // Octaves 1..7 (C4..C7 range)
-  const stepInOctave = i % JOYFUL_OCTAVE_STEPS.length;
-  const ratio = JOYFUL_OCTAVE_STEPS[stepInOctave];
-  // Calculate resonant celestial frequency
-  const f = BASE_ROOT_FREQ * Math.pow(2, octave - 1) * ratio;
+  const f = BASE_ROOT_FREQ * Math.pow(2, (i / 53) * 2); // Smooth 2-octave continuous span (261.63 Hz to 1046.50 Hz)
   return Math.round(f * 100) / 100;
 });
+
+export const CARILLON_BELL_LUT = new Float32Array(CARILLON_BELL_SCALE);
 
 // 54-bell Cathedral Bronze scale: smooth, close harmonic range (392 Hz / G4 to 783.99 Hz / G5)
 // Zero abrupt jumps or harsh drops; every letter has an individual bronze voice that stays in warm unison.
@@ -34,6 +35,8 @@ export const CATHEDRAL_BELL_SCALE: number[] = Array.from({ length: 54 }, (_, i) 
   const f = 392.00 * Math.pow(2, i / 53); // Exactly 1 octave span across 54 unique frequencies
   return Math.round(f * 100) / 100;
 });
+
+export const CATHEDRAL_BELL_LUT = new Float32Array(CATHEDRAL_BELL_SCALE);
 
 // Shchedryk / Carol of the Bells harmonic motif scale (Leontovych minor-harmonic ostinato)
 // Sequences through festive handbell & chime motifs: (B4-A4-G#4-A4), (E5-D5-C5-D5), (G4-F#4-E4-F#4), (B5-A5-G#5-A5)
@@ -52,6 +55,8 @@ export const SHCHEDRYK_BELL_SCALE: number[] = Array.from({ length: 54 }, (_, i) 
   const microOffset = (Math.floor(i / SHCHEDRYK_MOTIF_BASE.length) * 1.5);
   return Math.round((baseFreq + microOffset) * 100) / 100;
 });
+
+export const SHCHEDRYK_BELL_LUT = new Float32Array(SHCHEDRYK_BELL_SCALE);
 
 // Map of Ukrainian Cyrillic characters (33 letters) to distinct, dedicated indices (0..32)
 const UKRAINIAN_CHAR_MAP: Record<string, number> = {

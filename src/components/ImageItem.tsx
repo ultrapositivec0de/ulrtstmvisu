@@ -41,7 +41,7 @@ const ImageItem = React.memo(({
       <div 
         onMouseDown={(e) => e.preventDefault()}
         className={cn(
-          "relative rounded-lg overflow-hidden border border-slate-800 hover:border-cyan-500 hover:ring-1 hover:ring-cyan-500/50 transition-all cursor-pointer bg-slate-900 shadow-sm flex-none aspect-square w-full"
+          "relative rounded-lg overflow-hidden border border-[var(--border-color)] hover:border-cyan-500 hover:ring-1 hover:ring-cyan-500/50 transition-all cursor-pointer bg-[var(--bg-card)] shadow-sm flex-none aspect-square w-full"
         )}
         onClick={(e) => { e.stopPropagation(); onInsert(img.url, img.name, 'plain'); }}
         title={t('asIs')}
@@ -61,14 +61,14 @@ const ImageItem = React.memo(({
     <div 
       onMouseDown={(e) => e.preventDefault()}
       className={cn(
-        "group relative rounded-lg overflow-hidden border transition-all cursor-pointer bg-slate-900 shadow-sm flex-none",
+        "group relative rounded-lg overflow-hidden border transition-all cursor-pointer bg-[var(--bg-card)] shadow-sm flex-none",
         galleryView === 'grid' ? "flex flex-col w-full min-h-[140px]" : "flex flex-row items-center p-1.5 gap-2 min-h-[50px]",
-        img.selected ? "border-cyan-500 ring-1 ring-cyan-500/20" : "border-slate-800 hover:border-slate-700"
+        img.selected ? "border-cyan-500 ring-1 ring-cyan-500/20" : "border-[var(--border-color)] hover:border-slate-400 dark:hover:border-slate-700"
       )}
       onClick={() => onToggle(idx)}
     >
       <div className={cn(
-        "overflow-hidden relative flex-none bg-slate-950",
+        "overflow-hidden relative flex-none bg-[var(--bg-main)]",
         galleryView === 'grid' ? "aspect-square w-full" : "w-10 h-10 rounded"
       )}>
         <img 
@@ -81,16 +81,16 @@ const ImageItem = React.memo(({
         
         {galleryView === 'grid' && (
           <div className={cn(
-            "absolute inset-x-0 bottom-0 bg-slate-950/90 backdrop-blur-sm px-1 py-1.5 flex flex-row items-center justify-center gap-1 transition-all z-10",
+            "absolute inset-x-0 bottom-0 bg-[var(--bg-overlay-surface)] backdrop-blur-dynamic border-t border-[var(--border-subtle)] px-1 py-1.5 flex flex-row items-center justify-center gap-1 transition-all z-10",
             "lg:opacity-0 lg:group-hover:opacity-100"
           )}>
-            <button onMouseDown={(e) => e.preventDefault()} onClick={(e) => { e.stopPropagation(); onInsert(img.url, img.name, 'left'); }} className="p-1.5 bg-slate-800 rounded flex-1 hover:bg-cyan-600 outline-none text-white transition-colors flex justify-center items-center" title={t('leftText')}>
+            <button onMouseDown={(e) => e.preventDefault()} onClick={(e) => { e.stopPropagation(); onInsert(img.url, img.name, 'left'); }} className="p-1.5 bg-slate-800/80 dark:bg-slate-800 rounded flex-1 hover:bg-cyan-600 hover:text-white outline-none text-slate-100 dark:text-white transition-colors flex justify-center items-center shadow-xs" title={t('leftText')}>
               <AlignLeft className="shrink-0" style={{ width: 'calc(var(--gallery-icon-size, 16px) * 0.8)', height: 'calc(var(--gallery-icon-size, 16px) * 0.8)' }} />
             </button>
-            <button onMouseDown={(e) => e.preventDefault()} onClick={(e) => { e.stopPropagation(); onInsert(img.url, img.name, 'plain'); }} className="p-1.5 bg-slate-800 rounded flex-1 hover:bg-cyan-600 outline-none text-white transition-colors flex justify-center items-center" title={t('asIs')}>
+            <button onMouseDown={(e) => e.preventDefault()} onClick={(e) => { e.stopPropagation(); onInsert(img.url, img.name, 'plain'); }} className="p-1.5 bg-slate-800/80 dark:bg-slate-800 rounded flex-1 hover:bg-cyan-600 hover:text-white outline-none text-slate-100 dark:text-white transition-colors flex justify-center items-center shadow-xs" title={t('asIs')}>
               <FileText className="shrink-0" style={{ width: 'calc(var(--gallery-icon-size, 16px) * 0.8)', height: 'calc(var(--gallery-icon-size, 16px) * 0.8)' }} />
             </button>
-            <button onMouseDown={(e) => e.preventDefault()} onClick={(e) => { e.stopPropagation(); onInsert(img.url, img.name, 'right'); }} className="p-1.5 bg-slate-800 rounded flex-1 hover:bg-cyan-600 outline-none text-white transition-colors flex justify-center items-center" title={t('rightText')}>
+            <button onMouseDown={(e) => e.preventDefault()} onClick={(e) => { e.stopPropagation(); onInsert(img.url, img.name, 'right'); }} className="p-1.5 bg-slate-800/80 dark:bg-slate-800 rounded flex-1 hover:bg-cyan-600 hover:text-white outline-none text-slate-100 dark:text-white transition-colors flex justify-center items-center shadow-xs" title={t('rightText')}>
               <AlignRight className="shrink-0" style={{ width: 'calc(var(--gallery-icon-size, 16px) * 0.8)', height: 'calc(var(--gallery-icon-size, 16px) * 0.8)' }} />
             </button>
             
@@ -101,13 +101,13 @@ const ImageItem = React.memo(({
               <button 
                 onMouseDown={(e) => e.preventDefault()}
                 onClick={(e) => { e.stopPropagation(); onHost(img.url, img.name); }} 
-                className="p-1.5 bg-slate-800 rounded flex-1 hover:bg-green-600 outline-none text-white transition-colors flex justify-center items-center" 
+                className="p-1.5 bg-slate-800/80 dark:bg-slate-800 rounded flex-1 hover:bg-green-600 hover:text-white outline-none text-slate-100 dark:text-white transition-colors flex justify-center items-center shadow-xs" 
                 title={t('uploadToSteemit')}
               >
                 <CloudUpload className="shrink-0" style={{ width: 'calc(var(--gallery-icon-size, 16px) * 0.8)', height: 'calc(var(--gallery-icon-size, 16px) * 0.8)' }} />
               </button>
             )}
-            <button onMouseDown={(e) => e.preventDefault()} onClick={(e) => { e.stopPropagation(); onDelete(idx); }} className="p-1.5 bg-slate-800 rounded flex-1 hover:bg-red-600 outline-none text-white transition-colors flex justify-center items-center" title={t('delete')}>
+            <button onMouseDown={(e) => e.preventDefault()} onClick={(e) => { e.stopPropagation(); onDelete(idx); }} className="p-1.5 bg-slate-800/80 dark:bg-slate-800 rounded flex-1 hover:bg-red-600 hover:text-white outline-none text-slate-100 dark:text-white transition-colors flex justify-center items-center shadow-xs" title={t('delete')}>
               <Trash2 className="shrink-0" style={{ width: 'calc(var(--gallery-icon-size, 16px) * 0.8)', height: 'calc(var(--gallery-icon-size, 16px) * 0.8)' }} />
             </button>
           </div>
@@ -116,22 +116,22 @@ const ImageItem = React.memo(({
       
       <div className={cn(
         "min-w-0 flex flex-col justify-center shrink-0",
-        galleryView === 'grid' ? "p-1.5 bg-slate-900" : "flex-1"
+        galleryView === 'grid' ? "p-1.5 bg-[var(--bg-card)]" : "flex-1"
       )}>
-        <p className="text-[9px] font-medium text-slate-300 truncate leading-tight uppercase tracking-tight">{img.name}</p>
+        <p className="text-[9px] font-medium text-[var(--text-main)] truncate leading-tight uppercase tracking-tight">{img.name}</p>
         
         {galleryView === 'list' && (
            <div className="flex items-center gap-2 mt-1">
-              <button onMouseDown={(e) => e.preventDefault()} title={t('leftText')} onClick={(e) => { e.stopPropagation(); onInsert(img.url, img.name, 'left'); }} className="text-slate-500 hover:text-cyan-400">
+              <button onMouseDown={(e) => e.preventDefault()} title={t('leftText')} onClick={(e) => { e.stopPropagation(); onInsert(img.url, img.name, 'left'); }} className="text-[var(--text-muted)] hover:text-cyan-500">
                 <AlignLeft className="shrink-0" style={{ width: 'calc(var(--gallery-icon-size, 16px) * 0.75)', height: 'calc(var(--gallery-icon-size, 16px) * 0.75)' }} />
               </button>
-              <button onMouseDown={(e) => e.preventDefault()} title={t('asIs')} onClick={(e) => { e.stopPropagation(); onInsert(img.url, img.name, 'plain'); }} className="text-slate-500 hover:text-cyan-400">
+              <button onMouseDown={(e) => e.preventDefault()} title={t('asIs')} onClick={(e) => { e.stopPropagation(); onInsert(img.url, img.name, 'plain'); }} className="text-[var(--text-muted)] hover:text-cyan-500">
                 <FileText className="shrink-0" style={{ width: 'calc(var(--gallery-icon-size, 16px) * 0.75)', height: 'calc(var(--gallery-icon-size, 16px) * 0.75)' }} />
               </button>
-              <button onMouseDown={(e) => e.preventDefault()} title={t('rightText')} onClick={(e) => { e.stopPropagation(); onInsert(img.url, img.name, 'right'); }} className="text-slate-500 hover:text-cyan-400">
+              <button onMouseDown={(e) => e.preventDefault()} title={t('rightText')} onClick={(e) => { e.stopPropagation(); onInsert(img.url, img.name, 'right'); }} className="text-[var(--text-muted)] hover:text-cyan-500">
                 <AlignRight className="shrink-0" style={{ width: 'calc(var(--gallery-icon-size, 16px) * 0.75)', height: 'calc(var(--gallery-icon-size, 16px) * 0.75)' }} />
               </button>
-              <button onMouseDown={(e) => e.preventDefault()} title={t('delete')} onClick={(e) => { e.stopPropagation(); onDelete(idx); }} className="text-slate-500 hover:text-red-400">
+              <button onMouseDown={(e) => e.preventDefault()} title={t('delete')} onClick={(e) => { e.stopPropagation(); onDelete(idx); }} className="text-[var(--text-muted)] hover:text-red-500">
                 <Trash2 className="shrink-0" style={{ width: 'calc(var(--gallery-icon-size, 16px) * 0.75)', height: 'calc(var(--gallery-icon-size, 16px) * 0.75)' }} />
               </button>
            </div>
@@ -151,7 +151,7 @@ const ImageItem = React.memo(({
                 onMouseDown={(e) => e.preventDefault()}
                 onClick={(e) => { e.stopPropagation(); onMoveLeft(idx); }} 
                 className={cn(
-                   "bg-slate-900/80 hover:bg-slate-700 backdrop-blur-sm rounded text-white transition-colors flex items-center justify-center",
+                   "bg-[var(--bg-overlay-surface)] hover:bg-slate-700/80 border border-[var(--border-subtle)] backdrop-blur-dynamic rounded text-[var(--text-main)] transition-colors flex items-center justify-center shadow-xs",
                    galleryView === 'grid' ? "p-1" : "p-0.5"
                 )}
                 title={galleryView === 'grid' ? t('moveLeft') : t('moveUp')}
@@ -168,7 +168,7 @@ const ImageItem = React.memo(({
                 onMouseDown={(e) => e.preventDefault()}
                 onClick={(e) => { e.stopPropagation(); onMoveRight(idx); }} 
                 className={cn(
-                   "bg-slate-900/80 hover:bg-slate-700 backdrop-blur-sm rounded text-white transition-colors flex items-center justify-center",
+                   "bg-[var(--bg-overlay-surface)] hover:bg-slate-700/80 border border-[var(--border-subtle)] backdrop-blur-dynamic rounded text-[var(--text-main)] transition-colors flex items-center justify-center shadow-xs",
                    galleryView === 'grid' ? "p-1" : "p-0.5"
                 )}
                 title={galleryView === 'grid' ? t('moveRight') : t('moveDown')}

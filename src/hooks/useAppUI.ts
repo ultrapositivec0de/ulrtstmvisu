@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
+import { useDeviceStore } from '../store/deviceStore';
 
 export const isTauriEnv = () =>
   typeof window !== 'undefined' && (!!(window as any).__TAURI_INTERNALS__ || !!(window as any).__TAURI__);
@@ -21,11 +22,25 @@ export function useAppUI(options: UseAppUIOptions = {}) {
     setIsWidgetMenuOpen,
   } = options;
 
+  const isMobileLayout = useDeviceStore((s) => s.isMobileLayout);
   const [activeModal, setActiveModal] = useState<string | null>(null);
   const [activeView, setActiveView] = useState<'editor' | 'reader'>('editor');
-  const [isSidebarOpen, setIsSidebarOpen] = useState(() => window.innerWidth >= 1024);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(() => !useDeviceStore.getState().isMobileLayout);
   const [isFullScreen, setIsFullScreen] = useState(false);
   const [isEditorFullScreen, setIsEditorFullScreen] = useState(false);
+
+  // Sync sidebar open state with desktop layout so it is never lost on PC
+  useEffect(() => {
+    if (!isMobileLayout) {
+      setIsSidebarOpen(true);
+    }
+  }, [isMobileLayout]);
+
+  useEffect(() => {
+    if (isTauriEnv()) {
+      document.documentElement.classList.add('is-tauri');
+    }
+  }, []);
 
   const toggleFullScreen = useCallback(() => {
     setIsFullScreen((prev) => {

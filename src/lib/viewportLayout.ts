@@ -6,10 +6,12 @@ export interface EditorBottomReservedOptions {
   keyboardOffset?: number;
   widgetPos?: string;
   toolbarIconSize?: number;
+  showMobileBottomBar?: boolean;
 }
 
 /**
- * Calculates reserved bottom space in the editor to prevent toolbar/keyboard overlap
+ * Calculates reserved bottom space in the editor to prevent toolbar/keyboard overlap.
+ * Universally handles smartphones, 1600x720 screens, and Full HD tablets (1920x1080/1200).
  */
 export function calculateEditorBottomReserved({
   isMobile,
@@ -17,12 +19,21 @@ export function calculateEditorBottomReserved({
   keyboardOffset = 0,
   widgetPos = 'bottom',
   toolbarIconSize = 18,
+  showMobileBottomBar = false,
 }: EditorBottomReservedOptions): number {
   const dynamicWidgetHeight = toolbarIconSize + 24; // dynamically scales with icon size (12-32px -> 36-56px + padding)
-  if (isMobile) {
-    return isKeyboardOpen ? keyboardOffset + dynamicWidgetHeight + 8 : dynamicWidgetHeight + 90;
+  
+  // If virtual keyboard is open or has offset on ANY device (phone, tablet, touch):
+  if (isKeyboardOpen || keyboardOffset > 0) {
+    return keyboardOffset + dynamicWidgetHeight + 12;
   }
-  // Desktop mode: toolbar widget bottom-4 (16px) + dynamicWidgetHeight (36-56px) + comfortable breathing clearance (40-60px)
+
+  // Mobile layout: include bottom bar only if it is actually visible
+  if (isMobile) {
+    return showMobileBottomBar ? dynamicWidgetHeight + 72 : dynamicWidgetHeight + 24;
+  }
+
+  // Desktop mode: toolbar widget bottom-4 (16px) + dynamicWidgetHeight (36-56px) + comfortable clearance
   return widgetPos === 'bottom' ? dynamicWidgetHeight + 76 : (widgetPos === 'floating' ? 56 : 32);
 }
 
@@ -113,7 +124,7 @@ export interface FloatingWidgetStyleOptions {
 }
 
 /**
- * Computes dynamic styles for floating / mobile docked toolbar widget
+ * Computes dynamic styles for floating / docked toolbar widget across all screen sizes
  */
 export function getFloatingWidgetStyles({
   widgetPos,
@@ -132,38 +143,55 @@ export function getFloatingWidgetStyles({
     opacity: 1.0,
   };
 
-  if (widgetPos === 'floating' && !isMobile && floatingPos && editorPaneEl) {
-    const rect = editorPaneEl.getBoundingClientRect();
-    style.position = 'fixed';
-    const widgetWidth = 400; // Width estimation for 8 tools + navigation + settings + paddings (~420px)
-    const leftBound = rect.left + 10;
-    const rightBound = rect.right - widgetWidth - 10;
-    style.left = Math.min(rightBound, Math.max(leftBound, floatingPos.x));
-    style.top = floatingPos.y < 150 ? floatingPos.y + 40 : floatingPos.y - 80;
-  } else if (isMobile) {
+  const actualWidgetHeight = widgetEl?.offsetHeight || (toolbarIconSize + 28);
+  const visualBottom = offsetTop + viewportHeight;
+
+  // 1. Virtual Keyboard Open: Position directly above keyboard top edge on ANY device
+  if (isKeyboardOpen) {
     style.position = 'fixed';
     style.left = '0.5rem';
     style.right = '0.5rem';
     style.margin = '0 auto';
     style.zIndex = 150;
     style.transition = 'top 0.15s cubic-bezier(0.2, 0, 0.2, 1)';
-
-    const actualWidgetHeight = widgetEl?.offsetHeight || (toolbarIconSize + 28);
-    const visualBottom = offsetTop + viewportHeight;
-
-    if (isKeyboardOpen) {
-      // Place exactly 8px above virtual keyboard top edge
-      const targetTop = Math.max(offsetTop + 8, visualBottom - actualWidgetHeight - 8);
-      style.top = `${targetTop}px`;
-      style.bottom = 'auto';
-    } else {
-      // Place above bottom navigation bar or screen bottom, taking browser chrome and insets into account
-      const bottomNavOffset = (isEditorFullScreen || isFullScreen) ? 16 : 76;
-      style.top = 'auto';
-      style.bottom = `calc(env(safe-area-inset-bottom, 0px) + var(--browser-bottom-inset, 0px) + ${bottomNavOffset}px)`;
-    }
+    const targetTop = Math.max(offsetTop + 8, visualBottom - actualWidgetHeight - 8);
+    style.top = `${targetTop}px`;
+    style.bottom = 'auto';
+    return style;
   }
 
+  // 2. Desktop Floating Mode
+  if (widgetPos === 'floating' && !isMobile && floatingPos && editorPaneEl) {
+    const rect = editorPaneEl.getBoundingClientRect();
+    style.position = 'fixed';
+    const widgetWidth = 400; // Width estimation for tools + navigation + settings + paddings (~420px)
+    const leftBound = rect.left + 10;
+    const rightBound = rect.right - widgetWidth - 10;
+    style.left = Math.min(rightBound, Math.max(leftBound, floatingPos.x));
+    style.top = floatingPos.y < 150 ? floatingPos.y + 40 : floatingPos.y - 80;
+    return style;
+  }
+
+  // 3. Mobile Docked Layout (docked above bottom navigation bar or screen bottom)
+  if (isMobile) {
+    style.position = 'fixed';
+    style.left = '0.5rem';
+    style.right = '0.5rem';
+    style.margin = '0 auto';
+    style.zIndex = 150;
+    style.top = 'auto';
+    // When in fullscreen, sit just above safe-area + browser bottom inset + 8px gap
+    // Otherwise use auto-calculated global variable that accounts for active bottom bar / stats footer
+    style.bottom = (isEditorFullScreen || isFullScreen)
+      ? 'calc(env(safe-area-inset-bottom, 0px) + var(--browser-bottom-inset, 0px) + 0.5rem)'
+      : 'var(--app-floating-widget-bottom, calc(var(--active-footer-height, 2rem) + env(safe-area-inset-bottom, 0px) + var(--browser-bottom-inset, 0px) + 0.5rem))';
+    return style;
+  }
+
+  // 4. Desktop Docked Layout
+  if (isEditorFullScreen || isFullScreen) {
+    style.bottom = 'calc(env(safe-area-inset-bottom, 0px) + var(--browser-bottom-inset, 0px) + 0.5rem)';
+  }
   return style;
 }
 
@@ -177,7 +205,7 @@ export interface MiniGalleryBottomOptions {
 }
 
 /**
- * Calculates bottom style for Mini Gallery strip
+ * Calculates bottom style for Mini Gallery strip across all screen sizes
  */
 export function getMiniGalleryBottomStyle({
   isMobile,
@@ -187,14 +215,14 @@ export function getMiniGalleryBottomStyle({
   isEditorFullScreen,
   widgetPos,
 }: MiniGalleryBottomOptions): string | undefined {
+  if (isKeyboardOpen && keyboardOffset > 0) {
+    return `calc(${keyboardOffset}px + var(--toolbar-btn-size, 3rem) + 0.5rem)`;
+  }
   if (isMobile) {
-    if (isKeyboardOpen) {
-      return `calc(${keyboardOffset > 0 ? keyboardOffset : 0}px + var(--toolbar-btn-size, 3rem) + 0.35rem)`;
-    }
     if (isEditorFullScreen || isFullScreen) {
       return 'calc(env(safe-area-inset-bottom, 0px) + var(--toolbar-btn-size, 3rem) + 0.35rem)';
     }
-    return 'calc(4rem + env(safe-area-inset-bottom, 0px) + var(--toolbar-btn-size, 3rem) + 0.35rem)';
+    return 'calc(var(--app-bottom-total, 0px) + var(--toolbar-btn-size, 3rem) + 0.35rem)';
   }
   return widgetPos === 'bottom' ? 'calc(4.5rem)' : undefined;
 }

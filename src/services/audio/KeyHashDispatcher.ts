@@ -6,9 +6,9 @@
 
 import { soundSynthEngine } from './SoundSynthEngine';
 import {
-  CARILLON_BELL_SCALE,
-  CATHEDRAL_BELL_SCALE,
-  SHCHEDRYK_BELL_SCALE,
+  CARILLON_BELL_LUT,
+  CATHEDRAL_BELL_LUT,
+  SHCHEDRYK_BELL_LUT,
   getUniqueKeyIndex,
   getUniqueKeyPitchOffset
 } from './keyboardMap';
@@ -128,16 +128,16 @@ export class KeyHashDispatcher {
 
     if (preset.synthesisMode === 'cathedral-bell') {
       const uniqueIdx = getUniqueKeyIndex(rawKey, rawCode);
-      const targetFreq = CATHEDRAL_BELL_SCALE[uniqueIdx % CATHEDRAL_BELL_SCALE.length];
+      const targetFreq = CATHEDRAL_BELL_LUT[uniqueIdx % CATHEDRAL_BELL_LUT.length];
       pitchOffsetHz = targetFreq - (preset.oscillator?.baseFreq ?? 440.0);
     } else if (preset.synthesisMode === 'shchedryk') {
       const uniqueIdx = getUniqueKeyIndex(rawKey, rawCode);
-      const targetFreq = SHCHEDRYK_BELL_SCALE[uniqueIdx % SHCHEDRYK_BELL_SCALE.length];
+      const targetFreq = SHCHEDRYK_BELL_LUT[uniqueIdx % SHCHEDRYK_BELL_LUT.length];
       pitchOffsetHz = targetFreq - (preset.oscillator?.baseFreq ?? 493.88);
     } else if (preset.tuningScale === 'pentatonic' || preset.synthesisMode === 'bell') {
       // 54-bell grand carillon scale: every character/symbol gets a distinct musical pitch
       const uniqueIdx = getUniqueKeyIndex(rawKey, rawCode);
-      const targetFreq = CARILLON_BELL_SCALE[uniqueIdx % CARILLON_BELL_SCALE.length];
+      const targetFreq = CARILLON_BELL_LUT[uniqueIdx % CARILLON_BELL_LUT.length];
       pitchOffsetHz = targetFreq - (preset.oscillator?.baseFreq ?? 523.25);
     } else {
       // Collision-free deterministic mechanical switch pitch variance

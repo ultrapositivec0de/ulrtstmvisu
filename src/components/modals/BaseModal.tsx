@@ -65,18 +65,39 @@ export const BaseModal: React.FC<BaseModalProps> = ({
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [isOpen, onClose, closeOnBackdropClick]);
 
+  // Lock and reset window scroll to prevent viewport/header shifting on virtual keyboard focus or drag
+  useEffect(() => {
+    if (!isOpen) return;
+
+    const resetWindowScroll = () => {
+      if (window.scrollY !== 0 || window.scrollX !== 0) {
+        window.scrollTo(0, 0);
+      }
+    };
+
+    window.scrollTo(0, 0);
+    window.addEventListener('scroll', resetWindowScroll, { passive: true });
+    window.addEventListener('focusin', resetWindowScroll, { passive: true });
+
+    return () => {
+      window.removeEventListener('scroll', resetWindowScroll);
+      window.removeEventListener('focusin', resetWindowScroll);
+    };
+  }, [isOpen]);
+
   if (!isOpen) return null;
 
   const isCritical = priority === 'critical';
-  const zIndexClass = isCritical ? 'z-[1000]' : 'z-[500]';
+  const zIndexClass = isCritical ? 'z-[var(--z-modal-critical,1000)]' : 'z-[var(--z-modal,500)]';
 
   return (
     <div
       key={modalKey}
       className={cn(
-        'fixed inset-0 flex items-center justify-center p-3 sm:p-4',
+        'fixed inset-0 flex items-center justify-center p-3 sm:p-4 overscroll-contain select-none',
         zIndexClass
       )}
+      style={{ touchAction: 'none' }}
     >
       {/* Universal Backdrop: Transparent overlay to keep application workspace fully visible as a pure window */}
       <motion.div
@@ -86,7 +107,7 @@ export const BaseModal: React.FC<BaseModalProps> = ({
         transition={{ duration: 0.15 }}
         onClick={closeOnBackdropClick ? onClose : undefined}
         className={cn(
-          'fixed inset-0 transition-opacity bg-transparent',
+          'fixed inset-0 transition-opacity bg-transparent select-none',
           backdropClassName
         )}
       />
@@ -98,15 +119,20 @@ export const BaseModal: React.FC<BaseModalProps> = ({
         exit={{ scale: 0.95, opacity: 0, y: 12 }}
         transition={{ duration: 0.18, ease: 'easeOut' }}
         className={cn(
-          'relative w-full bg-[var(--modal-bg)] rounded-2xl sm:rounded-3xl overflow-hidden flex flex-col max-h-[90vh] text-[var(--text-main)]',
+          'relative w-full bg-[var(--modal-bg)] rounded-2xl sm:rounded-3xl overflow-hidden flex flex-col max-h-[90vh] text-[var(--text-main)] select-text',
           'border border-[var(--modal-border)] shadow-[0_25px_70px_rgba(0,0,0,0.55)] dark:shadow-[0_30px_90px_rgba(0,0,0,0.85)] ring-1 ring-white/10 dark:ring-white/10',
+          'overscroll-contain',
           SIZE_CLASSES[size],
           className
         )}
+        style={{ touchAction: 'pan-y' }}
       >
         {/* Optional Universal Header */}
         {!hideHeader && (title || onClose) && (
-          <div className="flex items-center justify-between px-5 py-4 border-b border-[var(--modal-border)] bg-[var(--modal-bg)] shrink-0">
+          <div 
+            className="flex items-center justify-between px-5 py-4 border-b border-[var(--modal-border)] bg-[var(--modal-bg)] shrink-0 select-none"
+            style={{ touchAction: 'none' }}
+          >
             <div className="flex items-center gap-2.5 min-w-0">
               {Icon && (
                 <div className="p-2 rounded-xl bg-cyan-500/10 text-cyan-400 shrink-0">

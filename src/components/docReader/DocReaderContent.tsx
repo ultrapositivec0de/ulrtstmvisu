@@ -30,10 +30,17 @@ export const DocReaderContent: React.FC<DocReaderContentProps> = ({
 }) => {
   const [renderedHtml, setRenderedHtml] = useState<string>('');
   const contentContainerRef = React.useRef<HTMLDivElement | null>(null);
+  const cacheRef = React.useRef<{ content: string; html: string }>({ content: '', html: '' });
 
   useEffect(() => {
     if (!content) {
       setRenderedHtml('');
+      cacheRef.current = { content: '', html: '' };
+      return;
+    }
+
+    if (cacheRef.current.content === content && cacheRef.current.html) {
+      // Content has not changed, reuse cached rendered HTML to avoid re-parsing & layout jumps
       return;
     }
 
@@ -48,16 +55,18 @@ export const DocReaderContent: React.FC<DocReaderContentProps> = ({
         parsedHtml = content;
       }
 
-      // Inject IDs to headings for TOC targeting
+      // Inject deterministic IDs to headings for TOC targeting
       let headingIdx = 0;
       const finalHtml = parsedHtml.replace(/<h([1-6])([^>]*)>(.*?)<\/h\1>/gi, (_match, level, attrs, innerText) => {
-        const correspondingHeading = headings[headingIdx++];
-        const id = correspondingHeading ? correspondingHeading.id : `heading-${headingIdx}`;
+        const rawText = innerText.replace(/<[^>]+>/g, '').trim();
+        const slug = rawText ? rawText.toLowerCase().replace(/[^a-zа-яіїєґ0-9]/gi, '-').slice(0, 30) : '';
+        const id = `heading-${headingIdx++}-${slug}`;
         return `<h${level}${attrs} id="${id}">${innerText}</h${level}>`;
       });
 
       const sanitized = DOMPurify.sanitize(finalHtml, DOM_PURIFY_CONFIG);
       if (!isCancelled) {
+        cacheRef.current = { content, html: sanitized };
         setRenderedHtml(sanitized);
       }
     };
@@ -66,9 +75,9 @@ export const DocReaderContent: React.FC<DocReaderContentProps> = ({
     return () => {
       isCancelled = true;
     };
-  }, [content, headings]);
+  }, [content]);
 
-  // Ensure DOM heading elements have matching IDs after render
+  // Ensure DOM heading elements have matching IDs after render (fallback synchronization)
   useEffect(() => {
     if (!contentContainerRef.current || !renderedHtml) return;
     const headingEls = Array.from(contentContainerRef.current.querySelectorAll('h1, h2, h3, h4, h5, h6'))
@@ -76,8 +85,9 @@ export const DocReaderContent: React.FC<DocReaderContentProps> = ({
     
     headingEls.forEach((el, idx) => {
       const corresponding = headings[idx];
-      const targetId = corresponding ? corresponding.id : `heading-${idx}`;
-      el.setAttribute('id', targetId);
+      if (corresponding) {
+        el.setAttribute('id', corresponding.id);
+      }
     });
   }, [renderedHtml, headings]);
 
@@ -115,7 +125,7 @@ export const DocReaderContent: React.FC<DocReaderContentProps> = ({
     >
       {/* Header: Title & Tags */}
       <header className="mb-8 pb-6 border-b border-slate-700/40">
-        <h1 className="text-2xl sm:text-4xl font-bold tracking-tight mb-3 leading-tight">
+        <h1 className="text-2xl sm:text-4xl font-bold tracking-tight mb-3 leading-tight break-words [overflow-wrap:anywhere] hyphens-auto">
           {title || 'Документ без назви'}
         </h1>
 
@@ -139,8 +149,15 @@ export const DocReaderContent: React.FC<DocReaderContentProps> = ({
         <div 
           ref={contentContainerRef}
           className={cn(
-            "doc-reader-body markdown-body max-w-none break-words",
+            "doc-reader-body markdown-body max-w-none break-words [overflow-wrap:anywhere] hyphens-auto",
             "[&_h1]:scroll-mt-20 [&_h2]:scroll-mt-20 [&_h3]:scroll-mt-20 [&_h4]:scroll-mt-20 [&_h5]:scroll-mt-20 [&_h6]:scroll-mt-20",
+            "[&_h1]:break-words [&_h1]:[overflow-wrap:anywhere] [&_h1]:hyphens-auto",
+            "[&_h2]:break-words [&_h2]:[overflow-wrap:anywhere] [&_h2]:hyphens-auto",
+            "[&_h3]:break-words [&_h3]:[overflow-wrap:anywhere] [&_h3]:hyphens-auto",
+            "[&_h4]:break-words [&_h4]:[overflow-wrap:anywhere] [&_h4]:hyphens-auto",
+            "[&_h5]:break-words [&_h5]:[overflow-wrap:anywhere] [&_h5]:hyphens-auto",
+            "[&_h6]:break-words [&_h6]:[overflow-wrap:anywhere] [&_h6]:hyphens-auto",
+            "[&_img]:max-w-full [&_img]:h-auto [&_img]:rounded-xl [&_img]:my-4 [&_img]:object-contain",
             themeProseClasses
           )}
           dangerouslySetInnerHTML={{ __html: renderedHtml }}

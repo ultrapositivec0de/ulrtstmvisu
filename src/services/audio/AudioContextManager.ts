@@ -5,6 +5,19 @@
  */
 
 import { NoiseType } from './types';
+import { voicePool } from './VoicePool';
+
+/**
+ * High-performance 32-bit PRNG (Xorshift32)
+ * Eliminates Math.random() overhead and provides deterministic high-speed entropy.
+ */
+let xorState = 0x8a5f319b;
+export function xorshift32(): number {
+  xorState ^= xorState << 13;
+  xorState ^= xorState >> 17;
+  xorState ^= xorState << 5;
+  return (xorState >>> 0) / 4294967296;
+}
 
 class AudioContextManager {
   private static instance: AudioContextManager | null = null;
@@ -31,17 +44,21 @@ class AudioContextManager {
   }
 
   /**
-   * Creates a smooth soft-clipping saturation curve (tanh-based)
-   * to eliminate harsh digital clipping and protect speaker diaphragms
+   * Creates a transparent soft-clipping saturation curve (tanh-based)
+   * that is 100% linear for signals under 0.8, and softly limits peaks
+   * above 0.8 to eliminate harsh digital clipping and protect speaker diaphragms.
    */
   private makeSoftClipCurve(samples = 1024): Float32Array {
     const curve = new Float32Array(samples);
-    const deg = Math.PI / 180;
-    const k = 1.5; // subtle transparent saturation
     for (let i = 0; i < samples; ++i) {
-      const x = (i * 2) / samples - 1;
-      // Soft saturation transfer function
-      curve[i] = ((3 + k) * x * 20 * deg) / (Math.PI + k * Math.abs(x * 20 * deg));
+      const x = (i * 2) / (samples - 1) - 1; // correctly maps [0..samples-1] to [-1.0 .. 1.0]
+      if (x < -0.8) {
+        curve[i] = -0.8 + 0.2 * Math.tanh((x + 0.8) / 0.2);
+      } else if (x > 0.8) {
+        curve[i] = 0.8 + 0.2 * Math.tanh((x - 0.8) / 0.2);
+      } else {
+        curve[i] = x;
+      }
     }
     return curve;
   }
@@ -64,22 +81,14 @@ class AudioContextManager {
       // Master gain node
       this.masterGain = this.ctx.createGain();
       this.masterGain.gain.setValueAtTime(this.isMuted ? 0 : this.currentVolume, this.ctx.currentTime);
-
-      // Studio-grade transparent limiter: protects against digital clipping while preserving natural polyphonic decay
-      this.compressor = this.ctx.createDynamicsCompressor();
-      this.compressor.threshold.setValueAtTime(-2.0, this.ctx.currentTime);
-      this.compressor.knee.setValueAtTime(24, this.ctx.currentTime);
-      this.compressor.ratio.setValueAtTime(3.0, this.ctx.currentTime);
-      this.compressor.attack.setValueAtTime(0.005, this.ctx.currentTime);
-      this.compressor.release.setValueAtTime(0.06, this.ctx.currentTime);
-
-      // Soft-clipper wave shaper to smoothly round off peaks without abrupt digital truncation
+      
+      // Safety WaveShaper to prevent digital clipping in browser output
       this.waveShaper = this.ctx.createWaveShaper();
-      this.waveShaper.curve = this.makeSoftClipCurve() as Float32Array<ArrayBuffer>;
-      this.waveShaper.oversample = '2x';
+      this.waveShaper.curve = this.makeSoftClipCurve() as any;
+      this.waveShaper.oversample = '4x';
 
-      this.masterGain.connect(this.compressor);
-      this.compressor.connect(this.waveShaper);
+      // Connect: MasterGain -> WaveShaper -> Destination
+      this.masterGain.connect(this.waveShaper);
       this.waveShaper.connect(this.ctx.destination);
 
       // Pre-compute noise and impulse buffers (one-time allocation, zero garbage collection during typing)
@@ -187,7 +196,7 @@ class AudioContextManager {
     const whiteBuffer = ctx.createBuffer(1, length, sampleRate);
     const whiteData = whiteBuffer.getChannelData(0);
     for (let i = 0; i < length; i++) {
-      whiteData[i] = Math.random() * 2 - 1;
+      whiteData[i] = xorshift32() * 2 - 1;
     }
     this.noiseBuffers.set('white', whiteBuffer);
 
@@ -196,7 +205,7 @@ class AudioContextManager {
     const pinkData = pinkBuffer.getChannelData(0);
     let b0 = 0, b1 = 0, b2 = 0, b3 = 0, b4 = 0, b5 = 0, b6 = 0;
     for (let i = 0; i < length; i++) {
-      const white = Math.random() * 2 - 1;
+      const white = xorshift32() * 2 - 1;
       b0 = 0.99886 * b0 + white * 0.0555179;
       b1 = 0.99332 * b1 + white * 0.0750759;
       b2 = 0.96900 * b2 + white * 0.1538520;
@@ -213,7 +222,7 @@ class AudioContextManager {
     const brownData = brownBuffer.getChannelData(0);
     let lastOut = 0.0;
     for (let i = 0; i < length; i++) {
-      const white = Math.random() * 2 - 1;
+      const white = xorshift32() * 2 - 1;
       lastOut = (lastOut + 0.02 * white) / 1.02;
       brownData[i] = lastOut * 3.5;
     }
@@ -233,7 +242,7 @@ class AudioContextManager {
     for (let v = 0; v < 8; v++) {
       const buffer = ctx.createBuffer(1, pulseLen, sampleRate);
       const data = buffer.getChannelData(0);
-      const piezoFreq = 3800 + v * 160 + (Math.random() * 80 - 40); // Resonant piezo disc frequency
+      const piezoFreq = 3800 + v * 160 + (xorshift32() * 80 - 40); // Resonant piezo disc frequency
       const decayTime = 0.00045 + (v % 3) * 0.00008; // Fast exponential ringdown
 
       for (let i = 0; i < pulseLen; i++) {
@@ -243,7 +252,7 @@ class AudioContextManager {
         // Damped resonant sine wave of the dosimeter piezo element
         const ring = Math.sin(2 * Math.PI * piezoFreq * t) * Math.exp(-t / decayTime);
         // High-frequency ionizing spark noise
-        const spark = (Math.random() * 0.3 - 0.15) * Math.exp(-t / (decayTime * 0.6));
+        const spark = (xorshift32() * 0.3 - 0.15) * Math.exp(-t / (decayTime * 0.6));
         data[i] = (needleSpike * 0.45 + ring * 0.75 + spark * 0.35);
       }
       this.geigerBuffers.push(buffer);
@@ -251,6 +260,7 @@ class AudioContextManager {
   }
 
   public dispose(): void {
+    voicePool.reset();
     if (this.suspendTimer) {
       clearTimeout(this.suspendTimer);
       this.suspendTimer = null;

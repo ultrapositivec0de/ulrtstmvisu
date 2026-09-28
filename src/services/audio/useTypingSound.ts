@@ -129,6 +129,7 @@ export function useTypingSound() {
   }, []);
 
   const lastPhysicalKeyDownTimeRef = useRef<number>(0);
+  const lastKeyRepeatTimeRef = useRef<number>(0);
 
   // Listeners for physical typing, user gesture wake-up, and mobile touch input
   useEffect(() => {
@@ -139,14 +140,31 @@ export function useTypingSound() {
       audioContextManager.ensureRunning().catch(() => {});
     };
 
+    window.addEventListener('touchstart', handleGestureWake, { passive: true });
+    window.addEventListener('touchend', handleGestureWake, { passive: true });
     window.addEventListener('pointerdown', handleGestureWake, { passive: true });
     window.addEventListener('click', handleGestureWake, { passive: true });
+    window.addEventListener('keydown', handleGestureWake, { passive: true });
 
     // 1. Physical Keyboard listener
     const handleKeyDown = (e: KeyboardEvent) => {
       handleGestureWake();
+      // Ignore Android Virtual Keyboard 229 placeholder events (handled accurately via beforeinput)
+      if (e.keyCode === 229 || e.which === 229 || e.key === 'Unidentified') {
+        return;
+      }
+
       // Ignore IME composing sessions (handled via beforeinput)
       if (e.isComposing) return;
+
+      // Throttle OS key-repeat events to ~13Hz (min 75ms) to prevent sound buffer flooding when holding keys down
+      const now = performance.now();
+      if (e.repeat) {
+        if (now - lastKeyRepeatTimeRef.current < 75) {
+          return;
+        }
+        lastKeyRepeatTimeRef.current = now;
+      }
 
       // Filter out lone modifier keys to avoid glitch sounds when using keyboard shortcuts (e.g. Ctrl, Alt, Shift, Meta)
       const isLoneModifier = [
@@ -172,12 +190,13 @@ export function useTypingSound() {
       // We focus on text input elements to avoid triggering sound on general page hotkeys
       if (!isInputOrEditor) return;
 
-      lastPhysicalKeyDownTimeRef.current = performance.now();
+      lastPhysicalKeyDownTimeRef.current = now;
 
       triggerSound({
         key: e.key,
         code: e.code,
-        isVirtual: false
+        isVirtual: false,
+        isRepeat: !!e.repeat
       });
     };
 
@@ -212,8 +231,11 @@ export function useTypingSound() {
     window.addEventListener('beforeinput', handleBeforeInput as EventListener, { passive: true, capture: true });
 
     return () => {
+      window.removeEventListener('touchstart', handleGestureWake);
+      window.removeEventListener('touchend', handleGestureWake);
       window.removeEventListener('pointerdown', handleGestureWake);
       window.removeEventListener('click', handleGestureWake);
+      window.removeEventListener('keydown', handleGestureWake);
       window.removeEventListener('keydown', handleKeyDown, { capture: true });
       window.removeEventListener('beforeinput', handleBeforeInput as EventListener, { capture: true });
     };

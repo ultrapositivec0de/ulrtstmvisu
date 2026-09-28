@@ -22,6 +22,7 @@ import {
 import { cn } from '../../lib/utils';
 import { ImageItem } from '../../types';
 import { SecurityService } from '../../services/securityService';
+import { useDeviceStore } from '../../store/deviceStore';
 import ImageItemComp from '../ImageItem';
 import ExternalImageItem from '../ExternalImageItem';
 
@@ -138,6 +139,7 @@ export interface SidebarProps {
 }
 
 export const Sidebar: React.FC<SidebarProps> = (props) => {
+  const isMobileLayout = useDeviceStore(s => s.isMobileLayout);
   const {
     isSidebarOpen,
     isGalleryCollapsed,
@@ -207,7 +209,8 @@ export const Sidebar: React.FC<SidebarProps> = (props) => {
             <motion.aside 
               {...getSidebarMotionConfig()}
               className={cn(
-                "border-r border-slate-800 bg-slate-900 flex flex-col z-40 lg:z-30 absolute lg:relative h-full pb-16 lg:pb-0 shadow-2xl lg:shadow-none transition-all duration-300 overflow-visible",
+                "border-r border-slate-800 bg-slate-900 flex flex-col h-full transition-all duration-300 overflow-visible",
+                isMobileLayout ? "z-40 absolute pb-16 shadow-2xl" : "z-30 relative pb-0 shadow-none",
                 isGalleryCollapsed ? "w-16" : "w-[clamp(20rem,25vw,30rem)]"
               )}
             >

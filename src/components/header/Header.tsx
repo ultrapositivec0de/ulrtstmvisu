@@ -1,5 +1,6 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
+import { useDeviceStore } from '../../store/deviceStore';
 import {
   Edit3,
   Globe,
@@ -193,6 +194,32 @@ export const Header: React.FC<HeaderProps> = (props) => {
   };
 
   const TOOLS_MAP = toolsMap || fallbackToolsMap;
+  const isMobileLayout = useDeviceStore(s => s.isMobileLayout);
+  const isHeaderCompact = useDeviceStore(s => s.isHeaderCompact);
+  const showMobileBottomBar = useDeviceStore(s => s.showMobileBottomBar);
+
+  // Close open header dropdowns when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent | TouchEvent) => {
+      const target = e.target as HTMLElement | null;
+      if (!target) return;
+      if (!target.closest('.mobile-tools-container')) {
+        setShowMobileTools1(false);
+        setShowMobileTools2(false);
+        setShowMobileToolsOpen(false);
+      }
+      if (!target.closest('.notification-container')) {
+        setShowNotificationList(false);
+      }
+      if (!target.closest('.lang-menu-container')) {
+        setShowLangMenu(false);
+      }
+    };
+    document.addEventListener('pointerdown', handleClickOutside);
+    return () => {
+      document.removeEventListener('pointerdown', handleClickOutside);
+    };
+  }, [setShowMobileTools1, setShowMobileTools2, setShowMobileToolsOpen, setShowNotificationList, setShowLangMenu]);
 
   return (
 <header 
@@ -255,7 +282,7 @@ export const Header: React.FC<HeaderProps> = (props) => {
 
           {/* Mobile Format menu trigger (grouped immediately with editor controls to eliminate overlap) */}
           {activeView === 'editor' && (
-            <div className="relative mobile-tools-container shrink-0 lg:hidden">
+            <div className={cn("relative mobile-tools-container shrink-0", !isHeaderCompact ? "hidden" : "flex")}>
               <button
                 id="mobile-format-tools-btn"
                 onMouseDown={(e) => e.preventDefault()}
@@ -279,54 +306,58 @@ export const Header: React.FC<HeaderProps> = (props) => {
 
               {/* Tools Dropdown */}
               <div className={cn(
-                "fixed top-14 left-2 right-2 sm:absolute sm:top-full sm:left-0 sm:right-auto mt-2 bg-slate-800 border border-slate-700 p-2.5 rounded-xl shadow-2xl z-[250] flex-col gap-2.5 max-w-[95vw] sm:w-max max-h-[75vh] overflow-y-auto custom-scrollbar mx-auto sm:mx-0",
+                "fixed top-14 left-2 right-2 sm:absolute sm:top-full sm:left-0 sm:right-auto mt-2 bg-slate-800 border border-slate-700 p-2.5 rounded-xl shadow-2xl z-[250] flex-col gap-2.5 max-w-[calc(100vw-1rem)] sm:w-max max-h-[75vh] overflow-y-auto custom-scrollbar mx-auto sm:mx-0",
                 showMobileToolsOpen ? "flex" : "hidden"
               )}>
                 {/* Group 1 */}
-                <div className="flex gap-1 bg-slate-900/50 p-1 rounded-lg">
+                <div className="flex flex-wrap gap-1 bg-slate-900/50 p-1 rounded-lg">
                   <IconButton icon={Bold} onClick={() => { fmt('**'); setShowMobileToolsOpen(false); }} title={t('bold')} className="shrink-0 size-8" active={activeFormats.bold} />
                   <IconButton icon={Italic} onClick={() => { fmt('*'); setShowMobileToolsOpen(false); }} title={t('italic')} className="shrink-0 size-8" active={activeFormats.italic} />
                   <IconButton icon={Strikethrough} onClick={() => { fmt('~~'); setShowMobileToolsOpen(false); }} title={t('strike')} className="shrink-0 size-8" active={activeFormats.strikethrough} />
                 </div>
                 {/* Group 2 */}
-                <div className="flex gap-1 bg-slate-900/50 p-1 rounded-lg">
+                <div className="flex flex-wrap gap-1 bg-slate-900/50 p-1 rounded-lg">
                   <button type="button" onMouseDown={(e) => e.preventDefault()} onPointerDown={(e) => e.preventDefault()} onClick={() => { fmtLine('# '); setShowMobileToolsOpen(false); }} title={t('h1')} className="size-8 flex items-center justify-center hover:bg-slate-700 rounded-lg text-[10px] font-black text-slate-400 shrink-0">H1</button>
                   <button type="button" onMouseDown={(e) => e.preventDefault()} onPointerDown={(e) => e.preventDefault()} onClick={() => { fmtLine('## '); setShowMobileToolsOpen(false); }} title={t('h2')} className="size-8 flex items-center justify-center hover:bg-slate-700 rounded-lg text-[10px] font-black text-slate-400 shrink-0">H2</button>
                   <button type="button" onMouseDown={(e) => e.preventDefault()} onPointerDown={(e) => e.preventDefault()} onClick={() => { fmtLine('### '); setShowMobileToolsOpen(false); }} title={t('h3')} className="size-8 flex items-center justify-center hover:bg-slate-700 rounded-lg text-[10px] font-black text-slate-400 shrink-0">H3</button>
                 </div>
                 {/* Group 3 */}
-                <div className="flex gap-1 bg-slate-900/50 p-1 rounded-lg">
+                <div className="flex flex-wrap gap-1 bg-slate-900/50 p-1 rounded-lg">
                   <IconButton icon={AlignLeft} onClick={() => { fmt('<div class="text-left">\n', '\n</div>'); setShowMobileToolsOpen(false); }} title={t('leftText')} className="shrink-0 size-8" />
                   <IconButton icon={AlignCenter} onClick={() => { fmt('<center>\n', '\n</center>'); setShowMobileToolsOpen(false); }} title="Center" className="shrink-0 size-8" />
                   <IconButton icon={AlignRight} onClick={() => { fmt('<div class="text-right">\n', '\n</div>'); setShowMobileToolsOpen(false); }} title={t('rightText')} className="shrink-0 size-8" />
                   <IconButton icon={AlignJustify} onClick={() => { fmt('<div class="text-justify">\n', '\n</div>'); setShowMobileToolsOpen(false); }} title="Justify" className="shrink-0 size-8" />
                 </div>
                 {/* Group 4 */}
-                <div className="flex gap-1 bg-slate-900/50 p-1 rounded-lg">
+                <div className="flex flex-wrap gap-1 bg-slate-900/50 p-1 rounded-lg">
                   <IconButton icon={Quote} onClick={() => { fmtLine('> '); setShowMobileToolsOpen(false); }} title={t('quote')} className="shrink-0 size-8" />
                   <IconButton icon={LinkIcon} onClick={() => { handleLink(); setShowMobileToolsOpen(false); }} title={t('link')} className="shrink-0 size-8" />
                   <IconButton icon={Minus} onClick={() => { insertAtCursor('\n\n---\n\n', 'end'); setShowMobileToolsOpen(false); }} title={t('hr')} className="shrink-0 size-8" />
                   <button type="button" onMouseDown={(e) => e.preventDefault()} onPointerDown={(e) => e.preventDefault()} onClick={() => { fmt('<div class="phishy">', '</div>'); setShowMobileToolsOpen(false); }} title={t('redText')} className={cn("size-8 flex items-center justify-center hover:bg-slate-700 rounded-lg text-[10px] font-black shrink-0 transition-colors", activeFormats.phishy ? "bg-red-500/20 text-red-400 ring-1 ring-red-500/50" : "text-red-500")}>A</button>
                 </div>
                 {/* Group 5 */}
-                <div className="flex gap-1 bg-slate-900/50 p-1 rounded-lg items-center text-slate-500 text-xs font-bold uppercase tracking-widest pl-2">
-                  Code
-                  <IconButton icon={Terminal} onClick={() => { fmt('`'); setShowMobileToolsOpen(false); }} title={t('inlineCode')} className="shrink-0 size-8 ml-auto" active={activeFormats.code} />
-                  <IconButton icon={Code} onClick={() => { fmt('```\n', '\n```'); setShowMobileToolsOpen(false); }} title={t('codeBlock')} className="shrink-0 size-8" />
-                  <IconButton icon={Indent} onClick={() => {
-                    handleIndent('out');
-                    setShowMobileToolsOpen(false);
-                  }} title={t('indent')} className="shrink-0 size-8" />
+                <div className="flex flex-wrap gap-1 bg-slate-900/50 p-1 rounded-lg items-center text-slate-500 text-xs font-bold uppercase tracking-widest pl-2">
+                  <span className="shrink-0 mr-auto">Code</span>
+                  <div className="flex items-center gap-1">
+                    <IconButton icon={Terminal} onClick={() => { fmt('`'); setShowMobileToolsOpen(false); }} title={t('inlineCode')} className="shrink-0 size-8" active={activeFormats.code} />
+                    <IconButton icon={Code} onClick={() => { fmt('```\n', '\n```'); setShowMobileToolsOpen(false); }} title={t('codeBlock')} className="shrink-0 size-8" />
+                    <IconButton icon={Indent} onClick={() => {
+                      handleIndent('out');
+                      setShowMobileToolsOpen(false);
+                    }} title={t('indent')} className="shrink-0 size-8" />
+                  </div>
                 </div>
                 {/* Group 6 */}
-                <div className="flex gap-1 bg-slate-900/50 p-1 rounded-lg items-center text-slate-500 text-xs font-bold uppercase tracking-widest pl-2">
-                  {t('table')}
-                  <IconButton icon={LayoutGrid} onClick={(e) => { TOOLS_MAP['Table']?.action(e); setShowMobileToolsOpen(false); }} title={t('table')} className="shrink-0 size-8 ml-auto" />
-                  <IconButton icon={SplitSquareHorizontal} onClick={() => { insertAtCursor('| Head |\n| --- |\n', 'end'); setShowMobileToolsOpen(false); }} title="1 Col" className="shrink-0 size-8" />
-                  <IconButton icon={TableIcon} onClick={() => { importTable(); setShowMobileToolsOpen(false); }} title={t('importTable')} className="shrink-0 size-8" />
+                <div className="flex flex-wrap gap-1 bg-slate-900/50 p-1 rounded-lg items-center text-slate-500 text-xs font-bold uppercase tracking-widest pl-2">
+                  <span className="shrink-0 mr-auto">{t('table')}</span>
+                  <div className="flex items-center gap-1">
+                    <IconButton icon={LayoutGrid} onClick={(e) => { TOOLS_MAP['Table']?.action(e); setShowMobileToolsOpen(false); }} title={t('table')} className="shrink-0 size-8" />
+                    <IconButton icon={SplitSquareHorizontal} onClick={() => { insertAtCursor('| Head |\n| --- |\n', 'end'); setShowMobileToolsOpen(false); }} title="1 Col" className="shrink-0 size-8" />
+                    <IconButton icon={TableIcon} onClick={() => { importTable(); setShowMobileToolsOpen(false); }} title={t('importTable')} className="shrink-0 size-8" />
+                  </div>
                 </div>
                 {/* Group 7 */}
-                <div className="flex gap-1 bg-slate-900/50 p-1 rounded-lg">
+                <div className="flex flex-wrap gap-1 bg-slate-900/50 p-1 rounded-lg">
                   <IconButton icon={AtSign} onClick={() => { setActiveModal('mentions'); setShowMobileToolsOpen(false); }} title={t('mentions')} className="shrink-0 size-8" />
                   <IconButton icon={FileText} onClick={() => { setActiveModal('templates'); setShowMobileToolsOpen(false); }} title={t('templates')} className="shrink-0 size-8" />
                 </div>
@@ -338,7 +369,7 @@ export const Header: React.FC<HeaderProps> = (props) => {
         {/* Center: Desktop Formatting Tools (Scrollable, visible on large screens) */}
         {activeView === 'editor' && (
           <div 
-            className="hidden lg:flex flex-1 min-w-0 px-2 items-center justify-center relative group/tools overflow-hidden"
+            className={cn("flex-1 min-w-0 px-2 items-center justify-center relative group/tools overflow-hidden", isHeaderCompact ? "hidden" : "flex")}
             onWheel={(e) => {
               const container = e.currentTarget.querySelector('.tools-scroll-container');
               if (container && e.deltaY !== 0) container.scrollLeft += e.deltaY;
@@ -412,7 +443,7 @@ export const Header: React.FC<HeaderProps> = (props) => {
               {showNotificationList && (
                 <motion.div 
                   {...getMotionConfig()}
-                  className="fixed top-14 left-2 right-2 sm:absolute sm:top-full sm:left-auto sm:right-0 sm:origin-top-right sm:mt-2 sm:w-80 max-w-sm mx-auto bg-slate-900 border border-slate-800 rounded-2xl shadow-2xl z-[100] overflow-hidden"
+                  className="fixed top-14 left-2 right-2 sm:absolute sm:top-full sm:left-auto sm:right-0 sm:origin-top-right sm:mt-2 sm:w-80 max-w-[calc(100vw-1rem)] sm:max-w-sm mx-auto bg-slate-900 border border-slate-800 rounded-2xl shadow-2xl z-[100] overflow-hidden"
                 >
                   <div className="p-4 border-b border-slate-800 flex items-center justify-between bg-slate-950/50">
                     <div className="flex flex-col">
@@ -507,7 +538,7 @@ export const Header: React.FC<HeaderProps> = (props) => {
                        initial={{ opacity: 0, y: 5, scale: 0.95 }}
                        animate={{ opacity: 1, y: 0, scale: 1 }}
                        exit={{ opacity: 0, y: 5, scale: 0.95 }}
-                       className="absolute top-full right-0 mt-2 bg-slate-800 border border-slate-700 rounded-xl shadow-2xl overflow-hidden z-50 min-w-[120px]"
+                       className="absolute top-full right-0 mt-2 bg-slate-800 border border-slate-700 rounded-xl shadow-2xl overflow-hidden z-50 min-w-[120px] max-w-[calc(100vw-1rem)]"
                      >
                        {AVAILABLE_LANGUAGES.map(item => (
                          <button
@@ -547,21 +578,25 @@ export const Header: React.FC<HeaderProps> = (props) => {
                     setShowLangMenu(false);
                   }
                 }}
-                className="lg:hidden flex items-center justify-center bg-slate-800/30 rounded-xl border border-slate-700/30 text-slate-400 hover:text-white hover:bg-slate-700/50 transition-all size-8 sm:size-9"
+                className={cn("flex items-center justify-center bg-slate-800/30 rounded-xl border border-slate-700/30 text-slate-400 hover:text-white hover:bg-slate-700/50 transition-all size-8 sm:size-9", !isHeaderCompact && "hidden")}
                 title="Tools"
              >
                 <Layers className="shrink-0" style={{ width: 'var(--header-icon-size, 18px)', height: 'var(--header-icon-size, 18px)' }} />
              </button>
              <div className={cn(
-                "absolute lg:static top-full right-0 mt-2 lg:mt-0 bg-slate-800 lg:bg-slate-800/30 border border-slate-700 lg:border-slate-700/30 p-2 lg:p-1 rounded-xl shadow-2xl lg:shadow-none min-w-max flex-col lg:flex-row items-center gap-1 lg:gap-1.5 z-50",
-                showMobileTools1 ? "flex" : "hidden lg:flex"
+                isHeaderCompact
+                  ? cn(
+                      "absolute top-full right-0 mt-2 bg-slate-900 border border-slate-700/80 p-2 rounded-xl shadow-2xl min-w-max max-w-[calc(100vw-1rem)] flex-col items-center gap-1.5 z-50",
+                      showMobileTools1 ? "flex" : "hidden"
+                    )
+                  : "flex flex-row items-center gap-1 bg-slate-800/30 border border-slate-700/30 p-1 rounded-xl static shadow-none mt-0 z-10"
              )}>
-                <IconButton icon={Layers} onClick={() => { setActiveModal('splitPost'); setShowMobileTools1(false); }} title={t('splitPost')} className="shrink-0 size-10" />
-                <IconButton icon={ListIcon} onClick={() => { setActiveModal('queue'); setShowMobileTools1(false); }} title={t('queue')} className="shrink-0 size-10" />
-                <IconButton icon={FolderOpen} onClick={() => { setActiveModal('drafts'); setShowMobileTools1(false); }} title={t('drafts')} className="shrink-0 size-10" />
-                <div className="w-full lg:w-px h-px lg:h-5 bg-slate-700 my-1 lg:my-0 lg:mx-0.5 shrink-0" />
-                <label className="w-10 h-10 bg-cyan-950/20 border border-cyan-500/30 text-cyan-400 hover:text-cyan-300 hover:bg-cyan-900/30 rounded-lg transition-colors cursor-pointer shrink-0 flex items-center justify-center shadow-lg shadow-cyan-950/50" title={t('importMd') || 'Import MD'}>
-                   <FileDown size={20} />
+                <IconButton icon={Layers} onClick={() => { setActiveModal('splitPost'); setShowMobileTools1(false); }} title={t('splitPost')} className="shrink-0 size-8 sm:size-9" />
+                <IconButton icon={ListIcon} onClick={() => { setActiveModal('queue'); setShowMobileTools1(false); }} title={t('queue')} className="shrink-0 size-8 sm:size-9" />
+                <IconButton icon={FolderOpen} onClick={() => { setActiveModal('drafts'); setShowMobileTools1(false); }} title={t('drafts')} className="shrink-0 size-8 sm:size-9" />
+                <div className={cn("shrink-0 bg-slate-700", isHeaderCompact ? "w-full h-px my-0.5" : "w-px h-5 mx-0.5")} />
+                <label className="size-8 sm:size-9 bg-cyan-950/20 border border-cyan-500/30 text-cyan-400 hover:text-cyan-300 hover:bg-cyan-900/30 rounded-lg transition-colors cursor-pointer shrink-0 flex items-center justify-center shadow-lg shadow-cyan-950/50" title={t('importMd') || 'Import MD'}>
+                   <FileDown size={18} />
                    <input type="file" accept=".md,.txt" className="hidden" onChange={(e) => {
                       const f = e.target.files?.[0];
                       if(f) {
@@ -604,7 +639,7 @@ export const Header: React.FC<HeaderProps> = (props) => {
                       }
                    }} />
                 </label>
-                <IconButton icon={FileUp} onClick={() => { downloadFile(); setShowMobileTools1(false); }} title={t('exportMd') || 'Export MD'} className="shrink-0 size-10 text-slate-400 hover:text-cyan-400" />
+                <IconButton icon={FileUp} onClick={() => { downloadFile(); setShowMobileTools1(false); }} title={t('exportMd') || 'Export MD'} className="shrink-0 size-8 sm:size-9 text-slate-400 hover:text-cyan-400" />
              </div>
           </div>
 
@@ -623,14 +658,18 @@ export const Header: React.FC<HeaderProps> = (props) => {
                     setShowLangMenu(false);
                   }
                 }}
-                className="lg:hidden flex items-center justify-center bg-slate-800/30 rounded-xl border border-slate-700/30 text-slate-400 hover:text-white hover:bg-slate-700/50 transition-all size-8 sm:size-9"
+                className={cn("flex items-center justify-center bg-slate-800/30 rounded-xl border border-slate-700/30 text-slate-400 hover:text-white hover:bg-slate-700/50 transition-all size-8 sm:size-9", !isHeaderCompact && "hidden")}
                 title="Files"
              >
                 <FilePlus className="shrink-0" style={{ width: 'var(--header-icon-size, 18px)', height: 'var(--header-icon-size, 18px)' }} />
              </button>
              <div className={cn(
-                "absolute lg:static top-full right-0 mt-2 lg:mt-0 bg-slate-800 lg:bg-slate-800/30 border border-slate-700 lg:border-slate-700/30 p-2 lg:p-1 rounded-xl shadow-2xl lg:shadow-none min-w-max flex-col lg:flex-row items-stretch lg:items-center gap-1.5 z-40",
-                showMobileTools2 ? "flex" : "hidden lg:flex"
+                isHeaderCompact
+                  ? cn(
+                      "absolute top-full right-0 mt-2 bg-slate-900 border border-slate-700/80 p-2 rounded-xl shadow-2xl min-w-max max-w-[calc(100vw-1rem)] flex-col items-stretch gap-1.5 z-40",
+                      showMobileTools2 ? "flex" : "hidden"
+                    )
+                  : "flex flex-row items-center gap-1 bg-slate-800/30 border border-slate-700/30 p-1 rounded-xl static shadow-none mt-0 z-10"
              )}>
                 <IconButton 
                   icon={FilePlus} 
@@ -649,18 +688,18 @@ export const Header: React.FC<HeaderProps> = (props) => {
                     }
                   }} 
                   title={t('newPost')} 
-                  className="shrink-0 size-10 flex mx-auto" 
+                  className="shrink-0 size-8 sm:size-9 flex mx-auto" 
                 />
-                <div className="w-full lg:w-px h-px lg:h-5 bg-slate-700 my-0.5 lg:my-0 lg:mx-0.5 shrink-0" />
-                <div className="flex flex-col lg:flex-row lg:items-center bg-slate-900 border border-slate-700 rounded-lg overflow-hidden shrink-0">
-                   <button onClick={() => { saveDraft(); setShowMobileTools2(false); }} className="px-3 lg:px-2 py-2 lg:py-1.5 hover:bg-slate-800 text-slate-300 border-b lg:border-b-0 lg:border-r border-slate-700 flex items-center justify-center lg:justify-start gap-1.5 text-[10px] lg:text-[9px] font-black uppercase transition-colors" title={t('saveDraft')}>
-                     <Save size={20} /> 
-                     <span className="lg:hidden xl:inline">{t('saveDraft')}</span>
+                <div className={cn("shrink-0 bg-slate-700", isHeaderCompact ? "w-full h-px my-0.5" : "w-px h-5 mx-0.5")} />
+                <div className="flex flex-row items-center bg-slate-900 border border-slate-700 rounded-lg overflow-hidden shrink-0">
+                   <button onClick={() => { saveDraft(); setShowMobileTools2(false); }} className="px-2.5 py-1.5 hover:bg-slate-800 text-slate-300 border-r border-slate-700 flex items-center justify-center gap-1 text-[10px] font-bold uppercase transition-colors" title={t('saveDraft')}>
+                     <Save size={16} /> 
+                     <span className={cn(isHeaderCompact ? "inline" : "hidden xl:inline")}>{t('saveDraft')}</span>
                    </button>
                    <button onClick={() => { saveDraft(); setShowMobileTools2(false); }} className={cn(
-                     "px-3 lg:px-2 py-2 lg:py-1.5 flex items-center justify-center transition-colors hover:bg-[rgb(var(--accent-color)/0.1)] text-[rgb(var(--accent-color))] hover:text-[rgb(var(--accent-color))]"
+                     "px-2 py-1.5 flex items-center justify-center transition-colors hover:bg-[rgb(var(--accent-color)/0.1)] text-[rgb(var(--accent-color))] hover:text-[rgb(var(--accent-color))]"
                    )} title={t('ready')}>
-                     <CheckCircle size={20} />
+                     <CheckCircle size={16} />
                    </button>
                 </div>
              </div>
@@ -674,11 +713,11 @@ export const Header: React.FC<HeaderProps> = (props) => {
                 icon={Download} 
                 onClick={handleInstallPwa} 
                 title={t('installApp') || "Встановити PWA"} 
-                className="shrink-0 size-8 hidden lg:flex text-cyan-400 bg-cyan-950/60 border border-cyan-800/60 hover:bg-cyan-900/80 active:scale-95 transition-transform" 
+                className={cn("shrink-0 size-8 text-cyan-400 bg-cyan-950/60 border border-cyan-800/60 hover:bg-cyan-900/80 active:scale-95 transition-transform", isHeaderCompact ? "hidden" : "flex")} 
               />
             )}
             <IconButton icon={ShieldUserIcon} onClick={() => setActiveModal('keys')} title={t('keys')} className="shrink-0 size-8 flex" />
-            <IconButton icon={Settings} onClick={() => { setSettingsTab('general'); setActiveModal('settings'); }} title={t('settings')} className="shrink-0 size-8 hidden lg:flex" />
+            <IconButton icon={Settings} onClick={() => { setSettingsTab('general'); setActiveModal('settings'); }} title={t('settings')} className={cn("shrink-0 size-8", showMobileBottomBar ? "hidden" : "flex")} />
 
             {activeView === 'editor' && (
               <IconButton icon={Rocket} onClick={() => setActiveModal('publish')} title={t('publish')} className={cn("shrink-0 size-8 bg-cyan-600 text-white hover:bg-cyan-500 border border-cyan-500/30 transition-all", performanceMode ? "shadow-none" : "shadow-lg shadow-cyan-500/30 hover:scale-105 active:scale-95")} />

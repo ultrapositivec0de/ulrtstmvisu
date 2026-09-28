@@ -38,6 +38,7 @@ import {
 import { cn } from '../../lib/utils';
 import { ShieldUserIcon } from '../common/ShieldUserIcon';
 import { getFloatingWidgetStyles } from '../../lib/viewportLayout';
+import { useDeviceStore } from '../../store/deviceStore';
 
 export interface TamedWidgetProps {
   toolsMap?: Record<string, { label: string | React.ReactNode; action: (e?: React.MouseEvent) => void }>;
@@ -195,6 +196,7 @@ export const TamedWidget: React.FC<TamedWidgetProps> = (props) => {
   };
 
   const TOOLS_MAP = props.toolsMap || fallbackToolsMap;
+  const isMobileLayout = useDeviceStore(s => s.isMobileLayout);
 
   return (
     <>
@@ -205,7 +207,7 @@ export const TamedWidget: React.FC<TamedWidgetProps> = (props) => {
                     ref={widgetRef}
                     style={getFloatingWidgetStyles({
                       widgetPos,
-                      isMobile: typeof window !== 'undefined' ? window.innerWidth < 1024 : false,
+                      isMobile: isMobileLayout,
                       floatingPos,
                       editorPaneEl: editorPaneRef.current,
                       widgetEl: widgetRef.current,
@@ -223,8 +225,10 @@ export const TamedWidget: React.FC<TamedWidgetProps> = (props) => {
                         : "bg-slate-900 border border-white/10 rounded-3xl p-1 shadow-none",
                       widgetPos === 'floating' 
                         ? "fixed" 
-                        : "fixed sm:absolute bottom-4 left-2 right-2 sm:left-4 sm:right-4 rounded-3xl mx-auto max-w-2xl",
-                      isSidebarOpen ? "hidden lg:flex" : "flex"
+                        : isMobileLayout
+                          ? "fixed left-2 right-2 rounded-3xl mx-auto max-w-2xl"
+                          : "absolute bottom-4 left-4 right-4 rounded-3xl mx-auto max-w-2xl",
+                      (isSidebarOpen && isMobileLayout) ? "hidden" : "flex"
                     )}
                   >
                     <button 
@@ -232,7 +236,10 @@ export const TamedWidget: React.FC<TamedWidgetProps> = (props) => {
                       onMouseDown={(e) => e.preventDefault()}
                       onPointerDown={(e) => e.preventDefault()}
                       onClick={() => scrollRef.current?.scrollBy({ left: -100, behavior: 'smooth' })}
-                      className="hidden lg:flex h-[var(--toolbar-btn-size,3rem)] px-1.5 items-center justify-center text-slate-500 hover:text-cyan-400 transition-colors"
+                      className={cn(
+                        "h-[var(--toolbar-btn-size,3rem)] px-1.5 items-center justify-center text-slate-500 hover:text-cyan-400 transition-colors",
+                        isMobileLayout ? "hidden" : "flex"
+                      )}
                     >
                       <ChevronLeft size={20} className="w-[var(--toolbar-icon-size,1.25rem)] h-[var(--toolbar-icon-size,1.25rem)]" />
                     </button>
@@ -296,12 +303,15 @@ export const TamedWidget: React.FC<TamedWidgetProps> = (props) => {
                       onMouseDown={(e) => e.preventDefault()}
                       onPointerDown={(e) => e.preventDefault()}
                       onClick={() => scrollRef.current?.scrollBy({ left: 100, behavior: 'smooth' })}
-                      className="hidden lg:flex h-[var(--toolbar-btn-size,3rem)] px-1.5 items-center justify-center text-slate-500 hover:text-cyan-400 transition-colors"
+                      className={cn(
+                        "h-[var(--toolbar-btn-size,3rem)] px-1.5 items-center justify-center text-slate-500 hover:text-cyan-400 transition-colors",
+                        isMobileLayout ? "hidden" : "flex"
+                      )}
                     >
                       <ChevronRight size={20} className="w-[var(--toolbar-icon-size,1.25rem)] h-[var(--toolbar-icon-size,1.25rem)]" />
                     </button>
 
-                    <div className="hidden lg:block w-px h-[calc(var(--toolbar-btn-size,3rem)-8px)] bg-slate-700/50 mx-1 flex-shrink-0" />
+                    <div className={cn("w-px h-[calc(var(--toolbar-btn-size,3rem)-8px)] bg-slate-700/50 mx-1 flex-shrink-0", isMobileLayout ? "hidden" : "block")} />
                     
                     <div className="relative widget-settings-container">
                       <button 
