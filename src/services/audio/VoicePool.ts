@@ -49,6 +49,48 @@ export class VoicePool {
     const startTime = targetStartTime !== undefined && targetStartTime >= now ? targetStartTime : now + 0.002;
     const stopTime = startTime + durationSec;
 
+    // Voice Stealing: Enforce maximum 16 concurrent voices
+    const MAX_ACTIVE_VOICES = 16;
+    if (this.activeVoices.size >= MAX_ACTIVE_VOICES) {
+      let oldestVoice: ActiveVoice | null = null;
+      for (const v of this.activeVoices) {
+        if (!oldestVoice || v.startTime < oldestVoice.startTime) {
+          oldestVoice = v;
+        }
+      }
+
+      if (oldestVoice) {
+        // Smoothly fade out oldest voice over 5ms to avoid clicks/pops
+        const fadeOutTime = now + 0.005;
+        try {
+          oldestVoice.gainNode.gain.cancelScheduledValues(now);
+          oldestVoice.gainNode.gain.setValueAtTime(oldestVoice.gainNode.gain.value || 0.5, now);
+          oldestVoice.gainNode.gain.linearRampToValueAtTime(0.0001, fadeOutTime);
+        } catch {
+          // ignore
+        }
+
+        const targetVoice = oldestVoice;
+        setTimeout(() => {
+          if (this.activeVoices.has(targetVoice)) {
+            this.activeVoices.delete(targetVoice);
+            if (targetVoice.cleanupTimer) {
+              clearTimeout(targetVoice.cleanupTimer);
+              targetVoice.cleanupTimer = undefined;
+            }
+            for (let i = 0; i < targetVoice.nodes.length; i++) {
+              try {
+                targetVoice.nodes[i].disconnect();
+              } catch {
+                // ignore
+              }
+            }
+            targetVoice.nodes = [];
+          }
+        }, 8);
+      }
+    }
+
     // Fresh isolated node chain: Filter -> Gain -> MasterBus
     const gainNode = ctx.createGain();
     const filterNode = ctx.createBiquadFilter();

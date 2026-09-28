@@ -86,7 +86,7 @@ export const DocReaderContainer: React.FC<DocReaderContainerProps> = ({
       <div 
         ref={scrollContainerRef}
         onScroll={handleScroll}
-        className="flex-1 overflow-y-auto custom-scrollbar"
+        className="flex-1 overflow-y-auto custom-scrollbar overscroll-contain"
       >
         <DocReaderContent
           title={source.title}

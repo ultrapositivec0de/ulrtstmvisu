@@ -102,33 +102,42 @@ export function getUniqueKeyIndex(key?: string, code?: string): number {
 
   // 1. Check Ukrainian Cyrillic map
   if (char && char in UKRAINIAN_CHAR_MAP) {
-    return UKRAINIAN_CHAR_MAP[char];
+    const raw = UKRAINIAN_CHAR_MAP[char];
+    // Prime-modulo scramble for maximum pitch contrast between consecutive alphabetical/keyboard letters
+    return (raw * 17) % 54;
   }
 
   // 2. Check Latin alphabet map
   if (char && char in LATIN_CHAR_MAP) {
-    return LATIN_CHAR_MAP[char];
+    const raw = LATIN_CHAR_MAP[char];
+    // Prime-modulo scramble for maximum pitch contrast between consecutive alphabetical/keyboard letters
+    return (raw * 19) % 54;
   }
 
   // 3. Check Digits
   if (char && char in DIGIT_MAP) {
-    return DIGIT_MAP[char];
+    const raw = DIGIT_MAP[char];
+    // Offset and scramble to occupy distinct parts of the scale
+    return (raw * 23) % 54;
   }
 
   // 4. Check Punctuation
   if (char && char in PUNCTUATION_MAP) {
-    return PUNCTUATION_MAP[char];
+    const raw = PUNCTUATION_MAP[char];
+    // Offset and scramble to occupy distinct parts of the scale
+    return (raw * 29) % 54;
   }
 
   // 5. Check Physical Key Code (if virtual or special layout)
   if (code && code in PHYSICAL_KEY_CODE_MAP) {
-    return PHYSICAL_KEY_CODE_MAP[code];
+    const raw = PHYSICAL_KEY_CODE_MAP[code];
+    return (raw * 31) % 54;
   }
 
   // 6. Deterministic fallback for unknown unicode glyphs
   if (char && char.length > 0) {
     const codePoint = char.charCodeAt(0);
-    return codePoint % CARILLON_BELL_SCALE.length;
+    return (codePoint * 13) % CARILLON_BELL_SCALE.length;
   }
 
   return 15;

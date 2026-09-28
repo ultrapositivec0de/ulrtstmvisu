@@ -56,25 +56,13 @@ export function useDocReader({
     });
   }, []);
 
-  // 2. Active reading source
+  // 2. Active reading source - snapshot at the moment reading mode is opened
   const [source, setSource] = useState<DocReaderSource>(() => ({
     title: currentEditorTitle || 'Документ без назви',
     content: currentEditorContent || '',
     tags: currentEditorTags,
     type: 'current'
   }));
-
-  // Sync with current editor content if user is viewing 'current' source
-  useEffect(() => {
-    if (source.type === 'current') {
-      setSource(prev => ({
-        ...prev,
-        title: currentEditorTitle || 'Документ без назви',
-        content: currentEditorContent || '',
-        tags: currentEditorTags
-      }));
-    }
-  }, [currentEditorContent, currentEditorTitle, currentEditorTags, source.type]);
 
   // 3. Select source helpers
   const selectCurrentDocument = useCallback(() => {
@@ -195,14 +183,14 @@ export function useDocReader({
       const totalScrollable = el.scrollHeight - el.clientHeight;
       if (totalScrollable > 0) {
         const progress = Math.min(100, Math.max(0, Math.round((el.scrollTop / totalScrollable) * 100)));
-        setScrollProgress(progress);
+        setScrollProgress(prev => (prev === progress ? prev : progress));
       }
 
       // Find active heading in view relative to container top boundary
       if (headings.length > 0) {
         const containerRect = el.getBoundingClientRect();
         const headingElements = headings
-          .map(h => ({ id: h.id, el: document.getElementById(h.id) }))
+          .map(h => ({ id: h.id, el: el.querySelector(`[id="${h.id}"]`) as HTMLElement | null }))
           .filter((item): item is { id: string; el: HTMLElement } => item.el !== null);
 
         let currentActiveId: string | null = null;
@@ -223,7 +211,10 @@ export function useDocReader({
   }, [headings]);
 
   const scrollToHeading = useCallback((headingId: string) => {
-    const el = document.getElementById(headingId);
+    const container = scrollContainerRef.current;
+    if (!container) return;
+
+    const el = container.querySelector(`[id="${headingId}"]`) as HTMLElement | null;
     if (el) {
       isProgrammaticScrollingRef.current = true;
       if (programmaticScrollTimeoutRef.current) {
@@ -233,16 +224,11 @@ export function useDocReader({
         isProgrammaticScrollingRef.current = false;
       }, 500);
 
-      const container = scrollContainerRef.current;
-      if (container && container.contains(el)) {
-        const containerRect = container.getBoundingClientRect();
-        const elRect = el.getBoundingClientRect();
-        const relativeTop = elRect.top - containerRect.top + container.scrollTop;
-        // 70px offset provides padding below top navigation bars
-        container.scrollTo({ top: Math.max(0, relativeTop - 70), behavior: 'smooth' });
-      } else {
-        el.scrollIntoView({ behavior: 'smooth', block: 'start' });
-      }
+      const containerRect = container.getBoundingClientRect();
+      const elRect = el.getBoundingClientRect();
+      const relativeTop = elRect.top - containerRect.top + container.scrollTop;
+      // 70px offset provides padding below top navigation bars
+      container.scrollTo({ top: Math.max(0, relativeTop - 70), behavior: 'smooth' });
       setActiveHeadingId(headingId);
     }
   }, []);

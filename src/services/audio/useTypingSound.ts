@@ -19,6 +19,7 @@ import {
 } from './presets';
 import { audioContextManager } from './AudioContextManager';
 import { keyHashDispatcher } from './KeyHashDispatcher';
+import { soundSynthEngine } from './SoundSynthEngine';
 
 export function useTypingSound() {
   const [settings, setSettings] = useState<AudioTypingSettings>(() => loadAudioSettings());
@@ -109,6 +110,15 @@ export function useTypingSound() {
   const allPresets = [...BUILTIN_PRESETS, ...settings.customPresets];
   const activePreset = allPresets.find((p) => p.id === settings.activePresetId) || BUILTIN_PRESETS[0];
 
+  // Pre-render current preset sounds whenever audio is enabled or preset changes
+  useEffect(() => {
+    if (settings.enabled) {
+      audioContextManager.ensureRunning().then(() => {
+        soundSynthEngine.preRenderPresetSounds(activePreset).catch(() => {});
+      });
+    }
+  }, [settings.enabled, activePreset]);
+
   // Direct trigger function for keys or virtual clicks
   const triggerSound = useCallback((options: KeySoundTriggerOptions = {}) => {
     const current = settingsRef.current;
@@ -117,6 +127,9 @@ export function useTypingSound() {
 
     const currentAllPresets = [...BUILTIN_PRESETS, ...current.customPresets];
     const currentActivePreset = currentAllPresets.find((p) => p.id === current.activePresetId) || BUILTIN_PRESETS[0];
+
+    // Record keystroke to track typing speed WPM in real-time
+    soundSynthEngine.recordKeystroke();
 
     keyHashDispatcher.dispatch(currentActivePreset, options).catch(() => {});
   }, []);

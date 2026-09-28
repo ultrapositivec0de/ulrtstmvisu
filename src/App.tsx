@@ -1446,6 +1446,7 @@ function App() {
 
               {/* Preview Pane */}
               <PreviewPane
+                editorMode={editorMode}
                 previewRef={previewRef}
                 previewPaneRef={previewPaneRef}
                 activeMobileTab={activeMobileTab}

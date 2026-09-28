@@ -23,6 +23,7 @@ export const ReadingTimeBadge: React.FC<{ splitWords?: number; t: (key: any) => 
 export const MobileStatsBar: React.FC<StatusBarProps> = ({ visualStyle, isDarkMode, t }) => {
   const stats = useEditorStore(state => state.stats);
   const cleanStats = useEditorStore(state => state.cleanStats);
+  const wpm = useEditorStore(state => state.wpm);
   const isMobileLayout = useDeviceStore(s => s.isMobileLayout);
   const showMobileBottomBar = useDeviceStore(s => s.showMobileBottomBar);
 
@@ -36,11 +37,19 @@ export const MobileStatsBar: React.FC<StatusBarProps> = ({ visualStyle, isDarkMo
       "flex items-center justify-between px-4 py-2 border-b text-[10px] font-medium uppercase tracking-widest shrink-0 transition-colors",
       visualStyle === 'neon' ? "bg-slate-950 border-slate-800/80 text-slate-400" : (isDarkMode ? "bg-slate-900 border-slate-800 text-slate-500" : "bg-slate-50 border-slate-200 text-slate-600")
     )}>
-      <div className="flex gap-4 items-center">
+      <div className="flex gap-4 items-center flex-wrap">
         <span>{t('wordsLabel')}: {stats?.words || 0}</span>
         <span className="text-cyan-400">{t('cleanWordsLabel')}: {cleanStats?.words || 0}</span>
         <span>{t('charsLabel')}: {stats?.chars || 0}</span>
         <ReadingTimeBadge splitWords={300} t={t} />
+        {wpm > 0 && (
+          <span 
+            className="font-bold animate-pulse"
+            style={{ color: 'var(--accent-hex)' }}
+          >
+            WPM: {wpm}
+          </span>
+        )}
       </div>
     </div>
   );
@@ -49,6 +58,7 @@ export const MobileStatsBar: React.FC<StatusBarProps> = ({ visualStyle, isDarkMo
 export const DesktopStatsFooter: React.FC<StatusBarProps> = ({ t }) => {
   const stats = useEditorStore(state => state.stats);
   const cleanStats = useEditorStore(state => state.cleanStats);
+  const wpm = useEditorStore(state => state.wpm);
   const showMobileBottomBar = useDeviceStore(s => s.showMobileBottomBar);
 
   // When MobileBottomBar is visible in mobile portrait, footer is hidden
@@ -68,6 +78,18 @@ export const DesktopStatsFooter: React.FC<StatusBarProps> = ({ t }) => {
         <span className="text-cyan-400">{t('cleanWordsLabel')}: {cleanStats?.words || 0}</span>
         <span>{t('charsLabel')}: {stats?.chars || 0}</span>
         <ReadingTimeBadge splitWords={300} t={t} />
+        {wpm > 0 && (
+          <span 
+            className="font-bold animate-pulse flex items-center gap-1 shrink-0"
+            style={{ color: 'var(--accent-hex)' }}
+          >
+            <span 
+              className="w-1.5 h-1.5 rounded-full animate-ping"
+              style={{ backgroundColor: 'var(--accent-hex)' }}
+            />
+            WPM: {wpm}
+          </span>
+        )}
       </div>
       <div className="flex items-center gap-2 shrink-0">
         <div className="w-2 h-2 rounded-full bg-emerald-500" />

@@ -17,6 +17,25 @@ interface DocReaderContentProps {
   beautifyEnabled?: boolean;
 }
 
+function parseMarkdownContent(rawMarkdown: string): string {
+  if (!rawMarkdown) return '';
+  try {
+    const markedInstance = getMarked();
+    const parsed = markedInstance.parse(rawMarkdown);
+    const parsedHtml = typeof parsed === 'string' ? parsed : rawMarkdown;
+    let headingIdx = 0;
+    const finalHtml = parsedHtml.replace(/<h([1-6])([^>]*)>(.*?)<\/h\1>/gi, (_match, level, attrs, innerText) => {
+      const rawText = innerText.replace(/<[^>]+>/g, '').trim();
+      const slug = rawText ? rawText.toLowerCase().replace(/[^a-zа-яіїєґ0-9]/gi, '-').slice(0, 30) : '';
+      const id = `heading-${headingIdx++}-${slug}`;
+      return `<h${level}${attrs} id="${id}">${innerText}</h${level}>`;
+    });
+    return DOMPurify.sanitize(finalHtml, DOM_PURIFY_CONFIG);
+  } catch {
+    return DOMPurify.sanitize(rawMarkdown, DOM_PURIFY_CONFIG);
+  }
+}
+
 export const DocReaderContent: React.FC<DocReaderContentProps> = ({
   title,
   tags,
@@ -28,9 +47,12 @@ export const DocReaderContent: React.FC<DocReaderContentProps> = ({
   wysiwygSpacing = 1.6,
   beautifyEnabled = false
 }) => {
-  const [renderedHtml, setRenderedHtml] = useState<string>('');
+  const cacheRef = React.useRef<{ content: string; html: string }>({ 
+    content: content || '', 
+    html: content ? parseMarkdownContent(content) : '' 
+  });
+  const [renderedHtml, setRenderedHtml] = useState<string>(() => cacheRef.current.html);
   const contentContainerRef = React.useRef<HTMLDivElement | null>(null);
-  const cacheRef = React.useRef<{ content: string; html: string }>({ content: '', html: '' });
 
   useEffect(() => {
     if (!content) {
@@ -44,37 +66,9 @@ export const DocReaderContent: React.FC<DocReaderContentProps> = ({
       return;
     }
 
-    let isCancelled = false;
-    const processContent = async () => {
-      let parsedHtml: string;
-      try {
-        const markedInstance = getMarked();
-        const parsed = await markedInstance.parse(content);
-        parsedHtml = typeof parsed === 'string' ? parsed : content;
-      } catch {
-        parsedHtml = content;
-      }
-
-      // Inject deterministic IDs to headings for TOC targeting
-      let headingIdx = 0;
-      const finalHtml = parsedHtml.replace(/<h([1-6])([^>]*)>(.*?)<\/h\1>/gi, (_match, level, attrs, innerText) => {
-        const rawText = innerText.replace(/<[^>]+>/g, '').trim();
-        const slug = rawText ? rawText.toLowerCase().replace(/[^a-zа-яіїєґ0-9]/gi, '-').slice(0, 30) : '';
-        const id = `heading-${headingIdx++}-${slug}`;
-        return `<h${level}${attrs} id="${id}">${innerText}</h${level}>`;
-      });
-
-      const sanitized = DOMPurify.sanitize(finalHtml, DOM_PURIFY_CONFIG);
-      if (!isCancelled) {
-        cacheRef.current = { content, html: sanitized };
-        setRenderedHtml(sanitized);
-      }
-    };
-
-    processContent();
-    return () => {
-      isCancelled = true;
-    };
+    const html = parseMarkdownContent(content);
+    cacheRef.current = { content, html };
+    setRenderedHtml(html);
   }, [content]);
 
   // Ensure DOM heading elements have matching IDs after render (fallback synchronization)

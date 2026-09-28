@@ -16,6 +16,9 @@ interface EditorState {
   stats: { words: number; chars: number };
   cleanStats: { words: number; chars: number };
   setStats: (stats: { words: number; chars: number }, cleanStats: { words: number; chars: number }) => void;
+  
+  wpm: number;
+  setWpm: (wpm: number) => void;
 }
 
 const getInitialContent = () => {
@@ -44,7 +47,9 @@ export const useEditorStore = create<EditorState>()(
     }),
     setCursor: (cursor) => set({ cursor }),
     setSelection: (start, end) => set({ selectionStart: start, selectionEnd: end }),
-    setContent: (content) => set({ content })
+    setContent: (content) => set({ content }),
+    wpm: 0,
+    setWpm: (wpm) => set({ wpm })
   }))
 );
 

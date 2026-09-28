@@ -1,345 +1,43 @@
 /**
  * Ultra Steem Editor - Sound Presets
- * Rich procedural synthesis presets for mechanical keyboards, vintage typewriters,
- * deep thock switches, sci-fi cyber clicks, and calming droplet effects.
+ * Statically imports modularized sound presets to keep context compact and token consumption low.
  */
 
 import { SoundPreset, AudioTypingSettings } from './types';
 
+// Static imports of modularized sound presets
+import { cherryBluePreset } from './presets/cherry-blue';
+import { vintageTypewriterPreset } from './presets/vintage-typewriter';
+import { deepThockPreset } from './presets/deep-thock';
+import { cyberNeonPreset } from './presets/cyber-neon';
+import { crystalBellPreset } from './presets/crystal-bell';
+import { cathedralBellPreset } from './presets/cathedral-bell';
+import { shchedrykPreset } from './presets/shchedryk';
+import { waterDropsPreset } from './presets/water-drops';
+import { geigerCounterPreset } from './presets/geiger-counter';
+import { softMinimalPreset } from './presets/soft-minimal';
+import { forestRainPreset } from './presets/forest-rain';
+import { lofiChillPreset } from './presets/lofi-chill';
+import { spaceNebulaPreset } from './presets/space-nebula';
+import { coffeeShopPreset } from './presets/coffee-shop';
+import { bambooZenPreset } from './presets/bamboo-zen';
+
 export const BUILTIN_PRESETS: SoundPreset[] = [
-  {
-    id: 'cherry-blue',
-    name: 'Mechanical Cherry Blue',
-    description: 'Чіткий механічний подвійний клік із пластиковим тактильним пелюстком та швидким відгуком.',
-    author: 'Ultra Steem Team',
-    version: '1.0.0',
-    tags: ['mechanical', 'clicky', 'crisp'],
-    isBuiltin: true,
-    oscillator: {
-      type: 'triangle',
-      baseFreq: 260,
-      freqDecay: 0.02,
-      pitchVariance: 45,
-      subOsc: {
-        type: 'sine',
-        freqRatio: 0.5,
-        gain: 0.25
-      }
-    },
-    noise: {
-      type: 'pink',
-      gain: 0.22,
-      durationMs: 22,
-      playbackRate: 1.2
-    },
-    filter: {
-      type: 'bandpass',
-      baseFrequency: 1650,
-      q: 3.2,
-      freqSweep: -350
-    },
-    envelope: {
-      attack: 0.001,
-      decay: 0.038,
-      sustain: 0.0,
-      release: 0.015
-    },
-    transient: {
-      enabled: true,
-      clickFrequency: 3600,
-      clickGain: 0.45,
-      clickDurationMs: 4,
-      secondaryClickDelayMs: 6,
-      secondaryClickGain: 0.22
-    },
-    specialKeys: {
-      space: { pitchMultiplier: 0.68, gainMultiplier: 1.25, decayMultiplier: 1.4, noiseGainMultiplier: 1.5 },
-      enter: { pitchMultiplier: 0.85, gainMultiplier: 1.2, decayMultiplier: 1.3 },
-      backspace: { pitchMultiplier: 1.15, gainMultiplier: 0.9, decayMultiplier: 0.75 },
-      delete: { pitchMultiplier: 1.2, gainMultiplier: 0.85, decayMultiplier: 0.7 },
-      tab: { pitchMultiplier: 0.75, gainMultiplier: 1.1 },
-      modifier: { pitchMultiplier: 0.9, gainMultiplier: 0.7, decayMultiplier: 0.6 }
-    }
-  },
-  {
-    id: 'vintage-typewriter',
-    name: 'Vintage Typewriter',
-    description: 'Автентичний механічний удар літерного важеля об валик та папір друкарської машинки, без металевого дзвону пластин, з класичним дзвоником на Enter.',
-    author: 'Ultra Steem Team',
-    version: '1.2.0',
-    tags: ['vintage', 'retro', 'typewriter', 'mechanical', 'paper'],
-    isBuiltin: true,
-    oscillator: {
-      type: 'triangle',
-      baseFreq: 220,
-      freqDecay: 0.025,
-      pitchVariance: 35,
-      subOsc: {
-        type: 'sine',
-        freqRatio: 0.5,
-        gain: 0.25
-      }
-    },
-    noise: {
-      type: 'pink',
-      gain: 0.30,
-      durationMs: 26,
-      playbackRate: 1.05
-    },
-    filter: {
-      type: 'bandpass',
-      baseFrequency: 1150,
-      q: 1.8,
-      freqSweep: -280
-    },
-    envelope: {
-      attack: 0.001,
-      decay: 0.042,
-      sustain: 0.0,
-      release: 0.015
-    },
-    transient: {
-      enabled: true,
-      clickFrequency: 2400,
-      clickGain: 0.42,
-      clickDurationMs: 3.5
-    },
-    specialKeys: {
-      space: { pitchMultiplier: 0.68, gainMultiplier: 1.25, noiseGainMultiplier: 1.4, decayMultiplier: 1.3 },
-      enter: { pitchMultiplier: 1.1, gainMultiplier: 1.2, extraBell: true },
-      backspace: { pitchMultiplier: 0.95, gainMultiplier: 1.05 },
-      delete: { pitchMultiplier: 0.95, gainMultiplier: 1.0 },
-      modifier: { pitchMultiplier: 0.92, gainMultiplier: 0.6 }
-    }
-  },
-  {
-    id: 'deep-thock',
-    name: 'Lubed Linear (Deep Thock)',
-    description: 'Глибокий, оксамитовий та приглушений звук змащених лінійних світчів без різких високих частот.',
-    author: 'Ultra Steem Team',
-    version: '1.0.0',
-    tags: ['thock', 'smooth', 'linear', 'quiet'],
-    isBuiltin: true,
-    oscillator: {
-      type: 'sine',
-      baseFreq: 155,
-      freqDecay: 0.025,
-      pitchVariance: 30,
-      subOsc: {
-        type: 'triangle',
-        freqRatio: 0.5,
-        gain: 0.4
-      }
-    },
-    noise: {
-      type: 'brown',
-      gain: 0.18,
-      durationMs: 25,
-      playbackRate: 0.8
-    },
-    filter: {
-      type: 'lowpass',
-      baseFrequency: 750,
-      q: 1.6
-    },
-    envelope: {
-      attack: 0.002,
-      decay: 0.045,
-      sustain: 0.0,
-      release: 0.02
-    },
-    transient: {
-      enabled: true,
-      clickFrequency: 1200,
-      clickGain: 0.2,
-      clickDurationMs: 3
-    },
-    specialKeys: {
-      space: { pitchMultiplier: 0.72, gainMultiplier: 1.35, decayMultiplier: 1.4 },
-      enter: { pitchMultiplier: 0.85, gainMultiplier: 1.15 },
-      backspace: { pitchMultiplier: 1.1, gainMultiplier: 0.9 }
-    }
-  },
-  {
-    id: 'cyber-neon',
-    name: 'Cyber Neon Synth',
-    description: 'Футуристичний електронний кібер-імпульс із дзвінким лазерним піпом. Ідеально пасує до Neon теми.',
-    author: 'Ultra Steem Team',
-    version: '1.2.0',
-    tags: ['sci-fi', 'neon', 'electronic', 'synth', 'cyberpunk'],
-    isBuiltin: true,
-    oscillator: {
-      type: 'sawtooth',
-      baseFreq: 780,
-      freqDecay: 0.022,
-      pitchVariance: 60
-    },
-    filter: {
-      type: 'bandpass',
-      baseFrequency: 2800,
-      q: 3.5,
-      freqSweep: -800
-    },
-    envelope: {
-      attack: 0.001,
-      decay: 0.028,
-      sustain: 0.0,
-      release: 0.012
-    },
-    transient: {
-      enabled: true,
-      clickFrequency: 5200,
-      clickGain: 0.38,
-      clickDurationMs: 2.5
-    },
-    specialKeys: {
-      space: { pitchMultiplier: 0.65, gainMultiplier: 1.25 },
-      enter: { pitchMultiplier: 1.45, gainMultiplier: 1.2 },
-      backspace: { pitchMultiplier: 0.85, decayMultiplier: 0.7 }
-    }
-  },
-  {
-    id: 'crystal-bell',
-    name: 'Crystal Bell (Кришталеві дзвіночки)',
-    description: 'Мелодійні сонячні кришталеві дзвіночки на базі фізичного моделювання з мажорними обертонами. Світле, відкрите та очищувальне звучання без металевого брязкоту.',
-    author: 'Ultra Steem Team',
-    version: '1.3.0',
-    tags: ['bell', 'crystal', 'melody', 'zen', 'joyful', 'celestial'],
-    isBuiltin: true,
-    synthesisMode: 'bell',
-    tuningScale: 'pentatonic',
-    oscillator: {
-      type: 'sine',
-      baseFreq: 523.25,
-      pitchVariance: 0
-    },
-    envelope: {
-      attack: 0.003,
-      decay: 1.7,
-      sustain: 0.0,
-      release: 0.2
-    }
-  },
-  {
-    id: 'cathedral-bell',
-    name: 'Cathedral Bronze Bells (Соборні гармонійні дзвони)',
-    description: 'Автентичні благородні бронзові дзвони у плавному, злитному гармонійному ряду (G4–G5) без різких стрибків регістру. Глибокий унтертон (Hum Tone), тепла терція та величний триголосний передзвін на Enter.',
-    author: 'Ultra Steem Team',
-    version: '1.0.0',
-    tags: ['bell', 'cathedral', 'temple', 'bronze', 'sacred', 'harmony', 'peace'],
-    isBuiltin: true,
-    synthesisMode: 'cathedral-bell',
-    oscillator: {
-      type: 'sine',
-      baseFreq: 440.0,
-      pitchVariance: 0
-    },
-    envelope: {
-      attack: 0.003,
-      decay: 2.0,
-      sustain: 0.0,
-      release: 0.3
-    }
-  },
-  {
-    id: 'shchedryk',
-    name: 'Shchedryk / Carol of the Bells (Щедрик / Дзвоники Леонтовича)',
-    description: 'Святковий стилізований передзвін за мотивами всесвітньо відомого «Щедрика» Миколи Леонтовича. Кожна клавіша вплітається в улюблені мотиви, а Enter дарує розкішний святковий каскад срібних дзвоників.',
-    author: 'Ultra Steem Team',
-    version: '1.0.0',
-    tags: ['bell', 'shchedryk', 'carol', 'christmas', 'festive', 'ukrainian', 'celebration'],
-    isBuiltin: true,
-    synthesisMode: 'shchedryk',
-    oscillator: {
-      type: 'sine',
-      baseFreq: 493.88,
-      pitchVariance: 0
-    },
-    envelope: {
-      attack: 0.0025,
-      decay: 1.8,
-      sustain: 0.0,
-      release: 0.25
-    }
-  },
-  {
-    id: 'water-drops',
-    name: 'Water Drops (Краплі води / Bubbles)',
-    description: 'Автентичний звук падіння крапель води та бульбашок зі стрімким зльотом частоти вгору (Pitch Slide Up). Заспокоює та освіжає ритм письма.',
-    author: 'Ultra Steem Team',
-    version: '1.2.0',
-    tags: ['water', 'drops', 'bubbles', 'nature', 'calm'],
-    isBuiltin: true,
-    synthesisMode: 'bubbles',
-    oscillator: {
-      type: 'sine',
-      baseFreq: 640,
-      pitchVariance: 200
-    },
-    envelope: {
-      attack: 0.003,
-      decay: 0.06,
-      sustain: 0.0,
-      release: 0.01
-    }
-  },
-  {
-    id: 'geiger-counter',
-    name: 'Geiger Counter / S.T.A.L.K.E.R. (Дозиметр)',
-    description: 'Автентичний гострий п’єзо-тріск лічильника Гейгера (S.T.A.L.K.E.R.-style) зі стохастичними іонізаційними спалахами та аномалійним потрійним мікро-імпульсом на Enter.',
-    author: 'Ultra Steem Team',
-    version: '1.3.0',
-    tags: ['geiger', 'electric', 'radiation', 'click', 'sharp', 'stalker', 'dosimeter'],
-    isBuiltin: true,
-    synthesisMode: 'geiger',
-    oscillator: {
-      type: 'triangle',
-      baseFreq: 4200,
-      pitchVariance: 400
-    },
-    envelope: {
-      attack: 0.0001,
-      decay: 0.0024,
-      sustain: 0.0,
-      release: 0.001
-    }
-  },
-  {
-    id: 'soft-minimal',
-    name: 'Soft Chiclet (Minimal)',
-    description: 'Ледь чутний дискретний клік ультратонких клавіатур ноутбуків. Для любителів максимальної стриманості.',
-    author: 'Ultra Steem Team',
-    version: '1.0.0',
-    tags: ['minimal', 'office', 'chiclet', 'discrete'],
-    isBuiltin: true,
-    oscillator: {
-      type: 'triangle',
-      baseFreq: 340,
-      freqDecay: 0.015,
-      pitchVariance: 25
-    },
-    noise: {
-      type: 'white',
-      gain: 0.12,
-      durationMs: 15,
-      playbackRate: 1.4
-    },
-    filter: {
-      type: 'bandpass',
-      baseFrequency: 2200,
-      q: 2.0
-    },
-    envelope: {
-      attack: 0.001,
-      decay: 0.022,
-      sustain: 0.0,
-      release: 0.01
-    },
-    specialKeys: {
-      space: { pitchMultiplier: 0.8, gainMultiplier: 1.15 },
-      enter: { pitchMultiplier: 0.9, gainMultiplier: 1.1 }
-    }
-  }
+  cherryBluePreset,
+  vintageTypewriterPreset,
+  deepThockPreset,
+  cyberNeonPreset,
+  crystalBellPreset,
+  cathedralBellPreset,
+  shchedrykPreset,
+  waterDropsPreset,
+  geigerCounterPreset,
+  softMinimalPreset,
+  forestRainPreset,
+  lofiChillPreset,
+  spaceNebulaPreset,
+  coffeeShopPreset,
+  bambooZenPreset
 ];
 
 export const DEFAULT_PRESET_ID = 'cherry-blue';
@@ -348,7 +46,7 @@ export const DEFAULT_AUDIO_SETTINGS: AudioTypingSettings = {
   enabled: false,
   activePresetId: DEFAULT_PRESET_ID,
   volume: 0.5,
-  favoritePresetIds: ['cherry-blue', 'crystal-bell', 'water-drops', 'deep-thock'],
+  favoritePresetIds: ['cherry-blue', 'crystal-bell', 'water-drops', 'deep-thock', 'lofi-chill', 'coffee-shop'],
   customPresets: [],
   playOnVirtualKeys: true
 };

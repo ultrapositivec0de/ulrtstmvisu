@@ -6,6 +6,13 @@ export interface ChangelogEntry {
 
 export const APP_CHANGELOG: ChangelogEntry[] = [
   {
+    version: "v4.8.6",
+    date: "2026-09-28",
+    changes: [
+      "Оптимізація режиму читання (Doc Reader): повна ізоляція від фонової реактивності, синхронний зліпковий рендеринг, усунення стрибків скролу та інтелектуальна адаптація звуку під швидкість набору (WPM)."
+    ]
+  },
+  {
     version: "v4.8.5",
     date: "2026-09-14",
     changes: [

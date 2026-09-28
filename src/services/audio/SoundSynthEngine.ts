@@ -3,6 +3,8 @@
  * High-performance procedural synthesizer using Web Audio API.
  * Supports specialized acoustic models (FM Crystal Bells, Organic Water Drops, Geiger Counter)
  * from reference physical synthesis alongside customizable mechanical switch presets.
+ * Supports pre-rendering and caching of common key sounds into AudioBuffers via OfflineAudioContext
+ * for perfect mobile and native-app port performance.
  */
 
 import { audioContextManager, xorshift32 } from './AudioContextManager';
@@ -18,11 +20,73 @@ import {
   KeySoundModifier,
   KeySoundTriggerOptions
 } from './types';
-
-export const PENTATONIC_SCALE = CARILLON_BELL_SCALE;
+import { useEditorStore } from '../../store';
 
 export class SoundSynthEngine {
   private static instance: SoundSynthEngine | null = null;
+
+  // Cache of pre-rendered buffers: presetId -> (keyChar -> AudioBuffer)
+  private preRenderedCache: Map<string, Map<string, AudioBuffer>> = new Map();
+  private isPreRendering: boolean = false;
+
+  private keystrokeTimestamps: number[] = [];
+  private wpmDecayInterval: any = null;
+
+  private constructor() {
+    if (typeof window !== 'undefined') {
+      this.startWpmDecayer();
+    }
+  }
+
+  private startWpmDecayer(): void {
+    if (this.wpmDecayInterval) return;
+    this.wpmDecayInterval = setInterval(() => {
+      this.updateWpm();
+    }, 300);
+  }
+
+  // Record a keystroke and update active WPM
+  public recordKeystroke(): void {
+    const now = performance.now();
+    this.keystrokeTimestamps.push(now);
+    this.updateWpm();
+  }
+
+  // Get current speed factor to scale decay times
+  public getTypingSpeedFactor(): number {
+    const wpm = this.getCurrentWpm();
+    if (wpm <= 40) return 1.0;
+    if (wpm >= 160) return 0.28; // scale decay down to 28% for ultra fast typing
+    // linear interpolation between 40 WPM and 160 WPM
+    const ratio = (wpm - 40) / (160 - 40);
+    return 1.0 - ratio * (1.0 - 0.28);
+  }
+
+  private updateWpm(): void {
+    const now = performance.now();
+    const windowMs = 4000; // 4 second sliding window
+    this.keystrokeTimestamps = this.keystrokeTimestamps.filter(t => t > now - windowMs);
+    
+    // Formula: WPM = (Keystrokes / 5) * (60000 / windowMs)
+    // For 4 seconds window: WPM = Keystrokes * 3
+    const calculatedWpm = Math.round((this.keystrokeTimestamps.length / 5) * (60000 / windowMs));
+    
+    try {
+      const state = useEditorStore.getState();
+      if (state && state.setWpm && state.wpm !== calculatedWpm) {
+        state.setWpm(calculatedWpm);
+      }
+    } catch (e) {
+      // safe fallback
+    }
+  }
+
+  public getCurrentWpm(): number {
+    const now = performance.now();
+    const windowMs = 4000;
+    const active = this.keystrokeTimestamps.filter(t => t > now - windowMs);
+    return Math.round((active.length / 5) * (60000 / windowMs));
+  }
 
   public static getInstance(): SoundSynthEngine {
     if (!SoundSynthEngine.instance) {
@@ -32,7 +96,215 @@ export class SoundSynthEngine {
   }
 
   /**
-   * Main entry point to play key sound
+   * Clears the pre-rendered audio buffer cache
+   */
+  public clearCache(): void {
+    this.preRenderedCache.clear();
+  }
+
+  /**
+   * Pre-renders all common key sounds for the specified preset using OfflineAudioContext.
+   * Runs as a staggered background task to avoid any possibility of UI thread stutter.
+   */
+  public async preRenderPresetSounds(preset: SoundPreset): Promise<void> {
+    if (this.isPreRendering) return;
+    this.isPreRendering = true;
+
+    const ctx = await audioContextManager.getContext();
+    if (!ctx) {
+      this.isPreRendering = false;
+      return;
+    }
+
+    const presetId = preset.id;
+    // If this preset is already cached, we are fully warmed up
+    if (this.preRenderedCache.has(presetId)) {
+      this.isPreRendering = false;
+      return;
+    }
+
+    const keyCache = new Map<string, AudioBuffer>();
+    this.preRenderedCache.set(presetId, keyCache);
+
+    // High-frequency keys, common letters (Latin & Ukrainian), digits, space, enter, and punctuation marks
+    const keysToRender = [
+      ' ', 'Enter', 'Backspace',
+      // Latin letters
+      'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l', 'm', 'n', 'o', 'p', 'q', 'r', 's', 't', 'u', 'v', 'w', 'x', 'y', 'z',
+      // Ukrainian Cyrillic letters
+      'а', 'б', 'в', 'г', 'ґ', 'д', 'е', 'є', 'ж', 'з', 'и', 'і', 'ї', 'й', 'к', 'л', 'м', 'н', 'о', 'п', 'р', 'с', 'т', 'у', 'ф', 'х', 'ц', 'ч', 'ш', 'щ', 'ь', 'ю', 'я',
+      // Digits & Punctuation
+      '0', '1', '2', '3', '4', '5', '6', '7', '8', '9',
+      ',', '.', '!', '?', '\'', '’'
+    ];
+
+    // Stagger rendering in micro-batches to allow UI thread to process events smoothly
+    const batchSize = 10;
+    for (let i = 0; i < keysToRender.length; i += batchSize) {
+      const batch = keysToRender.slice(i, i + batchSize);
+      await Promise.all(
+        batch.map(async (key) => {
+          try {
+            const buffer = await this.renderSingleKeySound(preset, key, ctx);
+            if (buffer) {
+              keyCache.set(key, buffer);
+            }
+          } catch (err) {
+            console.warn(`[SoundSynthEngine] Error pre-rendering key '${key}':`, err);
+          }
+        })
+      );
+      // Brief breathing room for browser scheduler
+      await new Promise((resolve) => setTimeout(resolve, 4));
+    }
+
+    this.isPreRendering = false;
+    console.log(`[SoundSynthEngine] Successfully pre-rendered ${keyCache.size} sounds for preset: ${preset.name}`);
+  }
+
+  /**
+   * Resolves the deterministic key modifiers and pitch offsets for a given key, matching KeyHashDispatcher
+   */
+  private resolveKeyParams(preset: SoundPreset, key: string): { pitchOffsetHz: number; modifier?: KeySoundModifier } {
+    const code = key === ' ' ? 'Space' : '';
+    let category: string = 'other';
+    let specialKeyId: string | undefined;
+
+    if (key === ' ') {
+      category = 'space';
+      specialKeyId = 'space';
+    } else if (key === 'Enter') {
+      category = 'enter';
+      specialKeyId = 'enter';
+    } else if (key === 'Backspace') {
+      category = 'backspace';
+      specialKeyId = 'backspace';
+    } else if (key === 'Delete') {
+      category = 'delete';
+      specialKeyId = 'delete';
+    } else if (/^[0-9]$/.test(key)) {
+      category = 'number';
+      specialKeyId = 'numbers';
+    } else if (/[.,!?;:()[\]{}'"/\\@#$%^&*_\-+=<>~`]/.test(key)) {
+      category = 'punctuation';
+      specialKeyId = 'punctuation';
+    }
+
+    let modifier: KeySoundModifier | undefined;
+    if (specialKeyId && preset.specialKeys && preset.specialKeys[specialKeyId]) {
+      modifier = preset.specialKeys[specialKeyId];
+    } else if (category === 'backspace') {
+      modifier = { slideDown: true, decayMultiplier: 1.15, gainMultiplier: 0.85 };
+    } else if (category === 'enter') {
+      modifier = { extraBell: true, gainMultiplier: 1.15 };
+    }
+
+    let pitchOffsetHz: number;
+    const mode = preset.synthesisMode || (
+      preset.id === 'crystal-bell' ? 'bell' :
+      preset.id === 'cathedral-bell' ? 'cathedral-bell' :
+      preset.id === 'shchedryk' ? 'shchedryk' :
+      preset.id === 'water-drops' ? 'bubbles' :
+      preset.id === 'geiger-counter' ? 'geiger' : 'mechanical'
+    );
+
+    if (mode === 'cathedral-bell') {
+      const uniqueIdx = getUniqueKeyIndex(key, code);
+      const targetFreq = CATHEDRAL_BELL_SCALE[uniqueIdx % CATHEDRAL_BELL_SCALE.length];
+      pitchOffsetHz = targetFreq - (preset.oscillator?.baseFreq ?? 440.0);
+    } else if (mode === 'shchedryk') {
+      const uniqueIdx = getUniqueKeyIndex(key, code);
+      const targetFreq = SHCHEDRYK_BELL_SCALE[uniqueIdx % SHCHEDRYK_BELL_SCALE.length];
+      pitchOffsetHz = targetFreq - (preset.oscillator?.baseFreq ?? 493.88);
+    } else if (preset.tuningScale === 'pentatonic' || mode === 'bell') {
+      const uniqueIdx = getUniqueKeyIndex(key, code);
+      const targetFreq = CARILLON_BELL_SCALE[uniqueIdx % CARILLON_BELL_SCALE.length];
+      pitchOffsetHz = targetFreq - (preset.oscillator?.baseFreq ?? 523.25);
+    } else {
+      const maxVarianceHz = preset.oscillator?.pitchVariance ?? 45;
+      const uniqueIdx = getUniqueKeyIndex(key, code);
+      const normalized = (uniqueIdx / (54 - 1)) * 2 - 1; // range [-1.0 .. 1.0]
+      pitchOffsetHz = Math.round(normalized * maxVarianceHz * 10) / 10;
+
+      if (key.length === 1 && key !== key.toLowerCase()) {
+        pitchOffsetHz += 4.5;
+      }
+    }
+
+    return { pitchOffsetHz, modifier };
+  }
+
+  /**
+   * Renders a single key sound offline into an AudioBuffer
+   */
+  private async renderSingleKeySound(
+    preset: SoundPreset,
+    key: string,
+    liveCtx: AudioContext
+  ): Promise<AudioBuffer | null> {
+    try {
+      const mode = preset.synthesisMode || (
+        preset.id === 'crystal-bell' ? 'bell' :
+        preset.id === 'cathedral-bell' ? 'cathedral-bell' :
+        preset.id === 'shchedryk' ? 'shchedryk' :
+        preset.id === 'water-drops' ? 'bubbles' :
+        preset.id === 'geiger-counter' ? 'geiger' : 'mechanical'
+      );
+
+      let durationSec = 0.25;
+      if (mode === 'bell' || mode === 'cathedral-bell' || mode === 'shchedryk') {
+        durationSec = 2.0; // Captures beautiful long tails of bells
+      } else if (mode === 'bubbles') {
+        durationSec = 0.12;
+      } else if (mode === 'geiger') {
+        durationSec = 0.03;
+      } else {
+        // Mechanical presets
+        const { modifier } = this.resolveKeyParams(preset, key);
+        const decayMult = modifier?.decayMultiplier ?? 1.0;
+        const attack = preset.envelope.attack ?? 0.002;
+        const decay = preset.envelope.decay ?? 0.04;
+        const release = preset.envelope.release ?? 0.015;
+        durationSec = attack + (decay * decayMult) + release + 0.08;
+        if (modifier?.extraBell) {
+          durationSec = Math.max(durationSec, 0.35);
+        }
+      }
+
+      const sampleRate = liveCtx.sampleRate;
+      const renderCtx = new OfflineAudioContext(1, Math.floor(sampleRate * durationSec), sampleRate);
+
+      const filterNode = renderCtx.createBiquadFilter();
+      const gainNode = renderCtx.createGain();
+
+      filterNode.connect(gainNode);
+      gainNode.connect(renderCtx.destination);
+
+      const { pitchOffsetHz, modifier } = this.resolveKeyParams(preset, key);
+
+      this.synthesizePresetSound(
+        renderCtx,
+        gainNode,
+        filterNode,
+        preset,
+        mode,
+        key,
+        { key, code: key === ' ' ? 'Space' : '' },
+        pitchOffsetHz,
+        modifier,
+        0.002, // ultra tight lookahead for transients
+        () => {} // offline nodes do not need registration/manual disconnects
+      );
+
+      return await renderCtx.startRendering();
+    } catch (err) {
+      console.warn(`[SoundSynthEngine] Failed offline render for key '${key}':`, err);
+      return null;
+    }
+  }
+
+  /**
+   * Main entry point to play a key sound
    */
   public async playKeySound(
     preset: SoundPreset,
@@ -44,7 +316,23 @@ export class SoundSynthEngine {
     const masterGain = audioContextManager.getMasterGain();
     if (!ctx || !masterGain) return;
 
-    // Detect specialized synthesis mode
+    // Trigger pre-rendering of current preset in background if not already started/done
+    this.preRenderPresetSounds(preset).catch(() => {});
+
+    const rawKey = options.key || 'a';
+    const normalizedKey = rawKey.length === 1 ? rawKey.toLowerCase() : rawKey;
+
+    // Query pre-rendered buffer cache
+    const presetCache = this.preRenderedCache.get(preset.id);
+    const cachedBuffer = presetCache ? presetCache.get(normalizedKey) : null;
+
+    if (cachedBuffer) {
+      // 1. HIGH-PERFORMANCE PRE-RENDERED BUFFER PLAYBACK (Ultra low latency, perfect for Android/Mobile Web)
+      this.playPreRenderedBuffer(ctx, masterGain, cachedBuffer, preset, options, modifier);
+      return;
+    }
+
+    // 2. REAL-TIME PROCEDURAL FALLBACK (For rare characters or initial keystrokes prior to render completion)
     const mode = preset.synthesisMode || (
       preset.id === 'crystal-bell' ? 'bell' :
       preset.id === 'cathedral-bell' ? 'cathedral-bell' :
@@ -54,123 +342,346 @@ export class SoundSynthEngine {
     );
 
     try {
-      if (mode === 'bell') {
-        this.playBellSound(ctx, masterGain, options, modifier);
-        return;
+      let totalDuration = 0.25;
+      if (mode === 'bell' || mode === 'cathedral-bell' || mode === 'shchedryk') {
+        totalDuration = 2.1;
+      } else if (mode === 'bubbles') {
+        totalDuration = 0.12;
+      } else if (mode === 'geiger') {
+        totalDuration = 0.03;
+      } else {
+        const decayMult = modifier?.decayMultiplier ?? 1.0;
+        totalDuration = (preset.envelope.attack ?? 0.002) + ((preset.envelope.decay ?? 0.04) * decayMult) + (preset.envelope.release ?? 0.015) + 0.1;
       }
 
-      if (mode === 'cathedral-bell') {
-        this.playCathedralBellSound(ctx, masterGain, options, modifier);
-        return;
-      }
+      const voice = voicePool.acquireVoice(ctx, masterGain, totalDuration + 0.05);
 
-      if (mode === 'shchedryk') {
-        this.playShchedrykSound(ctx, masterGain, options, modifier);
-        return;
-      }
+      // Introduce dynamic humanization jitter for real-time playback
+      const creativePresetIds = [
+        'crystal-bell', 'cathedral-bell', 'shchedryk', 'water-drops',
+        'bamboo-zen', 'space-nebula', 'forest-rain', 'lofi-chill', 'coffee-shop'
+      ];
+      const isCreative = creativePresetIds.includes(preset.id);
+      const pitchJitterRange = isCreative ? 0.022 : 0.012;
+      const volumeJitterRange = isCreative ? 0.09 : 0.05;
+      
+      const randomPitchFactor = 1.0 + (Math.random() * 2 - 1) * pitchJitterRange;
+      const randomVolumeFactor = 1.0 + (Math.random() * 2 - 1) * volumeJitterRange;
+      
+      // Calculate a randomized pitch offset for real-time play
+      const livePitchOffsetHz = pitchOffsetHz + (randomPitchFactor - 1.0) * (preset.oscillator?.baseFreq ?? 220);
+      
+      // Merge volume jitter into the modifier
+      const liveModifier: KeySoundModifier = {
+        ...modifier,
+        gainMultiplier: (modifier?.gainMultiplier ?? 1.0) * randomVolumeFactor
+      };
 
-      if (mode === 'bubbles') {
-        this.playBubblesSound(ctx, masterGain, options, modifier);
-        return;
-      }
-
-      if (mode === 'geiger') {
-        this.playGeigerSound(ctx, masterGain, options, modifier);
-        return;
-      }
-
-      // Default: mechanical / tactile switch synthesis
-      this.playMechanicalSound(ctx, masterGain, preset, options, pitchOffsetHz, modifier);
+      this.synthesizePresetSound(
+        ctx,
+        voice.gainNode,
+        voice.filterNode,
+        preset,
+        mode,
+        rawKey,
+        options,
+        livePitchOffsetHz,
+        liveModifier,
+        voice.startTime,
+        (node) => voice.registerNode(node)
+      );
     } catch (err) {
-      console.warn('[SoundSynthEngine] Error synthesizing sound:', err);
+      console.warn('[SoundSynthEngine] Error during real-time synthesis fallback:', err);
     }
   }
 
   /**
-   * Pure physical modeling of crystalline bells with multi-partial harmonics,
-   * 1-to-1 collision-free unique carillon tuning for every letter/symbol, and zero repeat clashing.
+   * Plays a pre-rendered AudioBuffer cleanly through the voice pool with dynamic humanization
    */
-  private playBellSound(
+  private playPreRenderedBuffer(
     ctx: AudioContext,
     masterGain: GainNode,
+    buffer: AudioBuffer,
+    preset: SoundPreset,
     options: KeySoundTriggerOptions,
     modifier?: KeySoundModifier
   ): void {
-    const now = ctx.currentTime;
-    const rawKey = options.key || 'a';
-    const rawCode = options.code || '';
+    const speedFactor = this.getTypingSpeedFactor();
+    const duration = buffer.duration;
+    const playDuration = duration * speedFactor;
 
-    // 1. Backspace / Delete: Joyful rising celestial chime interval (E5 -> A5)
-    if (rawKey === 'Backspace' || rawKey === 'Delete' || rawCode === 'Backspace' || rawCode === 'Delete') {
-      this.playBellTone(ctx, masterGain, 659.25, 0.36, 1.4, now);
-      this.playBellTone(ctx, masterGain, 880.00, 0.38, 1.6, now + 0.04);
-      return;
+    // Acquire a voice to automatically support active voice capping (voice stealing) & master soft clipping
+    const voice = voicePool.acquireVoice(ctx, masterGain, playDuration + 0.02);
+    const startTime = voice.startTime;
+
+    const source = ctx.createBufferSource();
+    source.buffer = buffer;
+
+    const voiceGain = voice.gainNode;
+    const voiceFilter = voice.filterNode;
+
+    // Dynamic anti-mud low frequency shelving highpass EQ during rapid typing
+    if (speedFactor < 0.95) {
+      const cutoff = 60 + (1.0 - speedFactor) * (220 - 60) / (1.0 - 0.28);
+      voiceFilter.type = 'highpass';
+      voiceFilter.frequency.setValueAtTime(cutoff, startTime);
+      voiceFilter.Q.setValueAtTime(0.7, startTime);
+    } else {
+      voiceFilter.type = 'allpass';
     }
 
-    // 2. Enter: Magnificent radiant multi-tone celestial chord (C5 + E5 + G5 + C6)
-    if (rawKey === 'Enter' || rawCode === 'Enter') {
-      this.playBellTone(ctx, masterGain, 523.25, 0.34, 2.2, now);
-      this.playBellTone(ctx, masterGain, 659.25, 0.30, 2.3, now + 0.035);
-      this.playBellTone(ctx, masterGain, 783.99, 0.28, 2.4, now + 0.07);
-      this.playBellTone(ctx, masterGain, 1046.50, 0.26, 2.6, now + 0.105);
-      return;
+    // Introduce dynamic humanization jitter (micro-pitch and micro-volume offsets)
+    // to prevent static/repetitive "machine-gun" effect and make typing sound incredibly organic.
+    const creativePresetIds = [
+      'crystal-bell', 'cathedral-bell', 'shchedryk', 'water-drops',
+      'bamboo-zen', 'space-nebula', 'forest-rain', 'lofi-chill', 'coffee-shop'
+    ];
+    const isCreative = creativePresetIds.includes(preset.id);
+    
+    // For creative/melodic sounds, a slightly larger pitch jitter makes them feel richer and more shimmering.
+    // For mechanical switches, a subtle pitch jitter of ~1.2% keeps them realistic and perfectly mechanical.
+    const pitchJitterRange = isCreative ? 0.022 : 0.012; 
+    const volumeJitterRange = isCreative ? 0.09 : 0.05;
+    
+    const randomPitchFactor = 1.0 + (Math.random() * 2 - 1) * pitchJitterRange;
+    const randomVolumeFactor = 1.0 + (Math.random() * 2 - 1) * volumeJitterRange;
+    
+    // Apply pitch jitter to playback rate
+    source.playbackRate.setValueAtTime(randomPitchFactor, startTime);
+
+    let volume = 1.0;
+    if (modifier?.gainMultiplier) {
+      volume *= modifier.gainMultiplier;
     }
-
-    // 3. Spacebar: Warm, soothing singing quartz bell tone (C5 / 523.25 Hz)
-    if (rawKey === ' ' || rawCode === 'Space') {
-      this.playBellTone(ctx, masterGain, 523.25, 0.40, 2.0, now);
-      return;
-    }
-
-    // 4. Regular Keys: Collision-free 1-to-1 unique joyful carillon bell mapping
-    const uniqueIndex = getUniqueKeyIndex(rawKey, rawCode);
-    const freq = CARILLON_BELL_SCALE[uniqueIndex % CARILLON_BELL_SCALE.length];
-
-    // Dynamic volume scaling across octaves: gentle high-end roll-off to prevent ear fatigue and polyphony overload
-    const baseVol = 0.40 - (uniqueIndex / CARILLON_BELL_SCALE.length) * 0.08;
-    let vol = baseVol * (modifier?.gainMultiplier ?? 1.0);
-    let decayTime = freq < 450 ? 2.0 : (freq > 1000 ? 1.4 : 1.7);
-
-    // On continuous key-holding (repeat strokes), tighten decay to create a clean rhythmic chime without sound buildup
     if (options.isRepeat) {
-      vol *= 0.75;
-      decayTime = Math.min(decayTime * 0.45, 0.6);
+      volume *= 0.72; // Tighten volume slightly on key-holding repeat strokes
     }
 
-    this.playBellTone(ctx, masterGain, freq, vol, decayTime, now);
+    // Apply volume humanization
+    volume *= randomVolumeFactor;
+
+    // Mild high-speed volume compression/attenuation to prevent rapid sound buildup fatigue
+    if (speedFactor < 1.0) {
+      const volAtten = 1.0 - (1.0 - speedFactor) * 0.35;
+      volume *= volAtten;
+    }
+
+    const releaseTime = Math.min(0.015, playDuration * 0.15);
+    const attackTime = Math.min(0.002, playDuration * 0.05);
+
+    voiceGain.gain.setValueAtTime(0.0001, startTime);
+    voiceGain.gain.linearRampToValueAtTime(volume, startTime + attackTime); // crisp click-free fade-in
+    voiceGain.gain.setValueAtTime(volume, startTime + playDuration - releaseTime);
+    voiceGain.gain.exponentialRampToValueAtTime(0.0001, startTime + playDuration); // smooth release to avoid pop
+
+    source.connect(voiceFilter);
+    voice.registerNode(source);
+
+    source.start(startTime);
+    source.stop(startTime + playDuration);
   }
 
   /**
-   * Synthesizes a single high-purity crystal bell tone using pure 2-operator FM synthesis (Carrier + Modulator).
-   * Zero node-overload, zero DC clicks, and singing natural harmonic decay.
+   * Universal procedural synthesizer. Dispatches the synthesis to the chosen acoustic model.
+   * Works on any BaseAudioContext (meaning both real-time AudioContext and OfflineAudioContext).
    */
-  private playBellTone(
-    ctx: AudioContext,
-    masterGain: GainNode,
+  private synthesizePresetSound(
+    ctx: BaseAudioContext,
+    targetGainNode: GainNode,
+    targetFilterNode: BiquadFilterNode,
+    preset: SoundPreset,
+    mode: string,
+    key: string,
+    options: KeySoundTriggerOptions,
+    pitchOffsetHz: number,
+    modifier: KeySoundModifier | undefined,
+    startTime: number,
+    registerNode: (node: AudioNode) => void
+  ): void {
+    const rawCode = options.code || '';
+    const speedFactor = this.getTypingSpeedFactor();
+
+    if (mode === 'bell') {
+      if (key === 'Backspace' || key === 'Delete') {
+        this.synthesizeBellTone(ctx, targetGainNode, targetFilterNode, 659.25, 0.36, 1.4 * speedFactor, startTime, registerNode);
+        this.synthesizeBellTone(ctx, targetGainNode, targetFilterNode, 880.00, 0.38, 1.6 * speedFactor, startTime + 0.04 * speedFactor, registerNode);
+        return;
+      }
+      if (key === 'Enter') {
+        this.synthesizeBellTone(ctx, targetGainNode, targetFilterNode, 523.25, 0.34, 2.2 * speedFactor, startTime, registerNode);
+        this.synthesizeBellTone(ctx, targetGainNode, targetFilterNode, 659.25, 0.30, 2.3 * speedFactor, startTime + 0.035 * speedFactor, registerNode);
+        this.synthesizeBellTone(ctx, targetGainNode, targetFilterNode, 783.99, 0.28, 2.4 * speedFactor, startTime + 0.07 * speedFactor, registerNode);
+        this.synthesizeBellTone(ctx, targetGainNode, targetFilterNode, 1046.50, 0.26, 2.6 * speedFactor, startTime + 0.105 * speedFactor, registerNode);
+        return;
+      }
+      if (key === ' ' || rawCode === 'Space') {
+        this.synthesizeBellTone(ctx, targetGainNode, targetFilterNode, 523.25, 0.40, 2.0 * speedFactor, startTime, registerNode);
+        return;
+      }
+
+      const uniqueIndex = getUniqueKeyIndex(key, rawCode);
+      const freq = CARILLON_BELL_SCALE[uniqueIndex % CARILLON_BELL_SCALE.length];
+      const baseVol = 0.40 - (uniqueIndex / CARILLON_BELL_SCALE.length) * 0.08;
+      let vol = baseVol * (modifier?.gainMultiplier ?? 1.0);
+      let decayTime = freq < 450 ? 2.0 : (freq > 1000 ? 1.4 : 1.7);
+      decayTime *= speedFactor;
+
+      if (options.isRepeat) {
+        vol *= 0.75;
+        decayTime = Math.min(decayTime * 0.45, 0.6);
+      }
+
+      this.synthesizeBellTone(ctx, targetGainNode, targetFilterNode, freq, vol, decayTime, startTime, registerNode);
+      return;
+    }
+
+    if (mode === 'cathedral-bell') {
+      if (key === 'Enter') {
+        this.synthesizeCathedralBellTone(ctx, targetGainNode, targetFilterNode, 349.23, 0.36, 2.6 * speedFactor, startTime, registerNode);
+        this.synthesizeCathedralBellTone(ctx, targetGainNode, targetFilterNode, 523.25, 0.30, 2.8 * speedFactor, startTime + 0.04 * speedFactor, registerNode);
+        this.synthesizeCathedralBellTone(ctx, targetGainNode, targetFilterNode, 698.46, 0.26, 3.0 * speedFactor, startTime + 0.08 * speedFactor, registerNode);
+        return;
+      }
+      if (key === ' ' || rawCode === 'Space') {
+        this.synthesizeCathedralBellTone(ctx, targetGainNode, targetFilterNode, 293.66, 0.42, 2.4 * speedFactor, startTime, registerNode);
+        return;
+      }
+      if (key === 'Backspace' || key === 'Delete') {
+        this.synthesizeCathedralBellTone(ctx, targetGainNode, targetFilterNode, 440.00, 0.35, 1.6 * speedFactor, startTime, registerNode);
+        this.synthesizeCathedralBellTone(ctx, targetGainNode, targetFilterNode, 349.23, 0.38, 1.8 * speedFactor, startTime + 0.05 * speedFactor, registerNode);
+        return;
+      }
+
+      const uniqueIndex = getUniqueKeyIndex(key, rawCode);
+      const freq = CATHEDRAL_BELL_SCALE[uniqueIndex % CATHEDRAL_BELL_SCALE.length];
+      let vol = 0.38 * (modifier?.gainMultiplier ?? 1.0);
+      let decayTime = freq < 500 ? 2.2 : (freq > 650 ? 1.7 : 1.9);
+      decayTime *= speedFactor;
+
+      if (options.isRepeat) {
+        vol *= 0.75;
+        decayTime = Math.min(decayTime * 0.45, 0.6);
+      }
+
+      this.synthesizeCathedralBellTone(ctx, targetGainNode, targetFilterNode, freq, vol, decayTime, startTime, registerNode);
+      return;
+    }
+
+    if (mode === 'shchedryk') {
+      if (key === 'Enter') {
+        this.synthesizeShchedrykChime(ctx, targetGainNode, targetFilterNode, 493.88, 0.34, 2.2 * speedFactor, startTime, registerNode);
+        this.synthesizeShchedrykChime(ctx, targetGainNode, targetFilterNode, 587.33, 0.30, 2.3 * speedFactor, startTime + 0.04 * speedFactor, registerNode);
+        this.synthesizeShchedrykChime(ctx, targetGainNode, targetFilterNode, 739.99, 0.28, 2.4 * speedFactor, startTime + 0.08 * speedFactor, registerNode);
+        this.synthesizeShchedrykChime(ctx, targetGainNode, targetFilterNode, 987.77, 0.26, 2.6 * speedFactor, startTime + 0.12 * speedFactor, registerNode);
+        this.synthesizeShchedrykChime(ctx, targetGainNode, targetFilterNode, 587.33, 0.22, 1.2 * speedFactor, startTime + 0.18 * speedFactor, registerNode);
+        this.synthesizeShchedrykChime(ctx, targetGainNode, targetFilterNode, 523.25, 0.22, 1.2 * speedFactor, startTime + 0.24 * speedFactor, registerNode);
+        this.synthesizeShchedrykChime(ctx, targetGainNode, targetFilterNode, 493.88, 0.24, 1.4 * speedFactor, startTime + 0.30 * speedFactor, registerNode);
+        this.synthesizeShchedrykChime(ctx, targetGainNode, targetFilterNode, 523.25, 0.24, 1.6 * speedFactor, startTime + 0.36 * speedFactor, registerNode);
+        return;
+      }
+      if (key === ' ' || rawCode === 'Space') {
+        this.synthesizeShchedrykChime(ctx, targetGainNode, targetFilterNode, 329.63, 0.40, 2.0 * speedFactor, startTime, registerNode);
+        return;
+      }
+      if (key === 'Backspace' || key === 'Delete') {
+        this.synthesizeShchedrykChime(ctx, targetGainNode, targetFilterNode, 415.30, 0.36, 1.4 * speedFactor, startTime, registerNode);
+        this.synthesizeShchedrykChime(ctx, targetGainNode, targetFilterNode, 440.00, 0.38, 1.6 * speedFactor, startTime + 0.04 * speedFactor, registerNode);
+        return;
+      }
+
+      const uniqueIndex = getUniqueKeyIndex(key, rawCode);
+      const freq = SHCHEDRYK_BELL_SCALE[uniqueIndex % SHCHEDRYK_BELL_SCALE.length];
+      let vol = 0.38 * (modifier?.gainMultiplier ?? 1.0);
+      let decayTime = freq < 500 ? 1.8 : (freq > 800 ? 1.3 : 1.5);
+      decayTime *= speedFactor;
+
+      if (options.isRepeat) {
+        vol *= 0.75;
+        decayTime = Math.min(decayTime * 0.45, 0.6);
+      }
+
+      this.synthesizeShchedrykChime(ctx, targetGainNode, targetFilterNode, freq, vol, decayTime, startTime, registerNode);
+      return;
+    }
+
+    if (mode === 'bubbles') {
+      if (key === 'Backspace' || key === 'Delete') {
+        this.synthesizeSingleBubbleDrop(ctx, targetGainNode, targetFilterNode, 640, 360, 0.48, startTime, registerNode);
+        return;
+      }
+      if (key === 'Enter') {
+        this.synthesizeSingleBubbleDrop(ctx, targetGainNode, targetFilterNode, 520, 920, 0.45, startTime, registerNode);
+        this.synthesizeSingleBubbleDrop(ctx, targetGainNode, targetFilterNode, 680, 1180, 0.38, startTime + 0.04, registerNode);
+        return;
+      }
+      if (key === ' ' || rawCode === 'Space') {
+        this.synthesizeSingleBubbleDrop(ctx, targetGainNode, targetFilterNode, 480, 840, 0.52, startTime, registerNode);
+        return;
+      }
+
+      const uniqueIndex = getUniqueKeyIndex(key, rawCode);
+      const baseFreq = 480 + (uniqueIndex % CARILLON_BELL_SCALE.length) * 14;
+      const targetFreq = baseFreq * 1.72;
+      const vol = 0.50 * (modifier?.gainMultiplier ?? 1.0);
+
+      this.synthesizeSingleBubbleDrop(ctx, targetGainNode, targetFilterNode, baseFreq, targetFreq, vol, startTime, registerNode);
+      return;
+    }
+
+    if (mode === 'geiger') {
+      const gainMult = modifier?.gainMultiplier ?? 1.0;
+      if (key === 'Enter') {
+        this.synthesizeSingleGeigerTick(ctx, targetGainNode, targetFilterNode, 0.68 * gainMult, startTime, registerNode);
+        this.synthesizeSingleGeigerTick(ctx, targetGainNode, targetFilterNode, 0.55 * gainMult, startTime + 0.007, registerNode);
+        this.synthesizeSingleGeigerTick(ctx, targetGainNode, targetFilterNode, 0.48 * gainMult, startTime + 0.016, registerNode);
+        return;
+      }
+      if (key === ' ' || rawCode === 'Space') {
+        this.synthesizeSingleGeigerTick(ctx, targetGainNode, targetFilterNode, 0.72 * gainMult, startTime, registerNode);
+        return;
+      }
+
+      const primaryVol = 0.65 * gainMult;
+      this.synthesizeSingleGeigerTick(ctx, targetGainNode, targetFilterNode, primaryVol, startTime, registerNode);
+
+      const charCode = key.length > 0 ? key.charCodeAt(0) : 65;
+      const isDoublet = ((charCode * 17 + Math.floor(startTime * 100)) % 100) < 28;
+      if (isDoublet) {
+        const doubletDelay = 0.005 + (xorshift32() * 0.007);
+        this.synthesizeSingleGeigerTick(ctx, targetGainNode, targetFilterNode, primaryVol * 0.58, startTime + doubletDelay, registerNode);
+      }
+      return;
+    }
+
+    // Default mechanical keyboard modeling
+    this.synthesizeMechanicalSound(ctx, targetGainNode, targetFilterNode, preset, options, pitchOffsetHz, modifier, startTime, registerNode);
+  }
+
+  /**
+   * FM Crystal Bell Synth core logic
+   */
+  private synthesizeBellTone(
+    ctx: BaseAudioContext,
+    voiceGain: GainNode,
+    filter: BiquadFilterNode,
     freq: number,
     vol: number,
     decayTime: number,
-    _startTime: number
+    startTime: number,
+    registerNode: (node: AudioNode) => void
   ): void {
-    const voice = voicePool.acquireVoice(ctx, masterGain, decayTime + 0.1, _startTime);
-    const startTime = voice.startTime;
-
-    const filter = voice.filterNode;
     filter.type = 'lowpass';
     filter.frequency.setValueAtTime(12000, startTime);
 
-    // 1. FM Carrier
     const osc = ctx.createOscillator();
     osc.type = 'sine';
     osc.frequency.setValueAtTime(freq, startTime);
 
-    // 2. FM Modulator (1.5x inharmonic tierce/quint bell overtone)
     const mod = ctx.createOscillator();
     const modGain = ctx.createGain();
     mod.type = 'sine';
     mod.frequency.setValueAtTime(freq * 1.5, startTime);
 
-    // Dynamic FM modulation index: smooth, non-clicky metallic strike that relaxes into a pure crystal body
     modGain.gain.setValueAtTime(0.0001, startTime);
     modGain.gain.linearRampToValueAtTime(freq * 0.22, startTime + 0.005);
     modGain.gain.exponentialRampToValueAtTime(0.0001, startTime + decayTime * 0.45);
@@ -178,16 +689,14 @@ export class SoundSynthEngine {
     mod.connect(modGain);
     modGain.connect(osc.frequency);
 
-    // 3. Voice Master Gain: Smooth 8ms attack to eliminate clicks/pops
-    const voiceGain = voice.gainNode;
     voiceGain.gain.setValueAtTime(0.0001, startTime);
     voiceGain.gain.linearRampToValueAtTime(vol * 0.65, startTime + 0.008);
     voiceGain.gain.exponentialRampToValueAtTime(0.0001, startTime + decayTime);
 
     osc.connect(filter);
-    voice.registerNode(osc);
-    voice.registerNode(mod);
-    voice.registerNode(modGain);
+    registerNode(osc);
+    registerNode(mod);
+    registerNode(modGain);
 
     osc.start(startTime);
     mod.start(startTime);
@@ -196,80 +705,25 @@ export class SoundSynthEngine {
   }
 
   /**
-   * Authentic Cathedral Bronze Bells (Гармонійні соборні дзвони)
-   * Smooth, cohesive register without abrupt octave jumps; rich bronze acoustics
-   * with deep Hum Tone (0.5x), Strike Prime (1.0x), Warm Tierce (1.25x), Quint (1.5x), and Nominal (2.0x).
+   * Cathedral Bell Synth core logic
    */
-  private playCathedralBellSound(
-    ctx: AudioContext,
-    masterGain: GainNode,
-    options: KeySoundTriggerOptions,
-    modifier?: KeySoundModifier
-  ): void {
-    const now = ctx.currentTime;
-    const rawKey = options.key || 'a';
-    const rawCode = options.code || '';
-
-    // 1. Enter: Majestic triple cathedral bell peal (F4 + C5 + F5) with rich singing tail
-    if (rawKey === 'Enter' || rawCode === 'Enter') {
-      this.playCathedralBellTone(ctx, masterGain, 349.23, 0.36, 2.6, now);
-      this.playCathedralBellTone(ctx, masterGain, 523.25, 0.30, 2.8, now + 0.04);
-      this.playCathedralBellTone(ctx, masterGain, 698.46, 0.26, 3.0, now + 0.08);
-      return;
-    }
-
-    // 2. Spacebar: Grand foundation bronze bass bell (D4 / 293.66 Hz)
-    if (rawKey === ' ' || rawCode === 'Space') {
-      this.playCathedralBellTone(ctx, masterGain, 293.66, 0.42, 2.4, now);
-      return;
-    }
-
-    // 3. Backspace / Delete: Soothing cathedral soft clapper tone (A4 -> F4)
-    if (rawKey === 'Backspace' || rawKey === 'Delete' || rawCode === 'Backspace' || rawCode === 'Delete') {
-      this.playCathedralBellTone(ctx, masterGain, 440.00, 0.35, 1.6, now);
-      this.playCathedralBellTone(ctx, masterGain, 349.23, 0.38, 1.8, now + 0.05);
-      return;
-    }
-
-    // 4. Regular Keys: Smooth, tight 1-octave harmonic range (392 Hz .. 783 Hz)
-    const uniqueIndex = getUniqueKeyIndex(rawKey, rawCode);
-    const freq = CATHEDRAL_BELL_SCALE[uniqueIndex % CATHEDRAL_BELL_SCALE.length];
-
-    let vol = 0.38 * (modifier?.gainMultiplier ?? 1.0);
-    let decayTime = freq < 500 ? 2.2 : (freq > 650 ? 1.7 : 1.9);
-
-    if (options.isRepeat) {
-      vol *= 0.75;
-      decayTime = Math.min(decayTime * 0.45, 0.6);
-    }
-
-    this.playCathedralBellTone(ctx, masterGain, freq, vol, decayTime, now);
-  }
-
-  /**
-   * Synthesizes noble bronze cathedral bell acoustics using pure FM synthesis (Carrier + Inharmonic Modulator + Warm Hum).
-   */
-  private playCathedralBellTone(
-    ctx: AudioContext,
-    masterGain: GainNode,
+  private synthesizeCathedralBellTone(
+    ctx: BaseAudioContext,
+    voiceGain: GainNode,
+    filter: BiquadFilterNode,
     freq: number,
     vol: number,
     decayTime: number,
-    _startTime: number
+    startTime: number,
+    registerNode: (node: AudioNode) => void
   ): void {
-    const voice = voicePool.acquireVoice(ctx, masterGain, decayTime + 0.1, _startTime);
-    const startTime = voice.startTime;
-
-    const filter = voice.filterNode;
     filter.type = 'lowpass';
     filter.frequency.setValueAtTime(10000, startTime);
 
-    // 1. FM Carrier (Bronze strike prime)
     const osc = ctx.createOscillator();
     osc.type = 'sine';
     osc.frequency.setValueAtTime(freq, startTime);
 
-    // 2. Bronze Inharmonic Modulator (2.756x bronze bell ratio)
     const mod = ctx.createOscillator();
     const modGain = ctx.createGain();
     mod.type = 'sine';
@@ -281,7 +735,6 @@ export class SoundSynthEngine {
     mod.connect(modGain);
     modGain.connect(osc.frequency);
 
-    // 3. Gentle warm undertone cushion (0.5x)
     const humOsc = ctx.createOscillator();
     const humGain = ctx.createGain();
     humOsc.type = 'sine';
@@ -293,18 +746,16 @@ export class SoundSynthEngine {
     humOsc.connect(humGain);
     humGain.connect(filter);
 
-    // 4. Voice Master Gain: Smooth 8ms attack to eliminate clicks/pops
-    const voiceGain = voice.gainNode;
     voiceGain.gain.setValueAtTime(0.0001, startTime);
     voiceGain.gain.linearRampToValueAtTime(vol * 0.70, startTime + 0.008);
     voiceGain.gain.exponentialRampToValueAtTime(0.0001, startTime + decayTime);
 
     osc.connect(filter);
-    voice.registerNode(osc);
-    voice.registerNode(mod);
-    voice.registerNode(modGain);
-    voice.registerNode(humOsc);
-    voice.registerNode(humGain);
+    registerNode(osc);
+    registerNode(mod);
+    registerNode(modGain);
+    registerNode(humOsc);
+    registerNode(humGain);
 
     osc.start(startTime);
     mod.start(startTime);
@@ -316,86 +767,25 @@ export class SoundSynthEngine {
   }
 
   /**
-   * Shchedryk / Carol of the Bells (Щедрик / Carol of the Bells)
-   * Festive Ukrainian handbell & orchestra chime acoustic physical model,
-   * stepping through Leontovych's iconic motifs and harmonies.
+   * Leontovych Shchedryk Bell core logic
    */
-  private playShchedrykSound(
-    ctx: AudioContext,
-    masterGain: GainNode,
-    options: KeySoundTriggerOptions,
-    modifier?: KeySoundModifier
-  ): void {
-    const now = ctx.currentTime;
-    const rawKey = options.key || 'a';
-    const rawCode = options.code || '';
-
-    // 1. Enter: Celebratory full Shchedryk festive chime cascade (B4 -> D5 -> F#5 -> B5 + handbell flourish)
-    if (rawKey === 'Enter' || rawCode === 'Enter') {
-      this.playShchedrykChime(ctx, masterGain, 493.88, 0.34, 2.2, now); // B4
-      this.playShchedrykChime(ctx, masterGain, 587.33, 0.30, 2.3, now + 0.04); // D5
-      this.playShchedrykChime(ctx, masterGain, 739.99, 0.28, 2.4, now + 0.08); // F#5
-      this.playShchedrykChime(ctx, masterGain, 987.77, 0.26, 2.6, now + 0.12); // B5 (High silver bell)
-      // Rapid celebratory handbell echo (D5 -> C5 -> B4 -> C5)
-      this.playShchedrykChime(ctx, masterGain, 587.33, 0.22, 1.2, now + 0.18);
-      this.playShchedrykChime(ctx, masterGain, 523.25, 0.22, 1.2, now + 0.24);
-      this.playShchedrykChime(ctx, masterGain, 493.88, 0.24, 1.4, now + 0.30);
-      this.playShchedrykChime(ctx, masterGain, 523.25, 0.24, 1.6, now + 0.36);
-      return;
-    }
-
-    // 2. Spacebar: Warm, deep festive chime tonic base (E4 / 329.63 Hz)
-    if (rawKey === ' ' || rawCode === 'Space') {
-      this.playShchedrykChime(ctx, masterGain, 329.63, 0.40, 2.0, now);
-      return;
-    }
-
-    // 3. Backspace / Delete: Playful counter-phrase echo (G#4 -> A4)
-    if (rawKey === 'Backspace' || rawKey === 'Delete' || rawCode === 'Backspace' || rawCode === 'Delete') {
-      this.playShchedrykChime(ctx, masterGain, 415.30, 0.36, 1.4, now);
-      this.playShchedrykChime(ctx, masterGain, 440.00, 0.38, 1.6, now + 0.04);
-      return;
-    }
-
-    // 4. Regular Keys: Stepping through Shchedryk modal ostinato variations
-    const uniqueIndex = getUniqueKeyIndex(rawKey, rawCode);
-    const freq = SHCHEDRYK_BELL_SCALE[uniqueIndex % SHCHEDRYK_BELL_SCALE.length];
-
-    let vol = 0.38 * (modifier?.gainMultiplier ?? 1.0);
-    let decayTime = freq < 500 ? 1.8 : (freq > 800 ? 1.3 : 1.5);
-
-    if (options.isRepeat) {
-      vol *= 0.75;
-      decayTime = Math.min(decayTime * 0.45, 0.6);
-    }
-
-    this.playShchedrykChime(ctx, masterGain, freq, vol, decayTime, now);
-  }
-
-  /**
-   * Synthesizes a festive silver handbell chime using FM synthesis (2.0x silver octave harmonic).
-   */
-  private playShchedrykChime(
-    ctx: AudioContext,
-    masterGain: GainNode,
+  private synthesizeShchedrykChime(
+    ctx: BaseAudioContext,
+    voiceGain: GainNode,
+    filter: BiquadFilterNode,
     freq: number,
     vol: number,
     decayTime: number,
-    _startTime: number
+    startTime: number,
+    registerNode: (node: AudioNode) => void
   ): void {
-    const voice = voicePool.acquireVoice(ctx, masterGain, decayTime + 0.1, _startTime);
-    const startTime = voice.startTime;
-
-    const filter = voice.filterNode;
     filter.type = 'lowpass';
     filter.frequency.setValueAtTime(11500, startTime);
 
-    // 1. FM Carrier
     const osc = ctx.createOscillator();
     osc.type = 'sine';
     osc.frequency.setValueAtTime(freq, startTime);
 
-    // 2. Silver Handbell FM Modulator (2.0x pure octave chime)
     const mod = ctx.createOscillator();
     const modGain = ctx.createGain();
     mod.type = 'sine';
@@ -407,16 +797,14 @@ export class SoundSynthEngine {
     mod.connect(modGain);
     modGain.connect(osc.frequency);
 
-    // 3. Voice Master Gain: Smooth 8ms attack to eliminate clicks/pops
-    const voiceGain = voice.gainNode;
     voiceGain.gain.setValueAtTime(0.0001, startTime);
     voiceGain.gain.linearRampToValueAtTime(vol * 0.75, startTime + 0.008);
     voiceGain.gain.exponentialRampToValueAtTime(0.0001, startTime + decayTime);
 
     osc.connect(filter);
-    voice.registerNode(osc);
-    voice.registerNode(mod);
-    voice.registerNode(modGain);
+    registerNode(osc);
+    registerNode(mod);
+    registerNode(modGain);
 
     osc.start(startTime);
     mod.start(startTime);
@@ -425,62 +813,18 @@ export class SoundSynthEngine {
   }
 
   /**
-   * Organic soft water bubble drops with smooth pitch sweep,
-   * warm lowpass filtering, and click-free envelopes.
+   * Water Droplet bubble organic synth core logic
    */
-  private playBubblesSound(
-    ctx: AudioContext,
-    masterGain: GainNode,
-    options: KeySoundTriggerOptions,
-    modifier?: KeySoundModifier
-  ): void {
-    const now = ctx.currentTime;
-    const rawKey = options.key || 'a';
-    const rawCode = options.code || '';
-
-    // Backspace: soft downward water droplet
-    if (rawKey === 'Backspace' || rawKey === 'Delete' || rawCode === 'Backspace' || rawCode === 'Delete') {
-      this.playSingleBubbleDrop(ctx, masterGain, 640, 360, 0.48, now);
-      return;
-    }
-
-    // Enter: dual ripple water droplets
-    if (rawKey === 'Enter' || rawCode === 'Enter') {
-      this.playSingleBubbleDrop(ctx, masterGain, 520, 920, 0.45, now);
-      this.playSingleBubbleDrop(ctx, masterGain, 680, 1180, 0.38, now + 0.04);
-      return;
-    }
-
-    // Space: deep water droplet
-    if (rawKey === ' ' || rawCode === 'Space') {
-      this.playSingleBubbleDrop(ctx, masterGain, 480, 840, 0.52, now);
-      return;
-    }
-
-    // Determine organic bubble pitch from collision-free unique key index
-    const uniqueIndex = getUniqueKeyIndex(rawKey, rawCode);
-    const baseFreq = 480 + (uniqueIndex % CARILLON_BELL_SCALE.length) * 14;
-    const targetFreq = baseFreq * 1.72;
-    const vol = 0.50 * (modifier?.gainMultiplier ?? 1.0);
-
-    this.playSingleBubbleDrop(ctx, masterGain, baseFreq, targetFreq, vol, now);
-  }
-
-  /**
-   * Synthesizes a single organic water droplet
-   */
-  private playSingleBubbleDrop(
-    ctx: AudioContext,
-    masterGain: GainNode,
+  private synthesizeSingleBubbleDrop(
+    ctx: BaseAudioContext,
+    voiceGain: GainNode,
+    filter: BiquadFilterNode,
     startFreq: number,
     endFreq: number,
     vol: number,
-    _startTime: number
+    startTime: number,
+    registerNode: (node: AudioNode) => void
   ): void {
-    const voice = voicePool.acquireVoice(ctx, masterGain, 0.08, _startTime);
-    const startTime = voice.startTime;
-
-    const filter = voice.filterNode;
     filter.type = 'lowpass';
     filter.frequency.setValueAtTime(3200, startTime);
     filter.Q.setValueAtTime(0.8, startTime);
@@ -491,196 +835,80 @@ export class SoundSynthEngine {
     osc.frequency.exponentialRampToValueAtTime(endFreq, startTime + 0.038);
     osc.frequency.exponentialRampToValueAtTime(endFreq * 0.95, startTime + 0.055);
 
-    const voiceGain = voice.gainNode;
     voiceGain.gain.setValueAtTime(0.0001, startTime);
     voiceGain.gain.linearRampToValueAtTime(vol, startTime + 0.003);
     voiceGain.gain.exponentialRampToValueAtTime(0.0001, startTime + 0.060);
 
     osc.connect(filter);
-    voice.registerNode(osc);
+    registerNode(osc);
 
     osc.start(startTime);
     osc.stop(startTime + 0.070);
   }
 
   /**
-   * Authentic S.T.A.L.K.E.R.-style Geiger-Müller radiation counter dosimeter clicks.
-   * Features sharp piezoelectric sounder pings, electrostatic ionization sparks,
-   * stochastic particle doublets, and highpass isolation (zero plastic/polymer box thumping).
+   * Geiger-Müller radiation tick core logic
    */
-  private playGeigerSound(
-    ctx: AudioContext,
-    masterGain: GainNode,
-    options: KeySoundTriggerOptions,
-    modifier?: KeySoundModifier
-  ): void {
-    const now = ctx.currentTime;
-    const rawKey = options.key || 'a';
-    const rawCode = options.code || '';
-    const gainMult = modifier?.gainMultiplier ?? 1.0;
-
-    // 1. Enter: Rapid 3-particle radiation ionization burst (stepping near an anomaly)
-    if (rawKey === 'Enter' || rawCode === 'Enter') {
-      this.playSingleGeigerTick(ctx, masterGain, 0.68 * gainMult, now);
-      this.playSingleGeigerTick(ctx, masterGain, 0.55 * gainMult, now + 0.007);
-      this.playSingleGeigerTick(ctx, masterGain, 0.48 * gainMult, now + 0.016);
-      return;
-    }
-
-    // 2. Spacebar: Prominent single dosimeter tick
-    if (rawKey === ' ' || rawCode === 'Space') {
-      this.playSingleGeigerTick(ctx, masterGain, 0.72 * gainMult, now);
-      return;
-    }
-
-    // 3. Regular Keys & Backspace: Authentic stochastic ionizing particle ticks
-    const primaryVol = 0.65 * gainMult;
-    this.playSingleGeigerTick(ctx, masterGain, primaryVol, now);
-
-    // Stochastic Poisson doublet click (~28% chance of secondary micro-particle)
-    const charCode = rawKey.length > 0 ? rawKey.charCodeAt(0) : 65;
-    const isDoublet = ((charCode * 17 + Math.floor(now * 100)) % 100) < 28;
-    if (isDoublet) {
-      const doubletDelay = 0.005 + (xorshift32() * 0.007); // 5ms - 12ms secondary arrival
-      this.playSingleGeigerTick(ctx, masterGain, primaryVol * 0.58, now + doubletDelay);
-    }
-  }
-
-  /**
-   * Plays a single razor-sharp piezoelectric Geiger tick with highpass body-stripping and piezo resonance
-   */
-  private playSingleGeigerTick(
-    ctx: AudioContext,
-    masterGain: GainNode,
+  private synthesizeSingleGeigerTick(
+    ctx: BaseAudioContext,
+    voiceGain: GainNode,
+    highpass: BiquadFilterNode,
     vol: number,
-    _startTime: number
+    startTime: number,
+    registerNode: (node: AudioNode) => void
   ): void {
     const buffer = audioContextManager.getGeigerBuffer();
     if (!buffer) return;
 
-    const voice = voicePool.acquireVoice(ctx, masterGain, 0.01, _startTime);
-    const startTime = voice.startTime;
-
     const source = ctx.createBufferSource();
     source.buffer = buffer;
 
-    // Stochastic pitch variation per ionizing particle (3800Hz - 4800Hz range)
     const jitter = 0.92 + xorshift32() * 0.20;
     source.playbackRate.setValueAtTime(jitter, startTime);
 
-    // 1. Highpass filter at 2200 Hz: completely removes muddy polymer box / plastic thump frequencies
-    const highpass = voice.filterNode;
     highpass.type = 'highpass';
     highpass.frequency.setValueAtTime(2200, startTime);
     highpass.Q.setValueAtTime(0.707, startTime);
 
-    // 2. Peaking filter at 4100 Hz (Q=2.8): enhances the crisp piezoelectric sounder disc resonance ("пік/цок")
     const piezoPeak = ctx.createBiquadFilter();
     piezoPeak.type = 'peaking';
     piezoPeak.frequency.setValueAtTime(4100 + (xorshift32() * 300 - 150), startTime);
     piezoPeak.Q.setValueAtTime(2.8, startTime);
     piezoPeak.gain.setValueAtTime(3.5, startTime);
 
-    const voiceGain = voice.gainNode;
     voiceGain.gain.setValueAtTime(0.0001, startTime);
-    voiceGain.gain.linearRampToValueAtTime(vol, startTime + 0.0001); // 0.1ms instantaneous needle spike
-    voiceGain.gain.exponentialRampToValueAtTime(0.0001, startTime + 0.0024); // 2.4ms fast piezo decay
+    voiceGain.gain.linearRampToValueAtTime(vol, startTime + 0.0001);
+    voiceGain.gain.exponentialRampToValueAtTime(0.0001, startTime + 0.0024);
 
     source.connect(piezoPeak);
     piezoPeak.connect(highpass);
-    voice.registerNode(source);
-    voice.registerNode(piezoPeak);
+    registerNode(source);
+    registerNode(piezoPeak);
 
     source.start(startTime);
     source.stop(startTime + 0.003);
   }
 
   /**
-   * Intuitive downward pitch slide (280Hz -> 90Hz) representing undo / deletion for mechanical presets.
+   * Mechanical Key Synthesis core logic (Cherry MX, Lubed Thock, Typewriter, Minimal Chiclet, Neon Synth)
    */
-  private playBackspaceSound(ctx: AudioContext, masterGain: GainNode, _now: number): void {
-    const voice = voicePool.acquireVoice(ctx, masterGain, 0.12, _now);
-    const startTime = voice.startTime;
-
-    const osc = ctx.createOscillator();
-    osc.type = 'sine';
-    osc.frequency.setValueAtTime(280, startTime);
-    osc.frequency.exponentialRampToValueAtTime(90, startTime + 0.1);
-
-    const voiceGain = voice.gainNode;
-    voiceGain.gain.setValueAtTime(0.0001, startTime);
-    voiceGain.gain.linearRampToValueAtTime(0.35, startTime + 0.005);
-    voiceGain.gain.exponentialRampToValueAtTime(0.0001, startTime + 0.1);
-
-    osc.connect(voice.filterNode);
-    voice.registerNode(osc);
-
-    osc.start(startTime);
-    osc.stop(startTime + 0.11);
-  }
-
-  /**
-   * Resonant carriage bell tone (1450Hz with 1.8s decay) marking typewriter paragraph / line completion.
-   */
-  private playEnterSound(ctx: AudioContext, masterGain: GainNode, _now: number): void {
-    const voice = voicePool.acquireVoice(ctx, masterGain, 1.9, _now);
-    const startTime = voice.startTime;
-
-    const filter = voice.filterNode;
-    filter.type = 'lowpass';
-    filter.frequency.setValueAtTime(7000, startTime);
-
-    const osc = ctx.createOscillator();
-    const mod = ctx.createOscillator();
-    const modGain = ctx.createGain();
-
-    osc.type = 'sine';
-    osc.frequency.setValueAtTime(1450, startTime);
-
-    mod.type = 'sine';
-    mod.frequency.setValueAtTime(1450 * 1.5, startTime);
-    modGain.gain.setValueAtTime(1450 * 0.35, startTime);
-    modGain.gain.exponentialRampToValueAtTime(1, startTime + 0.15);
-
-    mod.connect(modGain);
-    modGain.connect(osc.frequency);
-
-    const voiceGain = voice.gainNode;
-    voiceGain.gain.setValueAtTime(0.0001, startTime);
-    voiceGain.gain.linearRampToValueAtTime(0.42, startTime + 0.005);
-    voiceGain.gain.exponentialRampToValueAtTime(0.0001, startTime + 1.8);
-
-    osc.connect(filter);
-    voice.registerNode(osc);
-    voice.registerNode(mod);
-    voice.registerNode(modGain);
-
-    osc.start(startTime);
-    mod.start(startTime);
-    osc.stop(startTime + 1.85);
-    mod.stop(startTime + 1.85);
-  }
-
-  /**
-   * Standard mechanical switch synthesizer (Cherry Blue, Typewriter, Thock, Cyber, Chiclet).
-   * Generates multi-oscillator tones, noise bursts, and click transients without dropping keystrokes.
-   */
-  private playMechanicalSound(
-    ctx: AudioContext,
-    masterGain: GainNode,
+  private synthesizeMechanicalSound(
+    ctx: BaseAudioContext,
+    voiceGain: GainNode,
+    filterNode: BiquadFilterNode,
     preset: SoundPreset,
     _options: KeySoundTriggerOptions,
     pitchOffsetHz: number,
-    modifier?: KeySoundModifier
+    modifier: KeySoundModifier | undefined,
+    startTime: number,
+    registerNode: (node: AudioNode) => void
   ): void {
-    // 1. Calculate effective parameters with modifiers
     const pitchMult = modifier?.pitchMultiplier ?? 1.0;
     const gainMult = modifier?.gainMultiplier ?? 1.0;
     const noiseGainMult = modifier?.noiseGainMultiplier ?? 1.0;
     const decayMult = modifier?.decayMultiplier ?? 1.0;
     const filterFreqMult = modifier?.filterFreqMultiplier ?? 1.0;
 
-    // Base Frequency with key-hash variance & pitch offset or fixed frequency
     const baseFreq = modifier?.fixedFreq
       ? modifier.fixedFreq
       : Math.max(
@@ -688,22 +916,15 @@ export class SoundSynthEngine {
           (preset.oscillator.baseFreq + pitchOffsetHz + (modifier?.pitchOffset ?? 0)) * pitchMult
         );
 
-    // Envelope durations
+    const speedFactor = this.getTypingSpeedFactor();
     const attack = Math.max(0.003, preset.envelope.attack);
-    const decay = Math.max(0.015, preset.envelope.decay * decayMult);
-    const totalDuration = attack + decay + (preset.envelope.release || 0.02);
+    const decay = Math.max(0.015, preset.envelope.decay * decayMult * speedFactor);
+    const totalDuration = attack + decay + ((preset.envelope.release || 0.02) * speedFactor);
 
-    const voice = voicePool.acquireVoice(ctx, masterGain, totalDuration + 0.05);
-    const startTime = voice.startTime;
-
-    // Voice master gain for this single key hit
-    const voiceGain = voice.gainNode;
     voiceGain.gain.setValueAtTime(0.0001, startTime);
-    voiceGain.gain.linearRampToValueAtTime(0.7 * gainMult, startTime + attack);
+    voiceGain.gain.linearRampToValueAtTime(0.35 * gainMult, startTime + attack);
     voiceGain.gain.exponentialRampToValueAtTime(0.0001, startTime + attack + decay);
 
-    // Filter configuration
-    const filterNode = voice.filterNode;
     if (preset.filter) {
       filterNode.type = preset.filter.type;
       const cutoff = Math.max(80, preset.filter.baseFrequency * filterFreqMult);
@@ -721,7 +942,6 @@ export class SoundSynthEngine {
       filterNode.type = 'allpass';
     }
 
-    // 2. Main Oscillator
     const osc = ctx.createOscillator();
     osc.type = preset.oscillator.type;
 
@@ -747,11 +967,9 @@ export class SoundSynthEngine {
       osc.frequency.setValueAtTime(baseFreq, startTime);
     }
 
-    // 2.1 FM Modulation (if defined in custom preset)
     if (preset.fmModulation && preset.fmModulation.depthRatio > 0 && !modifier?.slideDown) {
       const modOsc = ctx.createOscillator();
       const modGain = ctx.createGain();
-
       const modFreq = baseFreq * preset.fmModulation.freqRatio;
       const modDepth = baseFreq * preset.fmModulation.depthRatio;
 
@@ -765,8 +983,8 @@ export class SoundSynthEngine {
       modOsc.start(startTime);
       modOsc.stop(startTime + totalDuration);
 
-      voice.registerNode(modOsc);
-      voice.registerNode(modGain);
+      registerNode(modOsc);
+      registerNode(modGain);
     }
 
     if (preset.oscillator.detune) {
@@ -774,12 +992,11 @@ export class SoundSynthEngine {
     }
 
     osc.connect(filterNode);
-    voice.registerNode(osc);
+    registerNode(osc);
 
     osc.start(startTime);
     osc.stop(startTime + totalDuration);
 
-    // 3. Sub / Overtone Oscillator (if configured in preset)
     if (preset.oscillator.subOsc && preset.oscillator.subOsc.gain > 0) {
       const subOsc = ctx.createOscillator();
       subOsc.type = preset.oscillator.subOsc.type;
@@ -792,14 +1009,13 @@ export class SoundSynthEngine {
 
       subOsc.connect(subGain);
       subGain.connect(filterNode);
-      voice.registerNode(subOsc);
-      voice.registerNode(subGain);
+      registerNode(subOsc);
+      registerNode(subGain);
 
       subOsc.start(startTime);
       subOsc.stop(startTime + totalDuration);
     }
 
-    // 4. Noise Burst (mechanical friction, paper/platen strike, switch bottoming-out)
     if (preset.noise && preset.noise.gain > 0) {
       const noiseBuffer = audioContextManager.getNoiseBuffer(preset.noise.type);
       if (noiseBuffer) {
@@ -826,16 +1042,15 @@ export class SoundSynthEngine {
         noiseSource.connect(noiseFilter);
         noiseFilter.connect(noiseGain);
         noiseGain.connect(filterNode);
-        voice.registerNode(noiseSource);
-        voice.registerNode(noiseFilter);
-        voice.registerNode(noiseGain);
+        registerNode(noiseSource);
+        registerNode(noiseFilter);
+        registerNode(noiseGain);
 
         noiseSource.start(startTime);
         noiseSource.stop(startTime + noiseDurationSec + 0.01);
       }
     }
 
-    // 5. Mechanical Click Transient (smooth acoustic leaf snap)
     if (preset.transient?.enabled && (preset.transient.clickGain ?? 0) > 0) {
       const clickOsc = ctx.createOscillator();
       clickOsc.type = 'sine';
@@ -849,13 +1064,12 @@ export class SoundSynthEngine {
 
       clickOsc.connect(clickGain);
       clickGain.connect(filterNode);
-      voice.registerNode(clickOsc);
-      voice.registerNode(clickGain);
+      registerNode(clickOsc);
+      registerNode(clickGain);
 
       clickOsc.start(startTime);
       clickOsc.stop(startTime + clickDurationSec + 0.005);
 
-      // Secondary Click (Tactile leaf reset, e.g. Cherry Blue double-click)
       if (
         preset.transient.secondaryClickDelayMs &&
         preset.transient.secondaryClickDelayMs > 0 &&
@@ -874,15 +1088,14 @@ export class SoundSynthEngine {
 
         secOsc.connect(secGain);
         secGain.connect(filterNode);
-        voice.registerNode(secOsc);
-        voice.registerNode(secGain);
+        registerNode(secOsc);
+        registerNode(secGain);
 
         secOsc.start(secTime);
         secOsc.stop(secTime + clickDurationSec * 1.2 + 0.005);
       }
     }
 
-    // 6. Enter Key typewriter carriage bell simulation
     if (modifier?.extraBell) {
       const bellTime = startTime + 0.02;
       const bellOsc = ctx.createOscillator();
@@ -892,13 +1105,13 @@ export class SoundSynthEngine {
       const bellGain = ctx.createGain();
       bellGain.gain.setValueAtTime(0.0001, startTime);
       bellGain.gain.setValueAtTime(0.0001, bellTime);
-      bellGain.gain.linearRampToValueAtTime(0.28, bellTime + 0.002);
+      bellGain.gain.linearRampToValueAtTime(0.18 * gainMult, bellTime + 0.002);
       bellGain.gain.exponentialRampToValueAtTime(0.0001, bellTime + 0.22);
 
       bellOsc.connect(bellGain);
       bellGain.connect(filterNode);
-      voice.registerNode(bellOsc);
-      voice.registerNode(bellGain);
+      registerNode(bellOsc);
+      registerNode(bellGain);
 
       bellOsc.start(bellTime);
       bellOsc.stop(bellTime + 0.25);

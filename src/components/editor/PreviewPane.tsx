@@ -16,6 +16,7 @@ export interface PreviewPaneProps {
   widgetPos: string;
   lang: string;
   t: (key: any) => string;
+  editorMode?: string;
 }
 
 export const PreviewPane: React.FC<PreviewPaneProps> = ({
@@ -30,7 +31,8 @@ export const PreviewPane: React.FC<PreviewPaneProps> = ({
   toggleFullScreen,
   widgetPos,
   lang,
-  t
+  t,
+  editorMode
 }) => {
   const isMobileLayout = useDeviceStore(s => s.isMobileLayout);
 
@@ -39,9 +41,11 @@ export const PreviewPane: React.FC<PreviewPaneProps> = ({
       ref={previewRef}
       className={cn(
         "flex-1 flex flex-col min-w-0 bg-slate-900 relative",
-        isMobileLayout 
-          ? (activeMobileTab === 'preview' ? "flex" : "hidden")
-          : (isLivePreviewEnabled ? "flex" : "hidden"),
+        editorMode === 'reading' 
+          ? "hidden" 
+          : (isMobileLayout 
+              ? (activeMobileTab === 'preview' ? "flex" : "hidden")
+              : (isLivePreviewEnabled ? "flex" : "hidden")),
         isFullScreen && "bg-slate-950 p-4 lg:p-12 overflow-y-auto fixed top-0 left-0 right-0 z-[250]"
       )}
     >

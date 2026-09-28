@@ -1,4 +1,8 @@
 # Changelog
+## [2026-09-28] - Version 4.8.6 (ultrasteemeditor/4.8.6)
+### Added & Improved
+- **Release Updates**: Оптимізація режиму читання (Doc Reader): повна ізоляція від фонової реактивності, синхронний зліпковий рендеринг, усунення стрибків скролу та інтелектуальна адаптація звуку під швидкість набору (WPM).
+
 ## [2026-09-14] - Version 4.8.5 (ultrasteemeditor/4.8.5)
 ### Added & Improved
 - **Technical Syntax Protection & Caret Safety**: Prevented accidental markdown formatting injection and marker pollution inside HTML tags (`<... >`), markdown table separator rows (`| --- |`), code fences (```` ``` ````), and link URLs.
