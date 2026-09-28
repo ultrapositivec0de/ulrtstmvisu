@@ -167,6 +167,7 @@ export function useDocReader({
   const isProgrammaticScrollingRef = useRef(false);
   const programmaticScrollTimeoutRef = useRef<any>(null);
   const rafIdRef = useRef<number | null>(null);
+  const lastHeadingCheckTimeRef = useRef(0);
 
   const handleScroll = useCallback(() => {
     if (isProgrammaticScrollingRef.current) return;
@@ -179,15 +180,10 @@ export function useDocReader({
       const el = scrollContainerRef.current;
       if (!el) return;
 
-      // Calculate scroll progress percentage
-      const totalScrollable = el.scrollHeight - el.clientHeight;
-      if (totalScrollable > 0) {
-        const progress = Math.min(100, Math.max(0, Math.round((el.scrollTop / totalScrollable) * 100)));
-        setScrollProgress(prev => (prev === progress ? prev : progress));
-      }
-
-      // Find active heading in view relative to container top boundary
-      if (headings.length > 0) {
+      const now = performance.now();
+      // Only check headings at most once every 120ms to prevent layout thrashing on fast scrolls
+      if (headings.length > 0 && now - lastHeadingCheckTimeRef.current > 120) {
+        lastHeadingCheckTimeRef.current = now;
         const containerRect = el.getBoundingClientRect();
         const headingElements = headings
           .map(h => ({ id: h.id, el: el.querySelector(`[id="${h.id}"]`) as HTMLElement | null }))

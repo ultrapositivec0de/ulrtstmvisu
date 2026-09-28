@@ -17,73 +17,70 @@ interface DocReaderContentProps {
   beautifyEnabled?: boolean;
 }
 
-function parseMarkdownContent(rawMarkdown: string): string {
-  if (!rawMarkdown) return '';
-  try {
-    const markedInstance = getMarked();
-    const parsed = markedInstance.parse(rawMarkdown);
-    const parsedHtml = typeof parsed === 'string' ? parsed : rawMarkdown;
-    let headingIdx = 0;
-    const finalHtml = parsedHtml.replace(/<h([1-6])([^>]*)>(.*?)<\/h\1>/gi, (_match, level, attrs, innerText) => {
-      const rawText = innerText.replace(/<[^>]+>/g, '').trim();
-      const slug = rawText ? rawText.toLowerCase().replace(/[^a-zа-яіїєґ0-9]/gi, '-').slice(0, 30) : '';
-      const id = `heading-${headingIdx++}-${slug}`;
-      return `<h${level}${attrs} id="${id}">${innerText}</h${level}>`;
-    });
-    return DOMPurify.sanitize(finalHtml, DOM_PURIFY_CONFIG);
-  } catch {
-    return DOMPurify.sanitize(rawMarkdown, DOM_PURIFY_CONFIG);
-  }
-}
+const cacheRefGlobal = new Map<string, string>();
 
-export const DocReaderContent: React.FC<DocReaderContentProps> = ({
+export const DocReaderContent = React.memo<DocReaderContentProps>(({
   title,
   tags,
   content,
-  headings,
+  headings: _headings,
   isDarkMode = true,
   visualStyle = 'dark',
   editorFontSize = 16,
   wysiwygSpacing = 1.6,
   beautifyEnabled = false
 }) => {
-  const cacheRef = React.useRef<{ content: string; html: string }>({ 
-    content: content || '', 
-    html: content ? parseMarkdownContent(content) : '' 
+  const [renderedHtml, setRenderedHtml] = useState<string>(() => {
+    if (!content) return '';
+    return cacheRefGlobal.get(content) || '';
   });
-  const [renderedHtml, setRenderedHtml] = useState<string>(() => cacheRef.current.html);
   const contentContainerRef = React.useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
     if (!content) {
       setRenderedHtml('');
-      cacheRef.current = { content: '', html: '' };
       return;
     }
 
-    if (cacheRef.current.content === content && cacheRef.current.html) {
-      // Content has not changed, reuse cached rendered HTML to avoid re-parsing & layout jumps
+    const cached = cacheRefGlobal.get(content);
+    if (cached) {
+      setRenderedHtml(cached);
       return;
     }
 
-    const html = parseMarkdownContent(content);
-    cacheRef.current = { content, html };
-    setRenderedHtml(html);
-  }, [content]);
-
-  // Ensure DOM heading elements have matching IDs after render (fallback synchronization)
-  useEffect(() => {
-    if (!contentContainerRef.current || !renderedHtml) return;
-    const headingEls = Array.from(contentContainerRef.current.querySelectorAll('h1, h2, h3, h4, h5, h6'))
-      .filter(el => !el.closest('pre, code'));
-    
-    headingEls.forEach((el, idx) => {
-      const corresponding = headings[idx];
-      if (corresponding) {
-        el.setAttribute('id', corresponding.id);
+    let isMounted = true;
+    const processMarkdown = async () => {
+      try {
+        const markedInstance = getMarked();
+        const parsed = await markedInstance.parse(content);
+        const parsedHtml = typeof parsed === 'string' ? parsed : content;
+        let headingIdx = 0;
+        const finalHtml = parsedHtml.replace(/<h([1-6])([^>]*)>(.*?)<\/h\1>/gi, (_match, level, attrs, innerText) => {
+          const rawText = innerText.replace(/<[^>]+>/g, '').trim();
+          const slug = rawText ? rawText.toLowerCase().replace(/[^a-zа-яіїєґ0-9]/gi, '-').slice(0, 30) : '';
+          const id = `heading-${headingIdx++}-${slug}`;
+          return `<h${level}${attrs} id="${id}">${innerText}</h${level}>`;
+        });
+        const sanitized = (DOMPurify.sanitize(finalHtml, DOM_PURIFY_CONFIG as any) as unknown) as string;
+        cacheRefGlobal.set(content, sanitized);
+        if (isMounted) {
+          setRenderedHtml(sanitized);
+        }
+      } catch (err) {
+        console.warn('DocReader markdown parse error:', err);
+        if (isMounted) {
+          const fallback = (DOMPurify.sanitize(content, DOM_PURIFY_CONFIG as any) as unknown) as string;
+          cacheRefGlobal.set(content, fallback);
+          setRenderedHtml(fallback);
+        }
       }
-    });
-  }, [renderedHtml, headings]);
+    };
+
+    processMarkdown();
+    return () => {
+      isMounted = false;
+    };
+  }, [content]);
 
   // Width class based on global beautifyEnabled
   const widthClass = useMemo(() => {
@@ -163,5 +160,5 @@ export const DocReaderContent: React.FC<DocReaderContentProps> = ({
       )}
     </article>
   );
-};
+});
 
