@@ -89,7 +89,8 @@
   },
   "overrides": {
     "glob": "^13.0.6",
-    "yaeti": "npm:event-target-shim@^6.0.2"
+    "yaeti": "npm:event-target-shim@^6.0.2",
+    "postcss-selector-parser": "^7.1.6"
   },
   "allowScripts": {
     "esbuild": true,
