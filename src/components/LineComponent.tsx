@@ -1,5 +1,6 @@
 import React, { useCallback } from 'react';
 import { useEditorStore } from '../store';
+import { getTranslation } from '../locales';
 
 interface LineComponentProps {
   index: number;
@@ -10,6 +11,7 @@ export const LineComponent = React.memo(({ index }: LineComponentProps) => {
   // Це гарантує, що зміна іншого рядка не викличе перерендер цього компонента.
   const line = useEditorStore(state => state.lines[index]);
   const updateLine = useEditorStore(state => state.updateLine);
+  const currentLang = (typeof localStorage !== 'undefined' && localStorage.getItem('steem_lang')) || 'uk';
 
   const handleChange = useCallback((e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     updateLine(index, e.target.value);
@@ -25,7 +27,7 @@ export const LineComponent = React.memo(({ index }: LineComponentProps) => {
         className="flex-1 bg-transparent text-slate-300 outline-none p-1 font-mono text-sm"
         value={line || ''}
         onChange={handleChange}
-        placeholder={index === 0 ? "Введіть текст..." : ""}
+        placeholder={index === 0 ? getTranslation(currentLang, 'lineEnterTextPlaceholder') : ""}
       />
     </div>
   );

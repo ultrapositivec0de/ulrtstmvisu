@@ -221,9 +221,10 @@ export const useDeviceStore = create<DeviceStoreState>((set, get) => {
       if (document.documentElement) {
         const bottomBarHeight = showMobileBottomBar ? '4rem' : '0px';
         const bottomBarHeightNum = showMobileBottomBar ? 64 : 0;
-        // When MobileBottomBar is hidden, DesktopStatsFooter (height: 2rem / 32px) is rendered instead
-        const activeFooterHeight = showMobileBottomBar ? '4rem' : '2rem';
-        const activeFooterHeightNum = showMobileBottomBar ? 64 : 32;
+        // In mobile layout, stats are always rendered in MobileStatsBar at the top of EditorPane,
+        // while DesktopStatsFooter (height: 2rem / 32px) is only rendered in desktop layout.
+        const activeFooterHeight = isMobileLayout ? (showMobileBottomBar ? '4rem' : '0px') : '2rem';
+        const activeFooterHeightNum = isMobileLayout ? (showMobileBottomBar ? 64 : 0) : 32;
 
         document.documentElement.style.setProperty('--vv-height', `${visualH}px`);
         document.documentElement.style.setProperty('--keyboard-offset', `${effectiveKeyboardOffset}px`);

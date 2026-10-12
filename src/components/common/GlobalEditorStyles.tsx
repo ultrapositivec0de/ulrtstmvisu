@@ -17,13 +17,13 @@ export const GlobalEditorStyles: React.FC<GlobalEditorStylesProps> = React.memo(
       }
       ${visualStyle === 'neon' ? `
         .theme-neon h1, .theme-neon h2, .theme-neon h3 {
-          text-shadow: 0 0 15px rgba(var(--accent-rgb), 0.6), 0 0 5px rgba(var(--accent-rgb), 0.4) !important;
+          text-shadow: 0 0 15px rgb(var(--accent-color) / 0.6), 0 0 5px rgb(var(--accent-color) / 0.4) !important;
         }
         .theme-neon .markdown-body h1, .theme-neon .markdown-body h2, .theme-neon .markdown-body h3 {
-          border-bottom: 1px solid rgba(var(--accent-rgb), 0.3) !important;
+          border-bottom: 1px solid rgb(var(--accent-color) / 0.3) !important;
         }
         .theme-neon button.bg-cyan-600, .theme-neon button.bg-cyan-500 {
-          box-shadow: 0 0 20px rgba(var(--accent-rgb), 0.5), 0 0 10px rgba(var(--accent-rgb), 0.3) !important;
+          box-shadow: 0 0 20px rgb(var(--accent-color) / 0.5), 0 0 10px rgb(var(--accent-color) / 0.3) !important;
           text-shadow: none !important;
         }
         .theme-neon .logo-s {
@@ -36,8 +36,8 @@ export const GlobalEditorStyles: React.FC<GlobalEditorStylesProps> = React.memo(
           justify-content: center;
         }
         .theme-neon .neon-tab-glow {
-          box-shadow: 0 0 15px rgba(var(--accent-rgb), 0.4), 0 0 5px rgba(var(--accent-rgb), 0.2) !important;
-          border: 1px solid rgba(var(--accent-rgb), 0.5) !important;
+          box-shadow: 0 0 15px rgb(var(--accent-color) / 0.4), 0 0 5px rgb(var(--accent-color) / 0.2) !important;
+          border: 1px solid rgb(var(--accent-color) / 0.5) !important;
         }
         ${neonTextColored ? `
           .wysiwyg-editor, .wysiwyg-editor *, #main-editor {
@@ -57,9 +57,9 @@ export const GlobalEditorStyles: React.FC<GlobalEditorStylesProps> = React.memo(
       .to-blue-600 { --tw-gradient-to: var(--accent) !important; filter: brightness(1.1); }
       .shadow-cyan-500\\/20 { --tw-shadow-color: var(--accent) !important; }
       .shadow-cyan-900\\/20 { --tw-shadow-color: var(--accent) !important; opacity: 0.2; }
-      .bg-cyan-500\\/10 { background-color: rgba(var(--accent-rgb), 0.1) !important; }
-      .border-cyan-500\\/50 { border-color: rgba(var(--accent-rgb), 0.5) !important; }
-      .hover\\:bg-cyan-500\\/10:hover { background-color: rgba(var(--accent-rgb), 0.1) !important; }
+      .bg-cyan-500\\/10 { background-color: rgb(var(--accent-color) / 0.1) !important; }
+      .border-cyan-500\\/50 { border-color: rgb(var(--accent-color) / 0.5) !important; }
+      .hover\\:bg-cyan-500\\/10:hover { background-color: rgb(var(--accent-color) / 0.1) !important; }
       @keyframes swing {
         0%, 100% { transform: rotate(0deg); }
         20% { transform: rotate(15deg); }

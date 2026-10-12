@@ -55,7 +55,7 @@ export const AboutModal: React.FC<AboutModalProps> = ({
       <button 
         onClick={onClose}
         className="absolute top-6 right-6 p-1.5 text-[var(--text-muted)] hover:text-[var(--text-main)] hover:bg-[var(--border-color)] rounded-xl transition-colors z-10"
-        aria-label="Close"
+        aria-label={t('close')}
       >
         <X size={20} />
       </button>
@@ -73,7 +73,7 @@ export const AboutModal: React.FC<AboutModalProps> = ({
           {/* Credits Section */}
           <div className="space-y-4">
             <h3 className="text-xs font-bold text-cyan-400 uppercase tracking-widest flex items-center gap-2">
-              <Sparkles size={16} /> {t('credits') || 'Авторство та розробка'}
+              <Sparkles size={16} /> {t('credits')}
             </h3>
             
             <div className="space-y-3">
@@ -84,12 +84,12 @@ export const AboutModal: React.FC<AboutModalProps> = ({
                     <User size={14} />
                   </div>
                   <div>
-                    <span className="text-xs font-bold text-slate-200 block">{t('humanCredits') || 'Людина (Автор проєкту)'}</span>
-                    <span className="text-[9px] text-slate-500 font-medium">{t('developer') || 'Розробник'} / Архітектор</span>
+                    <span className="text-xs font-bold text-slate-200 block">{t('humanCredits')}</span>
+                    <span className="text-[9px] text-slate-500 font-medium">{t('developer')} / {t('architectRole')}</span>
                   </div>
                 </div>
                 <p className="text-[10px] text-slate-400 leading-snug">
-                  {t('humanTasks') || 'Ідея, концепція, творче спрямування, тестування, архітектурне бачення та асистування.'}
+                  {t('humanTasks')}
                 </p>
               </div>
 
@@ -100,18 +100,18 @@ export const AboutModal: React.FC<AboutModalProps> = ({
                     <Bot size={14} />
                   </div>
                   <div>
-                    <span className="text-xs font-bold text-cyan-300 block">{t('aiCredits') || 'ШІ (Gemini AI / AI Studio)'}</span>
-                    <span className="text-[9px] text-slate-500 font-medium">Технічна розробка</span>
+                    <span className="text-xs font-bold text-cyan-300 block">{t('aiCredits')}</span>
+                    <span className="text-[9px] text-slate-500 font-medium">{t('techDevRole')}</span>
                   </div>
                 </div>
                 <p className="text-[10px] text-slate-400 leading-snug">
-                  {t('aiTasks') || 'Написання коду, глибока технічна оптимізація, алгоритми та реалізація логіки.'}
+                  {t('aiTasks')}
                 </p>
               </div>
 
               <div className="p-2 bg-slate-950/40 border border-slate-800/60 rounded-xl flex items-center justify-between text-[10px] text-slate-400 px-3">
                 <span className="flex items-center gap-1.5">
-                  <Code size={12} className="text-cyan-400" /> {t('license') || 'Ліцензія'}: Apache 2.0 (Open Source)
+                  <Code size={12} className="text-cyan-400" /> {t('license')}: Apache 2.0 (Open Source)
                 </span>
                 <span className="text-slate-500 font-mono text-[9px]">© 2026</span>
               </div>
@@ -157,18 +157,18 @@ export const AboutModal: React.FC<AboutModalProps> = ({
               </h3>
               <div className="mt-2 space-y-2 max-h-48 overflow-y-auto custom-scrollbar pr-1">
                 {[
-                  { n: 'react', v: '19.0.0', d: 'Ядро інтерфейсу, реактивність та керування станом компонентів.' },
-                  { n: '@blazeapps/dsteem', v: '0.12.2', d: 'Повноцінна клієнтська інтеграція з блокчейном Steem (транзакції, підписи, апвоути).' },
-                  { n: 'motion', v: '13.1.0', d: 'Професійні та плавні анімації інтерфейсу для відмінного UX.' },
-                  { n: 'marked', v: '18.0.7', d: 'Швидкісний і безпечний парсер Markdown розмітки в чистий HTML.' },
-                  { n: 'dompurify', v: '3.4.13', d: 'Надійне очищення HTML від XSS-загроз при читанні стрічки дописів.' },
-                  { n: 'lucide-react', v: '1.31.0', d: 'Набір сучасних та лаконічних векторних іконок для UI.' },
-                  { n: 'buffer', v: '6.0.3', d: 'Поліфіл буфера для криптографічних підписів у браузерному оточенні.' },
-                  { n: 'fflate', v: '0.8.3', d: 'Ультра-швидке та легковажне стиснення й розархівування чернеток у ZIP.' },
-                  { n: 'exifreader', v: '4.38.1', d: 'Зчитування та аналіз метаданих EXIF з фотографій для параметрів зйомки.' },
-                  { n: 'idb-keyval', v: '6.2.2', d: 'Надшвидке сховище автозбереження чернеток в IndexedDB браузера.' },
-                  { n: 'idiomorph', v: '0.7.4', d: 'Інтелектуальне зіставлення (morphing) DOM для безшовної синхронізації без втрати фокусу й курсору.' },
-                  { n: 'zustand', v: '5.0.14', d: 'Легковажне керування глобальним станом застосунку.' }
+                  { n: 'react', v: '19.0.0', d: t('pkgDesc_react') },
+                  { n: '@blazeapps/dsteem', v: '0.12.2', d: t('pkgDesc_dsteem') },
+                  { n: 'motion', v: '13.1.0', d: t('pkgDesc_motion') },
+                  { n: 'marked', v: '18.0.7', d: t('pkgDesc_marked') },
+                  { n: 'dompurify', v: '3.4.13', d: t('pkgDesc_dompurify') },
+                  { n: 'lucide-react', v: '1.31.0', d: t('pkgDesc_lucide') },
+                  { n: 'buffer', v: '6.0.3', d: t('pkgDesc_buffer') },
+                  { n: 'fflate', v: '0.8.3', d: t('pkgDesc_fflate') },
+                  { n: 'exifreader', v: '4.38.1', d: t('pkgDesc_exifreader') },
+                  { n: 'idb-keyval', v: '6.2.2', d: t('pkgDesc_idb') },
+                  { n: 'idiomorph', v: '0.7.4', d: t('pkgDesc_idiomorph') },
+                  { n: 'zustand', v: '5.0.14', d: t('pkgDesc_zustand') }
                 ].map(pkg => (
                   <div key={pkg.n} className="p-2 bg-slate-950/60 border border-slate-800/80 rounded-xl flex flex-col gap-0.5">
                     <div className="flex justify-between items-center">

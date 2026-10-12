@@ -56,8 +56,8 @@ export const MentionsModal: React.FC<MentionsModalProps> = ({
         <button 
           onClick={addMention}
           disabled={!newMention.trim()}
-          className="p-2.5 bg-cyan-600 hover:bg-cyan-500 disabled:opacity-40 disabled:cursor-not-allowed text-white rounded-xl transition-all shadow-md shadow-cyan-900/20 active:scale-95 cursor-pointer shrink-0"
-          aria-label={t('add') || "Add"}
+          className="btn-primary p-2.5 shrink-0"
+          aria-label={t('add')}
         >
           <Plus size={18} />
         </button>
@@ -96,7 +96,7 @@ export const MentionsModal: React.FC<MentionsModalProps> = ({
 
         {mentions.length === 0 && (
           <p className="text-center text-xs text-[var(--text-muted)] py-4 w-full">
-            {t('noMentions') || "Немає збережених згадувань"}
+            {t('noMentions')}
           </p>
         )}
       </div>

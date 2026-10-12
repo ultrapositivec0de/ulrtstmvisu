@@ -190,7 +190,8 @@ export function getFloatingWidgetStyles({
 
   // 4. Desktop Docked Layout
   if (isEditorFullScreen || isFullScreen) {
-    style.bottom = 'calc(env(safe-area-inset-bottom, 0px) + var(--browser-bottom-inset, 0px) + 0.5rem)';
+    // Sit cleanly above the 2rem DesktopStatsFooter in fullscreen mode
+    style.bottom = 'calc(2rem + env(safe-area-inset-bottom, 0px) + var(--browser-bottom-inset, 0px) + 0.75rem)';
   }
   return style;
 }
@@ -223,6 +224,11 @@ export function getMiniGalleryBottomStyle({
       return 'calc(env(safe-area-inset-bottom, 0px) + var(--toolbar-btn-size, 3rem) + 0.35rem)';
     }
     return 'calc(var(--app-bottom-total, 0px) + var(--toolbar-btn-size, 3rem) + 0.35rem)';
+  }
+  if (isEditorFullScreen || isFullScreen) {
+    return widgetPos === 'bottom'
+      ? 'calc(2rem + var(--toolbar-btn-size, 3rem) + 1.5rem)'
+      : 'calc(2.5rem)';
   }
   return widgetPos === 'bottom' ? 'calc(4.5rem)' : undefined;
 }

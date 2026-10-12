@@ -475,16 +475,18 @@ export function useSteemGallery(config: SteemGalleryConfig) {
         });
         result += `\n\n`;
       } else if (gridLayout === 'col-img-text') {
-        selected.forEach((item) => {
+        selected.forEach((item, idx) => {
           const mdImg = getMarkdownImg(item, isLocal);
           const linkedImg = (pexelsSettings.linkEmbedded && !isLocal) ? `[${mdImg}](${item.url})` : mdImg;
-          result += `<div class="pull-left">\n\n${linkedImg}\n\n</div>\n\n${config.t('textPlaceholder')}\n\n<div class="clearfix"></div>\n\n`;
+          const caption = gridWithCaptions ? `<br/><sup>${getCaption(item, idx, isLocal, true)}</sup>` : '';
+          result += `<table style="width:100%">\n <tr>\n  <td style="width:50%; vertical-align:top; padding:6px">\n    ${linkedImg}${caption}\n  </td>\n  <td style="width:50%; vertical-align:top; padding:6px">\n    ${config.t('textPlaceholder')}\n  </td>\n </tr>\n</table>\n\n`;
         });
       } else if (gridLayout === 'col-text-img') {
-        selected.forEach((item) => {
+        selected.forEach((item, idx) => {
           const mdImg = getMarkdownImg(item, isLocal);
           const linkedImg = (pexelsSettings.linkEmbedded && !isLocal) ? `[${mdImg}](${item.url})` : mdImg;
-          result += `<div class="pull-right">\n\n${linkedImg}\n\n</div>\n\n${config.t('textPlaceholder')}\n\n<div class="clearfix"></div>\n\n`;
+          const caption = gridWithCaptions ? `<br/><sup>${getCaption(item, idx, isLocal, true)}</sup>` : '';
+          result += `<table style="width:100%">\n <tr>\n  <td style="width:50%; vertical-align:top; padding:6px">\n    ${config.t('textPlaceholder')}\n  </td>\n  <td style="width:50%; vertical-align:top; padding:6px">\n    ${linkedImg}${caption}\n  </td>\n </tr>\n</table>\n\n`;
         });
       }
     } else {
@@ -528,16 +530,18 @@ export function useSteemGallery(config: SteemGalleryConfig) {
         }
         result += `</table>\n\n`;
       } else if (gridLayout === 'col-img-text') {
-        selected.forEach((item) => {
+        selected.forEach((item, idx) => {
           const imgHtml = getHtmlImg(item, isLocal);
           const linkedImg = (pexelsSettings.linkEmbedded && !isLocal) ? `<a href="${item.url}">${imgHtml}</a>` : imgHtml;
-          result += `<div class="pull-left">${linkedImg}</div>\n${config.t('textPlaceholder')}\n<div class="clearfix"></div>\n\n`;
+          const caption = gridWithCaptions ? `<br/><sup>${getCaption(item, idx, isLocal, true)}</sup>` : '';
+          result += `<table style="width:100%">\n <tr>\n  <td style="width:50%; vertical-align:top; padding:6px">\n    ${linkedImg}${caption}\n  </td>\n  <td style="width:50%; vertical-align:top; padding:6px">\n    ${config.t('textPlaceholder')}\n  </td>\n </tr>\n</table>\n\n`;
         });
       } else if (gridLayout === 'col-text-img') {
-        selected.forEach((item) => {
+        selected.forEach((item, idx) => {
           const imgHtml = getHtmlImg(item, isLocal);
           const linkedImg = (pexelsSettings.linkEmbedded && !isLocal) ? `<a href="${item.url}">${imgHtml}</a>` : imgHtml;
-          result += `<div class="pull-right">${linkedImg}</div>\n${config.t('textPlaceholder')}\n<div class="clearfix"></div>\n\n`;
+          const caption = gridWithCaptions ? `<br/><sup>${getCaption(item, idx, isLocal, true)}</sup>` : '';
+          result += `<table style="width:100%">\n <tr>\n  <td style="width:50%; vertical-align:top; padding:6px">\n    ${config.t('textPlaceholder')}\n  </td>\n  <td style="width:50%; vertical-align:top; padding:6px">\n    ${linkedImg}${caption}\n  </td>\n </tr>\n</table>\n\n`;
         });
       }
     }
@@ -587,7 +591,7 @@ export function useSteemGallery(config: SteemGalleryConfig) {
         );
         if (!pass) return;
         try {
-          config.setPubLog({ msg: '🔑 Перевірка PIN-коду...', type: 'loading' });
+          config.setPubLog({ msg: config.t('verifyingPinMsg'), type: 'loading' });
           await SecurityService.unlock(pass);
           await config.initVault();
           unlocked = true;
@@ -646,7 +650,7 @@ export function useSteemGallery(config: SteemGalleryConfig) {
         } catch {
           errText = '';
         }
-        throw new Error((config.t('serverError') || 'Server Error: ') + response.status + (errText ? ` (${errText.substring(0, 100)})` : ''));
+        throw new Error(config.t('serverError') + ': ' + response.status + (errText ? ` (${errText.substring(0, 100)})` : ''));
       }
       
       let data: any;
@@ -728,7 +732,7 @@ export function useSteemGallery(config: SteemGalleryConfig) {
           return;
         }
         try {
-          config.setPubLog({ msg: '🔑 Перевірка PIN-коду...', type: 'loading' });
+          config.setPubLog({ msg: config.t('verifyingPinMsg'), type: 'loading' });
           await SecurityService.unlock(pass);
           await config.initVault();
           unlocked = true;
@@ -799,7 +803,7 @@ export function useSteemGallery(config: SteemGalleryConfig) {
             } catch {
               errorDetail = xhr.responseText ? xhr.responseText.substring(0, 100) : '';
             }
-            safeReject(new Error(`${config.t('serverError') || 'Server Error: '}${xhr.status}${errorDetail ? ` (${errorDetail})` : ''}`));
+            safeReject(new Error(`${config.t('serverError')}: ${xhr.status}${errorDetail ? ` (${errorDetail})` : ''}`));
           }
         };
         xhr.onerror = () => safeReject(new Error("Network connection error"));
@@ -835,7 +839,7 @@ export function useSteemGallery(config: SteemGalleryConfig) {
               attempt++;
               try {
                 config.setPubLog({ 
-                  msg: `[${i + 1}/${files.length}] ` + config.t('signingImage').replace('{name}', file.name) + (attempt > 1 ? ` (спроба ${attempt}/3)` : ''), 
+                  msg: `[${i + 1}/${files.length}] ` + config.t('signingImage').replace('{name}', file.name) + (attempt > 1 ? config.t('signingImageAttempt').replace('{attempt}', attempt.toString()) : ''), 
                   type: 'loading' 
                 });
                 signature = await SecurityService.signBuffer(dataToSign, activeUser);
@@ -861,7 +865,10 @@ export function useSteemGallery(config: SteemGalleryConfig) {
                 console.warn(`Upload attempt ${attempt} failed for ${file.name}:`, err);
                 if (attempt >= 3) throw lastErr;
                 config.setPubLog({
-                  msg: `⚠️ Спроба ${attempt} не вдалася (${err.message || 'помилка'}). Повтор через ${attempt * 1.5}с...`,
+                  msg: config.t('uploadRetryAttempt')
+                    .replace('{attempt}', attempt.toString())
+                    .replace('{error}', err.message || config.t('error'))
+                    .replace('{seconds}', (attempt * 1.5).toString()),
                   type: 'loading'
                 });
                 await new Promise(r => setTimeout(r, 1500 * attempt));
@@ -885,7 +892,7 @@ export function useSteemGallery(config: SteemGalleryConfig) {
               } catch {
                 errText = '';
               }
-              throw new Error(`${config.t('serverError') || 'Server Error: '}${resp.status}${errText ? ` (${errText.substring(0, 100)})` : ''}`);
+              throw new Error(`${config.t('serverError')}: ${resp.status}${errText ? ` (${errText.substring(0, 100)})` : ''}`);
             }
             let data: any;
             try {
@@ -912,7 +919,13 @@ export function useSteemGallery(config: SteemGalleryConfig) {
           }
         } catch (err: any) {
           console.error(`Error uploading file ${file.name}:`, err);
-          config.setPubLog({ msg: `❌ ${config.t('fileError') || 'File error'} ${i + 1}: ${file.name} - ${err.message}`, type: 'error' });
+          config.setPubLog({ 
+            msg: config.t('fileErrorWithIndex')
+              .replace('{index}', (i + 1).toString())
+              .replace('{name}', file.name)
+              .replace('{error}', err.message), 
+            type: 'error' 
+          });
           await new Promise(resolve => setTimeout(resolve, 2500));
         }
       }

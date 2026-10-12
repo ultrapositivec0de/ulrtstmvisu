@@ -120,7 +120,7 @@ export class KeyHashDispatcher {
     } else if (category === 'backspace') {
       modifier = { slideDown: true, decayMultiplier: 1.15, gainMultiplier: 0.85 };
     } else if (category === 'enter') {
-      modifier = { extraBell: true, gainMultiplier: 1.15 };
+      modifier = { gainMultiplier: 1.15 };
     }
 
     // 2. Compute 100% Collision-Free Pitch Offset

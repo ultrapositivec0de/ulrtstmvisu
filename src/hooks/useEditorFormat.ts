@@ -307,12 +307,13 @@ const insertHtmlAtCursor = useCallback((html: string) => {
         // 3. Otherwise, wrap selection in phishy tag
         const prefixNl = (before === '' || before.endsWith('\n\n')) ? '' : before.endsWith('\n') ? '\n' : '\n\n';
         const suffixNl = (after === '' || after.startsWith('\n\n')) ? '' : after.startsWith('\n') ? '\n' : '\n\n';
-        const block = `${prefixNl}<div class="phishy">\n\n${trimmed || 'Червоний текст'}\n</div>${suffixNl}`;
+        const placeholder = t('redTextPlaceholder');
+        const block = `${prefixNl}<div class="phishy">\n\n${trimmed || placeholder}\n</div>${suffixNl}`;
         const newText = before + block + after;
         useEditorStore.getState().setContent(newText);
         setActiveFormats(prev => ({ ...prev, phishy: true }));
         const newStart = start + prefixNl.length + '<div class="phishy">\n\n'.length;
-        const newEnd = newStart + (trimmed || 'Червоний текст').length;
+        const newEnd = newStart + (trimmed || placeholder).length;
         setTimeout(() => {
           if (!editorRef.current) return;
           editorRef.current.focus({ preventScroll: true });
@@ -381,7 +382,7 @@ const insertHtmlAtCursor = useCallback((html: string) => {
 
           const prefixNl = (before === '' || before.endsWith('\n\n')) ? '' : before.endsWith('\n') ? '\n' : '\n\n';
           const suffixNl = (after === '' || after.startsWith('\n\n')) ? '' : after.startsWith('\n') ? '\n' : '\n\n';
-          const placeholder = 'Червоний текст';
+          const placeholder = t('redTextPlaceholder');
           const block = `${prefixNl}<div class="phishy">\n\n${placeholder}\n</div>${suffixNl}`;
           const newText = before + block + after;
           const newStart = start + prefixNl.length + '<div class="phishy">\n\n'.length;
@@ -1055,13 +1056,26 @@ function unwrapPhishyFromRange(range: Range, wysiwyg: HTMLElement): boolean {
       if (isUrl) {
         const label = await promptDialog(t('linkPrompt'), "");
         if (label !== null) {
+          restoreVisualSelection(true);
           const cleanLabel = label.trim() || selectionHtml;
           insertHtmlAtCursor(`<a href="${selectionHtml.trim()}">${cleanLabel}</a>`);
+          updateContentFromWysiwyg();
         }
       } else {
         const url = await promptDialog(t('urlPrompt'), "https://");
-        if (url) {
-          document.execCommand('createLink', false, url);
+        if (url && url.trim()) {
+          restoreVisualSelection(true);
+          const trimmedUrl = url.trim();
+          const sel = window.getSelection();
+          const selectedText = sel && !sel.isCollapsed ? sel.toString().trim() : '';
+          
+          if (selectedText) {
+            if (!document.execCommand('createLink', false, trimmedUrl)) {
+              insertHtmlAtCursor(`<a href="${trimmedUrl}">${selectedText}</a>`);
+            }
+          } else {
+            insertHtmlAtCursor(`<a href="${trimmedUrl}">${trimmedUrl}</a>`);
+          }
           updateContentFromWysiwyg();
         }
       }
@@ -1078,12 +1092,33 @@ function unwrapPhishyFromRange(range: Range, wysiwyg: HTMLElement): boolean {
         const newText = label ? `[${label}](${trimmed})` : `[${trimmed}](${trimmed})`;
         const newContent = content.substring(0, selection.s) + newText + content.substring(selection.e);
         useEditorStore.getState().setContent(newContent);
+        setTimeout(() => {
+          if (editorRef.current) {
+            editorRef.current.focus({ preventScroll: true });
+            editorRef.current.setSelectionRange(selection.s + newText.length, selection.s + newText.length);
+          }
+        }, 0);
       }
     } else {
       const url = await promptDialog(t('urlPrompt'), "https://");
-      if (url) fmt('[', `](${url})`);
+      if (url && url.trim()) {
+        const trimmedUrl = url.trim();
+        if (trimmed) {
+          fmt('[', `](${trimmedUrl})`);
+        } else {
+          const insertText = `[${trimmedUrl}](${trimmedUrl})`;
+          const newContent = content.substring(0, selection.s) + insertText + content.substring(selection.e);
+          useEditorStore.getState().setContent(newContent);
+          setTimeout(() => {
+            if (editorRef.current) {
+              editorRef.current.focus({ preventScroll: true });
+              editorRef.current.setSelectionRange(selection.s + 1, selection.s + 1 + trimmedUrl.length);
+            }
+          }, 0);
+        }
+      }
     }
-  }, [ t, getSelectionOrWord, fmt, promptDialog, editorMode, restoreVisualSelection, getVisualSelectionHtml, insertHtmlAtCursor, updateContentFromWysiwyg]);
+  }, [ t, getSelectionOrWord, fmt, promptDialog, editorMode, restoreVisualSelection, getVisualSelectionHtml, insertHtmlAtCursor, updateContentFromWysiwyg, editorRef]);
 
   const handleIndent = useCallback(() => {
     const content = useEditorStore.getState().content;

@@ -20,6 +20,7 @@ import {
   KeySoundModifier,
   KeySoundTriggerOptions
 } from './types';
+import { loadAudioSettings } from './presets';
 import { useEditorStore } from '../../store';
 
 export class SoundSynthEngine {
@@ -54,6 +55,14 @@ export class SoundSynthEngine {
 
   // Get current speed factor to scale decay times
   public getTypingSpeedFactor(): number {
+    try {
+      const settings = loadAudioSettings();
+      if (settings.speedScalingEnabled === false) {
+        return 1.0;
+      }
+    } catch {
+      // ignore fallback
+    }
     const wpm = this.getCurrentWpm();
     if (wpm <= 40) return 1.0;
     if (wpm >= 160) return 0.28; // scale decay down to 28% for ultra fast typing
@@ -196,7 +205,7 @@ export class SoundSynthEngine {
     } else if (category === 'backspace') {
       modifier = { slideDown: true, decayMultiplier: 1.15, gainMultiplier: 0.85 };
     } else if (category === 'enter') {
-      modifier = { extraBell: true, gainMultiplier: 1.15 };
+      modifier = { gainMultiplier: 1.15 };
     }
 
     let pitchOffsetHz: number;
@@ -504,14 +513,10 @@ export class SoundSynthEngine {
     if (mode === 'bell') {
       if (key === 'Backspace' || key === 'Delete') {
         this.synthesizeBellTone(ctx, targetGainNode, targetFilterNode, 659.25, 0.36, 1.4 * speedFactor, startTime, registerNode);
-        this.synthesizeBellTone(ctx, targetGainNode, targetFilterNode, 880.00, 0.38, 1.6 * speedFactor, startTime + 0.04 * speedFactor, registerNode);
         return;
       }
       if (key === 'Enter') {
-        this.synthesizeBellTone(ctx, targetGainNode, targetFilterNode, 523.25, 0.34, 2.2 * speedFactor, startTime, registerNode);
-        this.synthesizeBellTone(ctx, targetGainNode, targetFilterNode, 659.25, 0.30, 2.3 * speedFactor, startTime + 0.035 * speedFactor, registerNode);
-        this.synthesizeBellTone(ctx, targetGainNode, targetFilterNode, 783.99, 0.28, 2.4 * speedFactor, startTime + 0.07 * speedFactor, registerNode);
-        this.synthesizeBellTone(ctx, targetGainNode, targetFilterNode, 1046.50, 0.26, 2.6 * speedFactor, startTime + 0.105 * speedFactor, registerNode);
+        this.synthesizeBellTone(ctx, targetGainNode, targetFilterNode, 523.25, 0.36, 2.0 * speedFactor, startTime, registerNode);
         return;
       }
       if (key === ' ' || rawCode === 'Space') {
@@ -537,9 +542,7 @@ export class SoundSynthEngine {
 
     if (mode === 'cathedral-bell') {
       if (key === 'Enter') {
-        this.synthesizeCathedralBellTone(ctx, targetGainNode, targetFilterNode, 349.23, 0.36, 2.6 * speedFactor, startTime, registerNode);
-        this.synthesizeCathedralBellTone(ctx, targetGainNode, targetFilterNode, 523.25, 0.30, 2.8 * speedFactor, startTime + 0.04 * speedFactor, registerNode);
-        this.synthesizeCathedralBellTone(ctx, targetGainNode, targetFilterNode, 698.46, 0.26, 3.0 * speedFactor, startTime + 0.08 * speedFactor, registerNode);
+        this.synthesizeCathedralBellTone(ctx, targetGainNode, targetFilterNode, 349.23, 0.38, 2.4 * speedFactor, startTime, registerNode);
         return;
       }
       if (key === ' ' || rawCode === 'Space') {
@@ -547,8 +550,7 @@ export class SoundSynthEngine {
         return;
       }
       if (key === 'Backspace' || key === 'Delete') {
-        this.synthesizeCathedralBellTone(ctx, targetGainNode, targetFilterNode, 440.00, 0.35, 1.6 * speedFactor, startTime, registerNode);
-        this.synthesizeCathedralBellTone(ctx, targetGainNode, targetFilterNode, 349.23, 0.38, 1.8 * speedFactor, startTime + 0.05 * speedFactor, registerNode);
+        this.synthesizeCathedralBellTone(ctx, targetGainNode, targetFilterNode, 440.00, 0.36, 1.6 * speedFactor, startTime, registerNode);
         return;
       }
 
@@ -569,14 +571,7 @@ export class SoundSynthEngine {
 
     if (mode === 'shchedryk') {
       if (key === 'Enter') {
-        this.synthesizeShchedrykChime(ctx, targetGainNode, targetFilterNode, 493.88, 0.34, 2.2 * speedFactor, startTime, registerNode);
-        this.synthesizeShchedrykChime(ctx, targetGainNode, targetFilterNode, 587.33, 0.30, 2.3 * speedFactor, startTime + 0.04 * speedFactor, registerNode);
-        this.synthesizeShchedrykChime(ctx, targetGainNode, targetFilterNode, 739.99, 0.28, 2.4 * speedFactor, startTime + 0.08 * speedFactor, registerNode);
-        this.synthesizeShchedrykChime(ctx, targetGainNode, targetFilterNode, 987.77, 0.26, 2.6 * speedFactor, startTime + 0.12 * speedFactor, registerNode);
-        this.synthesizeShchedrykChime(ctx, targetGainNode, targetFilterNode, 587.33, 0.22, 1.2 * speedFactor, startTime + 0.18 * speedFactor, registerNode);
-        this.synthesizeShchedrykChime(ctx, targetGainNode, targetFilterNode, 523.25, 0.22, 1.2 * speedFactor, startTime + 0.24 * speedFactor, registerNode);
-        this.synthesizeShchedrykChime(ctx, targetGainNode, targetFilterNode, 493.88, 0.24, 1.4 * speedFactor, startTime + 0.30 * speedFactor, registerNode);
-        this.synthesizeShchedrykChime(ctx, targetGainNode, targetFilterNode, 523.25, 0.24, 1.6 * speedFactor, startTime + 0.36 * speedFactor, registerNode);
+        this.synthesizeShchedrykChime(ctx, targetGainNode, targetFilterNode, 493.88, 0.38, 2.0 * speedFactor, startTime, registerNode);
         return;
       }
       if (key === ' ' || rawCode === 'Space') {
@@ -585,7 +580,6 @@ export class SoundSynthEngine {
       }
       if (key === 'Backspace' || key === 'Delete') {
         this.synthesizeShchedrykChime(ctx, targetGainNode, targetFilterNode, 415.30, 0.36, 1.4 * speedFactor, startTime, registerNode);
-        this.synthesizeShchedrykChime(ctx, targetGainNode, targetFilterNode, 440.00, 0.38, 1.6 * speedFactor, startTime + 0.04 * speedFactor, registerNode);
         return;
       }
 
@@ -610,8 +604,7 @@ export class SoundSynthEngine {
         return;
       }
       if (key === 'Enter') {
-        this.synthesizeSingleBubbleDrop(ctx, targetGainNode, targetFilterNode, 520, 920, 0.45, startTime, registerNode);
-        this.synthesizeSingleBubbleDrop(ctx, targetGainNode, targetFilterNode, 680, 1180, 0.38, startTime + 0.04, registerNode);
+        this.synthesizeSingleBubbleDrop(ctx, targetGainNode, targetFilterNode, 520, 920, 0.48, startTime, registerNode);
         return;
       }
       if (key === ' ' || rawCode === 'Space') {
@@ -632,8 +625,6 @@ export class SoundSynthEngine {
       const gainMult = modifier?.gainMultiplier ?? 1.0;
       if (key === 'Enter') {
         this.synthesizeSingleGeigerTick(ctx, targetGainNode, targetFilterNode, 0.68 * gainMult, startTime, registerNode);
-        this.synthesizeSingleGeigerTick(ctx, targetGainNode, targetFilterNode, 0.55 * gainMult, startTime + 0.007, registerNode);
-        this.synthesizeSingleGeigerTick(ctx, targetGainNode, targetFilterNode, 0.48 * gainMult, startTime + 0.016, registerNode);
         return;
       }
       if (key === ' ' || rawCode === 'Space') {

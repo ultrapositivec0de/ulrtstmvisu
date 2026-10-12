@@ -1,5 +1,4 @@
-import React from 'react';
-import { Tags, Trash2 } from 'lucide-react';
+import { Tags, Trash2, Star } from 'lucide-react';
 import { BaseModal } from './BaseModal';
 import { cn } from '../../lib/utils';
 
@@ -18,6 +17,7 @@ interface TagGroupsModalProps {
   setPubTags: (tags: string) => void;
   promptDialog: (title: string, defaultValue?: string) => Promise<string | null>;
   confirmDialog: (msg: string) => Promise<boolean>;
+  pinTag: (tag: string) => void;
   t: (key: any) => string;
 }
 
@@ -30,6 +30,7 @@ export const TagGroupsModal: React.FC<TagGroupsModalProps> = ({
   setPubTags,
   promptDialog,
   confirmDialog,
+  pinTag,
   t
 }) => {
   return (
@@ -41,6 +42,17 @@ export const TagGroupsModal: React.FC<TagGroupsModalProps> = ({
       title={t('tagGroups')}
       modalKey="modal-tag-groups"
       bodyClassName="p-5 sm:p-6 space-y-4"
+      footer={
+        <div className="p-4 sm:p-5 bg-[var(--bg-main)]/40 border-t border-[var(--modal-border)] flex justify-end shrink-0 w-full">
+          <button 
+            type="button"
+            onClick={onClose}
+            className="btn-primary text-xs sm:text-sm w-full sm:w-auto"
+          >
+            {t('done')}
+          </button>
+        </div>
+      }
     >
       <button 
         onClick={async () => {
@@ -55,7 +67,7 @@ export const TagGroupsModal: React.FC<TagGroupsModalProps> = ({
           };
           setTagGroups([...tagGroups, newGroup]);
         }}
-        className="w-full py-2.5 bg-cyan-600 hover:bg-cyan-500 rounded-xl transition-colors font-bold text-xs sm:text-sm text-white shadow-md shadow-cyan-900/20 active:scale-[0.98] cursor-pointer"
+        className="btn-primary w-full text-xs sm:text-sm"
       >
         {t('addTagGroup')}
       </button>
@@ -97,25 +109,43 @@ export const TagGroupsModal: React.FC<TagGroupsModalProps> = ({
               {group.tags.filter(Boolean).map((tag, tIdx) => {
                 const isSelected = pubTags.split(/\s+/).includes(tag);
                 return (
-                  <button 
+                  <div 
                     key={`group-${group.id || gIdx}-tag-${tag}-${tIdx}`}
-                    onClick={() => {
-                      const currentTags = pubTags.split(/\s+/).filter(Boolean);
-                      if (currentTags.includes(tag)) {
-                        setPubTags(currentTags.filter(t => t !== tag).join(' '));
-                      } else {
-                        setPubTags([...currentTags, tag].join(' '));
-                      }
-                    }}
-                    className={cn(
-                      "text-xs px-2.5 py-1 rounded-lg transition-colors font-medium cursor-pointer",
-                      isSelected 
-                        ? "bg-cyan-600 text-white shadow-sm" 
-                        : "bg-[var(--bg-card)] text-[var(--text-muted)] hover:text-[var(--text-main)] border border-[var(--border-color)]"
-                    )}
+                    className="flex items-center gap-0.5 shrink-0"
                   >
-                    #{tag}
-                  </button>
+                    <button 
+                      type="button"
+                      onClick={() => {
+                        const currentTags = pubTags.split(/\s+/).filter(Boolean);
+                        if (currentTags.includes(tag)) {
+                          setPubTags(currentTags.filter(t => t !== tag).join(' '));
+                        } else {
+                          setPubTags([...currentTags, tag].join(' '));
+                        }
+                      }}
+                      className={cn(
+                        "text-xs px-2.5 py-1 rounded-l-lg transition-colors font-medium cursor-pointer h-7 flex items-center justify-center border-y border-l",
+                        isSelected 
+                          ? "bg-cyan-600 border-cyan-500 text-white shadow-sm" 
+                          : "bg-[var(--bg-card)] border-[var(--border-color)] text-[var(--text-muted)] hover:text-[var(--text-main)]"
+                      )}
+                    >
+                      #{tag}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => pinTag(tag)}
+                      className={cn(
+                        "px-1.5 rounded-r-lg border-y border-r transition-all h-7 flex items-center justify-center hover:text-amber-400 cursor-pointer text-slate-500",
+                        isSelected
+                          ? "bg-cyan-600 border-cyan-500 text-cyan-200"
+                          : "bg-[var(--bg-card)] border-[var(--border-color)] text-[var(--text-muted)] hover:border-slate-500"
+                      )}
+                      title={t('pinTagQuickSelect')}
+                    >
+                      <Star size={10} className="stroke-[2.5]" />
+                    </button>
+                  </div>
                 );
               })}
             </div>
@@ -123,7 +153,7 @@ export const TagGroupsModal: React.FC<TagGroupsModalProps> = ({
         ))}
         {tagGroups.length === 0 && (
           <p className="text-center text-xs text-[var(--text-muted)] py-6">
-            {t('noTagGroups') || "Немає збережених груп тегів"}
+            {t('noTagGroups')}
           </p>
         )}
       </div>

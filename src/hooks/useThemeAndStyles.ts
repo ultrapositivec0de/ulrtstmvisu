@@ -232,15 +232,69 @@ export function useThemeAndStyles() {
     localStorage.setItem('steem_wysiwyg_spacing', String(wysiwygSpacing));
   }, [wysiwygSpacing]);
 
-  // Update CSS variables for theme color, font, font size, toolbar sizing, UI scaling, and WYSIWYG spacing
+  // Update CSS variables and document theme classes for theme color, font, font size, toolbar sizing, UI scaling, and WYSIWYG spacing
   useEffect(() => {
     const theme = activeAssortment.find(t => t.name === themeColor) || activeAssortment[0];
-    document.documentElement.style.setProperty('--accent-color', theme.rgb);
-    document.documentElement.style.setProperty('--accent-hex', theme.hex);
-    
+    const root = document.documentElement;
+    const body = document.body;
+
+    // Ensure valid themeColor if switching between standard and neon
+    if (!activeAssortment.some(t => t.name === themeColor) && theme) {
+      setThemeColor(theme.name);
+    }
+
+    root.style.setProperty('--accent-color', theme.rgb);
+    root.style.setProperty('--accent-rgb', theme.rgb);
+    root.style.setProperty('--accent-hex', theme.hex);
+    root.style.setProperty('--accent', theme.hex);
+
+    // Synchronize theme classes directly on <html> and <body> for portals, native WebView2, and full cascade
+    const isLight = !isDarkMode && visualStyle !== 'neon';
+    const isNeon = visualStyle === 'neon';
+
+    root.classList.toggle('theme-light', isLight);
+    root.classList.toggle('theme-neon', isNeon);
+    root.classList.toggle('dark', isDarkMode || isNeon);
+
+    if (body) {
+      body.classList.toggle('theme-light', isLight);
+      body.classList.toggle('theme-neon', isNeon);
+      body.classList.toggle('dark', isDarkMode || isNeon);
+    }
+
+    // Explicitly set surface tokens so switching back from Neon or between Dark/Light never leaves stale colors
+    if (isNeon) {
+      root.style.setProperty('--bg-main', '#020210');
+      root.style.setProperty('--bg-sidebar', '#010115');
+      root.style.setProperty('--bg-card', '#080820');
+      root.style.setProperty('--text-main', '#f0f0ff');
+      root.style.setProperty('--text-muted', '#a5b4fc');
+      root.style.setProperty('--border-color', `rgba(${theme.rgb.split(' ').join(', ')}, 0.25)`);
+      root.style.setProperty('--modal-bg', '#080820');
+      root.style.setProperty('--modal-border', `rgba(${theme.rgb.split(' ').join(', ')}, 0.35)`);
+    } else if (isLight) {
+      root.style.setProperty('--bg-main', '#ffffff');
+      root.style.setProperty('--bg-sidebar', '#f8fafc');
+      root.style.setProperty('--bg-card', '#f1f5f9');
+      root.style.setProperty('--text-main', '#0f172a');
+      root.style.setProperty('--text-muted', '#334155');
+      root.style.setProperty('--border-color', '#cbd5e1');
+      root.style.setProperty('--modal-bg', '#ffffff');
+      root.style.setProperty('--modal-border', '#cbd5e1');
+    } else {
+      root.style.setProperty('--bg-main', '#020617');
+      root.style.setProperty('--bg-sidebar', '#0f172a');
+      root.style.setProperty('--bg-card', '#1e293b');
+      root.style.setProperty('--text-main', '#f1f5f9');
+      root.style.setProperty('--text-muted', '#94a3b8');
+      root.style.setProperty('--border-color', '#1e293b');
+      root.style.setProperty('--modal-bg', '#0f172a');
+      root.style.setProperty('--modal-border', '#334155');
+    }
+
     const font = fontOptions.find(f => f.id === editorFont) || fontOptions[0];
-    document.documentElement.style.setProperty('--font-editor', font.family);
-    document.documentElement.style.setProperty('--editor-font-size', `${editorFontSize}px`);
+    root.style.setProperty('--font-editor', font.family);
+    root.style.setProperty('--editor-font-size', `${editorFontSize}px`);
 
     // UI Scale tokens
     const computedHeaderHeight = headerHeightAuto 
@@ -248,16 +302,18 @@ export function useThemeAndStyles() {
       : headerHeight;
     const computedHeaderBtnSize = Math.max(32, headerIconSize + 14);
 
-    document.documentElement.style.setProperty('--header-icon-size', `${headerIconSize}px`);
-    document.documentElement.style.setProperty('--header-btn-size', `${computedHeaderBtnSize}px`);
-    document.documentElement.style.setProperty('--header-height', `${computedHeaderHeight}px`);
-    document.documentElement.style.setProperty('--gallery-icon-size', `${galleryIconSize}px`);
+    root.style.setProperty('--header-icon-size', `${headerIconSize}px`);
+    root.style.setProperty('--header-btn-size', `${computedHeaderBtnSize}px`);
+    root.style.setProperty('--header-height', `${computedHeaderHeight}px`);
+    root.style.setProperty('--gallery-icon-size', `${galleryIconSize}px`);
 
-    document.documentElement.style.setProperty('--toolbar-icon-size', `${toolbarIconSize}px`);
-    document.documentElement.style.setProperty('--toolbar-btn-size', `${toolbarIconSize + 16}px`);
-    document.documentElement.style.setProperty('--toolbar-btn-font-size', `${Math.round(toolbarIconSize * 0.85)}px`);
-    document.documentElement.style.setProperty('--wysiwyg-spacing', `${wysiwygSpacing}px`);
+    root.style.setProperty('--toolbar-icon-size', `${toolbarIconSize}px`);
+    root.style.setProperty('--toolbar-btn-size', `${toolbarIconSize + 16}px`);
+    root.style.setProperty('--toolbar-btn-font-size', `${Math.round(toolbarIconSize * 0.85)}px`);
+    root.style.setProperty('--wysiwyg-spacing', `${wysiwygSpacing}px`);
   }, [
+    isDarkMode,
+    visualStyle,
     themeColor, 
     activeAssortment, 
     editorFont, 

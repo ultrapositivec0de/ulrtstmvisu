@@ -10,12 +10,15 @@ import {
   Check,
   Music,
   Sliders,
-  Sparkles,
+  Gauge,
   Smartphone
 } from 'lucide-react';
 import { BaseModal } from './BaseModal';
 import { SoundPreset, AudioTypingSettings } from '../../services/audio/types';
-import { PRESET_JSON_TEMPLATE } from '../../services/audio/presets';
+import { PRESET_JSON_TEMPLATE, getPresetDisplayName, getPresetDisplayDescription } from '../../services/audio/presets';
+import { soundSynthEngine } from '../../services/audio/SoundSynthEngine';
+import { useEditorStore } from '../../store';
+import { getTranslation, TranslationKey } from '../../locales';
 
 interface AudioPresetsModalProps {
   isOpen: boolean;
@@ -56,6 +59,8 @@ export const AudioPresetsModal: React.FC<AudioPresetsModalProps> = ({
   const [importError, setImportError] = useState<string | null>(null);
   const [importSuccess, setImportSuccess] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const currentLang = useEditorStore(s => s.currentLang);
+  const t = (key: TranslationKey) => getTranslation(currentLang, key);
 
   if (!isOpen) return null;
 
@@ -81,13 +86,13 @@ export const AudioPresetsModal: React.FC<AudioPresetsModalProps> = ({
         const parsed = JSON.parse(text);
         const result = addCustomPreset(parsed);
         if (result.success && result.preset) {
-          setImportSuccess(`Пресет "${result.preset.name}" успішно імпортовано та активовано!`);
+          setImportSuccess(t('audioImportSuccess').replace('{name}', result.preset.name));
           setTimeout(() => setImportSuccess(null), 4000);
         } else {
-          setImportError(result.error || 'Помилка валідації файлу пресету');
+          setImportError(result.error || t('audioImportValidationError'));
         }
       } catch (err) {
-        setImportError('Не вдалося розібрати JSON файл. Перевірте синтаксис.');
+        setImportError(t('audioImportJsonError'));
       }
     };
     reader.readAsText(file);
@@ -110,56 +115,72 @@ export const AudioPresetsModal: React.FC<AudioPresetsModalProps> = ({
     <BaseModal
       isOpen={isOpen}
       onClose={onClose}
-      title="Звуковий супровід набору клавіш"
-      subtitle="Процедурний синтез Web Audio без важких семплів та навантаження пам'яті"
+      title={t('audioModalHeaderTitle')}
+      subtitle={t('audioModalHeaderSubtitle')}
       icon={Music}
       size="xl"
       className="max-h-[90vh]"
     >
       <div className="space-y-5">
         {/* Global Controls Row */}
-        <div className="flex flex-wrap items-center justify-between gap-3 p-3.5 bg-slate-900/60 rounded-xl border border-slate-800">
-          <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center justify-between gap-3 p-3.5 bg-[var(--bg-card)] rounded-xl border border-[var(--border-color)]">
+          <div className="flex flex-wrap items-center gap-3">
             <button
               id="audio-synth-toggle-main-btn"
               onClick={toggleEnabled}
               className={`flex items-center gap-2 px-3.5 py-1.5 rounded-xl font-medium text-xs sm:text-sm transition-all shadow-sm ${
                 settings.enabled
-                  ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/40 hover:bg-emerald-500/30'
-                  : 'bg-slate-800 text-slate-400 border border-slate-700/60 hover:text-white'
+                  ? 'bg-emerald-500/20 text-emerald-500 border border-emerald-500/40 hover:bg-emerald-500/30'
+                  : 'bg-[var(--bg-main)] text-[var(--text-muted)] border border-[var(--border-color)] hover:text-[var(--text-main)]'
               }`}
             >
               {settings.enabled ? (
                 <>
-                  <Volume2 className="w-4 h-4 text-emerald-400" />
-                  <span>Увімкнено</span>
+                  <Volume2 className="w-4 h-4 text-emerald-500" />
+                  <span>{t('audioEnabled')}</span>
                 </>
               ) : (
                 <>
-                  <VolumeX className="w-4 h-4 text-slate-400" />
-                  <span>Вимкнено</span>
+                  <VolumeX className="w-4 h-4 text-[var(--text-muted)]" />
+                  <span>{t('audioDisabled')}</span>
                 </>
               )}
             </button>
 
             {/* Virtual keys toggle */}
-            <label className="flex items-center gap-2 cursor-pointer text-xs text-slate-300 select-none">
+            <label className="flex items-center gap-2 cursor-pointer text-xs text-[var(--text-main)] select-none">
               <input
                 type="checkbox"
                 checked={settings.playOnVirtualKeys}
                 onChange={(e) =>
                   updateSettings((prev) => ({ ...prev, playOnVirtualKeys: e.target.checked }))
                 }
-                className="rounded border-slate-700 bg-slate-800 text-[rgb(var(--accent-color))] focus:ring-0"
+                className="rounded border-[var(--border-color)] bg-[var(--bg-main)] text-[rgb(var(--accent-color))] focus:ring-0"
               />
-              <Smartphone className="w-3.5 h-3.5 text-slate-400" />
-              <span>Тач/Екранні кнопки</span>
+              <Smartphone className="w-3.5 h-3.5 text-[var(--text-muted)]" />
+              <span>{t('audioTouchButtonsShort')}</span>
+            </label>
+
+            {/* WPM speed scaling toggle */}
+            <label className="flex items-center gap-2 cursor-pointer text-xs text-[var(--text-main)] select-none">
+              <input
+                type="checkbox"
+                checked={settings.speedScalingEnabled !== false}
+                onChange={(e) => {
+                  const checked = e.target.checked;
+                  updateSettings((prev) => ({ ...prev, speedScalingEnabled: checked }));
+                  soundSynthEngine.clearCache();
+                }}
+                className="rounded border-[var(--border-color)] bg-[var(--bg-main)] text-[rgb(var(--accent-color))] focus:ring-0"
+              />
+              <Gauge className="w-3.5 h-3.5 text-[var(--text-muted)]" />
+              <span>{t('audioWpmOptFull')}</span>
             </label>
           </div>
 
           {/* Volume Slider */}
           <div className="flex items-center gap-2.5 min-w-[150px]">
-            <Sliders className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+            <Sliders className="w-3.5 h-3.5 text-[var(--text-muted)] shrink-0" />
             <input
               type="range"
               min="0.05"
@@ -170,7 +191,7 @@ export const AudioPresetsModal: React.FC<AudioPresetsModalProps> = ({
               disabled={!settings.enabled}
               className="w-24 sm:w-28 accent-[rgb(var(--accent-color))] cursor-pointer disabled:opacity-40"
             />
-            <span className="text-xs text-slate-400 font-mono w-8 text-right">
+            <span className="text-xs text-[var(--text-muted)] font-mono tabular-nums w-8 text-right">
               {Math.round(volume * 100)}%
             </span>
           </div>
@@ -178,60 +199,60 @@ export const AudioPresetsModal: React.FC<AudioPresetsModalProps> = ({
 
         {/* Action feedback notifications */}
         {importError && (
-          <div className="p-3 bg-rose-950/40 border border-rose-800/60 text-rose-300 text-xs rounded-xl">
+          <div className="p-3 bg-rose-500/15 border border-rose-500/40 text-rose-400 text-xs rounded-xl">
             {importError}
           </div>
         )}
         {importSuccess && (
-          <div className="p-3 bg-emerald-950/40 border border-emerald-800/60 text-emerald-300 text-xs rounded-xl flex items-center gap-2">
-            <Check className="w-4 h-4 text-emerald-400 shrink-0" />
+          <div className="p-3 bg-emerald-500/15 border border-emerald-500/40 text-emerald-400 text-xs rounded-xl flex items-center gap-2">
+            <Check className="w-4 h-4 text-emerald-500 shrink-0" />
             <span>{importSuccess}</span>
           </div>
         )}
 
         {/* Tab Selector & Import Actions */}
-        <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-800 pb-3">
-          <div className="flex items-center gap-1 bg-slate-900/50 p-1 rounded-xl border border-slate-800/60 text-xs">
+        <div className="flex flex-wrap items-center justify-between gap-2 border-b border-[var(--border-color)] pb-3">
+          <div className="flex items-center gap-1 bg-[var(--bg-card)] p-1 rounded-xl border border-[var(--border-color)] text-xs">
             <button
               onClick={() => setActiveTab('all')}
               className={`px-2.5 py-1 rounded-lg transition-all ${
                 activeTab === 'all'
-                  ? 'bg-slate-800 text-white font-medium shadow-sm'
-                  : 'text-slate-400 hover:text-slate-200'
+                  ? 'bg-[rgb(var(--accent-color))] text-white font-semibold shadow-sm'
+                  : 'text-[var(--text-muted)] hover:text-[var(--text-main)]'
               }`}
             >
-              Всі ({allPresets.length})
+              {t('audioTabAll')} ({allPresets.length})
             </button>
             <button
               onClick={() => setActiveTab('favorites')}
               className={`px-2.5 py-1 rounded-lg transition-all flex items-center gap-1.5 ${
                 activeTab === 'favorites'
-                  ? 'bg-slate-800 text-amber-400 font-medium shadow-sm'
-                  : 'text-slate-400 hover:text-slate-200'
+                  ? 'bg-[rgb(var(--accent-color))] text-white font-semibold shadow-sm'
+                  : 'text-[var(--text-muted)] hover:text-[var(--text-main)]'
               }`}
             >
-              <Star className="w-3 h-3 fill-amber-400/40" />
-              <span>Обрані ({favoritePresetIds.length})</span>
+              <Star className="w-3 h-3 fill-amber-400 text-amber-400" />
+              <span>{t('audioTabFavorites')} ({favoritePresetIds.length})</span>
             </button>
             <button
               onClick={() => setActiveTab('builtin')}
               className={`px-2.5 py-1 rounded-lg transition-all ${
                 activeTab === 'builtin'
-                  ? 'bg-slate-800 text-white font-medium shadow-sm'
-                  : 'text-slate-400 hover:text-slate-200'
+                  ? 'bg-[rgb(var(--accent-color))] text-white font-semibold shadow-sm'
+                  : 'text-[var(--text-muted)] hover:text-[var(--text-main)]'
               }`}
             >
-              Вшиті
+              {t('audioTabBuiltin')}
             </button>
             <button
               onClick={() => setActiveTab('custom')}
               className={`px-2.5 py-1 rounded-lg transition-all ${
                 activeTab === 'custom'
-                  ? 'bg-slate-800 text-white font-medium shadow-sm'
-                  : 'text-slate-400 hover:text-slate-200'
+                  ? 'bg-[rgb(var(--accent-color))] text-white font-semibold shadow-sm'
+                  : 'text-[var(--text-muted)] hover:text-[var(--text-main)]'
               }`}
             >
-              Користувацькі ({settings.customPresets.length})
+              {t('audioTabCustom')} ({settings.customPresets.length})
             </button>
           </div>
 
@@ -245,19 +266,19 @@ export const AudioPresetsModal: React.FC<AudioPresetsModalProps> = ({
             />
             <button
               onClick={() => fileInputRef.current?.click()}
-              className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white border border-slate-700/60 text-xs transition-all"
-              title="Імпортувати .json пресет із пристрою"
+              className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-[var(--bg-card)] hover:opacity-90 text-[var(--text-main)] border border-[var(--border-color)] text-xs font-medium transition-all"
+              title={t('audioImportJsonTitle')}
             >
               <Upload className="w-3.5 h-3.5" />
-              <span>Імпорт JSON</span>
+              <span>{t('audioImportJsonBtn')}</span>
             </button>
             <button
               onClick={handleDownloadTemplate}
-              className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white border border-slate-700/60 text-xs transition-all"
-              title="Завантажити зразок шаблону пресету для редагування або ШІ"
+              className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-[var(--bg-card)] hover:opacity-90 text-[var(--text-main)] border border-[var(--border-color)] text-xs font-medium transition-all"
+              title={t('audioTemplateTitle')}
             >
               <Download className="w-3.5 h-3.5" />
-              <span>Шаблон</span>
+              <span>{t('audioTemplateBtn')}</span>
             </button>
           </div>
         </div>
@@ -265,8 +286,8 @@ export const AudioPresetsModal: React.FC<AudioPresetsModalProps> = ({
         {/* Presets List Grid */}
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 max-h-[50vh] overflow-y-auto pr-1">
           {filteredPresets.length === 0 ? (
-            <div className="col-span-full py-10 text-center text-slate-500 text-xs">
-              Немає пресетів у цій категорії.
+            <div className="col-span-full py-10 text-center text-[var(--text-muted)] text-xs">
+              {t('audioEmptyCategory')}
             </div>
           ) : (
             filteredPresets.map((preset) => {
@@ -279,24 +300,24 @@ export const AudioPresetsModal: React.FC<AudioPresetsModalProps> = ({
                   onClick={() => setActivePreset(preset.id)}
                   className={`relative p-3 rounded-xl border transition-all cursor-pointer flex flex-col justify-between gap-2 ${
                     isActive
-                      ? 'bg-[rgb(var(--accent-color)/0.1)] border-[rgb(var(--accent-color)/0.5)] shadow-sm'
-                      : 'bg-slate-900/40 border-slate-800 hover:border-slate-700/80 hover:bg-slate-800/30'
+                      ? 'bg-[rgb(var(--accent-color)/0.12)] border-[rgb(var(--accent-color)/0.6)] shadow-sm'
+                      : 'bg-[var(--bg-card)] border-[var(--border-color)] hover:border-[rgb(var(--accent-color)/0.4)]'
                   }`}
                 >
                   <div className="flex items-start justify-between gap-2">
                     <div className="min-w-0">
                       <div className="flex items-center gap-1.5">
-                        <span className="font-medium text-xs sm:text-sm text-slate-200 truncate">
-                          {preset.name}
+                        <span className="font-semibold text-xs sm:text-sm text-[var(--text-main)] truncate">
+                          {getPresetDisplayName(preset, currentLang)}
                         </span>
                         {isActive && (
                           <span className="flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[10px] bg-[rgb(var(--accent-color)/0.2)] text-[rgb(var(--accent-color))] font-mono">
-                            <Check className="w-2.5 h-2.5" /> Активний
+                            <Check className="w-2.5 h-2.5" /> {t('audioActiveBadge')}
                           </span>
                         )}
                       </div>
-                      <p className="text-[11px] text-slate-400 line-clamp-2 mt-0.5 leading-relaxed">
-                        {preset.description}
+                      <p className="text-[11px] text-[var(--text-muted)] line-clamp-2 mt-0.5 leading-relaxed">
+                        {getPresetDisplayDescription(preset, currentLang)}
                       </p>
                     </div>
 
@@ -307,12 +328,12 @@ export const AudioPresetsModal: React.FC<AudioPresetsModalProps> = ({
                           e.stopPropagation();
                           toggleFavoritePreset(preset.id);
                         }}
-                        className="p-1 rounded-lg text-slate-400 hover:text-amber-400 transition-colors"
-                        title={isFav ? 'Видалити з обраних' : 'Додати в обрані'}
+                        className="p-1 rounded-lg text-[var(--text-muted)] hover:text-amber-400 transition-colors"
+                        title={isFav ? t('audioFavRemoveTitle') : t('audioFavAddTitle')}
                       >
                         <Star
                           className={`w-3.5 h-3.5 ${
-                            isFav ? 'fill-amber-400 text-amber-400' : 'text-slate-500'
+                            isFav ? 'fill-amber-400 text-amber-400' : 'text-[var(--text-muted)]'
                           }`}
                         />
                       </button>
@@ -324,8 +345,8 @@ export const AudioPresetsModal: React.FC<AudioPresetsModalProps> = ({
                             e.stopPropagation();
                             deleteCustomPreset(preset.id);
                           }}
-                          className="p-1 rounded-lg text-slate-500 hover:text-rose-400 transition-colors"
-                          title="Видалити користувацький пресет"
+                          className="p-1 rounded-lg text-[var(--text-muted)] hover:text-rose-400 transition-colors"
+                          title={t('audioDeleteCustomTitle')}
                         >
                           <Trash2 className="w-3.5 h-3.5" />
                         </button>
@@ -334,12 +355,12 @@ export const AudioPresetsModal: React.FC<AudioPresetsModalProps> = ({
                   </div>
 
                   {/* Footer of Card: Tags & Preview */}
-                  <div className="flex items-center justify-between gap-2 pt-1 border-t border-slate-800/40 text-[10px]">
+                  <div className="flex items-center justify-between gap-2 pt-1 border-t border-[var(--border-color)] text-[10px]">
                     <div className="flex items-center gap-1 overflow-hidden">
                       {preset.tags?.slice(0, 3).map((tag) => (
                         <span
                           key={tag}
-                          className="px-1.5 py-0.5 bg-slate-800/60 text-slate-400 rounded text-[9px] truncate"
+                          className="px-1.5 py-0.5 bg-[var(--bg-main)] text-[var(--text-muted)] border border-[var(--border-color)] rounded text-[9px] truncate"
                         >
                           #{tag}
                         </span>
@@ -351,11 +372,11 @@ export const AudioPresetsModal: React.FC<AudioPresetsModalProps> = ({
                         e.stopPropagation();
                         previewPreset(preset);
                       }}
-                      className="flex items-center gap-1 px-2 py-1 rounded-lg bg-slate-800/80 hover:bg-slate-700 text-slate-300 hover:text-white transition-all shrink-0 font-medium"
-                      title="Послухати звук"
+                      className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-[var(--bg-main)] hover:bg-[rgb(var(--accent-color))] text-[var(--text-main)] hover:text-white border border-[var(--border-color)] transition-all shrink-0 font-semibold"
+                      title={t('audioPreviewSoundTitle')}
                     >
                       <Play className="w-2.5 h-2.5 fill-current" />
-                      <span>Тест</span>
+                      <span>{t('audioTestBtn')}</span>
                     </button>
                   </div>
                 </div>

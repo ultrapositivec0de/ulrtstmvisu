@@ -115,13 +115,9 @@ export function createToolsMap({
       }
     },
     'Left': { label: '⬅', action: () => fmt('<div class="text-left">\n', '\n</div>') },
-    'Center': { label: 'Центр', action: () => fmt('<center>\n', '\n</center>') },
+    'Center': { label: t('toolAlignCenterShort'), action: () => fmt('<center>\n', '\n</center>') },
     'Right': { label: '➡', action: () => fmt('<div class="text-right">\n', '\n</div>') },
-    'Justify': { label: 'Вирів', action: () => fmt('<div class="text-justify">\n', '\n</div>') },
-    'Grid': {
-      label: 'Сітка',
-      action: () => insertAtCursor(`<div class="pull-left">\n${t('leftContent')}\n</div>\n<div class="pull-right">\n${t('rightContent')}\n</div>\n<div class="clearfix"></div>\n`)
-    },
+    'Justify': { label: t('toolAlignJustifyShort'), action: () => fmt('<div class="text-justify">\n', '\n</div>') },
     'Templates': { label: <FileText size={20} />, action: () => setActiveModal('templates') },
     'Mentions': {
       label: <AtSign size={20} />,

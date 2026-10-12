@@ -2,6 +2,8 @@ import React from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { X, Bell } from 'lucide-react';
 import { SteemNotification } from '../../types';
+import { useEditorStore } from '../../store';
+import { getTranslation, TranslationKey } from '../../locales';
 
 export interface NotificationToastProps {
   showNotificationPopup: SteemNotification | null;
@@ -23,6 +25,9 @@ export const NotificationToast: React.FC<NotificationToastProps> = React.memo(({
   setNotifications,
   setTargetReaderPost,
 }) => {
+  const currentLang = useEditorStore(s => s.currentLang);
+  const t = (key: TranslationKey) => getTranslation(currentLang, key);
+
   if (!showNotificationPopup) return null;
 
   return (
@@ -39,7 +44,7 @@ export const NotificationToast: React.FC<NotificationToastProps> = React.memo(({
             type="button"
             onClick={() => setShowNotificationPopup(null)} 
             className="p-1.5 text-slate-500 hover:text-white transition-colors bg-slate-800 rounded-full"
-            aria-label="Close notification"
+            aria-label={t('closeNotificationAria')}
           >
             <X size={18} />
           </button>
@@ -49,7 +54,7 @@ export const NotificationToast: React.FC<NotificationToastProps> = React.memo(({
             <Bell size={22} className="animate-swing" />
           </div>
           <div className="flex-1 min-w-0">
-            <p className="text-[10px] font-black text-lime-400 uppercase tracking-widest mb-1">Нова відповідь</p>
+            <p className="text-[10px] font-black text-lime-400 uppercase tracking-widest mb-1">{t('newReplyLabel')}</p>
             <p className="text-sm font-bold text-white mb-1 truncate">@{showNotificationPopup.author}</p>
             <div 
               className="text-xs text-slate-400 line-clamp-2 italic mb-4 bg-slate-950/50 p-2 rounded-xl border border-white/5"
@@ -71,14 +76,14 @@ export const NotificationToast: React.FC<NotificationToastProps> = React.memo(({
                 }}
                 className="flex-1 py-2.5 bg-lime-500 text-black text-xs font-black rounded-xl hover:bg-lime-400 transition-all active:scale-95 shadow-lg shadow-lime-900/20"
               >
-                ПЕРЕГЛЯНУТИ
+                {t('viewBtn')}
               </button>
               <button 
                 type="button"
                 onClick={() => setShowNotificationPopup(null)}
                 className="px-4 py-2.5 bg-slate-800 text-slate-400 text-xs font-bold rounded-xl hover:bg-slate-700 transition-colors"
               >
-                ЗАКРИТИ
+                {t('dismissBtn')}
               </button>
             </div>
           </div>

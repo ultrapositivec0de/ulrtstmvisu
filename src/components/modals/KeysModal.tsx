@@ -102,10 +102,10 @@ export const KeysModal: React.FC<KeysModalProps> = (props) => {
         <div className="flex items-center justify-between">
           <label className="text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-widest flex items-center gap-1.5">
             <AtSign size={13} className="text-cyan-400" />
-            {t('username') || "Steem Username"}
+            {t('username')}
           </label>
           <span className="text-[9px] font-semibold text-[var(--text-muted)] bg-[var(--bg-card)] border border-[var(--border-color)] px-2 py-0.5 rounded-full">
-            {(typeof window !== 'undefined' && (window as any).steem_keychain) ? "🛡️ Keychain ready" : "Notifications & Reader"}
+            {(typeof window !== 'undefined' && (window as any).steem_keychain) ? t('keychainReadyBadge') : t('notificationsAndReaderBadge')}
           </span>
         </div>
         <div className="flex gap-2">
@@ -116,22 +116,22 @@ export const KeysModal: React.FC<KeysModalProps> = (props) => {
               value={tempUsername}
               onChange={e => setTempUsername(e.target.value.toLowerCase().trim().replace(/^@/, ''))}
               className="w-full bg-[var(--bg-card)] border border-[var(--border-color)] rounded-xl pl-7 pr-3 py-2 text-xs sm:text-sm outline-none focus:ring-1 focus:ring-cyan-500 text-cyan-400 font-bold placeholder:text-[var(--text-muted)]"
-              placeholder="username"
+              placeholder={t('username')}
             />
           </div>
           <button 
             onClick={() => {
               const clean = tempUsername.trim().replace(/^@/, '');
               setUsername(clean);
-              notify(t('saveSuccess') || "Збережено!");
+              notify(t('saveSuccess'));
             }}
-            className="px-4 py-2 bg-cyan-600 hover:bg-cyan-500 text-white rounded-xl text-xs font-bold transition-all shadow-sm shrink-0 cursor-pointer"
+            className="btn-primary px-4 py-2 text-xs shrink-0"
           >
-            {t('save') || "Зберегти"}
+            {t('save')}
           </button>
         </div>
         <p className="text-[10px] text-[var(--text-muted)] leading-relaxed">
-          {t('usernameDesc') || "Вкажіть ваш обліковий запис Steem для публікацій через Keychain, завантаження сповіщень та коментарів."}
+          {t('usernameDesc')}
         </p>
       </div>
 
@@ -161,7 +161,7 @@ export const KeysModal: React.FC<KeysModalProps> = (props) => {
               initVault();
               notify(t('vaultInit'));
             }}
-            className="w-full py-2.5 bg-cyan-600 hover:bg-cyan-500 text-white rounded-xl text-xs font-bold transition-all cursor-pointer shadow-md shadow-cyan-900/20"
+            className="btn-primary w-full py-2.5 text-xs"
           >
             {t('createVault')}
           </button>
@@ -188,7 +188,7 @@ export const KeysModal: React.FC<KeysModalProps> = (props) => {
                     notify(e.message, 'error');
                   }
                 }}
-                className="w-full py-2.5 bg-amber-600 hover:bg-amber-500 text-white rounded-xl text-xs font-bold transition-all cursor-pointer shadow-md shadow-amber-900/20"
+                className="btn-primary w-full py-2.5 text-xs"
               >
                 {t('unlockBtn')}
               </button>
@@ -254,7 +254,7 @@ export const KeysModal: React.FC<KeysModalProps> = (props) => {
                             notify(e.message, 'error');
                           }
                         }}
-                        className="w-full py-2.5 bg-cyan-600 hover:bg-cyan-500 text-white rounded-xl text-xs font-bold transition-all cursor-pointer shadow-md shadow-cyan-900/20"
+                        className="btn-primary w-full py-2.5 text-xs"
                       >
                         {t('saveToVault')}
                       </button>
@@ -352,7 +352,7 @@ export const KeysModal: React.FC<KeysModalProps> = (props) => {
             <div className="flex items-center justify-between">
               <label className="text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-widest">{t('pexelsKey')}</label>
               {!savePexelsUnencrypted && !isUnlocked && (
-                <span className="text-[9px] text-amber-400 flex items-center gap-1"><Lock size={10} /> Unlock Vault to save</span>
+                <span className="text-[9px] text-amber-400 flex items-center gap-1"><Lock size={10} /> {t('unlockVaultToSaveHint')}</span>
               )}
             </div>
             <div className="flex gap-2">
@@ -464,7 +464,7 @@ export const KeysModal: React.FC<KeysModalProps> = (props) => {
           <div className="pt-2">
             <button 
               onClick={async () => {
-                if (await confirmDialog(t('confirmClearApiKeys') || "Очистити всі API ключі?")) {
+                if (await confirmDialog(t('confirmClearApiKeys'))) {
                   setPexelsApiKey('');
                   setPixabayApiKey('');
                   setUnsplashAccessKey('');
@@ -474,12 +474,12 @@ export const KeysModal: React.FC<KeysModalProps> = (props) => {
                   localStorage.removeItem('steem_unsplash_access_key');
                   localStorage.removeItem('steem_unsplash_secret_key');
                   await SecurityService.clearAllApiKeys();
-                  notify(t('keysCleared') || "API ключі очищено!");
+                  notify(t('keysCleared'));
                 }
               }}
               className="text-xs text-red-400 hover:text-red-300 underline cursor-pointer"
             >
-              {t('clearApiKeys') || "Очистити API ключі"}
+              {t('clearApiKeys')}
             </button>
           </div>
         </div>
@@ -488,7 +488,7 @@ export const KeysModal: React.FC<KeysModalProps> = (props) => {
       <div className="pt-4 border-t border-[var(--border-color)] flex justify-end">
         <button 
           onClick={onClose}
-          className="px-6 py-2.5 bg-cyan-600 hover:bg-cyan-500 text-white rounded-xl text-xs font-bold transition-all shadow-md shadow-cyan-900/20 active:scale-98 cursor-pointer"
+          className="btn-primary px-6 py-2.5 text-xs font-bold"
         >
           {t('done')}
         </button>

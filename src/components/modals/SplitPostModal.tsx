@@ -39,7 +39,7 @@ export const SplitPostModal: React.FC<SplitPostModalProps> = ({
 
       <div className="bg-[var(--bg-main)]/50 p-4 rounded-xl border border-[var(--border-color)]">
         <div className="flex justify-between items-center text-[10px] sm:text-xs font-bold text-[var(--text-muted)] uppercase mb-3">
-          <span>{t('minWordsPerPart') || 'Words per part'}</span>
+          <span>{t('minWordsPerPart')}</span>
           <input 
             type="number" 
             min={50}
@@ -58,13 +58,13 @@ export const SplitPostModal: React.FC<SplitPostModalProps> = ({
       <div className="flex gap-3 pt-2">
         <button 
           onClick={onClose}
-          className="flex-1 py-2.5 bg-[var(--bg-main)] hover:bg-[var(--border-color)] text-[var(--text-main)] text-xs sm:text-sm font-bold rounded-xl transition-all border border-[var(--border-color)] cursor-pointer"
+          className="btn-secondary flex-1 py-2.5 text-xs sm:text-sm"
         >
           {t('cancel')}
         </button>
         <button 
           onClick={handleSplitPost}
-          className="flex-1 py-2.5 bg-cyan-600 hover:bg-cyan-500 text-white text-xs sm:text-sm font-bold rounded-xl shadow-lg shadow-cyan-900/20 transition-all active:scale-[0.98] cursor-pointer"
+          className="btn-primary flex-1 py-2.5 text-xs sm:text-sm"
         >
           {t('splitBtn')}
         </button>

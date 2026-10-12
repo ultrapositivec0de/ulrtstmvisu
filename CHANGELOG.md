@@ -1,4 +1,8 @@
 # Changelog
+## [2026-10-12] - Version 4.8.7 (ultrasteemeditor/4.8.7)
+### Added & Improved
+- **Release Updates**: Cross-platform release synchronization and system improvements.
+
 ## [2026-09-28] - Version 4.8.6 (ultrasteemeditor/4.8.6)
 ### Added & Improved
 - **Release Updates**: Оптимізація режиму читання (Doc Reader): повна ізоляція від фонової реактивності, синхронний зліпковий рендеринг, усунення стрибків скролу та інтелектуальна адаптація звуку під швидкість набору (WPM).

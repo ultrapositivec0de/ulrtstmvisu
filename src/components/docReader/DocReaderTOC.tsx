@@ -2,6 +2,8 @@ import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { TOCHeadingItem } from './types';
 import { X, Search, ListTree, Hash } from 'lucide-react';
 import { cn } from '../../lib/utils';
+import { useEditorStore } from '../../store';
+import { getTranslation, TranslationKey } from '../../locales';
 
 interface DocReaderTOCProps {
   isOpen: boolean;
@@ -20,6 +22,8 @@ export const DocReaderTOC: React.FC<DocReaderTOCProps> = ({
   onSelectHeading,
   theme = 'dark'
 }) => {
+  const currentLang = useEditorStore(s => s.currentLang);
+  const t = (key: TranslationKey) => getTranslation(currentLang, key);
   const [filterQuery, setFilterQuery] = useState('');
   const drawerRef = useRef<HTMLDivElement | null>(null);
 
@@ -36,7 +40,7 @@ export const DocReaderTOC: React.FC<DocReaderTOCProps> = ({
       if (drawerRef.current && !drawerRef.current.contains(e.target as Node)) {
         // Prevent closing if clicked on header buttons
         const target = e.target as HTMLElement;
-        if (target.closest('button')?.title?.includes('Зміст')) return;
+        if (target.closest('[data-drawer-trigger="toc"]')) return;
         onClose();
       }
     };
@@ -74,7 +78,7 @@ export const DocReaderTOC: React.FC<DocReaderTOCProps> = ({
         )}>
           <div className="flex items-center gap-2 font-medium">
             <ListTree size={18} className={isSepia ? "text-[#8c6d37]" : isLight ? "text-cyan-600" : "text-cyan-400"} />
-            <span>Зміст документа ({headings.length})</span>
+            <span>{t('readerTocHeader')} ({headings.length})</span>
           </div>
           <button
             onClick={onClose}
@@ -86,7 +90,7 @@ export const DocReaderTOC: React.FC<DocReaderTOCProps> = ({
                 ? "hover:bg-slate-100 text-slate-500" 
                 : "hover:bg-slate-800 text-slate-400"
             )}
-            title="Закрити зміст"
+            title={t('readerCloseToc')}
           >
             <X size={18} />
           </button>
@@ -109,7 +113,7 @@ export const DocReaderTOC: React.FC<DocReaderTOCProps> = ({
               <Search size={15} className="opacity-50 shrink-0" />
               <input
                 type="text"
-                placeholder="Пошук розділу..."
+                placeholder={t('readerTocSearchPlaceholder')}
                 value={filterQuery}
                 onChange={e => setFilterQuery(e.target.value)}
                 className="w-full bg-transparent focus:outline-none placeholder:opacity-50 text-sm"
@@ -128,8 +132,8 @@ export const DocReaderTOC: React.FC<DocReaderTOCProps> = ({
           {filteredHeadings.length === 0 ? (
             <div className="text-center py-12 px-4 text-sm opacity-60">
               {headings.length === 0 
-                ? "У документі немає заголовків (H1-H6)" 
-                : "Нічого не знайдено за запитом"}
+                ? t('readerTocEmpty') 
+                : t('readerTocNoMatch')}
             </div>
           ) : (
             filteredHeadings.map((h) => {

@@ -1,9 +1,11 @@
 import React from 'react';
 import { DocReaderSettings, DocReaderSource } from './types';
 import { 
-  Bookmark, ListTree, Sliders, Maximize2, Minimize2, Edit3, X, FileText 
+  Bookmark, ListTree, Sliders, Maximize2, Minimize2, Edit3, X
 } from 'lucide-react';
 import { cn } from '../../lib/utils';
+import { useEditorStore } from '../../store';
+import { getTranslation, TranslationKey } from '../../locales';
 
 interface DocReaderToolbarProps {
   source: DocReaderSource;
@@ -32,6 +34,8 @@ export const DocReaderToolbar: React.FC<DocReaderToolbarProps> = ({
   onEditDocument,
   onExitReadingMode
 }) => {
+  const currentLang = useEditorStore(s => s.currentLang);
+  const t = (key: TranslationKey) => getTranslation(currentLang, key);
   const isLight = settings.theme === 'paper' || settings.theme === 'sepia';
   const isSepia = settings.theme === 'sepia';
 
@@ -61,6 +65,7 @@ export const DocReaderToolbar: React.FC<DocReaderToolbarProps> = ({
         {/* Left: Source Selector Badge */}
         <div className="flex items-center gap-2 min-w-0">
           <button
+            data-drawer-trigger="source"
             onClick={onOpenSourceDrawer}
             className={cn(
               "flex items-center gap-2 py-1.5 px-2.5 rounded-xl border text-xs font-medium transition-all max-w-[180px] sm:max-w-xs truncate",
@@ -70,11 +75,11 @@ export const DocReaderToolbar: React.FC<DocReaderToolbarProps> = ({
                 ? "bg-slate-100 border-slate-200 hover:bg-slate-200/70 text-slate-700"
                 : "bg-slate-800/80 border-slate-700 hover:bg-slate-700 text-slate-200"
             )}
-            title="Змінити джерело читання (чернетки, файл або поточний текст)"
+            title={t('readerChangeSourceTitle')}
           >
             <Bookmark size={14} className="text-cyan-500 shrink-0" />
             <span className="truncate">
-              {source.type === 'draft' ? `Чернетка: ${source.title}` : source.type === 'file' ? `Файл: ${source.fileName}` : 'Поточний документ'}
+              {source.type === 'draft' ? `${t('readerSourceDraftPrefix')}: ${source.title}` : source.type === 'file' ? `${t('readerSourceFilePrefix')}: ${source.fileName}` : t('readerSourceCurrentDoc')}
             </span>
           </button>
         </div>
@@ -84,6 +89,7 @@ export const DocReaderToolbar: React.FC<DocReaderToolbarProps> = ({
           {/* TOC Button */}
           {headingsCount > 0 && (
             <button
+              data-drawer-trigger="toc"
               onClick={onOpenTOC}
               className={cn(
                 "p-2 rounded-xl transition-colors relative",
@@ -93,7 +99,7 @@ export const DocReaderToolbar: React.FC<DocReaderToolbarProps> = ({
                   ? "hover:bg-slate-100 text-slate-600"
                   : "hover:bg-slate-800 text-slate-300"
               )}
-              title="Зміст документа"
+              title={t('readerTocHeader')}
             >
               <ListTree size={18} />
               <span className="absolute -top-1 -right-1 px-1.5 py-0.2 bg-cyan-600 text-[10px] font-bold text-white rounded-full">
@@ -113,7 +119,7 @@ export const DocReaderToolbar: React.FC<DocReaderToolbarProps> = ({
                 ? "hover:bg-slate-100 text-slate-600"
                 : "hover:bg-slate-800 text-slate-300"
             )}
-            title="Налаштування вигляду (тема, шрифт, ширина)"
+            title={t('readerAppearanceTitle')}
           >
             <Sliders size={18} />
           </button>
@@ -129,7 +135,7 @@ export const DocReaderToolbar: React.FC<DocReaderToolbarProps> = ({
                 ? "hover:bg-slate-100 text-slate-600"
                 : "hover:bg-slate-800 text-slate-300"
             )}
-            title={isFullScreen ? "Вийти з повного екрана" : "Повноекранний режим"}
+            title={isFullScreen ? t('readerFullscreenExit') : t('readerFullscreenEnter')}
           >
             {isFullScreen ? <Minimize2 size={18} /> : <Maximize2 size={18} />}
           </button>
@@ -140,10 +146,10 @@ export const DocReaderToolbar: React.FC<DocReaderToolbarProps> = ({
           <button
             onClick={() => onEditDocument('visual')}
             className="py-1.5 px-3 bg-cyan-600 hover:bg-cyan-500 active:scale-98 text-white rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-all shadow-sm"
-            title="Перейти до редагування цього тексту"
+            title={t('readerEditDocTitle')}
           >
             <Edit3 size={14} />
-            <span className="hidden sm:inline">Редагувати</span>
+            <span className="hidden sm:inline">{t('readerEditDocBtn')}</span>
           </button>
 
           {/* Close Reading Mode */}
@@ -157,7 +163,7 @@ export const DocReaderToolbar: React.FC<DocReaderToolbarProps> = ({
                 ? "hover:bg-slate-100 text-slate-600"
                 : "hover:bg-slate-800 text-slate-300"
             )}
-            title="Закрити режим читання та повернутися в редактор"
+            title={t('readerCloseModeTitle')}
           >
             <X size={18} />
           </button>

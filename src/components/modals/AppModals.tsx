@@ -190,6 +190,9 @@ export interface AppModalsProps {
   showPwaInstructionsModal: boolean;
   setShowPwaInstructionsModal: (show: boolean) => void;
   deferredPrompt: any;
+  quickTags: string[];
+  setQuickTags: (tags: string[]) => void;
+  pinTag: (tag: string) => void;
 
   t: (key: any) => string;
 }
@@ -345,11 +348,25 @@ export const AppModals: React.FC<AppModalsProps> = (props) => {
     showPwaInstructionsModal,
     setShowPwaInstructionsModal,
     deferredPrompt,
+    quickTags,
+    setQuickTags,
+    pinTag,
     t
   } = props;
   
   const storeStats = useEditorStore(state => state.stats);
   const wordsCount = storeStats?.words || 0;
+
+  const lastActiveModalRef = React.useRef<string | null>(null);
+  React.useEffect(() => {
+    if (activeModal) {
+      if (activeModal !== 'tagPresets' && activeModal !== 'tagGroups' && activeModal !== 'keys') {
+        lastActiveModalRef.current = activeModal;
+      }
+    } else {
+      lastActiveModalRef.current = null;
+    }
+  }, [activeModal]);
 
   return (
     <>
@@ -367,7 +384,13 @@ export const AppModals: React.FC<AppModalsProps> = (props) => {
 
         <KeysModal
           isOpen={activeModal === 'keys'}
-          onClose={() => setActiveModal(null)}
+          onClose={() => {
+            if (lastActiveModalRef.current === 'publish') {
+              setActiveModal('publish');
+            } else {
+              setActiveModal(null);
+            }
+          }}
           username={username}
           setUsername={setUsername}
           isVaultInitialized={isVaultInitialized}
@@ -435,6 +458,10 @@ export const AppModals: React.FC<AppModalsProps> = (props) => {
           setActiveModal={setActiveModal}
           tagGroups={tagGroups}
           notify={notify}
+          promptDialog={promptDialog}
+          quickTags={quickTags}
+          setQuickTags={setQuickTags}
+          pinTag={pinTag}
           t={t}
         />
 
@@ -458,12 +485,19 @@ export const AppModals: React.FC<AppModalsProps> = (props) => {
 
         <TagPresetsModal
           isOpen={activeModal === 'tagPresets'}
-          onClose={() => setActiveModal(null)}
+          onClose={() => {
+            if (lastActiveModalRef.current === 'publish') {
+              setActiveModal('publish');
+            } else {
+              setActiveModal(null);
+            }
+          }}
           pubTags={pubTags}
           setPubTags={setPubTags}
           toggleTag={toggleTag}
           communities={COMMUNITIES}
           commonTags={COMMON_TAGS}
+          pinTag={pinTag}
           t={t}
         />
 
@@ -550,13 +584,20 @@ export const AppModals: React.FC<AppModalsProps> = (props) => {
 
         <TagGroupsModal
           isOpen={activeModal === 'tagGroups'}
-          onClose={() => setActiveModal(null)}
+          onClose={() => {
+            if (lastActiveModalRef.current === 'publish') {
+              setActiveModal('publish');
+            } else {
+              setActiveModal(null);
+            }
+          }}
           tagGroups={tagGroups}
           setTagGroups={setTagGroups}
           pubTags={pubTags}
           setPubTags={setPubTags}
           promptDialog={promptDialog}
           confirmDialog={confirmDialog}
+          pinTag={pinTag}
           t={t}
         />
 
@@ -693,8 +734,8 @@ export const AppModals: React.FC<AppModalsProps> = (props) => {
                   S
                 </div>
                 <div className="flex-1 min-w-0">
-                  <h4 className="text-xs font-bold text-white leading-tight">{t('pwaBannerTitle') || "Встановити Steem Editor"}</h4>
-                  <p className="text-[11px] text-slate-400 mt-0.5 leading-snug">{t('pwaBannerDesc') || "Швидкий запуск з робочого столу та підтримка офлайн"}</p>
+                  <h4 className="text-xs font-bold text-white leading-tight">{t('pwaBannerTitle')}</h4>
+                  <p className="text-[11px] text-slate-400 mt-0.5 leading-snug">{t('pwaBannerDesc')}</p>
                 </div>
                 <button
                   onClick={() => {
@@ -702,7 +743,7 @@ export const AppModals: React.FC<AppModalsProps> = (props) => {
                     try { localStorage.setItem('steem_pwa_banner_dismissed', 'true'); } catch { /* ignore storage error */ }
                   }}
                   className="text-slate-500 hover:text-slate-300 p-1 -mr-1 -mt-1 transition-colors"
-                  title={t('pwaBannerDismiss') || "Закрити"}
+                  title={t('pwaBannerDismiss')}
                 >
                   <X size={16} />
                 </button>
@@ -713,7 +754,7 @@ export const AppModals: React.FC<AppModalsProps> = (props) => {
                   className="flex-1 py-2 px-3 bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-white text-xs font-black uppercase tracking-wider rounded-xl shadow-md shadow-cyan-500/20 active:scale-95 transition-all flex items-center justify-center gap-1.5"
                 >
                   <Download size={14} />
-                  {t('pwaBannerInstall') || "Встановити"}
+                  {t('pwaBannerInstall')}
                 </button>
                 <button
                   onClick={() => {
@@ -722,7 +763,7 @@ export const AppModals: React.FC<AppModalsProps> = (props) => {
                   }}
                   className="py-2 px-3 bg-slate-800/80 hover:bg-slate-800 text-slate-300 text-xs font-bold rounded-xl transition-colors"
                 >
-                  {t('pwaBannerDismiss') || "Пізніше"}
+                  {t('pwaBannerDismiss')}
                 </button>
               </div>
             </div>

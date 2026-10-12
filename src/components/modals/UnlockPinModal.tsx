@@ -52,14 +52,14 @@ export const UnlockPinModal: React.FC<UnlockPinModalProps> = ({
           <button 
             type="button"
             onClick={onClose}
-            className="flex-1 py-2 px-3 bg-[var(--bg-card)] hover:bg-[var(--bg-main)] text-[var(--text-muted)] hover:text-[var(--text-main)] border border-[var(--border-color)] rounded-xl text-xs font-bold transition-all uppercase cursor-pointer"
+            className="btn-secondary flex-1 py-2 px-3 text-xs uppercase"
           >
             {t('cancel')}
           </button>
           <button 
             type="button"
             onClick={handleUnlock}
-            className="flex-[2] py-2 px-3 bg-cyan-600 hover:bg-cyan-500 text-white rounded-xl text-xs font-bold transition-all shadow-md shadow-cyan-900/20 uppercase cursor-pointer"
+            className="btn-primary flex-[2] py-2 px-3 text-xs uppercase"
           >
             {t('unlock')}
           </button>

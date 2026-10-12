@@ -75,7 +75,7 @@ export const DraftsModal: React.FC<DraftsModalProps> = (props) => {
         <div className="flex items-center gap-1.5">
           <label 
             className="p-1.5 text-[var(--text-muted)] hover:text-cyan-400 bg-[var(--bg-card)] hover:bg-cyan-500/10 rounded-lg border border-[var(--border-color)] hover:border-cyan-500/40 transition-colors flex items-center justify-center cursor-pointer"
-            title={t('importBackup') || "Імпортувати бекап (.zip)"}
+            title={t('importBackup')}
           >
             <FileDown size={16} />
             <input type="file" accept=".zip" className="hidden" onChange={importBackup} />
@@ -83,7 +83,7 @@ export const DraftsModal: React.FC<DraftsModalProps> = (props) => {
           <button 
             onClick={exportBackup}
             className="p-1.5 text-[var(--text-muted)] hover:text-cyan-400 bg-[var(--bg-card)] hover:bg-cyan-500/10 rounded-lg border border-[var(--border-color)] hover:border-cyan-500/40 transition-colors flex items-center justify-center cursor-pointer"
-            title={t('exportBackup') || "Експортувати бекап (.zip)"}
+            title={t('exportBackup')}
           >
             <FileUp size={16} />
           </button>
@@ -100,7 +100,7 @@ export const DraftsModal: React.FC<DraftsModalProps> = (props) => {
             className={cn(
               "text-xs px-3 py-1 rounded-full border transition-all font-semibold cursor-pointer",
               draftFilter === f 
-                ? "bg-cyan-600 border-cyan-500 text-white shadow-xs" 
+                ? "bg-[var(--accent-hex)] border-[var(--accent-hex)] text-white shadow-xs" 
                 : "bg-[var(--bg-card)] border-[var(--border-color)] text-[var(--text-muted)] hover:border-slate-500 hover:text-[var(--text-main)]"
             )}
           >

@@ -7,12 +7,16 @@ import {
   Star,
   Play,
   Sliders,
-  Sparkles,
+  Gauge,
   Smartphone,
   Layers
 } from 'lucide-react';
 import { cn } from '../../lib/utils';
 import { useTypingSound } from '../../services/audio/useTypingSound';
+import { soundSynthEngine } from '../../services/audio/SoundSynthEngine';
+import { getPresetDisplayName } from '../../services/audio/presets';
+import { useEditorStore } from '../../store';
+import { getTranslation, TranslationKey } from '../../locales';
 
 interface AudioControlWidgetProps {
   sound: ReturnType<typeof useTypingSound>;
@@ -30,6 +34,8 @@ export const AudioControlWidget: React.FC<AudioControlWidgetProps> = ({
   className
 }) => {
   const [isOpen, setIsOpen] = useState(false);
+  const currentLang = useEditorStore(s => s.currentLang);
+  const t = (key: TranslationKey) => getTranslation(currentLang, key);
 
   const {
     enabled,
@@ -73,22 +79,27 @@ export const AudioControlWidget: React.FC<AudioControlWidgetProps> = ({
           className={cn(
             "p-1 rounded-md transition-colors flex items-center gap-1",
             enabled
-              ? "hover:bg-cyan-500/20 text-cyan-400"
-              : "hover:bg-slate-800/50 text-slate-500 hover:text-slate-300"
+              ? "hover:bg-cyan-500/20 text-cyan-500"
+              : "hover:bg-[var(--bg-card)] text-[var(--text-muted)] hover:text-[var(--text-main)]"
           )}
-          title={enabled ? `Звук клавіш: ${activePreset.name} (Увімкнено)` : 'Увімкнути звук набору клавіш'}
+          title={enabled ? t('audioToggleOnTitle').replace('{name}', getPresetDisplayName(activePreset, currentLang)) : t('audioToggleOffTitle')}
         >
           {enabled ? (
-            <Volume2 size={13} className="shrink-0 text-cyan-400 animate-in fade-in" />
+            <Volume2 size={13} className="shrink-0 text-cyan-500" />
           ) : (
-            <VolumeX size={13} className="shrink-0 text-slate-500" />
+            <VolumeX size={13} className="shrink-0 text-[var(--text-muted)]" />
           )}
           <span className="hidden md:inline text-[10px] font-semibold truncate max-w-[85px]">
-            {enabled ? activePreset.name.split(' ')[0] : 'Звук'}
+            {t('audioShortLabel')}
           </span>
-          {enabled && (
-            <span className="w-1.5 h-1.5 rounded-full bg-[rgb(var(--accent-color))] shrink-0 animate-pulse" />
-          )}
+          <span
+            className={cn(
+              "w-1.5 h-1.5 rounded-full shrink-0 transition-opacity",
+              enabled
+                ? "bg-[rgb(var(--accent-color))] opacity-100 animate-pulse"
+                : "bg-slate-500 opacity-30"
+            )}
+          />
         </button>
 
         {/* Dropdown Opener */}
@@ -98,13 +109,20 @@ export const AudioControlWidget: React.FC<AudioControlWidgetProps> = ({
           onMouseDown={(e) => e.preventDefault()}
           onClick={(e) => {
             e.stopPropagation();
-            setIsOpen(!isOpen);
+            const nextOpen = !isOpen;
+            if (nextOpen && typeof document !== 'undefined') {
+              const activeEl = document.activeElement as HTMLElement | null;
+              if (activeEl && (activeEl.id === 'main-editor' || activeEl.classList.contains('wysiwyg-editor') || activeEl.isContentEditable)) {
+                activeEl.blur();
+              }
+            }
+            setIsOpen(nextOpen);
           }}
           className={cn(
-            "p-1 rounded-md transition-colors text-slate-400 hover:text-white",
-            isOpen && "bg-slate-800"
+            "p-1 rounded-md transition-colors text-[var(--text-muted)] hover:text-[var(--text-main)]",
+            isOpen && "bg-[var(--bg-card)]"
           )}
-          title="Налаштування звуку та швидкий вибір пресетів"
+          title={t('audioMenuTitle')}
         >
           <ChevronDown size={11} className={cn("transition-transform duration-200", isOpen && "rotate-180")} />
         </button>
@@ -125,25 +143,20 @@ export const AudioControlWidget: React.FC<AudioControlWidgetProps> = ({
               animate={{ opacity: 1, y: 0, scale: 1 }}
               exit={{ opacity: 0, y: 8, scale: 0.96 }}
               transition={{ duration: 0.15 }}
-              className={cn(
-                "absolute left-0 sm:left-auto sm:right-0 top-full mt-2 w-72 rounded-2xl border p-3.5 shadow-2xl z-50 flex flex-col gap-3 select-none",
-                visualStyle === 'neon' || isDarkMode
-                  ? "bg-slate-900/95 backdrop-blur-md border-slate-800 text-slate-100"
-                  : "bg-white/95 backdrop-blur-md border-slate-200 text-slate-900 shadow-slate-300/50"
-              )}
+              className="fixed left-2 right-2 top-[calc(var(--header-height,3.5rem)+4.75rem+env(safe-area-inset-top,0px))] mx-auto w-auto max-w-[calc(100vw-1rem)] sm:mx-0 sm:left-auto sm:right-0 sm:absolute sm:top-full sm:mt-2 sm:w-72 rounded-2xl border border-[var(--border-color)] bg-[var(--modal-bg)] text-[var(--text-main)] p-3.5 shadow-2xl z-50 flex flex-col gap-3 select-none"
             >
               {/* Header & Quick On/Off */}
-              <div className="flex items-center justify-between border-b border-slate-800/80 pb-2.5">
+              <div className="flex items-center justify-between border-b border-[var(--border-color)] pb-2.5">
                 <div className="flex items-center gap-2">
                   <div className={cn(
                     "p-1.5 rounded-lg",
-                    enabled ? "bg-cyan-500/20 text-cyan-400" : "bg-slate-800 text-slate-400"
+                    enabled ? "bg-cyan-500/20 text-cyan-500" : "bg-[var(--bg-card)] text-[var(--text-muted)]"
                   )}>
                     {enabled ? <Volume2 size={14} /> : <VolumeX size={14} />}
                   </div>
                   <div>
-                    <h4 className="text-xs font-bold leading-none">Звук клавіш</h4>
-                    <span className="text-[10px] text-slate-400 leading-none">Web Audio Synth</span>
+                    <h4 className="text-xs font-bold leading-none text-[var(--text-main)]">{t('audioKeySoundTitle')}</h4>
+                    <span className="text-[10px] text-[var(--text-muted)] leading-none">Web Audio Synth</span>
                   </div>
                 </div>
 
@@ -152,7 +165,7 @@ export const AudioControlWidget: React.FC<AudioControlWidgetProps> = ({
                   onClick={toggleEnabled}
                   className={cn(
                     "w-9 h-5 rounded-full relative transition-colors p-0.5",
-                    enabled ? "bg-[rgb(var(--accent-color))]" : "bg-slate-700"
+                    enabled ? "bg-[rgb(var(--accent-color))]" : "bg-slate-600"
                   )}
                 >
                   <div
@@ -164,13 +177,13 @@ export const AudioControlWidget: React.FC<AudioControlWidgetProps> = ({
                 </button>
               </div>
 
-              {/* Volume Slider & Touch keys toggle */}
+              {/* Volume Slider, Touch keys & WPM Speed Optimization toggles */}
               <div className="space-y-2 py-1">
-                <div className="flex items-center justify-between text-[11px] text-slate-400">
+                <div className="flex items-center justify-between text-[11px] text-[var(--text-muted)]">
                   <span className="flex items-center gap-1.5">
-                    <Sliders size={12} /> Гучність
+                    <Sliders size={12} /> {t('audioVolume')}
                   </span>
-                  <span className="font-mono text-[10px] text-slate-300">
+                  <span className="font-mono tabular-nums text-[10px] text-[var(--text-main)]">
                     {Math.round(volume * 100)}%
                   </span>
                 </div>
@@ -182,12 +195,12 @@ export const AudioControlWidget: React.FC<AudioControlWidgetProps> = ({
                   value={volume}
                   onChange={(e) => setVolume(parseFloat(e.target.value))}
                   disabled={!enabled}
-                  className="w-full accent-[rgb(var(--accent-color))] cursor-pointer disabled:opacity-40 h-1.5 bg-slate-800 rounded-lg"
+                  className="w-full accent-[rgb(var(--accent-color))] cursor-pointer disabled:opacity-40 h-1.5 bg-[var(--bg-card)] rounded-lg"
                 />
 
-                <label className="flex items-center justify-between text-[11px] text-slate-400 pt-1 cursor-pointer">
+                <label className="flex items-center justify-between text-[11px] text-[var(--text-muted)] pt-1 cursor-pointer hover:text-[var(--text-main)] transition-colors">
                   <span className="flex items-center gap-1.5">
-                    <Smartphone size={12} /> Екранний тач / кнопки
+                    <Smartphone size={12} /> {t('audioTouchButtons')}
                   </span>
                   <input
                     type="checkbox"
@@ -195,17 +208,33 @@ export const AudioControlWidget: React.FC<AudioControlWidgetProps> = ({
                     onChange={(e) =>
                       updateSettings((prev) => ({ ...prev, playOnVirtualKeys: e.target.checked }))
                     }
-                    className="rounded border-slate-700 bg-slate-800 text-[rgb(var(--accent-color))] focus:ring-0 w-3.5 h-3.5 cursor-pointer"
+                    className="rounded border-[var(--border-color)] bg-[var(--bg-card)] text-[rgb(var(--accent-color))] focus:ring-0 w-3.5 h-3.5 cursor-pointer"
+                  />
+                </label>
+
+                <label className="flex items-center justify-between text-[11px] text-[var(--text-muted)] pt-0.5 cursor-pointer hover:text-[var(--text-main)] transition-colors">
+                  <span className="flex items-center gap-1.5">
+                    <Gauge size={12} /> {t('audioWpmOpt')}
+                  </span>
+                  <input
+                    type="checkbox"
+                    checked={settings.speedScalingEnabled !== false}
+                    onChange={(e) => {
+                      const checked = e.target.checked;
+                      updateSettings((prev) => ({ ...prev, speedScalingEnabled: checked }));
+                      soundSynthEngine.clearCache();
+                    }}
+                    className="rounded border-[var(--border-color)] bg-[var(--bg-card)] text-[rgb(var(--accent-color))] focus:ring-0 w-3.5 h-3.5 cursor-pointer"
                   />
                 </label>
               </div>
 
               {/* Fast Preset Selector */}
               <div className="space-y-1.5">
-                <div className="flex items-center justify-between text-[10px] font-bold uppercase tracking-wider text-slate-500">
-                  <span>Швидкий вибір</span>
+                <div className="flex items-center justify-between text-[10px] font-bold uppercase tracking-wider text-[var(--text-muted)]">
+                  <span>{t('audioQuickSelect')}</span>
                   <span className="text-[9px] lowercase font-normal opacity-70">
-                    {allPresets.length} пресетів
+                    {t('audioPresetsCount').replace('{count}', String(allPresets.length))}
                   </span>
                 </div>
 
@@ -221,8 +250,8 @@ export const AudioControlWidget: React.FC<AudioControlWidgetProps> = ({
                         className={cn(
                           "flex items-center justify-between p-1.5 rounded-lg cursor-pointer transition-all text-xs",
                           isActive
-                            ? "bg-[rgb(var(--accent-color)/0.15)] text-[rgb(var(--accent-color))] font-semibold border border-[rgb(var(--accent-color)/0.3)]"
-                            : "hover:bg-slate-800/60 text-slate-300"
+                            ? "bg-[rgb(var(--accent-color)/0.15)] text-[rgb(var(--accent-color))] font-semibold border border-[rgb(var(--accent-color)/0.35)]"
+                            : "hover:bg-[var(--bg-card)] text-[var(--text-main)]"
                         )}
                       >
                         <div className="flex items-center gap-1.5 min-w-0">
@@ -232,14 +261,14 @@ export const AudioControlWidget: React.FC<AudioControlWidgetProps> = ({
                               e.stopPropagation();
                               toggleFavoritePreset(preset.id);
                             }}
-                            className="p-0.5 text-slate-500 hover:text-amber-400 transition-colors"
+                            className="p-0.5 text-[var(--text-muted)] hover:text-amber-400 transition-colors"
                           >
                             <Star
                               size={11}
                               className={cn(isFav && "fill-amber-400 text-amber-400")}
                             />
                           </button>
-                          <span className="truncate">{preset.name}</span>
+                          <span className="truncate">{getPresetDisplayName(preset, currentLang)}</span>
                         </div>
 
                         <div className="flex items-center gap-1 shrink-0">
@@ -249,8 +278,8 @@ export const AudioControlWidget: React.FC<AudioControlWidgetProps> = ({
                               e.stopPropagation();
                               previewPreset(preset);
                             }}
-                            className="p-1 rounded hover:bg-slate-700 text-slate-400 hover:text-white transition-colors"
-                            title="Послухати"
+                            className="p-1 rounded hover:bg-[var(--bg-card)] text-[var(--text-muted)] hover:text-[var(--text-main)] transition-colors"
+                            title={t('audioPreviewBtnTitle')}
                           >
                             <Play size={10} className="fill-current" />
                           </button>
@@ -262,17 +291,17 @@ export const AudioControlWidget: React.FC<AudioControlWidgetProps> = ({
               </div>
 
               {/* Footer: Open full presets manager modal */}
-              <div className="pt-2 border-t border-slate-800/80">
+              <div className="pt-2 border-t border-[var(--border-color)]">
                 <button
                   type="button"
                   onClick={() => {
                     setIsOpen(false);
                     onOpenPresetsModal();
                   }}
-                  className="w-full py-1.5 px-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold flex items-center justify-center gap-1.5 transition-all border border-slate-700/60"
+                  className="w-full py-1.5 px-2.5 rounded-xl bg-[var(--bg-card)] hover:opacity-90 text-[var(--text-main)] text-xs font-semibold flex items-center justify-center gap-1.5 transition-all border border-[var(--border-color)]"
                 >
                   <Layers size={13} />
-                  <span>Всі пресети, імпорт та налаштування...</span>
+                  <span>{t('audioAllPresetsBtn')}</span>
                 </button>
               </div>
             </motion.div>

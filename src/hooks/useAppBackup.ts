@@ -32,11 +32,7 @@ export function useAppBackup({
   t,
 }: UseAppBackupProps) {
   const handleClearCache = async () => {
-    const confirmed = await confirmDialog(
-      lang === 'uk' 
-        ? "Очистити кеш переглянутих дописів, тимчасових списків та завантажених зображень? Ваші чернетки, шаблони та збережені ключі НЕ будуть видалені." 
-        : "Clear cached posts, loaded lists, and temporary images? Your drafts, templates, and keys will NOT be deleted."
-    );
+    const confirmed = await confirmDialog(t('confirmClearCachePrompt'));
     if (!confirmed) return;
 
     const cleared = true;
@@ -143,11 +139,11 @@ export function useAppBackup({
       }
 
       if (cleared) {
-        notify(lang === 'uk' ? "Кеш перегляду та зображень успішно очищено!" : "Cache cleared successfully!", "success");
+        notify(t('cacheClearedSuccess'), "success");
       }
     } catch (err: any) {
       console.error(err);
-      notify((t('nativeCacheError') || "Error") + ": " + err.message, "error");
+      notify(t('nativeCacheError') + ": " + err.message, "error");
     }
   };
 

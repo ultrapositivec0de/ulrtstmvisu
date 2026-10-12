@@ -10,6 +10,7 @@ interface UseReaderBlockchainActionsProps {
   username: string;
   imageUploadAccount: string;
   vaultAccounts: string[];
+  vaultPin?: string;
   appAgent: string;
   mutedUsers: string[];
   setMutedUsers: React.Dispatch<React.SetStateAction<string[]>>;
@@ -28,6 +29,7 @@ export function useReaderBlockchainActions({
   username,
   imageUploadAccount,
   vaultAccounts,
+  vaultPin,
   appAgent,
   mutedUsers,
   setMutedUsers,
@@ -41,6 +43,62 @@ export function useReaderBlockchainActions({
 }: UseReaderBlockchainActionsProps) {
   const [loadingContext, setLoadingContext] = useState<Set<string>>(new Set());
 
+  const ensureVaultUnlocked = async () => {
+    if (authType === 'VAULT' && SecurityService.isLocked()) {
+      let pin = vaultPin?.trim() || '';
+      if (!pin && promptDialog) {
+        pin = (await promptDialog(t('enterPin'), '', undefined, 'password')) || '';
+      }
+      if (!pin) {
+        let unlocked = false;
+        let pinErrorMsg = '';
+        while (!unlocked) {
+          const pass = await promptDialog(
+            pinErrorMsg ? `${t('pinError')} (${pinErrorMsg}). ${t('enterPin')}` : t('enterPin'),
+            '',
+            undefined,
+            'password'
+          );
+          if (!pass) throw new Error(t('pinRequired'));
+          try {
+            await SecurityService.unlock(pass);
+            initVault();
+            unlocked = true;
+          } catch (e: any) {
+            pinErrorMsg = e.message || 'Incorrect PIN';
+            notify(`❌ ${pinErrorMsg}`, 'error');
+          }
+        }
+      } else {
+        try {
+          await SecurityService.unlock(pin);
+          initVault();
+        } catch (e: any) {
+          let unlocked = false;
+          let pinErrorMsg = e.message || 'Incorrect PIN';
+          while (!unlocked) {
+            const pass = await promptDialog(
+              `${t('pinError')} (${pinErrorMsg}). ${t('enterPin')}`,
+              '',
+              undefined,
+              'password'
+            );
+            if (!pass) throw new Error(t('pinRequired'), { cause: e });
+            try {
+              await SecurityService.unlock(pass);
+              initVault();
+              unlocked = true;
+            } catch (err: any) {
+              pinErrorMsg = err.message || 'Incorrect PIN';
+              notify(`❌ ${pinErrorMsg}`, 'error');
+            }
+          }
+        }
+      }
+    }
+    SecurityService.touchSession();
+  };
+
   const handleDeleteComment = async (author: string, permlink: string) => {
     const activeUser = authType === 'VAULT' ? selectedVaultUser : username;
     if (!activeUser) {
@@ -49,7 +107,8 @@ export function useReaderBlockchainActions({
     }
     
     try {
-      setPubLog({ msg: 'Deleting...', type: 'loading' });
+      await ensureVaultUnlocked();
+      setPubLog({ msg: t('deletingStatus'), type: 'loading' });
       const client = getClient();
       if (!client) throw new Error("Steem client failed to initialize.");
       
@@ -63,7 +122,7 @@ export function useReaderBlockchainActions({
           });
         });
       }
-      setPubLog({ msg: 'Deleted successfully', type: 'success' });
+      setPubLog({ msg: t('deletedSuccess'), type: 'success' });
       setTimeout(() => setPubLog({ msg: '', type: null }), 3000);
     } catch (err: any) {
       console.error(err);
@@ -90,29 +149,11 @@ export function useReaderBlockchainActions({
       }
     }
     
-    if (uploadAuthType === 'VAULT' && SecurityService.isLocked()) {
-      let unlocked = false;
-      let pinErrorMsg = '';
-      while (!unlocked) {
-        const pass = await promptDialog(
-          pinErrorMsg ? `${t('pinError')} (${pinErrorMsg}). ${t('enterPin')}` : t('enterPin'),
-          '',
-          undefined,
-          'password'
-        );
-        if (!pass) throw new Error(t('pinRequired') || "Cancelled");
-        try {
-          await SecurityService.unlock(pass);
-          initVault();
-          unlocked = true;
-        } catch (e: any) {
-          pinErrorMsg = e.message || 'Incorrect PIN';
-          notify(`❌ ${pinErrorMsg}`, 'error');
-        }
-      }
+    if (uploadAuthType === 'VAULT') {
+      await ensureVaultUnlocked();
     }
 
-    setPubLog({ msg: `Uploading ${file.name}...`, type: 'loading' });
+    setPubLog({ msg: t('uploadingStatus').replace('{name}', file.name), type: 'loading' });
     try {
       const sanitizedName = sanitizeFilename(file.name);
       const safeFile = new File([file], sanitizedName, { type: file.type });
@@ -146,6 +187,7 @@ export function useReaderBlockchainActions({
     }
 
     try {
+      await ensureVaultUnlocked();
       setPubLog({ msg: t('publishing'), type: 'loading' });
       const permlink = editPermlink || `re-${parentAuthor.replace(/\./g, '')}-${Date.now()}`;
       const meta = JSON.stringify({ tags: [], app: appAgent, format: 'markdown' });
@@ -196,6 +238,7 @@ export function useReaderBlockchainActions({
     }
 
     try {
+      await ensureVaultUnlocked();
       const client = getClient();
       if (!client) throw new Error("Steem client failed to initialize.");
       
@@ -219,7 +262,7 @@ export function useReaderBlockchainActions({
           json: json
         }, activeUser);
       }
-      notify(`Successfully ${mute ? 'muted' : 'unmuted'} @${targetUser}`, 'success');
+      notify(mute ? t('userMutedSuccess').replace('{user}', targetUser) : t('userUnmutedSuccess').replace('{user}', targetUser), 'success');
       setMutedUsers(prev => {
         let next;
         if (mute) next = Array.from(new Set([...prev, targetUser]));
@@ -245,6 +288,7 @@ export function useReaderBlockchainActions({
     setLoadingContext(prev => new Set(prev).add(key));
 
     try {
+      await ensureVaultUnlocked();
       const client = getClient();
       if (!client) throw new Error("Steem client failed to initialize.");
       const vote = { voter: activeUser, author, permlink, weight };

@@ -2,6 +2,8 @@ import React from 'react';
 import { DocReaderSettings, DocReaderTheme, DocReaderWidth, DocReaderFont } from './types';
 import { X, Sliders, Sun, Moon, Eye, AlignCenter, Type, Minus, Plus } from 'lucide-react';
 import { cn } from '../../lib/utils';
+import { useEditorStore } from '../../store';
+import { getTranslation, TranslationKey } from '../../locales';
 
 interface DocReaderSettingsMenuProps {
   isOpen: boolean;
@@ -16,25 +18,28 @@ export const DocReaderSettingsMenu: React.FC<DocReaderSettingsMenuProps> = ({
   settings,
   onUpdateSettings
 }) => {
+  const currentLang = useEditorStore(s => s.currentLang);
+  const t = (key: TranslationKey) => getTranslation(currentLang, key);
+
   if (!isOpen) return null;
 
   const themes: { id: DocReaderTheme; label: string; icon: any; bg: string; text: string }[] = [
-    { id: 'paper', label: 'Папір', icon: Sun, bg: 'bg-[#fafafa]', text: 'text-slate-900 border-slate-300' },
-    { id: 'sepia', label: 'Сепія', icon: Eye, bg: 'bg-[#f4ecd8]', text: 'text-[#433422] border-[#dfd2be]' },
-    { id: 'dark', label: 'Ніч', icon: Moon, bg: 'bg-[#0f172a]', text: 'text-slate-100 border-slate-700' },
-    { id: 'oled', label: 'OLED', icon: Moon, bg: 'bg-black', text: 'text-slate-200 border-zinc-800' }
+    { id: 'paper', label: t('readerThemePaper'), icon: Sun, bg: 'bg-[#fafafa]', text: 'text-slate-900 border-slate-300' },
+    { id: 'sepia', label: t('readerThemeSepia'), icon: Eye, bg: 'bg-[#f4ecd8]', text: 'text-[#433422] border-[#dfd2be]' },
+    { id: 'dark', label: t('readerThemeDark'), icon: Moon, bg: 'bg-[#0f172a]', text: 'text-slate-100 border-slate-700' },
+    { id: 'oled', label: t('readerThemeOled'), icon: Moon, bg: 'bg-black', text: 'text-slate-200 border-zinc-800' }
   ];
 
   const widths: { id: DocReaderWidth; label: string; desc: string }[] = [
-    { id: 'narrow', label: 'Книга', desc: '65ch (вузька)' },
-    { id: 'medium', label: 'Стандарт', desc: '85ch (комфортна)' },
-    { id: 'full', label: 'Повна', desc: '100% ширини' }
+    { id: 'narrow', label: t('readerWidthNarrow'), desc: t('readerWidthNarrowDesc') },
+    { id: 'medium', label: t('readerWidthMedium'), desc: t('readerWidthMediumDesc') },
+    { id: 'full', label: t('readerWidthFull'), desc: t('readerWidthFullDesc') }
   ];
 
   const fonts: { id: DocReaderFont; label: string; fontClass: string }[] = [
-    { id: 'sans', label: 'Sans (Сучасний)', fontClass: 'font-sans' },
-    { id: 'serif', label: 'Serif (Книжковий)', fontClass: 'font-serif' },
-    { id: 'mono', label: 'Mono (Код)', fontClass: 'font-mono' }
+    { id: 'sans', label: t('readerFontSans'), fontClass: 'font-sans' },
+    { id: 'serif', label: t('readerFontSerif'), fontClass: 'font-serif' },
+    { id: 'mono', label: t('readerFontMono'), fontClass: 'font-mono' }
   ];
 
   const isLight = settings.theme === 'paper' || settings.theme === 'sepia';
@@ -68,7 +73,7 @@ export const DocReaderSettingsMenu: React.FC<DocReaderSettingsMenuProps> = ({
         )}>
           <div className="flex items-center gap-2 font-medium">
             <Sliders size={18} className={isSepia ? "text-[#8c6d37]" : isLight ? "text-cyan-600" : "text-cyan-400"} />
-            <span>Параметри читання</span>
+            <span>{t('readerSettingsTitle')}</span>
           </div>
           <button
             onClick={onClose}
@@ -90,7 +95,7 @@ export const DocReaderSettingsMenu: React.FC<DocReaderSettingsMenuProps> = ({
           {/* 1. Theme Selection */}
           <div>
             <label className="block text-xs font-semibold uppercase tracking-wider opacity-60 mb-2">
-              Колірна тема
+              {t('readerColorTheme')}
             </label>
             <div className="grid grid-cols-4 gap-2">
               {themes.map(t => {
@@ -120,7 +125,7 @@ export const DocReaderSettingsMenu: React.FC<DocReaderSettingsMenuProps> = ({
           <div>
             <label className="block text-xs font-semibold uppercase tracking-wider opacity-60 mb-2 flex items-center gap-1.5">
               <AlignCenter size={14} />
-              <span>Ширина колонки тексту</span>
+              <span>{t('readerColumnWidth')}</span>
             </label>
             <div className="grid grid-cols-3 gap-2">
               {widths.map(w => {
@@ -156,7 +161,7 @@ export const DocReaderSettingsMenu: React.FC<DocReaderSettingsMenuProps> = ({
           <div>
             <label className="block text-xs font-semibold uppercase tracking-wider opacity-60 mb-2 flex items-center gap-1.5">
               <Type size={14} />
-              <span>Гарнітура шрифту</span>
+              <span>{t('readerFontFamily')}</span>
             </label>
             <div className="grid grid-cols-3 gap-2">
               {fonts.map(f => {
@@ -195,12 +200,12 @@ export const DocReaderSettingsMenu: React.FC<DocReaderSettingsMenuProps> = ({
               "p-3 rounded-xl border flex flex-col justify-between gap-2",
               isSepia ? "bg-[#f8f2e4] border-[#dfd2be]" : isLight ? "bg-white border-slate-200" : "bg-slate-800/40 border-slate-800"
             )}>
-              <div className="text-xs font-medium opacity-70">Розмір тексту</div>
+              <div className="text-xs font-medium opacity-70">{t('readerFontSize')}</div>
               <div className="flex items-center justify-between">
                 <button
                   onClick={() => onUpdateSettings({ fontSize: Math.max(14, settings.fontSize - 1) })}
                   className="p-1.5 rounded-lg border hover:opacity-80 transition-opacity"
-                  title="Зменшити"
+                  title={t('readerDecrease')}
                 >
                   <Minus size={14} />
                 </button>
@@ -208,7 +213,7 @@ export const DocReaderSettingsMenu: React.FC<DocReaderSettingsMenuProps> = ({
                 <button
                   onClick={() => onUpdateSettings({ fontSize: Math.min(28, settings.fontSize + 1) })}
                   className="p-1.5 rounded-lg border hover:opacity-80 transition-opacity"
-                  title="Збільшити"
+                  title={t('readerIncrease')}
                 >
                   <Plus size={14} />
                 </button>
@@ -220,12 +225,12 @@ export const DocReaderSettingsMenu: React.FC<DocReaderSettingsMenuProps> = ({
               "p-3 rounded-xl border flex flex-col justify-between gap-2",
               isSepia ? "bg-[#f8f2e4] border-[#dfd2be]" : isLight ? "bg-white border-slate-200" : "bg-slate-800/40 border-slate-800"
             )}>
-              <div className="text-xs font-medium opacity-70">Міжрядковий інтервал</div>
+              <div className="text-xs font-medium opacity-70">{t('readerLineHeight')}</div>
               <div className="flex items-center justify-between">
                 <button
                   onClick={() => onUpdateSettings({ lineHeight: Math.max(1.4, Number((settings.lineHeight - 0.1).toFixed(2))) })}
                   className="p-1.5 rounded-lg border hover:opacity-80 transition-opacity"
-                  title="Зменшити"
+                  title={t('readerDecrease')}
                 >
                   <Minus size={14} />
                 </button>
@@ -233,7 +238,7 @@ export const DocReaderSettingsMenu: React.FC<DocReaderSettingsMenuProps> = ({
                 <button
                   onClick={() => onUpdateSettings({ lineHeight: Math.min(2.4, Number((settings.lineHeight + 0.1).toFixed(2))) })}
                   className="p-1.5 rounded-lg border hover:opacity-80 transition-opacity"
-                  title="Збільшити"
+                  title={t('readerIncrease')}
                 >
                   <Plus size={14} />
                 </button>
@@ -244,7 +249,7 @@ export const DocReaderSettingsMenu: React.FC<DocReaderSettingsMenuProps> = ({
           {/* 5. Toggles */}
           <div className="pt-2 border-t space-y-2">
             <label className="flex items-center justify-between cursor-pointer py-1">
-              <span className="text-xs font-medium opacity-80">Показувати верхній прогрес-бар читання</span>
+              <span className="text-xs font-medium opacity-80">{t('readerShowProgress')}</span>
               <input
                 type="checkbox"
                 checked={settings.showProgress}

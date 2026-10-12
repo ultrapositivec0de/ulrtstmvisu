@@ -13,3 +13,7 @@
   - Floating and modal backdrops must enforce `overscroll-behavior: contain` / `touch-action: none` on non-scrollable containers to prevent rubber-band drag on touch devices.
   - Dropdown menus and popup panels in the Header must be bounded by `max-w-[calc(100vw-1rem)]` with `flex-wrap` where applicable to prevent horizontal document overflow on narrow mobile viewports.
 
+## Global Localization & Translation Standards (i18n)
+- **Single Source of Truth (`src/locales/`)**: All UI strings, button labels, titles, tooltips, placeholders, aria-labels, notifications, dialog prompts, and descriptions across all menus, modals, widgets, hooks, and sub-packages MUST be stored in the global localization dictionaries (`src/locales/uk.ts`, `src/locales/en.ts`, `src/locales/es.ts`, `src/locales/ko.ts`) and accessed via `t('key')` or `getTranslation(lang, 'key')`.
+- **No Hardcoded Strings or Inline Fallbacks**: Never hardcode Ukrainian or English UI strings directly in `.tsx` / `.ts` components, hooks, or services. Never use inline binary language checks (`lang === 'uk' ? '...' : '...'`) or inline fallback strings (`t('key') || '...'`) that bypass non-Ukrainian/non-English locales (`es`, `ko`, etc.).
+- **Multi-Locale Synchronization**: Whenever a new UI element, menu, modal, audio preset, or feature is created or updated, every new translation key MUST be added simultaneously to all active locale dictionaries (`uk`, `en`, `es`, `ko`) so `TranslationKey` types remain strictly synchronized.

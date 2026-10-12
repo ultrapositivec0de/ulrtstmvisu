@@ -54,6 +54,7 @@ import { callWithFallback } from "../lib/steem";
 import { ReaderConfig, SteemPost } from "../types";
 import { getTranslation, type TranslationKey } from "../locales";
 import { POPULAR_COMMUNITIES, POPULAR_TAGS } from "../data/communities";
+import { ReaderMobileBottomBar } from "./reader/ReaderMobileBottomBar";
 
 function getWordCounts(body: string) {
   const dirtyWords = body.trim().split(/\s+/).length;
@@ -77,6 +78,8 @@ function getWordCounts(body: string) {
 interface ReaderProps {
   lang?: string;
   t?: (key: TranslationKey) => string;
+  editorFontSize?: number;
+  setEditorFontSize?: (size: number | ((prev: number) => number)) => void;
   onEditPost: (post: SteemPost) => void;
   onComment: (
     parentAuthor: string,
@@ -200,10 +203,10 @@ const ReplyBox = React.memo(
     };
 
     return (
-      <div className="space-y-3 relative">
+      <div className="space-y-2 sm:space-y-3 relative">
         {(sending || uploading) && (
-          <div className="absolute inset-0 z-10 bg-slate-900/40 backdrop-blur-[1px] flex items-center justify-center rounded">
-            <RefreshCw size={24} className="text-cyan-400 animate-spin" />
+          <div className="absolute inset-0 z-10 bg-[var(--modal-bg)]/80 flex items-center justify-center rounded">
+            <RefreshCw size={24} className="text-[var(--accent-hex)] animate-spin" />
           </div>
         )}
         <textarea
@@ -220,21 +223,22 @@ const ReplyBox = React.memo(
               target.style.height = `${target.scrollHeight}px`;
             }
           }}
-          rows={4}
-          className="w-full bg-slate-950 border border-slate-800 rounded p-3 text-[12px] min-h-[120px] max-h-[40vh] md:max-h-[50vh] outline-none focus:ring-1 focus:ring-cyan-500 resize-none font-sans overflow-y-auto transition-all custom-scrollbar"
+          rows={3}
+          className="w-full bg-[var(--bg-main)] text-[var(--text-main)] border border-[var(--border-color)] rounded-lg p-2.5 sm:p-3 text-xs sm:text-[13px] min-h-[76px] sm:min-h-[110px] max-h-[30vh] sm:max-h-[45vh] outline-none focus:ring-1 focus:ring-[var(--accent-hex)] resize-none font-sans overflow-y-auto transition-all custom-scrollbar"
           placeholder={resolvedPlaceholder}
           onKeyDown={(e) => {
-            if (e.key === "Enter" && e.ctrlKey && !sending && value.trim()) {
+            if (e.key === "Enter" && (e.ctrlKey || e.metaKey) && !sending && value.trim()) {
+              e.preventDefault();
               handleSend();
             }
           }}
         />
-        <div className="flex justify-between items-center">
-          <div className="flex items-center gap-1.5 sm:gap-3 shrink-0 w-full sm:w-auto overflow-x-auto no-scrollbar justify-between sm:justify-start pb-1 sm:pb-0">
+        <div className="flex flex-wrap justify-between items-center gap-2">
+          <div className="flex items-center gap-2 sm:gap-3 shrink-0 overflow-x-auto no-scrollbar">
             {onUploadImage && (
-              <label className="cursor-pointer text-slate-500 hover:text-cyan-400 flex items-center gap-1.5 transition-colors">
-                <ImageIcon size={18} />
-                <span className="text-[10px] hidden sm:inline">{loc("image")}</span>
+              <label className="cursor-pointer text-[var(--text-muted)] hover:text-[var(--accent-hex)] flex items-center gap-1.5 transition-colors px-2 py-1 rounded-md bg-[var(--bg-main)] border border-[var(--border-color)]">
+                <ImageIcon size={16} />
+                <span className="text-[11px] font-medium">{loc("image")}</span>
                 <input
                   type="file"
                   accept="image/*"
@@ -244,30 +248,40 @@ const ReplyBox = React.memo(
                 />
               </label>
             )}
-            <span className="text-[10px] text-slate-500 leading-none">
+            <span className="text-[10px] text-[var(--text-muted)] leading-none hidden sm:inline">
               {loc("ctrlEnterToSend")}
             </span>
           </div>
-          <div className="flex justify-end gap-2">
+          <div className="flex justify-end items-center gap-2 ml-auto">
             {!sending && !uploading && (
               <button
-                onClick={onCancel}
-                className="px-2 py-1 text-[10px] text-slate-500 hover:text-slate-300"
+                type="button"
+                onMouseDown={(e) => e.preventDefault()}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onCancel();
+                }}
+                className="px-3 py-1.5 rounded-lg text-xs font-medium text-[var(--text-muted)] hover:text-[var(--text-main)] hover:bg-[var(--bg-main)] border border-transparent hover:border-[var(--border-color)] transition-colors"
               >
                 {loc("cancel")}
               </button>
             )}
             <button
+              type="button"
               disabled={sending || uploading || !value.trim()}
-              onClick={handleSend}
-              className="px-3 py-1 bg-cyan-600 hover:bg-cyan-500 disabled:opacity-50 disabled:cursor-not-allowed rounded text-[10px] font-bold flex items-center gap-1.5 transition-colors"
+              onMouseDown={(e) => e.preventDefault()}
+              onClick={(e) => {
+                e.stopPropagation();
+                handleSend();
+              }}
+              className="btn-primary px-4 py-1.5 disabled:opacity-50 disabled:cursor-not-allowed rounded-lg text-xs font-bold flex items-center gap-1.5 transition-all shadow-sm active:scale-95"
             >
               {sending ? (
-                <RefreshCw size={16} className="animate-spin" />
+                <RefreshCw size={15} className="animate-spin" />
               ) : (
-                <Send size={16} />
+                <Send size={15} />
               )}
-              {sending ? loc("sending") : loc("send")}
+              <span>{sending ? loc("sending") : loc("send")}</span>
             </button>
           </div>
         </div>
@@ -279,6 +293,8 @@ const ReplyBox = React.memo(
 export default function Reader({
   lang: propLang,
   t: propT,
+  editorFontSize,
+  setEditorFontSize,
   onEditPost,
   onComment,
   onVote,
@@ -291,6 +307,8 @@ export default function Reader({
   targetReaderPost,
   rawInboxData,
 }: ReaderProps) {
+  const mainScrollRef = useRef<HTMLDivElement>(null);
+
   const t = useCallback((k: TranslationKey) => {
     if (propT) return propT(k);
     const currentLang = propLang || (typeof localStorage !== "undefined" ? localStorage.getItem("steem_lang") : null) || "uk";
@@ -635,6 +653,30 @@ export default function Reader({
     return DEFAULT_READER_CONFIG;
   });
 
+  const currentFontSize = editorFontSize ?? config.fontSize;
+
+  useEffect(() => {
+    if (editorFontSize !== undefined && editorFontSize !== config.fontSize) {
+      setConfig((c) => ({ ...c, fontSize: editorFontSize }));
+    }
+  }, [editorFontSize, config.fontSize]);
+
+  const handleDecreaseFontSize = useCallback(() => {
+    const newSize = Math.max(12, currentFontSize - 1);
+    if (setEditorFontSize) {
+      setEditorFontSize(newSize);
+    }
+    setConfig((c) => ({ ...c, fontSize: newSize }));
+  }, [currentFontSize, setEditorFontSize]);
+
+  const handleIncreaseFontSize = useCallback(() => {
+    const newSize = Math.min(24, currentFontSize + 1);
+    if (setEditorFontSize) {
+      setEditorFontSize(newSize);
+    }
+    setConfig((c) => ({ ...c, fontSize: newSize }));
+  }, [currentFontSize, setEditorFontSize]);
+
   const [searchTag, setSearchTag] = useState(config.tags.join(" "));
   const [commentingPost, setCommentingPost] = useState<SteemPost | null>(null);
   const [commentBody, setCommentBody] = useState("");
@@ -675,6 +717,7 @@ export default function Reader({
   const [voteWeight, setVoteWeight] = useState(10000); // 100%
   const [showInbox, setShowInbox] = useState(false);
   const [inbox, setInbox] = useState<SteemPost[]>([]);
+  const unreadRepliesCount = inbox.filter((r) => !hiddenReplies.has(r.permlink)).length;
   const [inboxLimit, setInboxLimit] = useState(50);
   const [loadingInbox, setLoadingInbox] = useState(false);
   const [replyingTo, setReplyingTo] = useState<SteemPost | null>(null);
@@ -1399,6 +1442,8 @@ export default function Reader({
     if (
       target?.closest(".floating-reply-tooltip") ||
       target?.closest(".inline-reply-container") ||
+      target?.closest(".post-actions") ||
+      target?.closest("button") ||
       target?.tagName === "TEXTAREA" ||
       target?.tagName === "INPUT"
     ) {
@@ -1423,15 +1468,14 @@ export default function Reader({
 
       setCommentingPost(post);
     } else {
-      // If clicking outside and not on a menu, clear it
-      const target = window.event?.target as HTMLElement;
+      // If clicking outside and not on a menu or active inline comment box, clear floating quote tooltip only
       if (
         !target?.closest(".floating-reply-tooltip") &&
         !target?.closest(".inline-reply-container") &&
-        !target?.closest(".post-actions")
+        !target?.closest(".post-actions") &&
+        quotePosition
       ) {
         setQuotePosition(null);
-        setCommentingPost(null);
         setSelectedText("");
       }
     }
@@ -1611,8 +1655,8 @@ export default function Reader({
   };
 
   return (
-    <div className="flex flex-col h-full bg-slate-950 text-slate-100 overflow-hidden font-sans">
-      <div className="border-b border-slate-800 bg-slate-900/50 backdrop-blur-md">
+    <div className="flex flex-col h-full bg-[var(--bg-main)] text-[var(--text-main)] overflow-hidden font-sans">
+      <div className="border-b border-[var(--border-color)] bg-[var(--bg-card)]">
         <AnimatePresence initial={false}>
           {isReaderHeaderOpen && (
             <motion.div
@@ -1686,26 +1730,16 @@ export default function Reader({
 
                   <div className="flex items-center gap-1.5 p-1 bg-slate-800 rounded-lg border border-slate-700">
                     <button
-                      onClick={() =>
-                        setConfig((c) => ({
-                          ...c,
-                          fontSize: Math.max(12, c.fontSize - 1),
-                        }))
-                      }
+                      onClick={handleDecreaseFontSize}
                       className="p-1 px-2 hover:bg-slate-700 rounded transition-colors text-xs font-bold"
                     >
                       A-
                     </button>
                     <div className="w-10 text-center text-[10px] font-mono text-slate-500 border-x border-slate-700">
-                      {config.fontSize}px
+                      {currentFontSize}px
                     </div>
                     <button
-                      onClick={() =>
-                        setConfig((c) => ({
-                          ...c,
-                          fontSize: Math.min(24, c.fontSize + 1),
-                        }))
-                      }
+                      onClick={handleIncreaseFontSize}
                       className="p-1 px-2 hover:bg-slate-700 rounded transition-colors text-xs font-bold"
                     >
                       A+
@@ -1733,80 +1767,89 @@ export default function Reader({
           )}
         </AnimatePresence>
 
-        <div className="px-1 sm:px-4 pb-2 pt-2 flex items-center justify-between overflow-x-auto no-scrollbar">
-          <div className="flex items-center gap-1 sm:gap-2 w-full sm:w-auto shrink-0">
+        <div className="px-2 sm:px-4 py-2 flex items-center justify-between gap-2 sm:gap-4 overflow-x-auto custom-scrollbar scroll-smooth bg-slate-900/90 border-t border-slate-800/80 shadow-inner">
+          <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
             <button
               onClick={() => setViewMode("feed")}
               className={cn(
-                "px-2 sm:px-4 py-1.5 rounded-t-lg transition-all text-xs font-bold flex items-center gap-1 sm:gap-2 border-b-2 shrink-0",
+                "px-2.5 sm:px-4 py-1.5 rounded-xl transition-all text-xs font-bold flex items-center gap-1.5 sm:gap-2 border shrink-0",
                 viewMode === "feed"
-                  ? "border-cyan-500 text-cyan-400 bg-cyan-500/5"
-                  : "border-transparent text-slate-500 hover:text-slate-300",
+                  ? "border-cyan-500/60 text-cyan-300 bg-cyan-500/15 shadow-sm shadow-cyan-950/50"
+                  : "border-slate-800 bg-slate-800/40 text-slate-300 hover:text-white hover:bg-slate-800",
               )}
             >
-              <Layout size={18} /> <span className="hidden sm:inline">{t("feed")}</span>
+              <Layout size={17} className={cn(viewMode === "feed" ? "text-cyan-400" : "text-slate-400")} />
+              <span className="text-[11px] sm:text-xs">{t("feed")}</span>
             </button>
             <button
               onClick={() => {
                 setViewMode("curation");
               }}
               className={cn(
-                "px-2 sm:px-4 py-1.5 rounded-t-lg transition-all text-xs font-bold flex items-center gap-1 sm:gap-2 border-b-2 shrink-0",
+                "px-2.5 sm:px-4 py-1.5 rounded-xl transition-all text-xs font-bold flex items-center gap-1.5 sm:gap-2 border shrink-0",
                 viewMode === "curation"
-                  ? "border-purple-500 text-purple-400 bg-purple-500/5"
-                  : "border-transparent text-slate-500 hover:text-slate-300",
+                  ? "border-purple-500/60 text-purple-300 bg-purple-500/15 shadow-sm shadow-purple-950/50"
+                  : "border-slate-800 bg-slate-800/40 text-slate-300 hover:text-white hover:bg-slate-800",
               )}
             >
-              <Briefcase size={18} /> <span className="hidden lg:inline">{t("curationDashboard")}</span><span className="hidden sm:inline lg:hidden">{t("curation")}</span>
+              <Briefcase size={17} className={cn(viewMode === "curation" ? "text-purple-400" : "text-slate-400")} />
+              <span className="hidden lg:inline">{t("curationDashboard")}</span>
+              <span className="inline lg:hidden text-[11px] sm:text-xs">{t("curation")}</span>
             </button>
             <button
               onClick={() => {
                 setViewMode("settings");
               }}
               className={cn(
-                "px-2 sm:px-4 py-1.5 rounded-t-lg transition-all text-xs font-bold flex items-center gap-1 sm:gap-2 border-b-2 shrink-0",
+                "px-2.5 sm:px-4 py-1.5 rounded-xl transition-all text-xs font-bold flex items-center gap-1.5 sm:gap-2 border shrink-0",
                 viewMode === "settings"
-                  ? "border-white text-white bg-slate-500/5"
-                  : "border-transparent text-slate-500 hover:text-slate-300",
+                  ? "border-cyan-400/50 text-white bg-slate-700/70 shadow-sm"
+                  : "border-slate-800 bg-slate-800/40 text-slate-300 hover:text-white hover:bg-slate-800",
               )}
             >
-              <Settings size={18} /> <span className="hidden sm:inline">{t("settings")}</span>
+              <Settings size={17} className={cn(viewMode === "settings" ? "text-cyan-400" : "text-slate-400")} />
+              <span className="text-[11px] sm:text-xs">{t("settings")}</span>
             </button>
 
             <button
               onClick={() => setIsReaderHeaderOpen(!isReaderHeaderOpen)}
-              className="ml-2 w-7 h-7 flex items-center justify-center text-slate-500 hover:text-slate-300 hover:bg-slate-800 rounded-lg transition-colors"
+              className={cn(
+                "ml-0.5 px-2 h-8 flex items-center justify-center rounded-xl border transition-colors shrink-0",
+                isReaderHeaderOpen
+                  ? "bg-cyan-500/15 border-cyan-500/40 text-cyan-300"
+                  : "bg-slate-800/60 border-slate-700/70 text-slate-300 hover:text-white hover:bg-slate-800"
+              )}
               title={isReaderHeaderOpen ? t("collapseHeader") : t("expandHeader")}
             >
               {isReaderHeaderOpen ? (
-                <ChevronUp size={20} />
+                <ChevronUp size={18} />
               ) : (
-                <ChevronDown size={20} />
+                <ChevronDown size={18} />
               )}
             </button>
           </div>
 
-          <div className="flex items-center gap-1.5 sm:gap-3 shrink-0 ml-auto">
+          <div className="flex items-center gap-1.5 sm:gap-2.5 shrink-0 ml-auto pl-2 border-l border-slate-800/80">
             {(viewMode === "feed" || viewMode === "curation") && (
-              <div className="flex items-center gap-1 bg-slate-800 rounded-lg border border-slate-700 p-0.5">
+              <div className="flex items-center gap-0.5 bg-slate-800/80 rounded-xl border border-slate-700/80 p-0.5 shrink-0">
                 <button
                   onClick={() => {
                      const postList = viewMode === "feed" ? posts : curationPosts;
                      setExpandedPosts(new Set(postList.map((p) => p.permlink)));
                   }}
-                  className="px-2 py-1 bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-slate-200 rounded text-[10px] font-bold transition-colors flex items-center gap-1"
+                  className="px-2 py-1 bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white rounded-lg text-[10px] font-bold transition-colors flex items-center gap-1"
                   title={t("expandAll")}
                 >
-                  <ChevronDown size={18} />
+                  <ChevronDown size={16} className="text-cyan-400" />
                   <span className="hidden md:inline">Expand All</span>
                 </button>
-                <div className="w-px h-3 bg-slate-700 mx-0.5" />
+                <div className="w-px h-3.5 bg-slate-700 mx-0.5" />
                 <button
                   onClick={() => setExpandedPosts(new Set())}
-                  className="px-2 py-1 bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-slate-200 rounded text-[10px] font-bold transition-colors flex items-center gap-1"
+                  className="px-2 py-1 bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white rounded-lg text-[10px] font-bold transition-colors flex items-center gap-1"
                   title={t("collapseAll")}
                 >
-                  <ChevronUp size={18} />
+                  <ChevronUp size={16} className="text-slate-400" />
                   <span className="hidden md:inline">Collapse All</span>
                 </button>
               </div>
@@ -1817,19 +1860,19 @@ export default function Reader({
                 <button
                   onClick={fetchPosts}
                   disabled={loading}
-                  className="p-1.5 text-slate-400 hover:bg-slate-800 rounded-lg hover:text-white transition-colors"
+                  className="p-1.5 bg-slate-800/60 border border-slate-700/70 text-slate-300 hover:bg-slate-800 rounded-xl hover:text-white transition-colors shrink-0"
                 >
                   <RefreshCw
-                    size={20}
-                    className={cn(loading && "animate-spin")}
+                    size={18}
+                    className={cn(loading && "animate-spin text-cyan-400")}
                   />
                 </button>
               </>
             )}
             {viewMode === "curation" && (
-              <div className="flex items-center gap-2">
-                <div className="flex items-center gap-1 bg-slate-800 rounded-lg px-2 py-1 border border-slate-700">
-                  <Hash size={16} className="text-slate-500" />
+              <div className="flex items-center gap-1.5 shrink-0">
+                <div className="flex items-center gap-1 bg-slate-800 rounded-xl px-2.5 py-1 border border-slate-700">
+                  <Hash size={15} className="text-purple-400" />
                   <input
                     className="bg-transparent border-none outline-none text-xs text-white p-0.5 w-24"
                     value={curationTagInput || ""}
@@ -1843,42 +1886,43 @@ export default function Reader({
                 <button
                   onClick={() => fetchCurationFeed(curationTagInput.trim())}
                   disabled={isCurationLoading}
-                  className="p-1.5 text-slate-400 hover:bg-slate-800 rounded-lg transition-all border border-slate-700"
+                  className="p-1.5 bg-slate-800/60 text-slate-300 hover:bg-slate-800 rounded-xl transition-all border border-slate-700/80"
                 >
                   <RefreshCw
-                    size={20}
-                    className={cn(isCurationLoading && "animate-spin")}
+                    size={18}
+                    className={cn(isCurationLoading && "animate-spin text-purple-400")}
                   />
                 </button>
               </div>
             )}
-            <div className="w-px h-4 bg-slate-800" />
+            <div className="w-px h-4 bg-slate-700/80 shrink-0" />
             <button
               onClick={() =>
                 setConfig((c) => ({ ...c, autoShowInbox: !c.autoShowInbox }))
               }
               className={cn(
-                "px-2 py-1 flex items-center gap-1 rounded text-[9px] font-bold transition-all border shrink-0",
+                "px-2.5 py-1.5 flex items-center gap-1.5 rounded-xl text-[10px] font-bold transition-all border shrink-0",
                 config.autoShowInbox
-                  ? "bg-cyan-600/20 text-cyan-400 border-cyan-500/30"
-                  : "text-slate-500 border-slate-800 hover:bg-slate-800",
+                  ? "bg-cyan-600/20 text-cyan-300 border-cyan-500/40"
+                  : "bg-slate-800/60 text-slate-300 border-slate-700/70 hover:bg-slate-800",
               )}
               title={t("autoShowInboxTitle")}
             >
-              <BellRing size={16} className={cn(!config.autoShowInbox && "opacity-50")} /><span className="hidden sm:inline">Auto-Inbox: {config.autoShowInbox ? "ON" : "OFF"}</span>
+              <BellRing size={15} className={cn(config.autoShowInbox ? "text-cyan-400" : "opacity-60")} />
+              <span className="hidden sm:inline">Auto-Inbox: {config.autoShowInbox ? "ON" : "OFF"}</span>
             </button>
             <button
               onClick={() => setShowInbox(!showInbox)}
               className={cn(
-                "p-1.5 rounded-lg transition-colors relative",
+                "p-1.5 rounded-xl transition-colors relative border shrink-0",
                 showInbox
-                  ? "bg-cyan-500/10 text-cyan-400 border border-cyan-500/20"
-                  : "text-slate-400 hover:bg-slate-800",
+                  ? "bg-cyan-500/15 text-cyan-300 border-cyan-500/40"
+                  : "bg-slate-800/60 border-slate-700/70 text-slate-300 hover:bg-slate-800 hover:text-white",
               )}
             >
-              <Inbox size={20} />
+              <Inbox size={18} />
               {inbox.some((r) => !hiddenReplies.has(r.permlink)) && (
-                <span className="absolute top-0 right-0 w-2 h-2 bg-lime-400 shadow-[0_0_8px_rgba(163,230,53,0.8)] rounded-full animate-pulse" />
+                <span className="absolute -top-0.5 -right-0.5 w-2.5 h-2.5 bg-lime-400 shadow-[0_0_8px_rgba(163,230,53,0.8)] rounded-full animate-pulse" />
               )}
             </button>
           </div>
@@ -1891,9 +1935,9 @@ export default function Reader({
             initial={{ opacity: 0, x: 300 }}
             animate={{ opacity: 1, x: 0 }}
             exit={{ opacity: 0, x: 300 }}
-            className="fixed inset-y-0 right-0 z-[9999] w-full max-w-md bg-slate-900 border-l border-slate-800 shadow-2xl flex flex-col pointer-events-auto"
+            className="fixed inset-y-0 right-0 z-[9999] w-full max-w-md bg-[var(--modal-bg)] border-l border-[var(--border-color)] shadow-2xl flex flex-col pointer-events-auto"
           >
-            <div className="p-4 border-b border-slate-800 flex items-center justify-between bg-slate-900/50 backdrop-blur-md">
+            <div className="p-4 border-b border-[var(--border-color)] flex items-center justify-between bg-[var(--bg-card)]">
               <div className="flex items-center gap-2">
                 <h2 className="text-lg font-bold flex items-center gap-2">
                   <Bell
@@ -1947,7 +1991,12 @@ export default function Reader({
               </div>
             </div>
 
-            <div className="flex-1 overflow-y-auto p-4 space-y-4 custom-scrollbar">
+            <div 
+              className="flex-1 overflow-y-auto p-4 space-y-4 custom-scrollbar"
+              style={{
+                paddingBottom: 'calc(var(--app-bottom-total, 4rem) + 1.5rem)',
+              }}
+            >
               {!currentUser ? (
                 <div className="flex flex-col items-center justify-center h-full text-slate-500 text-center px-8">
                   <UserX size={48} className="mb-4 opacity-20" />
@@ -2530,10 +2579,14 @@ export default function Reader({
       </AnimatePresence>
 
       <div
+        ref={mainScrollRef}
         className={cn(
           "flex-1 overflow-y-auto p-4 space-y-4 custom-scrollbar transition-all duration-300",
           showInbox && "md:mr-[448px]",
         )}
+        style={{
+          paddingBottom: 'calc(var(--app-bottom-total, 4rem) + 1.5rem)',
+        }}
       >
         <div className="max-w-6xl mx-auto w-full space-y-4">
           <AnimatePresence>
@@ -2607,8 +2660,8 @@ export default function Reader({
                       animate={{ opacity: 1, y: 0 }}
                       onMouseUp={(e) => handleMouseUp(post, e)}
                       className={cn(
-                        "bg-slate-900 border border-slate-800 rounded-xl overflow-hidden shadow-xl transition-all",
-                        isExpanded && "ring-1 ring-cyan-500/20",
+                        "bg-[var(--bg-card)] border border-[var(--border-color)] rounded-xl overflow-hidden shadow-xl transition-all",
+                        isExpanded && "ring-1 ring-[var(--accent-hex)]/30",
                       )}
                     >
                       <div
@@ -2676,7 +2729,7 @@ export default function Reader({
                               )}
                             </div>
                           </div>
-                          <h3 className="text-base sm:text-lg font-bold text-slate-100 line-clamp-2 sm:truncate leading-tight">
+                          <h3 className="text-base sm:text-lg font-bold text-[var(--text-main)] line-clamp-2 sm:truncate leading-tight">
                             {post.title}
                           </h3>
                         </div>
@@ -2769,13 +2822,13 @@ export default function Reader({
                             initial={{ height: 0, opacity: 0 }}
                             animate={{ height: "auto", opacity: 1 }}
                             exit={{ height: 0, opacity: 0 }}
-                            className="border-t border-slate-800"
+                            className="border-t border-[var(--border-color)]"
                           >
-                            <div className="flex justify-center bg-slate-950/20 px-4 py-8 overflow-x-hidden">
+                            <div className="flex justify-center bg-[var(--bg-main)]/40 px-3 sm:px-4 py-5 sm:py-8 overflow-x-hidden">
                               <div
                                 className="markdown-body transition-all"
                                 style={{
-                                  fontSize: `${config.fontSize}px`,
+                                  fontSize: `${currentFontSize}px`,
                                   fontWeight: config.fontWeight,
                                   maxWidth: `${config.contentWidth}px`,
                                   width: "100%",
@@ -2808,21 +2861,24 @@ export default function Reader({
 
                             <div
                               id={`actions-${post.permlink}`}
-                              className="p-3 bg-slate-950/50 flex flex-wrap items-center gap-2 sm:gap-4 border-t border-slate-800"
+                              className="post-actions p-2.5 sm:p-3 bg-[var(--bg-main)]/60 flex flex-wrap items-center gap-2 sm:gap-4 border-t border-[var(--border-color)]"
                             >
                               <button
-                                onClick={() =>
+                                type="button"
+                                onMouseDown={(e) => e.preventDefault()}
+                                onClick={(e) => {
+                                  e.stopPropagation();
                                   handleLocalVote(
                                     post.author,
                                     post.permlink,
                                     voteWeight,
-                                  )
-                                }
+                                  );
+                                }}
                                 className={cn(
-                                  "flex items-center gap-1.5 px-3 py-1.5 hover:bg-slate-800 rounded-lg transition-all border border-transparent",
+                                  "flex items-center gap-1.5 px-3 py-1.5 hover:bg-slate-800/50 rounded-lg transition-all border border-transparent",
                                   hasVoted
                                     ? "text-cyan-400 border-cyan-500/30 bg-cyan-500/5"
-                                    : "text-slate-400 hover:text-cyan-400 hover:border-cyan-500/20",
+                                    : "text-[var(--text-muted)] hover:text-cyan-400 hover:border-cyan-500/20",
                                 )}
                               >
                                 <ThumbsUp
@@ -2835,12 +2891,14 @@ export default function Reader({
                               </button>
 
                                <button
+                                type="button"
+                                onMouseDown={(e) => e.preventDefault()}
                                 onClick={(e) => {
                                   e.stopPropagation();
                                   fetchComments(post.author, post.permlink);
                                 }}
                                 className={cn(
-                                  "flex items-center gap-1.5 px-3 py-1.5 hover:bg-slate-800 rounded-lg transition-all border border-transparent text-slate-400 hover:text-cyan-400",
+                                  "flex items-center gap-1.5 px-3 py-1.5 hover:bg-slate-800/50 rounded-lg transition-all border border-transparent text-[var(--text-muted)] hover:text-cyan-400",
                                   loadingComments.has(post.permlink) && "animate-pulse text-cyan-400"
                                 )}
                                 title={t("loadComments")}
@@ -2857,9 +2915,13 @@ export default function Reader({
                               </button>
 
                               <button
-                                onClick={() => {
+                                type="button"
+                                onMouseDown={(e) => e.preventDefault()}
+                                onClick={(e) => {
+                                  e.stopPropagation();
                                   if (
-                                    commentingPost?.permlink === post.permlink
+                                    commentingPost?.permlink === post.permlink &&
+                                    !quotePosition
                                   ) {
                                     setCommentingPost(null);
                                     setQuotePosition(null);
@@ -2869,11 +2931,11 @@ export default function Reader({
                                   }
                                 }}
                                 className={cn(
-                                  "flex items-center gap-1.5 px-3 py-1.5 hover:bg-slate-800 rounded-lg transition-all border border-transparent",
+                                  "flex items-center gap-1.5 px-3 py-1.5 hover:bg-slate-800/50 rounded-lg transition-all border border-transparent",
                                   commentingPost?.permlink === post.permlink ||
                                     respondedReplies[post.permlink]
                                     ? "text-green-400 bg-green-500/10 border-green-500/20"
-                                    : "text-slate-400 hover:text-green-400",
+                                    : "text-[var(--text-muted)] hover:text-green-400",
                                 )}
                                 title={t("writeComment")}
                               >
@@ -2938,9 +3000,12 @@ export default function Reader({
 
                             {commentingPost?.permlink === post.permlink &&
                               !quotePosition && (
-                                <div className="p-6 bg-slate-900 border-t border-slate-800 space-y-4 inline-reply-container">
-                                  <div className="flex items-center justify-between mb-2">
-                                    <div className="flex items-center gap-1 p-1 bg-slate-800 rounded-lg border border-slate-700">
+                                <div
+                                  onClick={(e) => e.stopPropagation()}
+                                  className="p-3 sm:p-5 bg-[var(--bg-card)] border-t border-[var(--border-color)] space-y-3 inline-reply-container"
+                                >
+                                  <div className="flex flex-wrap items-center justify-between gap-2 mb-1">
+                                    <div className="flex items-center gap-1 p-1 bg-[var(--bg-main)] rounded-lg border border-[var(--border-color)]">
                                       <button
                                         onClick={() => insertText("**", "**")}
                                         className="p-1.5 hover:bg-slate-700 rounded text-slate-400 hover:text-white"
@@ -3084,6 +3149,7 @@ export default function Reader({
                                         mutedUsers={mutedUsersRef.current}
                                         onSelection={handleMouseUp}
                                         t={t}
+                                        fontSize={currentFontSize}
                                       />
                                     ),
                                   )}
@@ -4498,47 +4564,51 @@ export default function Reader({
               marginTop: "-10px",
             }}
           >
-            <div className="bg-slate-900/90 backdrop-blur-md border border-slate-700 rounded-full py-1.5 px-3 flex items-center gap-3 shadow-2xl shadow-cyan-500/20 w-fit mx-auto">
+            <div className="bg-[var(--modal-bg)] border border-[var(--border-color)] rounded-full py-1.5 px-3 flex items-center gap-3 shadow-2xl w-fit mx-auto">
               <button
+                onMouseDown={(e) => e.preventDefault()}
                 onClick={handleQuote}
                 className="flex items-center gap-1.5 text-xs font-bold text-cyan-400 hover:text-cyan-300 transition-colors"
                 title={t("addSelectionQuote")}
               >
                 <QuoteIcon size={18} /> {t("quote")}
               </button>
-              <div className="w-px h-3 bg-slate-700" />
+              <div className="w-px h-3 bg-[var(--border-color)]" />
               <button
+                onMouseDown={(e) => e.preventDefault()}
                 onClick={handleQuote}
                 className="flex items-center gap-1.5 text-xs font-bold text-green-400 hover:text-green-300 transition-colors"
               >
                 <MessageSquare size={18} /> {t("reply")}
               </button>
-              <div className="w-px h-3 bg-slate-700" />
+              <div className="w-px h-3 bg-[var(--border-color)]" />
               <button
+                onMouseDown={(e) => e.preventDefault()}
                 onClick={() => setShowPreview(!showPreview)}
                 className={cn(
-                  "p-1 transition-all rounded hover:bg-slate-800",
+                  "p-1 transition-all rounded hover:bg-slate-800/50",
                   showPreview
                     ? "text-cyan-400 bg-cyan-400/5"
-                    : "text-slate-500 hover:text-slate-300",
+                    : "text-[var(--text-muted)] hover:text-[var(--text-main)]",
                 )}
               >
                 <Eye size={18} />
               </button>
-              <div className="w-px h-3 bg-slate-700" />
+              <div className="w-px h-3 bg-[var(--border-color)]" />
               <button
+                onMouseDown={(e) => e.preventDefault()}
                 onClick={() => {
                   setQuotePosition(null);
                   setCommentingPost(null);
                   setSelectedText("");
                 }}
-                className="p-1 text-slate-500 hover:text-white"
+                className="p-1 text-[var(--text-muted)] hover:text-[var(--text-main)]"
               >
                 <X size={18} />
               </button>
             </div>
 
-            <div className="bg-slate-900 border border-slate-700 rounded-2xl p-4 shadow-2xl space-y-3 animate-in zoom-in-95 backdrop-blur-md bg-slate-900/95 ring-1 ring-white/5 flex flex-col overflow-hidden max-h-[60vh]">
+            <div className="bg-[var(--modal-bg)] border border-[var(--border-color)] rounded-2xl p-3 sm:p-4 shadow-2xl space-y-3 animate-in zoom-in-95 flex flex-col overflow-hidden max-h-[60vh]">
               <div className="flex items-center justify-between shrink-0">
                 <div className="flex items-center gap-1 p-0.5 bg-slate-800/50 rounded border border-slate-700/50">
                   <button
@@ -4612,6 +4682,28 @@ export default function Reader({
           </motion.div>
         )}
       </AnimatePresence>
+
+      {/* Mobile Reader Bottom Navigation Bar */}
+      <ReaderMobileBottomBar
+        viewMode={viewMode}
+        onSelectViewMode={(mode) => setViewMode(mode)}
+        showInbox={showInbox}
+        onToggleInbox={() => setShowInbox(!showInbox)}
+        inboxCount={inbox.length}
+        unreadCount={unreadRepliesCount}
+        onRefresh={() => {
+          if (viewMode === "feed") {
+            fetchPosts();
+          } else if (viewMode === "curation") {
+            fetchCurationFeed();
+          }
+        }}
+        isLoading={loading || isCurationLoading}
+        onScrollToTop={() => {
+          mainScrollRef.current?.scrollTo({ top: 0, behavior: "smooth" });
+        }}
+        t={t}
+      />
     </div>
   );
 }
@@ -4629,6 +4721,7 @@ function CommentItem({
   mutedUsers = [],
   onSelection,
   t,
+  fontSize,
 }: {
   comment: SteemPost;
   currentUser: string | null | undefined;
@@ -4642,6 +4735,7 @@ function CommentItem({
   mutedUsers?: string[];
   onSelection?: (post: SteemPost, e?: React.MouseEvent | MouseEvent) => void;
   t?: (k: TranslationKey) => string;
+  fontSize?: number;
 }) {
   const currentLang = (typeof localStorage !== "undefined" ? localStorage.getItem("steem_lang") : null) || "uk";
   const loc = (k: TranslationKey) => t ? t(k) : getTranslation(currentLang, k);
@@ -4789,7 +4883,8 @@ function CommentItem({
         </div>
       ) : (
         <div
-          className="text-sm markdown-body opacity-90 leading-relaxed"
+          className="text-sm markdown-body opacity-90 leading-relaxed transition-all"
+          style={fontSize ? { fontSize: `${Math.max(12, fontSize - 2)}px` } : undefined}
           dangerouslySetInnerHTML={{ __html: renderContent(localComment.body) }}
         />
       )}
@@ -4830,12 +4925,15 @@ function CommentItem({
           <span>{localComment.active_votes.length}</span>
         </button>
         <button
-          onClick={() => {
+          type="button"
+          onMouseDown={(e) => e.preventDefault()}
+          onClick={(e) => {
+            e.stopPropagation();
             setShowReply(!showReply);
             setIsEditing(false);
           }}
           className={cn(
-            "flex items-center gap-1 hover:text-green-400 transition-colors",
+            "flex items-center gap-1 hover:text-green-400 transition-colors post-actions",
             showReply && "text-green-400",
           )}
         >
@@ -4844,8 +4942,13 @@ function CommentItem({
         </button>
         {localComment.children > 0 && replies.length === 0 && (
           <button
-            onClick={() => fetchReplies()}
-            className="text-cyan-500 hover:underline flex items-center gap-1"
+            type="button"
+            onMouseDown={(e) => e.preventDefault()}
+            onClick={(e) => {
+              e.stopPropagation();
+              fetchReplies();
+            }}
+            className="text-cyan-500 hover:underline flex items-center gap-1 post-actions"
           >
             {loadingReplies ? (
               <RefreshCw size={14} className="animate-spin" />
@@ -4857,7 +4960,10 @@ function CommentItem({
       </div>
 
       {showReply && (
-        <div className="mt-2 py-2">
+        <div
+          onClick={(e) => e.stopPropagation()}
+          className="mt-2 py-2 inline-reply-container"
+        >
           <ReplyBox
             draftKey={`comment-reply-${localComment.permlink}`}
             value={replyBody}
@@ -4920,6 +5026,7 @@ function CommentItem({
               mutedUsers={mutedUsers}
               onSelection={onSelection}
               t={t}
+              fontSize={fontSize}
             />
           ))}
         </div>

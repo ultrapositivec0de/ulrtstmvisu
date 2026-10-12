@@ -443,6 +443,54 @@ export function useEditorEvents(options: UseEditorEventsOptions) {
         }
 
         if (directChild) {
+          // If at the end of the heading: preserve entire heading content and create <p><br></p> AFTER heading
+          if (isRightEmpty) {
+            if (marker.parentNode) marker.parentNode.removeChild(marker);
+            
+            // Clean trailing <br> from headingEl if any
+            const lastChild = headingEl.lastChild;
+            if (lastChild && lastChild.nodeType === Node.ELEMENT_NODE && (lastChild as HTMLElement).tagName === 'BR') {
+              headingEl.removeChild(lastChild);
+            }
+            if (headingEl.childNodes.length === 0) {
+              headingEl.innerHTML = '<br>';
+            }
+
+            const p = document.createElement('p');
+            p.innerHTML = '<br>';
+            parent.insertBefore(p, headingEl.nextSibling);
+
+            const newRange = document.createRange();
+            newRange.selectNodeContents(p);
+            newRange.collapse(true);
+            sel.removeAllRanges();
+            sel.addRange(newRange);
+            savedVisualRangeRef.current = newRange.cloneRange();
+            if (wysiwygRef.current) wysiwygRef.current.focus({ preventScroll: true });
+            updateContentFromWysiwyg();
+            return true;
+          }
+
+          // If at the beginning of the heading: preserve entire heading content and create <p><br></p> BEFORE heading
+          if (isLeftEmpty) {
+            if (marker.parentNode) marker.parentNode.removeChild(marker);
+
+            const p = document.createElement('p');
+            p.innerHTML = '<br>';
+            parent.insertBefore(p, headingEl);
+
+            const newRange = document.createRange();
+            newRange.selectNodeContents(headingEl);
+            newRange.collapse(true);
+            sel.removeAllRanges();
+            sel.addRange(newRange);
+            savedVisualRangeRef.current = newRange.cloneRange();
+            if (wysiwygRef.current) wysiwygRef.current.focus({ preventScroll: true });
+            updateContentFromWysiwyg();
+            return true;
+          }
+
+          // If in the middle of the heading: split at the marker
           const childs: Node[] = Array.from(headingEl.childNodes);
           const directIndex = childs.indexOf(directChild);
           const leftChildren = directIndex > 0 ? childs.slice(0, directIndex) : [];
@@ -464,55 +512,6 @@ export function useEditorEvents(options: UseEditorEventsOptions) {
             rightChildren.shift();
           }
 
-          // If at the end of the heading: create <p><br></p> AFTER heading
-          if (isRightEmpty) {
-            headingEl.innerHTML = '';
-            if (leftChildren.length > 0) {
-              leftChildren.forEach((c) => headingEl!.appendChild(c));
-            } else {
-              headingEl.innerHTML = '<br>';
-            }
-
-            const p = document.createElement('p');
-            p.innerHTML = '<br>';
-            parent.insertBefore(p, headingEl.nextSibling);
-
-            const newRange = document.createRange();
-            newRange.selectNodeContents(p);
-            newRange.collapse(true);
-            sel.removeAllRanges();
-            sel.addRange(newRange);
-            savedVisualRangeRef.current = newRange.cloneRange();
-            if (wysiwygRef.current) wysiwygRef.current.focus({ preventScroll: true });
-            updateContentFromWysiwyg();
-            return true;
-          }
-
-          // If at the beginning of the heading: create <p><br></p> BEFORE heading, stay in heading
-          if (isLeftEmpty) {
-            headingEl.innerHTML = '';
-            if (rightChildren.length > 0) {
-              rightChildren.forEach((c) => headingEl!.appendChild(c));
-            } else {
-              headingEl.innerHTML = '<br>';
-            }
-
-            const p = document.createElement('p');
-            p.innerHTML = '<br>';
-            parent.insertBefore(p, headingEl);
-
-            const newRange = document.createRange();
-            newRange.selectNodeContents(headingEl);
-            newRange.collapse(true);
-            sel.removeAllRanges();
-            sel.addRange(newRange);
-            savedVisualRangeRef.current = newRange.cloneRange();
-            if (wysiwygRef.current) wysiwygRef.current.focus({ preventScroll: true });
-            updateContentFromWysiwyg();
-            return true;
-          }
-
-          // If in the middle of the heading: split into two headings
           const leftHeading = headingEl;
           const rightHeading = document.createElement(leftHeading.tagName.toLowerCase());
           rightHeading.className = leftHeading.className;

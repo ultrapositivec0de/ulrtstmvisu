@@ -240,20 +240,20 @@ div#root:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-t
   --bg-sidebar: #010115;
   --bg-card: #080820;
   --text-main: #f0f0ff;
-  --text-muted: #6366f199;
-  --border-color: rgba(var(--accent-rgb), 0.25);
-  --bg-overlay-surface: rgba(8, 8, 32, 0.95);
-  --border-subtle: rgba(var(--accent-rgb), 0.25);
+  --text-muted: #a5b4fc;
+  --border-color: rgb(var(--accent-color) / 0.25);
+  --bg-overlay-surface: #080820;
+  --border-subtle: rgb(var(--accent-color) / 0.25);
   --modal-bg: #080820;
-  --modal-border: rgba(var(--accent-rgb), 0.35);
+  --modal-border: rgb(var(--accent-color) / 0.4);
   --modal-backdrop: transparent;
-  --modal-header-border: rgba(var(--accent-rgb), 0.2);
-  --modal-shadow: 0 0 35px rgba(var(--accent-rgb), 0.25), 0 25px 70px rgba(0, 0, 0, 0.85);
+  --modal-header-border: rgb(var(--accent-color) / 0.25);
+  --modal-shadow: 0 0 35px rgb(var(--accent-color) / 0.25), 0 25px 70px rgba(0, 0, 0, 0.85);
 }
 
 .theme-neon body {
   background-image: 
-    radial-gradient(circle at 50% 0%, rgba(var(--accent-rgb), 0.15) 0%, transparent 60%),
+    radial-gradient(circle at 50% 0%, rgb(var(--accent-color) / 0.15) 0%, transparent 60%),
     radial-gradient(circle at 100% 100%, rgba(99, 102, 241, 0.1) 0%, transparent 50%);
 }
 
@@ -261,15 +261,15 @@ div#root:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-t
 .theme-neon .bg-slate-900 { background-color: var(--bg-sidebar) !important; }
 .theme-neon .bg-slate-800 { 
   background-color: var(--bg-card) !important; 
-  box-shadow: 0 0 20px rgba(var(--accent-rgb), 0.08);
-  border: 1px solid rgba(var(--accent-rgb), 0.15);
+  box-shadow: 0 0 20px rgb(var(--accent-color) / 0.08);
+  border: 1px solid rgb(var(--accent-color) / 0.2);
 }
 
 .theme-neon .border-slate-800,
-.theme-neon .border-slate-700 { border-color: rgba(var(--accent-rgb), 0.2) !important; }
+.theme-neon .border-slate-700 { border-color: rgb(var(--accent-color) / 0.25) !important; }
 
 .theme-neon .text-slate-400,
-.theme-neon .text-slate-500 { color: rgba(var(--accent-rgb), 0.6) !important; }
+.theme-neon .text-slate-500 { color: rgb(var(--accent-color) / 0.75) !important; }
 
 .theme-neon .text-white,
 .theme-neon .text-slate-100 { color: #f8fafc !important; }
@@ -278,52 +278,52 @@ div#root:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-type(1) > div:nth-of-t
 .theme-neon .bg-cyan-600 {
   background-color: rgb(var(--accent-color)) !important;
   color: #000 !important;
-  box-shadow: 0 0 20px rgba(var(--accent-rgb), 0.5), 0 0 40px rgba(var(--accent-rgb), 0.2);
+  box-shadow: 0 0 20px rgb(var(--accent-color) / 0.5), 0 0 40px rgb(var(--accent-color) / 0.2);
   font-weight: 950;
   text-shadow: none !important;
 }
 
 .theme-neon .markdown-body { 
-  color: rgba(var(--accent-rgb), 1); 
-  text-shadow: 0 0 2px rgba(var(--accent-rgb), 0.2);
+  color: rgb(var(--accent-color)); 
+  text-shadow: 0 0 2px rgb(var(--accent-color) / 0.2);
 }
 .theme-neon .markdown-body p,
 .theme-neon .markdown-body li {
-  color: rgba(var(--accent-rgb), 0.9);
+  color: rgb(var(--accent-color) / 0.9);
 }
 .theme-neon .markdown-body h1, 
 .theme-neon .markdown-body h2, 
 .theme-neon .markdown-body h3 { 
   color: rgb(var(--accent-color)); 
-  text-shadow: 0 0 12px rgba(var(--accent-rgb), 0.6), 0 0 25px rgba(var(--accent-rgb), 0.3); 
-  border-color: rgba(var(--accent-rgb), 0.4);
+  text-shadow: 0 0 12px rgb(var(--accent-color) / 0.6), 0 0 25px rgb(var(--accent-color) / 0.3); 
+  border-color: rgb(var(--accent-color) / 0.4);
 }
 
 .theme-neon .markdown-body a { 
   color: rgb(var(--accent-color)); 
-  text-shadow: 0 0 10px rgba(var(--accent-rgb), 0.4);
-  background: rgba(var(--accent-rgb), 0.08);
+  text-shadow: 0 0 10px rgb(var(--accent-color) / 0.4);
+  background: rgb(var(--accent-color) / 0.08);
   padding: 0 4px;
   border-radius: 4px;
   text-decoration: underline !important;
   text-underline-offset: 4px;
-  text-decoration-color: rgba(var(--accent-rgb), 0.5) !important;
+  text-decoration-color: rgb(var(--accent-color) / 0.5) !important;
 }
 .theme-neon .markdown-body a:hover { 
-  background: rgba(var(--accent-rgb), 0.2);
-  text-shadow: 0 0 15px rgba(var(--accent-rgb), 0.7);
+  background: rgb(var(--accent-color) / 0.2);
+  text-shadow: 0 0 15px rgb(var(--accent-color) / 0.7);
 }
 
 .theme-neon textarea#main-editor {
   color: rgb(var(--accent-color)) !important;
-  text-shadow: 0 0 12px rgba(var(--accent-rgb), 0.45);
+  text-shadow: 0 0 12px rgb(var(--accent-color) / 0.45);
   font-weight: 500;
   caret-color: #fff;
   background: transparent !important;
 }
 
 .theme-neon .neon-icon-glow {
-  filter: drop-shadow(0 0 4px rgba(var(--accent-rgb), 0.6)) drop-shadow(0 0 10px rgba(var(--accent-rgb), 0.2));
+  filter: drop-shadow(0 0 4px rgb(var(--accent-color) / 0.6)) drop-shadow(0 0 10px rgb(var(--accent-color) / 0.2));
 }
 
 body {
@@ -718,3 +718,95 @@ body {
   background-color: var(--bg-sidebar, #f8fafc) !important;
 }
 
+/* --- DYNAMIC INTERACTIVE BUTTONS SYSTEM --- */
+.btn-primary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 0.625rem 1.25rem;
+  font-weight: 700;
+  font-size: 0.825rem; /* text-sm style */
+  border-radius: 0.75rem; /* rounded-xl */
+  transition-property: all;
+  transition-duration: 150ms;
+  transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+  cursor: pointer;
+  user-select: none;
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  
+  /* Automatically adapt to the current theme style accent color! */
+  background-color: var(--accent-hex, #0891b2);
+  color: #ffffff !important; /* Premium high-contrast white text */
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+}
+
+.btn-primary:hover {
+  filter: brightness(1.12) contrast(1.05); /* Clean brightness boost without overloaded glow */
+}
+
+.btn-primary:active {
+  transform: scale(0.96); /* Tactile physical press response */
+  filter: brightness(0.9) contrast(1.1);
+}
+
+.btn-primary:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+  pointer-events: none;
+  box-shadow: none;
+}
+
+/* Light Theme adaptive styles */
+.theme-light .btn-primary {
+  background-color: var(--accent-hex, #0891b2);
+  color: #ffffff !important;
+  border-color: rgba(0, 0, 0, 0.15);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15);
+}
+.theme-light .btn-primary:hover {
+  filter: brightness(0.92) contrast(1.02); /* Smoothly darkens represent feedback in light themes */
+}
+
+/* Cyberpunk / Neon Theme adaptive styles */
+.theme-neon .btn-primary {
+  background-color: rgb(var(--accent-color, 6 182 212)) !important;
+  color: #000000 !important; /* Deep pure black text on luminous cyber glow */
+  border-color: #ffffff !important;
+  box-shadow: 0 0 15px rgb(var(--accent-color, 6 182 212) / 0.5), 0 2px 8px rgba(0,0,0,0.4);
+  font-weight: 900;
+}
+.theme-neon .btn-primary:hover {
+  background-color: #ffffff !important;
+  color: #000000 !important;
+  border-color: rgb(var(--accent-color, 6 182 212)) !important;
+  box-shadow: 0 0 25px rgba(255, 255, 255, 0.6), 0 4px 12px rgba(0,0,0,0.5);
+}
+
+/* Global Secondary Button styles */
+.btn-secondary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 0.625rem 1.25rem;
+  font-weight: 700;
+  font-size: 0.825rem;
+  border-radius: 0.75rem;
+  transition-property: all;
+  transition-duration: 150ms;
+  cursor: pointer;
+  border: 1px solid var(--border-color, #1e293b);
+  background-color: var(--bg-card, #1e293b);
+  color: var(--text-main, #f1f5f9);
+  user-select: none;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+}
+.btn-secondary:hover {
+  background-color: var(--border-color, #1e293b);
+  border-color: var(--text-muted, #94a3b8);
+  color: var(--text-main, #f1f5f9);
+}
+.btn-secondary:active {
+  transform: scale(0.97);
+}

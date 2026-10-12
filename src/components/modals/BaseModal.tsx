@@ -2,6 +2,8 @@ import React, { useEffect } from 'react';
 import { motion } from 'motion/react';
 import { X } from 'lucide-react';
 import { cn } from '../../lib/utils';
+import { useEditorStore } from '../../store';
+import { getTranslation, TranslationKey } from '../../locales';
 
 export type ModalSize = 'pin' | 'sm' | 'md' | 'lg' | 'xl' | '2xl' | 'fit';
 export type ModalPriority = 'standard' | 'critical';
@@ -53,6 +55,9 @@ export const BaseModal: React.FC<BaseModalProps> = ({
   backdropClassName,
   modalKey,
 }) => {
+  const currentLang = useEditorStore(s => s.currentLang);
+  const t = (key: TranslationKey) => getTranslation(currentLang, key);
+
   // Close on Escape key press
   useEffect(() => {
     if (!isOpen || !onClose || !closeOnBackdropClick) return;
@@ -68,6 +73,19 @@ export const BaseModal: React.FC<BaseModalProps> = ({
   // Lock and reset window scroll to prevent viewport/header shifting on virtual keyboard focus or drag
   useEffect(() => {
     if (!isOpen) return;
+
+    // Ensure the main editor releases focus when any modal opens so the virtual keyboard closes cleanly
+    if (typeof document !== 'undefined') {
+      const activeEl = document.activeElement as HTMLElement | null;
+      if (
+        activeEl &&
+        (activeEl.id === 'main-editor' ||
+          activeEl.classList.contains('wysiwyg-editor') ||
+          activeEl.isContentEditable)
+      ) {
+        activeEl.blur();
+      }
+    }
 
     const resetWindowScroll = () => {
       if (window.scrollY !== 0 || window.scrollX !== 0) {
@@ -160,7 +178,7 @@ export const BaseModal: React.FC<BaseModalProps> = ({
                   type="button"
                   onClick={onClose}
                   className="p-1.5 text-[var(--text-muted)] hover:text-[var(--text-main)] hover:bg-[var(--border-color)] rounded-xl transition-colors"
-                  aria-label="Close modal"
+                  aria-label={t('closeModalAria')}
                 >
                   <X className="w-5 h-5" />
                 </button>

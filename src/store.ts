@@ -19,6 +19,9 @@ interface EditorState {
   
   wpm: number;
   setWpm: (wpm: number) => void;
+  
+  currentLang: string;
+  setCurrentLang: (lang: string) => void;
 }
 
 const getInitialContent = () => {
@@ -26,6 +29,14 @@ const getInitialContent = () => {
     return localStorage.getItem('steem_autosave_temp') || sessionStorage.getItem('steem_autosave_temp') || '';
   } catch {
     return '';
+  }
+};
+
+const getInitialLang = () => {
+  try {
+    return localStorage.getItem('steem_language') || 'uk';
+  } catch {
+    return 'uk';
   }
 };
 
@@ -49,7 +60,9 @@ export const useEditorStore = create<EditorState>()(
     setSelection: (start, end) => set({ selectionStart: start, selectionEnd: end }),
     setContent: (content) => set({ content }),
     wpm: 0,
-    setWpm: (wpm) => set({ wpm })
+    setWpm: (wpm) => set({ wpm }),
+    currentLang: getInitialLang(),
+    setCurrentLang: (currentLang) => set({ currentLang }),
   }))
 );
 

@@ -65,7 +65,7 @@ if (typeof window !== 'undefined') {
 const STORAGE_KEY_AUTOSAVE = 'steem_autosave_temp';
 const STORAGE_KEY_FLOAT_CONFIG = 'steem_float_config';
 const STORAGE_KEY_USERS = 'steem_users_v2';
-const DEFAULT_FLOAT_TOOLS = ['B', 'I', 'sub', 'sup', 'Img', 'Gallery', 'Caption', 'Mentions', 'Table', 'Separator', 'Grid', 'HR'];
+const DEFAULT_FLOAT_TOOLS = ['B', 'I', 'sub', 'sup', 'Img', 'Gallery', 'Caption', 'Mentions', 'Table', 'Separator', 'HR'];
 
 function App() {
   // 1. Authentication & Security
@@ -97,12 +97,18 @@ function App() {
 
   // 2. Localization
   const [lang, setLang] = useState<Language>(() => {
-    const saved = localStorage.getItem('steem_lang');
+    const saved = localStorage.getItem('steem_lang') || localStorage.getItem('steem_language');
     if (saved && (translations[saved] || AVAILABLE_LANGUAGES.some(l => l.code === saved))) return saved;
     const browserLang = navigator?.language?.slice(0, 2);
     if (browserLang && (translations[browserLang] || AVAILABLE_LANGUAGES.some(l => l.code === browserLang))) return browserLang;
     return 'uk';
   });
+
+  useEffect(() => {
+    useEditorStore.getState().setCurrentLang(lang);
+    localStorage.setItem('steem_language', lang);
+    localStorage.setItem('steem_lang', lang);
+  }, [lang]);
 
   const t = useCallback((key: TranslationKey) => getTranslation(lang, key), [lang]);
 
@@ -313,7 +319,8 @@ function App() {
     const saved = localStorage.getItem(STORAGE_KEY_FLOAT_CONFIG);
     try {
       const initial = saved ? JSON.parse(saved) : DEFAULT_FLOAT_TOOLS;
-      return Array.isArray(initial) ? Array.from(new Set(initial)) : DEFAULT_FLOAT_TOOLS;
+      const filtered = (Array.isArray(initial) ? Array.from(new Set(initial)) : DEFAULT_FLOAT_TOOLS).filter((tool: any) => tool !== 'Grid');
+      return filtered.length > 0 ? filtered : DEFAULT_FLOAT_TOOLS;
     } catch {
       return DEFAULT_FLOAT_TOOLS;
     }
@@ -343,12 +350,6 @@ function App() {
     }
   });
   const [newMention, setNewMention] = useState('');
-  
-  const currentUser = authType === 'VAULT' ? selectedVaultUser : username;
-
-  useEffect(() => {
-    localStorage.setItem('steem_username', username);
-  }, [username]);
 
   const [pubLog, setPubLog] = useState<{ msg: string, type: 'success' | 'error' | 'loading' | null }>({ msg: '', type: null });
 
@@ -365,6 +366,40 @@ function App() {
       }, 15000);
     }
   }, []);
+
+  const [quickTags, setQuickTags] = useState<string[]>(() => {
+    try {
+      const saved = localStorage.getItem('steem_quick_tags_v1');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      }
+    } catch (e) {
+      console.debug(e);
+    }
+    return ['steem', 'steemit', 'blog', 'ukraine', 'steemexclusive', 'writing', 'life', 'art'];
+  });
+
+  const pinTag = useCallback((tag: string) => {
+    const cleanTag = tag.toLowerCase().replace(/[^a-z0-9-]/g, '').trim();
+    if (!cleanTag) return;
+    setQuickTags(prev => {
+      if (prev.includes(cleanTag)) {
+        notify(t('tagAlreadyPinnedNotify').replace('{tag}', cleanTag), "error");
+        return prev;
+      }
+      const updated = [...prev, cleanTag];
+      localStorage.setItem('steem_quick_tags_v1', JSON.stringify(updated));
+      notify(t('tagPinnedSuccessNotify').replace('{tag}', cleanTag), "success");
+      return updated;
+    });
+  }, [t, notify]);
+  
+  const currentUser = authType === 'VAULT' ? selectedVaultUser : username;
+
+  useEffect(() => {
+    localStorage.setItem('steem_username', username);
+  }, [username]);
 
   // 11. PWA & Notifications
   const {
@@ -788,6 +823,7 @@ function App() {
     username,
     imageUploadAccount,
     vaultAccounts,
+    vaultPin,
     appAgent,
     mutedUsers,
     setMutedUsers,
@@ -993,7 +1029,7 @@ function App() {
           <svg class="w-8 h-8 opacity-40" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21" />
           </svg>
-          <p>${lang === 'uk' ? "Прев'ю вимкнено для економії ресурсів.<br>Натисніть кнопку з оком, щоб увімкнути знову." : "Live Preview disabled to save resources.<br>Click the eye icon to enable again."}</p>
+          <p>${t('livePreviewDisabledHint')}</p>
         </div>`;
       }
       return;
@@ -1081,8 +1117,8 @@ function App() {
     const currentMarkdown = syncWysiwygToContentIfVisual();
     if (currentMarkdown && currentMarkdown.trim() !== '' && currentMarkdown.trim() !== post.body.trim()) {
       const saveFirst = await confirmDialog(
-        t('saveDraftBeforeNew') || "Зберегти поточний допис як чернетку перед відкриттям цього допису?",
-        t('saveDraft') || "Зберегти чернетку"
+        t('saveDraftBeforeNew'),
+        t('saveDraft')
       );
       if (saveFirst) {
         saveDraft('working');
@@ -1229,6 +1265,8 @@ function App() {
           <Reader 
             lang={lang}
             t={t}
+            editorFontSize={editorFontSize}
+            setEditorFontSize={setEditorFontSize}
             onEditPost={handleEditPost}
             onVote={handleReaderVote}
             onComment={handleReaderComment}
@@ -1463,7 +1501,13 @@ function App() {
             </div>
 
             {/* Desktop Status Bar Footer */}
-            <DesktopStatsFooter t={t} />
+            <DesktopStatsFooter
+              t={t}
+              visualStyle={visualStyle}
+              isDarkMode={isDarkMode}
+              isEditorFullScreen={isEditorFullScreen}
+              isFullScreen={isFullScreen}
+            />
           </main>
         </div>
       </div>
@@ -1619,26 +1663,31 @@ function App() {
         showPwaInstructionsModal={showPwaInstructionsModal}
         setShowPwaInstructionsModal={setShowPwaInstructionsModal}
         deferredPrompt={deferredPrompt}
+        quickTags={quickTags}
+        setQuickTags={setQuickTags}
+        pinTag={pinTag}
         t={t}
       />
 
-      {/* Mobile Bottom Navigation */}
-      <MobileBottomBar
-        isEditorFullScreen={isEditorFullScreen}
-        isFullScreen={isFullScreen}
-        isKeyboardOpen={isKeyboardOpen}
-        activeMobileTab={activeMobileTab}
-        setActiveMobileTab={setActiveMobileTab}
-        visualStyle={visualStyle}
-        pubTitle={pubTitle}
-        setPubTitle={setPubTitle}
-        activeModal={activeModal}
-        setActiveModal={setActiveModal}
-        isSidebarOpen={isSidebarOpen}
-        setIsSidebarOpen={setIsSidebarOpen}
-        setSettingsTab={setSettingsTab}
-        t={t}
-      />
+      {/* Mobile Bottom Navigation (Editor only) */}
+      {activeView === 'editor' && (
+        <MobileBottomBar
+          isEditorFullScreen={isEditorFullScreen}
+          isFullScreen={isFullScreen}
+          isKeyboardOpen={isKeyboardOpen}
+          activeMobileTab={activeMobileTab}
+          setActiveMobileTab={setActiveMobileTab}
+          visualStyle={visualStyle}
+          pubTitle={pubTitle}
+          setPubTitle={setPubTitle}
+          activeModal={activeModal}
+          setActiveModal={setActiveModal}
+          isSidebarOpen={isSidebarOpen}
+          setIsSidebarOpen={setIsSidebarOpen}
+          setSettingsTab={setSettingsTab}
+          t={t}
+        />
+      )}
 
       {/* Hidden File Input for local image uploads */}
       <input 

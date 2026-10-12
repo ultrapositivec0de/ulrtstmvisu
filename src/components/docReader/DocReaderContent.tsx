@@ -4,6 +4,8 @@ import { getMarked, DOM_PURIFY_CONFIG } from '../../utils/markdownParser';
 import DOMPurify from 'dompurify';
 import { Tag } from 'lucide-react';
 import { cn } from '../../lib/utils';
+import { useEditorStore } from '../../store';
+import { getTranslation, TranslationKey } from '../../locales';
 
 interface DocReaderContentProps {
   title: string;
@@ -30,6 +32,8 @@ export const DocReaderContent = React.memo<DocReaderContentProps>(({
   wysiwygSpacing = 1.6,
   beautifyEnabled = false
 }) => {
+  const currentLang = useEditorStore(s => s.currentLang);
+  const t = (key: TranslationKey) => getTranslation(currentLang, key);
   const [renderedHtml, setRenderedHtml] = useState<string>(() => {
     if (!content) return '';
     return cacheRefGlobal.get(content) || '';
@@ -117,7 +121,7 @@ export const DocReaderContent = React.memo<DocReaderContentProps>(({
       {/* Header: Title & Tags */}
       <header className="mb-8 pb-6 border-b border-slate-700/40">
         <h1 className="text-2xl sm:text-4xl font-bold tracking-tight mb-3 leading-tight break-words [overflow-wrap:anywhere] hyphens-auto">
-          {title || 'Документ без назви'}
+          {title || t('readerUntitledDoc')}
         </h1>
 
         {tagList.length > 0 && (
@@ -155,7 +159,7 @@ export const DocReaderContent = React.memo<DocReaderContentProps>(({
         />
       ) : (
         <div className="py-16 text-center opacity-40 text-sm italic">
-          Документ порожній. Перейдіть до режиму редагування або оберіть чернетку.
+          {t('readerEmptyDocHint')}
         </div>
       )}
     </article>

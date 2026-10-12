@@ -185,10 +185,9 @@ export const TamedWidget: React.FC<TamedWidgetProps> = (props) => {
     'Color': { label: 'A', action: () => fmt('<div class="phishy">', '</div>') },
     'Caption': { label: 'Caption', action: () => fmt('<center>\n<sub>', '</sub>\n</center>') },
     'Left': { label: '⬅', action: () => fmt('<div class="text-left">\n', '\n</div>') },
-    'Center': { label: 'Центр', action: () => fmt('<center>\n', '\n</center>') },
+    'Center': { label: t('center'), action: () => fmt('<center>\n', '\n</center>') },
     'Right': { label: '➡', action: () => fmt('<div class="text-right">\n', '\n</div>') },
-    'Justify': { label: 'Вирів', action: () => fmt('<div class="text-justify">\n', '\n</div>') },
-    'Grid': { label: 'Сітка', action: () => insertAtCursor('<div class="pull-left">\n</div>\n<div class="pull-right">\n</div>\n<div class="clearfix"></div>\n') },
+    'Justify': { label: t('justify'), action: () => fmt('<div class="text-justify">\n', '\n</div>') },
     'Templates': { label: <FileText size={20} />, action: () => setActiveModal('templates') },
     'Mentions': { label: 'Mentions', action: () => insertAtCursor('@') },
     'Img': { label: <ImageIcon size={20} />, action: () => {} },
@@ -327,6 +326,12 @@ export const TamedWidget: React.FC<TamedWidgetProps> = (props) => {
                         onClick={(e) => {
                           e.preventDefault();
                           e.stopPropagation();
+                          if (!isWidgetMenuOpen && typeof document !== 'undefined') {
+                            const activeEl = document.activeElement as HTMLElement | null;
+                            if (activeEl && (activeEl.id === 'main-editor' || activeEl.classList.contains('wysiwyg-editor') || activeEl.isContentEditable)) {
+                              activeEl.blur();
+                            }
+                          }
                           if (!isWidgetMenuOpen && scrollRef.current) {
                             setLockedToolsWidth(scrollRef.current.offsetWidth);
                           } else {
@@ -352,7 +357,7 @@ export const TamedWidget: React.FC<TamedWidgetProps> = (props) => {
                             exit={{ opacity: 0, scale: 0.95 }}
                             transition={{ duration: 0.1, ease: "easeOut" }}
                             className={cn(
-                              "absolute right-0 w-72 border border-white/5 rounded-3xl overflow-hidden z-[160] flex flex-col bg-slate-900 shadow-none",
+                              "absolute right-0 w-72 max-w-[calc(100vw-1rem)] border border-white/5 rounded-3xl overflow-hidden z-[160] flex flex-col bg-slate-900 shadow-none",
                               menuDirection === 'down' ? "top-full mt-3" : "bottom-full mb-3"
                             )}
                             style={{ 
@@ -406,7 +411,7 @@ export const TamedWidget: React.FC<TamedWidgetProps> = (props) => {
                                 <div className="flex items-center justify-between bg-white/5 p-3 rounded-2xl border border-white/5">
                                   <div className="flex items-center gap-3">
                                     <div className={cn("w-2 h-2 rounded-full transition-all duration-500", widgetNoBorder ? "bg-cyan-500 shadow-[0_0_8px_rgba(6,182,212,0.5)]" : "bg-slate-600")} />
-                                    <span className="text-[10px] font-bold text-slate-200 uppercase tracking-tight">{t('widgetNoBorder') || 'Без рамок'}</span>
+                                    <span className="text-[10px] font-bold text-slate-200 uppercase tracking-tight">{t('widgetNoBorder')}</span>
                                   </div>
                                   <button 
                                     onClick={() => {
@@ -430,15 +435,20 @@ export const TamedWidget: React.FC<TamedWidgetProps> = (props) => {
                                   <label className="text-[10px] font-bold text-slate-500 uppercase block tracking-wider">{t('widgetPos')}</label>
                                   <div className="grid grid-cols-3 gap-1.5">
                                     {[
-                                      { id: 'bottom', label: lang === 'uk' ? 'ВНИЗУ' : 'BOTTOM' },
-                                      { id: 'floating', label: lang === 'uk' ? 'ПЛАВАЮЧИЙ' : 'FLOAT' },
-                                      { id: 'hidden', label: lang === 'uk' ? 'ВИМКН' : 'OFF' }
+                                      { id: 'bottom', label: t('widgetPosBottom') },
+                                      { id: 'floating', label: t('widgetPosFloating') },
+                                      { id: 'hidden', label: t('widgetPosHidden') }
                                     ].map(pos => (
                                       <button
                                         key={pos.id}
                                         type="button"
-                                        onMouseDown={(e) => e.preventDefault()}
                                         onClick={() => {
+                                          if (typeof document !== 'undefined') {
+                                            const activeEl = document.activeElement as HTMLElement | null;
+                                            if (activeEl && (activeEl.id === 'main-editor' || activeEl.classList.contains('wysiwyg-editor') || activeEl.isContentEditable)) {
+                                              activeEl.blur();
+                                            }
+                                          }
                                           setWidgetPos(pos.id as any);
                                           localStorage.setItem('steem_widget_pos', pos.id);
                                         }}
@@ -457,7 +467,7 @@ export const TamedWidget: React.FC<TamedWidgetProps> = (props) => {
                               <div className="space-y-4 pt-6 border-t border-white/5">
                                 <div className="flex justify-between items-center mb-2">
                                   <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">{t('activeToolsSort')}</label>
-                                  <span className="text-[9px] text-slate-600 italic">Drag to sort</span>
+                                  <span className="text-[9px] text-slate-600 italic">{t('dragToReorder')}</span>
                                 </div>
 
                                 <Reorder.Group 

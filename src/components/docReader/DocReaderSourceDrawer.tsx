@@ -2,6 +2,8 @@ import React, { useRef, useEffect } from 'react';
 import { DocReaderSource } from './types';
 import { X, FileText, Bookmark, FolderOpen, Edit, Clock, Tag } from 'lucide-react';
 import { cn } from '../../lib/utils';
+import { useEditorStore } from '../../store';
+import { getTranslation, TranslationKey } from '../../locales';
 
 interface DocReaderSourceDrawerProps {
   isOpen: boolean;
@@ -26,6 +28,8 @@ export const DocReaderSourceDrawer: React.FC<DocReaderSourceDrawerProps> = ({
   onEditDocument,
   theme = 'dark'
 }) => {
+  const currentLang = useEditorStore(s => s.currentLang);
+  const t = (key: TranslationKey) => getTranslation(currentLang, key);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const drawerRef = useRef<HTMLDivElement | null>(null);
 
@@ -36,7 +40,7 @@ export const DocReaderSourceDrawer: React.FC<DocReaderSourceDrawerProps> = ({
       if (drawerRef.current && !drawerRef.current.contains(e.target as Node)) {
         // Prevent closing if clicked on header buttons
         const target = e.target as HTMLElement;
-        if (target.closest('button')?.title?.includes('Джерело')) return;
+        if (target.closest('[data-drawer-trigger="source"]')) return;
         onClose();
       }
     };
@@ -88,7 +92,7 @@ export const DocReaderSourceDrawer: React.FC<DocReaderSourceDrawerProps> = ({
         )}>
           <div className="flex items-center gap-2 font-medium">
             <Bookmark size={18} className={isSepia ? "text-[#8c6d37]" : isLight ? "text-cyan-600" : "text-cyan-400"} />
-            <span>Джерела для читання</span>
+            <span>{t('readerSourcesTitle')}</span>
           </div>
           <button
             onClick={onClose}
@@ -100,7 +104,7 @@ export const DocReaderSourceDrawer: React.FC<DocReaderSourceDrawerProps> = ({
                 ? "hover:bg-slate-100 text-slate-500" 
                 : "hover:bg-slate-800 text-slate-400"
             )}
-            title="Закрити панель"
+            title={t('readerClosePanel')}
           >
             <X size={18} />
           </button>
@@ -112,7 +116,7 @@ export const DocReaderSourceDrawer: React.FC<DocReaderSourceDrawerProps> = ({
           isSepia ? "border-[#dfd2be] bg-[#ebe0cc]/50" : isLight ? "border-slate-200 bg-slate-50" : "border-slate-800 bg-slate-950/40"
         )}>
           <div className="text-xs font-semibold uppercase tracking-wider opacity-60 px-1">
-            Зараз у рідері
+            {t('readerCurrentInReader')}
           </div>
           <div className={cn(
             "p-2.5 rounded-xl border flex flex-col gap-1.5",
@@ -124,7 +128,7 @@ export const DocReaderSourceDrawer: React.FC<DocReaderSourceDrawerProps> = ({
           )}>
             <div className="font-medium text-sm line-clamp-1 flex items-center gap-2">
               <FileText size={15} className="text-cyan-500 shrink-0" />
-              <span>{source.title || 'Документ без назви'}</span>
+              <span>{source.title || t('readerUntitledDoc')}</span>
             </div>
             {source.tags && (
               <div className="flex items-center gap-1 text-xs opacity-60">
@@ -140,7 +144,7 @@ export const DocReaderSourceDrawer: React.FC<DocReaderSourceDrawerProps> = ({
               className="mt-1 w-full py-1.5 px-3 bg-cyan-600 hover:bg-cyan-500 text-white rounded-lg text-xs font-medium flex items-center justify-center gap-1.5 transition-colors shadow-sm"
             >
               <Edit size={13} />
-              <span>Редагувати цей текст</span>
+              <span>{t('readerEditThisText')}</span>
             </button>
           </div>
         </div>
@@ -150,7 +154,7 @@ export const DocReaderSourceDrawer: React.FC<DocReaderSourceDrawerProps> = ({
           {/* 1. Editor Current Work */}
           <div>
             <div className="text-xs font-semibold uppercase tracking-wider opacity-60 px-1 mb-1.5">
-              Основний редактор
+              {t('readerMainEditor')}
             </div>
             <button
               onClick={() => {
@@ -174,8 +178,8 @@ export const DocReaderSourceDrawer: React.FC<DocReaderSourceDrawerProps> = ({
             >
               <FileText size={16} className="mt-0.5 text-cyan-500 shrink-0" />
               <div className="flex-1 min-w-0">
-                <div className="text-sm font-medium truncate">Поточний документ у редакторі</div>
-                <div className="text-xs opacity-60 mt-0.5">Синхронізовано з візуальним / кодовим редактором</div>
+                <div className="text-sm font-medium truncate">{t('readerCurrentDocInEditor')}</div>
+                <div className="text-xs opacity-60 mt-0.5">{t('readerSyncedWithEditor')}</div>
               </div>
             </button>
           </div>
@@ -183,7 +187,7 @@ export const DocReaderSourceDrawer: React.FC<DocReaderSourceDrawerProps> = ({
           {/* 2. Open Local File */}
           <div>
             <div className="text-xs font-semibold uppercase tracking-wider opacity-60 px-1 mb-1.5">
-              Локальні файли
+              {t('readerLocalFiles')}
             </div>
             <input
               type="file"
@@ -205,8 +209,8 @@ export const DocReaderSourceDrawer: React.FC<DocReaderSourceDrawerProps> = ({
             >
               <FolderOpen size={16} className="text-amber-500 shrink-0" />
               <div className="flex-1 min-w-0">
-                <div className="text-sm font-medium">Відкрити файл з диска</div>
-                <div className="text-xs opacity-60">Підтримує .md, .txt, .html</div>
+                <div className="text-sm font-medium">{t('readerOpenFileDisk')}</div>
+                <div className="text-xs opacity-60">{t('readerSupportedFormats')}</div>
               </div>
             </button>
           </div>
@@ -214,13 +218,13 @@ export const DocReaderSourceDrawer: React.FC<DocReaderSourceDrawerProps> = ({
           {/* 3. Saved Drafts */}
           <div>
             <div className="text-xs font-semibold uppercase tracking-wider opacity-60 px-1 mb-1.5 flex items-center justify-between">
-              <span>Збережені чернетки</span>
+              <span>{t('readerSavedDrafts')}</span>
               <span className="opacity-80">({drafts.length})</span>
             </div>
 
             {drafts.length === 0 ? (
               <div className="text-center py-6 px-3 text-xs opacity-50 border rounded-xl border-dashed">
-                Немає збережених чернеток
+                {t('readerNoSavedDrafts')}
               </div>
             ) : (
               <div className="space-y-1.5">
@@ -249,10 +253,10 @@ export const DocReaderSourceDrawer: React.FC<DocReaderSourceDrawerProps> = ({
                       )}
                     >
                       <div className="text-sm font-medium line-clamp-1">
-                        {d.title || 'Чернетка без назви'}
+                        {d.title || t('readerUntitledDraft')}
                       </div>
                       <div className="flex items-center justify-between text-xs opacity-60">
-                        <span>{d.content ? `${d.content.trim().split(/\s+/).length} слів` : '0 слів'}</span>
+                        <span>{d.content ? `${d.content.trim().split(/\s+/).length} ${t('readerWordsSuffix')}` : `0 ${t('readerWordsSuffix')}`}</span>
                         {(d.updatedAt || d.createdAt) && (
                           <span className="flex items-center gap-1">
                             <Clock size={10} />

@@ -4,6 +4,8 @@
  */
 
 import { SoundPreset, AudioTypingSettings } from './types';
+import { getTranslation, TranslationKey } from '../../locales';
+import { useEditorStore } from '../../store';
 
 // Static imports of modularized sound presets
 import { cherryBluePreset } from './presets/cherry-blue';
@@ -48,7 +50,8 @@ export const DEFAULT_AUDIO_SETTINGS: AudioTypingSettings = {
   volume: 0.5,
   favoritePresetIds: ['cherry-blue', 'crystal-bell', 'water-drops', 'deep-thock', 'lofi-chill', 'coffee-shop'],
   customPresets: [],
-  playOnVirtualKeys: true
+  playOnVirtualKeys: true,
+  speedScalingEnabled: true
 };
 
 export const SETTINGS_STORAGE_KEY = 'steem_editor_audio_synth_config_v1';
@@ -86,34 +89,53 @@ export function saveAudioSettings(settings: AudioTypingSettings): void {
   }
 }
 
+export function getPresetDisplayName(preset: SoundPreset, lang?: string): string {
+  if (!preset.isBuiltin) return preset.name;
+  const activeLang = (lang || useEditorStore.getState().currentLang || 'uk') as any;
+  const key = `audioPreset_${preset.id}_name` as TranslationKey;
+  const translated = getTranslation(activeLang, key);
+  return translated && translated !== key ? translated : preset.name;
+}
+
+export function getPresetDisplayDescription(preset: SoundPreset, lang?: string): string {
+  if (!preset.isBuiltin) return preset.description;
+  const activeLang = (lang || useEditorStore.getState().currentLang || 'uk') as any;
+  const key = `audioPreset_${preset.id}_desc` as TranslationKey;
+  const translated = getTranslation(activeLang, key);
+  return translated && translated !== key ? translated : preset.description;
+}
+
 /**
  * Validates whether an imported object matches the SoundPreset schema
  */
 export function validateSoundPreset(obj: unknown): { valid: boolean; error?: string; preset?: SoundPreset } {
+  const currentLang = (useEditorStore.getState().currentLang || 'uk') as any;
+  const t = (key: TranslationKey) => getTranslation(currentLang, key);
+
   if (!obj || typeof obj !== 'object') {
-    return { valid: false, error: 'Об’єкт пресету не передано або він некоректного формату' };
+    return { valid: false, error: t('audioPresetInvalidObj') };
   }
 
   const p = obj as Record<string, any>;
 
   if (!p.id || typeof p.id !== 'string') {
-    return { valid: false, error: 'Відсутнє або некоректне поле "id" (очікується рядок)' };
+    return { valid: false, error: t('audioPresetMissingId') };
   }
   if (!p.name || typeof p.name !== 'string') {
-    return { valid: false, error: 'Відсутнє або некоректне поле "name" (очікується назва)' };
+    return { valid: false, error: t('audioPresetMissingName') };
   }
   if (!p.oscillator || typeof p.oscillator.baseFreq !== 'number') {
-    return { valid: false, error: 'Секція "oscillator" повинна містити числове значення baseFreq' };
+    return { valid: false, error: t('audioPresetMissingBaseFreq') };
   }
   if (!p.envelope || typeof p.envelope.decay !== 'number') {
-    return { valid: false, error: 'Секція "envelope" повинна містити числове значення decay' };
+    return { valid: false, error: t('audioPresetMissingDecay') };
   }
 
   const validatedPreset: SoundPreset = {
     id: String(p.id).trim().toLowerCase().replace(/[^a-z0-9_-]/g, '-'),
     name: String(p.name).trim(),
-    description: p.description ? String(p.description) : 'Користувацький звуковий пресет',
-    author: p.author ? String(p.author) : 'Користувач',
+    description: p.description ? String(p.description) : t('audioCustomDefaultDesc'),
+    author: p.author ? String(p.author) : t('audioCustomDefaultAuthor'),
     version: p.version ? String(p.version) : '1.0.0',
     tags: Array.isArray(p.tags) ? p.tags.map(String) : ['custom'],
     isBuiltin: false,

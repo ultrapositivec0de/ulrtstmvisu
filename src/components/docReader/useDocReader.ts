@@ -1,5 +1,7 @@
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { DocReaderSettings, DocReaderSource, TOCHeadingItem } from './types';
+import { useEditorStore } from '../../store';
+import { getTranslation, TranslationKey } from '../../locales';
 
 const DEFAULT_SETTINGS: DocReaderSettings = {
   fontSize: 18,
@@ -31,6 +33,9 @@ export function useDocReader({
   onLoadIntoEditor,
   onSwitchToEditMode
 }: UseDocReaderProps) {
+  const currentLang = useEditorStore(s => s.currentLang);
+  const t = useCallback((key: TranslationKey) => getTranslation(currentLang, key), [currentLang]);
+
   // 1. Settings state with persistence
   const [settings, setSettings] = useState<DocReaderSettings>(() => {
     try {
@@ -58,7 +63,7 @@ export function useDocReader({
 
   // 2. Active reading source - snapshot at the moment reading mode is opened
   const [source, setSource] = useState<DocReaderSource>(() => ({
-    title: currentEditorTitle || 'Документ без назви',
+    title: currentEditorTitle || getTranslation(useEditorStore.getState().currentLang, 'readerUntitledDoc'),
     content: currentEditorContent || '',
     tags: currentEditorTags,
     type: 'current'
@@ -67,24 +72,24 @@ export function useDocReader({
   // 3. Select source helpers
   const selectCurrentDocument = useCallback(() => {
     setSource({
-      title: currentEditorTitle || 'Документ без назви',
+      title: currentEditorTitle || t('readerUntitledDoc'),
       content: currentEditorContent || '',
       tags: currentEditorTags,
       type: 'current'
     });
-  }, [currentEditorContent, currentEditorTitle, currentEditorTags]);
+  }, [currentEditorContent, currentEditorTitle, currentEditorTags, t]);
 
   const selectDraft = useCallback((draft: any) => {
     if (!draft) return;
     setSource({
       id: draft.id,
-      title: draft.title || 'Чернетка без назви',
+      title: draft.title || t('readerUntitledDraft'),
       content: draft.content || '',
       tags: draft.tags || '',
       type: 'draft',
       updatedAt: draft.updatedAt || draft.createdAt
     });
-  }, []);
+  }, [t]);
 
   const selectLocalFile = useCallback((file: File) => {
     const reader = new FileReader();

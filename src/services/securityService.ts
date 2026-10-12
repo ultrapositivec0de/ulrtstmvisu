@@ -150,6 +150,13 @@ export class SecurityService {
     return this.masterKey === null;
   }
 
+  static touchSession(timeoutMs: number = 3600000): void {
+    if (this.masterKey) {
+      if (this.sessionTimer) clearTimeout(this.sessionTimer);
+      this.sessionTimer = setTimeout(() => this.lock(), timeoutMs);
+    }
+  }
+
   static setStatusCallback(cb: (unlocked: boolean) => void) {
     this.onStatusChange = cb;
   }

@@ -81,7 +81,7 @@ export const TableImportModal: React.FC<TableImportModalProps> = ({
       <button 
         onClick={processTableImport}
         disabled={!tableImportText.trim()}
-        className="w-full py-3 bg-cyan-600 hover:bg-cyan-500 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-xl font-bold text-sm transition-all shadow-lg shadow-cyan-900/20 active:scale-[0.98] cursor-pointer"
+        className="btn-primary w-full py-3 text-sm"
       >
         {t('importBtn')}
       </button>

@@ -46,7 +46,7 @@ export const PreviewPane: React.FC<PreviewPaneProps> = ({
           : (isMobileLayout 
               ? (activeMobileTab === 'preview' ? "flex" : "hidden")
               : (isLivePreviewEnabled ? "flex" : "hidden")),
-        isFullScreen && "bg-slate-950 p-4 lg:p-12 overflow-y-auto fixed top-0 left-0 right-0 z-[250]"
+        isFullScreen && "bg-slate-950 p-4 lg:p-12 overflow-y-auto fixed inset-0 z-[250]"
       )}
     >
       <div className="absolute top-4 right-4 z-10 flex gap-2">
@@ -57,7 +57,7 @@ export const PreviewPane: React.FC<PreviewPaneProps> = ({
               "p-1.5 rounded-lg transition-colors",
               isLivePreviewEnabled ? "bg-cyan-600 text-white shadow-none" : "bg-red-950 text-red-400 border border-red-500/30"
             )}
-            title={lang === 'uk' ? "Увімкнути/вимкнути прев'ю перегляду" : "Enable/Disable Live Preview"}
+            title={t('toggleLivePreview')}
           >
             {isLivePreviewEnabled ? <Eye size={20} /> : <EyeOff size={20} />}
           </button>

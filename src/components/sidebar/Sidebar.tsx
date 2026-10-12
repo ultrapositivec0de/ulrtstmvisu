@@ -288,7 +288,7 @@ export const Sidebar: React.FC<SidebarProps> = (props) => {
                         onClick={() => setIsGallerySettingsCollapsed(false)}
                         className="flex items-center justify-between mb-0.5 cursor-pointer group"
                       >
-                        <span className="text-[9px] font-bold text-slate-500 uppercase tracking-widest leading-none group-hover:text-cyan-400 transition-colors">{t('editorTools') || "Tools"}</span>
+                        <span className="text-[9px] font-bold text-slate-500 uppercase tracking-widest leading-none group-hover:text-cyan-400 transition-colors">{t('editorTools')}</span>
                         <button 
                           onClick={(e) => {
                             e.stopPropagation();
@@ -423,7 +423,7 @@ export const Sidebar: React.FC<SidebarProps> = (props) => {
 
                             <div className="grid grid-cols-2 sm:grid-cols-3 gap-1.5 mt-1.5 shrink-0">
                                   <button
-                                    title={t('performanceDesc') || 'Вимикає деякі анімації'}
+                                    title={t('performanceDesc')}
                                     onClick={() => {
                                       const next = !performanceMode;
                                       setPerformanceMode?.(next);
@@ -431,7 +431,7 @@ export const Sidebar: React.FC<SidebarProps> = (props) => {
                                     }}
                                     className={cn("flex justify-between items-center px-1.5 py-1 rounded border", performanceMode ? "bg-cyan-900/30 border-cyan-800 text-cyan-400" : "bg-slate-800/30 border-slate-700/30 text-slate-500")}
                                   >
-                                    <span className="text-[9px] font-bold uppercase truncate">{t('performanceMode') || 'Perf'}</span>
+                                    <span className="text-[9px] font-bold uppercase truncate">{t('performanceMode')}</span>
                                     <div className={cn("w-1.5 h-1.5 rounded-full shrink-0", performanceMode ? "bg-[rgb(var(--accent-color))]" : "bg-slate-700")} />
                                   </button>
 
@@ -443,7 +443,7 @@ export const Sidebar: React.FC<SidebarProps> = (props) => {
                                     }}
                                     className={cn("flex justify-between items-center px-1.5 py-1 rounded border", isTrafficOptimized ? "bg-cyan-900/30 border-cyan-800 text-cyan-400" : "bg-slate-800/30 border-slate-700/30 text-slate-500")}
                                   >
-                                    <span className="text-[9px] font-bold uppercase truncate">{t('trafficOptimization')?.substring(0, 6) || "Optim"}</span>
+                                    <span className="text-[9px] font-bold uppercase truncate">{t('trafficOptimization')?.substring(0, 6)}</span>
                                     <div className={cn("w-1.5 h-1.5 rounded-full shrink-0", isTrafficOptimized ? "bg-[rgb(var(--accent-color))]" : "bg-slate-700")} />
                                   </button>
 
@@ -455,7 +455,7 @@ export const Sidebar: React.FC<SidebarProps> = (props) => {
                                     }}
                                     className={cn("flex justify-between items-center px-1.5 py-1 rounded border", isExifEnabled ? "bg-cyan-900/30 border-cyan-800 text-cyan-400" : "bg-slate-800/30 border-slate-700/30 text-slate-500")}
                                   >
-                                    <span className="text-[9px] font-bold uppercase truncate">{t('exifEnabled') || "EXIF"}</span>
+                                    <span className="text-[9px] font-bold uppercase truncate">{t('exifEnabled')}</span>
                                     <div className={cn("w-1.5 h-1.5 rounded-full shrink-0", isExifEnabled ? "bg-[rgb(var(--accent-color))]" : "bg-slate-700")} />
                                   </button>
                             </div>
@@ -473,7 +473,7 @@ export const Sidebar: React.FC<SidebarProps> = (props) => {
                                 <button
                                   onClick={() => setGridWithCaptions(!gridWithCaptions)}
                                   className={cn("flex items-center justify-center px-2 py-1.5 rounded-lg border transition-colors flex-1 min-w-0", gridWithCaptions ? "bg-cyan-900/30 border-cyan-800 text-cyan-400" : "bg-slate-800/30 border-slate-700/30 text-slate-500 hover:bg-slate-800/50 hover:text-slate-300")}
-                                  title={t('addCaption') || "Add Caption"}
+                                  title={t('addCaption')}
                                 >
                                   <ImageCaptionIcon className="shrink-0" style={{ width: 'var(--gallery-icon-size, 15px)', height: 'var(--gallery-icon-size, 15px)' }} />
                                 </button>
@@ -522,7 +522,7 @@ export const Sidebar: React.FC<SidebarProps> = (props) => {
                                         "p-1.5 shrink-0 rounded transition-all flex-1 sm:flex-none flex justify-center items-center", 
                                         gridLayout === l ? "bg-cyan-600 text-white shadow-sm" : "text-slate-500 hover:text-slate-300 active:scale-95"
                                       )}
-                                      title={l === 'col' ? 'В стовпчик (не таблиця)' : l === 'col-table' ? 'Стовпчик в таблиці (зверху вниз)' : l === 'grid-2' ? 'Плитка (2x2)' : l === 'row' ? 'В один рядок (таблиця)' : l === 'col-img-text' ? 'Текст праворуч' : 'Текст ліворуч'}
+                                      title={l === 'col' ? t('layoutCol') : l === 'col-table' ? t('layoutColTable') : l === 'grid-2' ? t('layoutGrid2') : l === 'row' ? t('layoutRow') : l === 'col-img-text' ? t('layoutColImgText') : t('layoutColTextImg')}
                                     >
                                       {l === 'col' ? (
                                         <ListIcon className="shrink-0" style={{ width: 'var(--gallery-icon-size, 15px)', height: 'var(--gallery-icon-size, 15px)' }} />

@@ -114,6 +114,7 @@ export interface AudioTypingSettings {
   favoritePresetIds: string[];
   customPresets: SoundPreset[];
   playOnVirtualKeys: boolean;   // Touch / virtual keyboard / format buttons
+  speedScalingEnabled?: boolean; // Dynamic WPM speed scaling for audio decay
 }
 
 export interface KeySoundTriggerOptions {

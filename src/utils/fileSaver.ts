@@ -57,27 +57,50 @@ export const saveFileNatively = async (blob: Blob, defaultFilename: string, mime
     }
 
     // 1. NEUTRALINO.JS (Native desktop app runner)
-    if (typeof window !== 'undefined' && (window as any).Neutralino) {
-      const neu = (window as any).Neutralino;
-      const ext = defaultFilename.split('.').pop() || '*';
-      const filePath = await neu.os.showSaveDialog('Save File', {
-        defaultPath: defaultFilename,
-        filters: [{
-          name: `${ext.toUpperCase()} Files`,
-          extensions: [ext]
-        }]
-      });
-      if (filePath) {
-        if (mimeType.startsWith('text/')) {
-          const text = await blob.text();
-          await neu.filesystem.writeFile(filePath, text);
-        } else {
-          const buffer = await blob.arrayBuffer();
-          await neu.filesystem.writeBinaryFile(filePath, buffer);
+    if (typeof window !== 'undefined' && (window as any).Neutralino?.filesystem) {
+      try {
+        const neu = (window as any).Neutralino;
+        const ext = defaultFilename.split('.').pop() || '*';
+        let filePath = '';
+        if (typeof neu.os?.showSaveDialog === 'function') {
+          try {
+            filePath = await neu.os.showSaveDialog('Save File', {
+              defaultPath: defaultFilename,
+              filters: [{
+                name: `${ext.toUpperCase()} Files`,
+                extensions: [ext]
+              }]
+            });
+          } catch {
+            filePath = await neu.os.showSaveDialog({
+              title: 'Save File',
+              defaultPath: defaultFilename,
+              filters: [{
+                name: `${ext.toUpperCase()} Files`,
+                extensions: [ext]
+              }]
+            });
+          }
         }
-        return true;
+        if (filePath) {
+          if (mimeType.startsWith('text/') || mimeType.includes('json') || mimeType.includes('markdown')) {
+            const text = await blob.text();
+            if (typeof neu.filesystem.writePlainTextFile === 'function') {
+              await neu.filesystem.writePlainTextFile(filePath, text);
+            } else if (typeof neu.filesystem.writeFile === 'function') {
+              await neu.filesystem.writeFile(filePath, text);
+            }
+          } else {
+            const buffer = await blob.arrayBuffer();
+            if (typeof neu.filesystem.writeBinaryFile === 'function') {
+              await neu.filesystem.writeBinaryFile(filePath, buffer);
+            }
+          }
+          return true;
+        }
+      } catch (neuErr) {
+        console.warn('Neutralino native file save error:', neuErr);
       }
-      return false;
     }
 
     // 2. TAURI (Native desktop app runner)

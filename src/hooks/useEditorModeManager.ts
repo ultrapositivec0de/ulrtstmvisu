@@ -269,9 +269,13 @@ export function useEditorModeManager({
       return null;
     };
 
+    const isMobileOrTouch = typeof window !== 'undefined' && (window.innerWidth < 1024 || 'ontouchstart' in window);
+
     if (editorMode === 'markdown') {
       hasRestoredInitialCursorRef.current = true;
-      restoreMarkdownCursorAndScroll();
+      if (!isMobileOrTouch) {
+        restoreMarkdownCursorAndScroll();
+      }
     } else if (editorMode === 'visual') {
       let isCancelled = false;
       const attemptRestore = async () => {
@@ -294,7 +298,7 @@ export function useEditorModeManager({
           
           await syncCursorMarkdownToVisual();
           
-          if (wysiwygRef.current) {
+          if (wysiwygRef.current && !isMobileOrTouch) {
             wysiwygRef.current.focus({ preventScroll: true });
           }
 
@@ -471,35 +475,50 @@ export function useEditorModeManager({
     return () => saveCursorPosition();
   }, [saveCursorPosition]);
 
+  const restoreVisualSelectionLatestRef = useRef(restoreVisualSelection);
+  restoreVisualSelectionLatestRef.current = restoreVisualSelection;
+  const restoreMarkdownCursorLatestRef = useRef(restoreMarkdownCursorAndScroll);
+  restoreMarkdownCursorLatestRef.current = restoreMarkdownCursorAndScroll;
+  const saveVisualSelectionLatestRef = useRef(saveVisualSelection);
+  saveVisualSelectionLatestRef.current = saveVisualSelection;
+  const saveCursorPositionLatestRef = useRef(saveCursorPosition);
+  saveCursorPositionLatestRef.current = saveCursorPosition;
+  const prevViewStateRef = useRef({ activeView, activeMobileTab });
+
   useEffect(() => {
+    const prev = prevViewStateRef.current;
+    const viewChanged = prev.activeView !== activeView || prev.activeMobileTab !== activeMobileTab;
+    prevViewStateRef.current = { activeView, activeMobileTab };
+
+    // Only run when the user actually switches between views/tabs (e.g. Reader <-> Editor or Preview <-> Editor)
+    if (!viewChanged) return;
+
     if (activeView === 'editor' && activeMobileTab === 'editor') {
       if (isTransitioningModeRef.current) return;
       setTimeout(() => {
         if (isTransitioningModeRef.current) return;
+        // On mobile/touch devices, do not aggressively pop up the virtual keyboard just from switching tabs
+        const isMobileOrTouch = typeof window !== 'undefined' && (window.innerWidth < 1024 || 'ontouchstart' in window);
+        if (isMobileOrTouch) {
+          isSyncingRef.current = false;
+          return;
+        }
         if (editorMode === 'visual') {
-          restoreVisualSelection();
-        } else {
-          restoreMarkdownCursorAndScroll();
+          restoreVisualSelectionLatestRef.current();
+        } else if (editorMode === 'markdown') {
+          restoreMarkdownCursorLatestRef.current();
         }
         isSyncingRef.current = false;
       }, 150);
     } else {
-      saveVisualSelection();
-      saveCursorPosition();
+      saveVisualSelectionLatestRef.current();
+      saveCursorPositionLatestRef.current();
       isSyncingRef.current = false;
     }
   }, [
     activeView,
     activeMobileTab,
     editorMode,
-    saveCursorPosition,
-    restoreVisualSelection,
-    saveVisualSelection,
-    restoreMarkdownCursorAndScroll,
-    isKeyboardOpen,
-    widgetPos,
-    toolbarIconSize,
-    editorRef,
     isSyncingRef
   ]);
 

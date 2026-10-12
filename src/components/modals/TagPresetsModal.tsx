@@ -1,5 +1,5 @@
 import React from 'react';
-import { Tags, LayoutGrid, Plus } from 'lucide-react';
+import { Tags, LayoutGrid, Plus, Star } from 'lucide-react';
 import { BaseModal } from './BaseModal';
 import { cn } from '../../lib/utils';
 
@@ -17,6 +17,7 @@ interface TagPresetsModalProps {
   toggleTag: (tag: string) => void;
   communities: Community[];
   commonTags: string[];
+  pinTag: (tag: string) => void;
   t: (key: any) => string;
 }
 
@@ -28,6 +29,7 @@ export const TagPresetsModal: React.FC<TagPresetsModalProps> = ({
   toggleTag,
   communities,
   commonTags,
+  pinTag,
   t
 }) => {
   return (
@@ -74,24 +76,44 @@ export const TagPresetsModal: React.FC<TagPresetsModalProps> = ({
                   )}
                 >
                   <span className="font-bold text-xs sm:text-sm text-[var(--text-main)] mb-2">{comm.name}</span>
-                  <div className="flex flex-wrap gap-1">
+                  <div className="flex flex-wrap gap-1.5">
                     {comm.tags.filter(Boolean).map((tag, tIdx) => (
-                      <button
-                        type="button"
+                      <div 
                         key={`preset-comm-${comm.id || cIdx}-tag-${tag}-${tIdx}`}
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          toggleTag(tag);
-                        }}
-                        className={cn(
-                          "text-[10px] px-2 py-0.5 rounded-full border transition-all font-medium",
-                          pubTags.includes(tag)
-                            ? "bg-cyan-600 border-cyan-500 text-white shadow-xs"
-                            : "bg-[var(--bg-card)] border-[var(--border-color)] text-[var(--text-muted)] hover:border-slate-500"
-                        )}
+                        className="flex items-center gap-0.5 shrink-0"
                       >
-                        #{tag}
-                      </button>
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            toggleTag(tag);
+                          }}
+                          className={cn(
+                            "text-[10px] px-2 py-0.5 rounded-l-full border-y border-l transition-all font-medium h-6 flex items-center justify-center",
+                            pubTags.includes(tag)
+                              ? "bg-cyan-600 border-cyan-500 text-white shadow-xs"
+                              : "bg-[var(--bg-card)] border-[var(--border-color)] text-[var(--text-muted)] hover:border-slate-500"
+                          )}
+                        >
+                          #{tag}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            pinTag(tag);
+                          }}
+                          className={cn(
+                            "px-1.5 rounded-r-full border-y border-r transition-all h-6 flex items-center justify-center hover:text-amber-400 cursor-pointer text-slate-500",
+                            pubTags.includes(tag)
+                              ? "bg-cyan-600 border-cyan-500 text-cyan-200"
+                              : "bg-[var(--bg-card)] border-[var(--border-color)] text-[var(--text-muted)] hover:border-slate-500"
+                          )}
+                          title={t('pinTagQuickSelect')}
+                        >
+                          <Star size={10} className="stroke-[2.5]" />
+                        </button>
+                      </div>
                     ))}
                   </div>
                 </div>
@@ -106,19 +128,36 @@ export const TagPresetsModal: React.FC<TagPresetsModalProps> = ({
           </h3>
           <div className="flex flex-wrap gap-2">
             {commonTags.filter(Boolean).map((tag, tIdx) => (
-              <button 
-                type="button"
+              <div 
                 key={`preset-common-tag-${tag}-${tIdx}`}
-                onClick={() => toggleTag(tag)}
-                className={cn(
-                  "px-3 py-1.5 rounded-full text-xs font-medium border transition-all cursor-pointer",
-                  pubTags.includes(tag) 
-                    ? "bg-cyan-600 border-cyan-500 text-white shadow-xs" 
-                    : "bg-[var(--bg-card)] border-[var(--border-color)] text-[var(--text-muted)] hover:border-slate-500 hover:text-[var(--text-main)]"
-                )}
+                className="flex items-center gap-0.5 shrink-0"
               >
-                #{tag}
-              </button>
+                <button 
+                  type="button"
+                  onClick={() => toggleTag(tag)}
+                  className={cn(
+                    "px-3 py-1.5 rounded-l-xl text-xs font-medium border-y border-l transition-all cursor-pointer h-8 flex items-center justify-center",
+                    pubTags.includes(tag) 
+                      ? "bg-cyan-600 border-cyan-500 text-white shadow-xs" 
+                      : "bg-[var(--bg-card)] border-[var(--border-color)] text-[var(--text-muted)] hover:border-slate-500 hover:text-[var(--text-main)]"
+                  )}
+                >
+                  #{tag}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => pinTag(tag)}
+                  className={cn(
+                    "px-2 rounded-r-xl border-y border-r transition-all h-8 flex items-center justify-center hover:text-amber-400 cursor-pointer text-slate-500",
+                    pubTags.includes(tag)
+                      ? "bg-cyan-600 border-cyan-500 text-cyan-200"
+                      : "bg-[var(--bg-card)] border-[var(--border-color)] hover:border-slate-500 text-[var(--text-muted)]"
+                  )}
+                  title={t('pinTagQuickSelect')}
+                >
+                  <Star size={12} className="stroke-[2.5]" />
+                </button>
+              </div>
             ))}
           </div>
         </section>
@@ -135,7 +174,7 @@ export const TagPresetsModal: React.FC<TagPresetsModalProps> = ({
         <button 
           type="button"
           onClick={onClose}
-          className="px-5 py-2 bg-cyan-600 hover:bg-cyan-500 text-white font-bold rounded-xl text-xs sm:text-sm transition-all shadow-md shadow-cyan-900/20 active:scale-[0.98] cursor-pointer"
+          className="btn-primary text-xs sm:text-sm"
         >
           {t('done')}
         </button>

@@ -199,7 +199,7 @@ export function usePublishingManager(options: UsePublishingManagerOptions) {
         pin = (await promptDialog(t('enterPin'), '', undefined, 'password')) || '';
       }
       if (!pin) {
-        setPubLog({ msg: t('pinRequired') || 'PIN required', type: 'error' });
+        setPubLog({ msg: t('pinRequired'), type: 'error' });
         return;
       }
       try {

@@ -63,7 +63,7 @@ export const AccountPromptModal: React.FC<AccountPromptModalProps> = ({
             type="text"
             value={username}
             onChange={(e) => setUsername(e.target.value.toLowerCase().trim())}
-            placeholder="softpedia"
+            placeholder={t('usernamePlaceholder')}
             className="w-full bg-[var(--bg-main)] border border-[var(--border-color)] rounded-xl px-4 py-2.5 text-[var(--text-main)] outline-none focus:ring-1 focus:ring-cyan-500 focus:border-cyan-500 transition-all font-bold placeholder:text-[var(--text-muted)] text-sm"
             onKeyDown={(e) => e.key === 'Enter' && setShowAccountPrompt(false)}
             autoFocus

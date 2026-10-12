@@ -68,7 +68,7 @@ export const TemplatesModal: React.FC<TemplatesModalProps> = ({
 
   const handleSaveTemplate = () => {
     if (!newTemplateName.trim()) {
-      notify('Вкажіть назву шаблону!');
+      notify(t('templateNameRequired'));
       return;
     }
     const newT: Template = {
@@ -94,7 +94,7 @@ export const TemplatesModal: React.FC<TemplatesModalProps> = ({
       size="lg"
       icon={FileText}
       title={t('templates')}
-      subtitle={`${templates.length} ${t('saved') || 'збережено'}`}
+      subtitle={`${templates.length} ${t('saved')}`}
       modalKey="modal-templates"
       bodyClassName="p-5 sm:p-6 overflow-y-auto custom-scrollbar flex-1 max-h-[75vh] space-y-4"
     >
@@ -102,25 +102,25 @@ export const TemplatesModal: React.FC<TemplatesModalProps> = ({
         <div className="space-y-4 bg-[var(--bg-main)]/70 p-4 sm:p-5 rounded-2xl border border-[var(--border-color)] mb-4">
           <div className="flex items-center gap-2 mb-1">
             <Edit3 size={16} className="text-cyan-400" />
-            <h3 className="font-bold text-[var(--text-main)] text-xs sm:text-sm">Зберегти як новий шаблон</h3>
+            <h3 className="font-bold text-[var(--text-main)] text-xs sm:text-sm">{t('saveAsNewTemplateTitle')}</h3>
           </div>
           
           <div>
             <label className="block text-[10px] text-[var(--text-muted)] font-bold uppercase tracking-wider mb-1.5">
-              Назва шаблону
+              {t('templateNameLabel')}
             </label>
             <input
               type="text"
               value={newTemplateName}
               onChange={(e) => setNewTemplateName(e.target.value)}
-              placeholder="Наприклад: Мій підпис, Звіт, Привітання..."
+              placeholder={t('templateNamePlaceholder')}
               className="w-full bg-[var(--bg-card)] border border-[var(--border-color)] rounded-xl px-3.5 py-2.5 text-xs text-[var(--text-main)] focus:outline-none focus:ring-1 focus:ring-cyan-500 placeholder:text-[var(--text-muted)] font-sans"
             />
           </div>
 
           <div>
             <label className="block text-[10px] text-[var(--text-muted)] font-bold uppercase tracking-wider mb-2">
-              Призначення та тип шаблону
+              {t('templatePurposeLabel')}
             </label>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <button
@@ -135,10 +135,10 @@ export const TemplatesModal: React.FC<TemplatesModalProps> = ({
               >
                 <div className="flex items-center gap-1.5 font-bold text-xs">
                   <FileText size={14} />
-                  <span>Шаблон допису</span>
+                  <span>{t('templateTypePost')}</span>
                 </div>
                 <p className="text-[10px] text-[var(--text-muted)] mt-1.5 leading-relaxed">
-                  Замінює весь поточний вміст, заголовок та теги допису.
+                  {t('templateTypePostDesc')}
                 </p>
               </button>
 
@@ -154,10 +154,10 @@ export const TemplatesModal: React.FC<TemplatesModalProps> = ({
               >
                 <div className="flex items-center gap-1.5 font-bold text-xs">
                   <Edit3 size={14} />
-                  <span>Вставка / Сніппет</span>
+                  <span>{t('templateTypeSnippet')}</span>
                 </div>
                 <p className="text-[10px] text-[var(--text-muted)] mt-1.5 leading-relaxed">
-                  Вставляє заготовлений текст у поточне місце курсору.
+                  {t('templateTypeSnippetDesc')}
                 </p>
               </button>
             </div>
@@ -170,7 +170,7 @@ export const TemplatesModal: React.FC<TemplatesModalProps> = ({
                 setIsAddingTemplate(false);
                 setNewTemplateName('');
               }}
-              className="flex-1 py-2.5 bg-[var(--bg-card)] hover:bg-[var(--border-color)] text-[var(--text-main)] font-bold rounded-xl text-xs transition-colors border border-[var(--border-color)] cursor-pointer"
+              className="btn-secondary flex-1 py-2.5 text-xs"
             >
               {t('cancel')}
             </button>
@@ -178,14 +178,9 @@ export const TemplatesModal: React.FC<TemplatesModalProps> = ({
               type="button"
               disabled={!newTemplateName.trim()}
               onClick={handleSaveTemplate}
-              className={cn(
-                "flex-1 py-2.5 font-bold rounded-xl text-xs transition-all flex items-center justify-center gap-1.5 cursor-pointer",
-                newTemplateName.trim()
-                  ? "bg-cyan-600 hover:bg-cyan-500 text-white shadow-md shadow-cyan-900/20 active:scale-98"
-                  : "bg-[var(--bg-card)] text-[var(--text-muted)] opacity-40 cursor-not-allowed"
-              )}
+              className="btn-primary flex-1 py-2.5 text-xs"
             >
-              {t('save') || "Зберегти"}
+              {t('save')}
             </button>
           </div>
         </div>
@@ -197,10 +192,7 @@ export const TemplatesModal: React.FC<TemplatesModalProps> = ({
               setNewTemplateName('');
               setNewTemplateType('snippet');
             }}
-            className={cn(
-              "w-full py-2.5 sm:py-3 bg-cyan-600 hover:bg-cyan-500 text-white rounded-xl font-bold text-xs sm:text-sm transition-all flex items-center justify-center gap-2 shadow-md shadow-cyan-900/20 cursor-pointer",
-              !performanceMode && "active:scale-[0.99]"
-            )}
+            className="btn-primary w-full py-2.5 sm:py-3 text-xs sm:text-sm"
           >
             <Plus size={18} />
             {t('saveAsTemplate')}
@@ -219,7 +211,7 @@ export const TemplatesModal: React.FC<TemplatesModalProps> = ({
                 : "text-[var(--text-muted)] hover:text-[var(--text-main)]"
             )}
           >
-            Всі ({templates.length})
+            {t('templatesFilterAll').replace('{count}', String(templates.length))}
           </button>
           <button
             onClick={() => setTemplateFilter('post')}
@@ -230,7 +222,7 @@ export const TemplatesModal: React.FC<TemplatesModalProps> = ({
                 : "text-[var(--text-muted)] hover:text-[var(--text-main)]"
             )}
           >
-            Шаблони допису ({templates.filter(t => t.type === 'post' || !t.type).length})
+            {t('templatesFilterPost').replace('{count}', String(templates.filter(t => t.type === 'post' || !t.type).length))}
           </button>
           <button
             onClick={() => setTemplateFilter('snippet')}
@@ -241,7 +233,7 @@ export const TemplatesModal: React.FC<TemplatesModalProps> = ({
                 : "text-[var(--text-muted)] hover:text-[var(--text-main)]"
             )}
           >
-            Фрагменти ({templates.filter(t => t.type === 'snippet').length})
+            {t('templatesFilterSnippet').replace('{count}', String(templates.filter(t => t.type === 'snippet').length))}
           </button>
         </div>
       )}
@@ -262,7 +254,7 @@ export const TemplatesModal: React.FC<TemplatesModalProps> = ({
           if (filtered.length === 0) {
             return (
               <div className="text-center py-10 text-[var(--text-muted)] border border-dashed border-[var(--border-color)] rounded-2xl">
-                <p className="text-xs">Немає шаблонів у цій категорії</p>
+                <p className="text-xs">{t('templatesEmptyCategory')}</p>
               </div>
             );
           }
@@ -283,7 +275,7 @@ export const TemplatesModal: React.FC<TemplatesModalProps> = ({
                         ? "bg-amber-500/10 text-amber-400 border-amber-500/20" 
                         : "bg-cyan-500/10 text-cyan-400 border-cyan-500/20"
                     )}>
-                      {isSnippet ? 'Фрагмент / Вставка' : 'Шаблон допису'}
+                      {isSnippet ? t('templateSnippetBadge') : t('templateTypePost')}
                     </span>
                   </div>
                   <div className="flex gap-2 items-center shrink-0">
@@ -291,14 +283,14 @@ export const TemplatesModal: React.FC<TemplatesModalProps> = ({
                       onClick={async () => {
                         if (isSnippet) {
                           insertAtCursor(tmp.content);
-                          notify('Фрагмент вставлено у місце курсору!');
+                          notify(t('templateSnippetInsertedNotify'));
                           onClose();
                         } else {
-                          if (await confirmDialog('Замінити весь поточний допис цим шаблоном? Поточні дані (заголовок, текст, теги) буде втрачено.')) {
+                          if (await confirmDialog(t('templatePostConfirmReplace'))) {
                             setContent(tmp.content);
                             if (tmp.tags) setPubTags(tmp.tags);
                             if (tmp.title) setPubTitle(tmp.title);
-                            notify('Шаблон допису застосовано!');
+                            notify(t('templatePostAppliedNotify'));
                             onClose();
                           }
                         }
@@ -309,7 +301,7 @@ export const TemplatesModal: React.FC<TemplatesModalProps> = ({
                           ? "hover:bg-amber-500/10 text-amber-400 border-amber-500/30" 
                           : "hover:bg-cyan-500/10 text-cyan-400 border-cyan-500/40"
                       )}
-                      title={isSnippet ? 'Вставити у курсор' : 'Застосувати шаблон'}
+                      title={isSnippet ? t('templateInsertCursorTitle') : t('templateApplyTitle')}
                     >
                       {isSnippet ? <PlusCircle size={17} /> : <CheckCircle size={17} />}
                     </button>
@@ -323,7 +315,7 @@ export const TemplatesModal: React.FC<TemplatesModalProps> = ({
                         }
                       }}
                       className="p-1.5 hover:bg-red-500/10 text-[var(--text-muted)] hover:text-red-400 border border-[var(--border-color)] hover:border-red-500/30 rounded-lg transition-colors flex items-center justify-center cursor-pointer"
-                      title={t('delete') || "Видалити"}
+                      title={t('delete')}
                     >
                       <Trash2 size={17} />
                     </button>

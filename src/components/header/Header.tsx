@@ -298,7 +298,7 @@ export const Header: React.FC<HeaderProps> = (props) => {
                   }
                 }}
                 className="flex shrink-0 items-center justify-center bg-slate-800/40 px-2 sm:px-2.5 py-1 rounded-xl border border-slate-700/40 text-slate-300 hover:text-white hover:bg-slate-700/50 transition-all gap-1 h-8 sm:h-9"
-                title={t('formatting') || "Formatting Tools"}
+                title={t('formatting')}
               >
                 <Type className="shrink-0" style={{ width: 'var(--header-icon-size, 16px)', height: 'var(--header-icon-size, 16px)' }} />
                 <ChevronDown size={12} className={cn("transition-transform duration-200 shrink-0 opacity-70", showMobileToolsOpen && "rotate-180")} />
@@ -306,7 +306,7 @@ export const Header: React.FC<HeaderProps> = (props) => {
 
               {/* Tools Dropdown */}
               <div className={cn(
-                "fixed top-14 left-2 right-2 sm:absolute sm:top-full sm:left-0 sm:right-auto mt-2 bg-slate-800 border border-slate-700 p-2.5 rounded-xl shadow-2xl z-[250] flex-col gap-2.5 max-w-[calc(100vw-1rem)] sm:w-max max-h-[75vh] overflow-y-auto custom-scrollbar mx-auto sm:mx-0",
+                "fixed top-14 left-2 right-2 sm:absolute sm:top-full sm:left-0 sm:right-auto mt-2 bg-[var(--modal-bg)] border border-[var(--border-color)] p-2.5 rounded-xl shadow-2xl z-[250] flex-col gap-2.5 max-w-[calc(100vw-1rem)] sm:w-max max-h-[75vh] overflow-y-auto custom-scrollbar mx-auto sm:mx-0",
                 showMobileToolsOpen ? "flex" : "hidden"
               )}>
                 {/* Group 1 */}
@@ -324,9 +324,9 @@ export const Header: React.FC<HeaderProps> = (props) => {
                 {/* Group 3 */}
                 <div className="flex flex-wrap gap-1 bg-slate-900/50 p-1 rounded-lg">
                   <IconButton icon={AlignLeft} onClick={() => { fmt('<div class="text-left">\n', '\n</div>'); setShowMobileToolsOpen(false); }} title={t('leftText')} className="shrink-0 size-8" />
-                  <IconButton icon={AlignCenter} onClick={() => { fmt('<center>\n', '\n</center>'); setShowMobileToolsOpen(false); }} title="Center" className="shrink-0 size-8" />
+                  <IconButton icon={AlignCenter} onClick={() => { fmt('<center>\n', '\n</center>'); setShowMobileToolsOpen(false); }} title={t('center')} className="shrink-0 size-8" />
                   <IconButton icon={AlignRight} onClick={() => { fmt('<div class="text-right">\n', '\n</div>'); setShowMobileToolsOpen(false); }} title={t('rightText')} className="shrink-0 size-8" />
-                  <IconButton icon={AlignJustify} onClick={() => { fmt('<div class="text-justify">\n', '\n</div>'); setShowMobileToolsOpen(false); }} title="Justify" className="shrink-0 size-8" />
+                  <IconButton icon={AlignJustify} onClick={() => { fmt('<div class="text-justify">\n', '\n</div>'); setShowMobileToolsOpen(false); }} title={t('justify')} className="shrink-0 size-8" />
                 </div>
                 {/* Group 4 */}
                 <div className="flex flex-wrap gap-1 bg-slate-900/50 p-1 rounded-lg">
@@ -385,9 +385,9 @@ export const Header: React.FC<HeaderProps> = (props) => {
               <button type="button" onMouseDown={(e) => e.preventDefault()} onPointerDown={(e) => e.preventDefault()} onClick={() => fmtLine('### ')} title={t('h3')} className="size-8 flex items-center justify-center hover:bg-slate-700 rounded-lg text-[10px] font-black text-slate-400 shrink-0">H3</button>
               <div className="h-4 w-px bg-slate-700 mx-0.5 shrink-0" />
               <IconButton icon={AlignLeft} onClick={() => fmt('<div class="text-left">\n', '\n</div>')} title={t('leftText')} className="shrink-0 size-8" />
-              <IconButton icon={AlignCenter} onClick={() => fmt('<center>\n', '\n</center>')} title="Center" className="shrink-0 size-8" />
+              <IconButton icon={AlignCenter} onClick={() => fmt('<center>\n', '\n</center>')} title={t('center')} className="shrink-0 size-8" />
               <IconButton icon={AlignRight} onClick={() => fmt('<div class="text-right">\n', '\n</div>')} title={t('rightText')} className="shrink-0 size-8" />
-              <IconButton icon={AlignJustify} onClick={() => fmt('<div class="text-justify">\n', '\n</div>')} title="Justify" className="shrink-0 size-8" />
+              <IconButton icon={AlignJustify} onClick={() => fmt('<div class="text-justify">\n', '\n</div>')} title={t('justify')} className="shrink-0 size-8" />
               <div className="h-4 w-px bg-slate-700 mx-0.5 shrink-0" />
               <IconButton icon={Quote} onClick={() => fmtLine('> ')} title={t('quote')} className="shrink-0 size-8" />
               <IconButton icon={LinkIcon} onClick={handleLink} title={t('link')} className="shrink-0 size-8" />
@@ -443,24 +443,24 @@ export const Header: React.FC<HeaderProps> = (props) => {
               {showNotificationList && (
                 <motion.div 
                   {...getMotionConfig()}
-                  className="fixed top-14 left-2 right-2 sm:absolute sm:top-full sm:left-auto sm:right-0 sm:origin-top-right sm:mt-2 sm:w-80 max-w-[calc(100vw-1rem)] sm:max-w-sm mx-auto bg-slate-900 border border-slate-800 rounded-2xl shadow-2xl z-[100] overflow-hidden"
+                  className="fixed top-14 left-2 right-2 sm:absolute sm:top-full sm:left-auto sm:right-0 sm:origin-top-right sm:mt-2 sm:w-80 max-w-[calc(100vw-1rem)] sm:max-w-sm mx-auto bg-[var(--modal-bg)] border border-[var(--border-color)] rounded-2xl shadow-2xl z-[100] overflow-hidden"
                 >
-                  <div className="p-4 border-b border-slate-800 flex items-center justify-between bg-slate-950/50">
+                  <div className="p-4 border-b border-[var(--border-color)] flex items-center justify-between bg-[var(--bg-card)]">
                     <div className="flex flex-col">
-                      <h3 className="text-xs font-black uppercase tracking-widest text-slate-400">Сповіщення</h3>
-                      <span className="text-[9px] text-slate-500 font-bold">{visibleNotifications.filter(n => !n.isRead).length} нових</span>
+                      <h3 className="text-xs font-black uppercase tracking-widest text-slate-400">{t('headerNotifTitle')}</h3>
+                      <span className="text-[9px] text-slate-500 font-bold">{visibleNotifications.filter(n => !n.isRead).length} {t('headerNotifNewSuffix')}</span>
                     </div>
                     <div className="flex items-center gap-2">
                        <button onClick={() => setNotifEnabled(!notifEnabled)} className={cn("w-7 h-4 rounded-full relative transition-colors", notifEnabled ? "bg-[rgb(var(--accent-color))]" : "bg-slate-700")}>
                           <div className={cn("absolute top-0.5 size-3 bg-white rounded-full transition-all", notifEnabled ? "left-3.5" : "left-0.5")} />
                        </button>
-                       <button onClick={() => markAllAsRead()} className="p-1 text-slate-500 hover:text-white" title="Очистити"><Trash2 size={16} /></button>
+                       <button onClick={() => markAllAsRead()} className="p-1 text-slate-500 hover:text-white" title={t('headerNotifClearTitle')}><Trash2 size={16} /></button>
                        <button onClick={() => setShowNotificationList(false)} className="p-1 text-slate-500 hover:text-white"><X size={18} /></button>
                     </div>
                   </div>
                   <div className="max-h-[60vh] overflow-y-auto custom-scrollbar">
                     {visibleNotifications.length === 0 ? (
-                      <div className="p-8 text-center text-slate-500 text-[10px] uppercase font-black">Порожньо</div>
+                      <div className="p-8 text-center text-slate-500 text-[10px] uppercase font-black">{t('headerNotifEmpty')}</div>
                     ) : (
                       <div className="divide-y divide-slate-800/30">
                         {visibleNotifications.map(n => (
@@ -483,7 +483,7 @@ export const Header: React.FC<HeaderProps> = (props) => {
                               }}
                               className="text-[9px] font-black text-cyan-400 hover:underline flex items-center gap-1"
                             >
-                              ПЕРЕГЛЯНУТИ <ArrowRight size={14} />
+                              {t('headerNotifViewBtn')} <ArrowRight size={14} />
                             </button>
                           </div>
                         ))}
@@ -538,7 +538,7 @@ export const Header: React.FC<HeaderProps> = (props) => {
                        initial={{ opacity: 0, y: 5, scale: 0.95 }}
                        animate={{ opacity: 1, y: 0, scale: 1 }}
                        exit={{ opacity: 0, y: 5, scale: 0.95 }}
-                       className="absolute top-full right-0 mt-2 bg-slate-800 border border-slate-700 rounded-xl shadow-2xl overflow-hidden z-50 min-w-[120px] max-w-[calc(100vw-1rem)]"
+                       className="absolute top-full right-0 mt-2 bg-[var(--modal-bg)] border border-[var(--border-color)] rounded-xl shadow-2xl overflow-hidden z-50 min-w-[120px] max-w-[calc(100vw-1rem)]"
                      >
                        {AVAILABLE_LANGUAGES.map(item => (
                          <button
@@ -579,14 +579,14 @@ export const Header: React.FC<HeaderProps> = (props) => {
                   }
                 }}
                 className={cn("flex items-center justify-center bg-slate-800/30 rounded-xl border border-slate-700/30 text-slate-400 hover:text-white hover:bg-slate-700/50 transition-all size-8 sm:size-9", !isHeaderCompact && "hidden")}
-                title="Tools"
+                title={t('tools')}
              >
                 <Layers className="shrink-0" style={{ width: 'var(--header-icon-size, 18px)', height: 'var(--header-icon-size, 18px)' }} />
              </button>
              <div className={cn(
                 isHeaderCompact
                   ? cn(
-                      "absolute top-full right-0 mt-2 bg-slate-900 border border-slate-700/80 p-2 rounded-xl shadow-2xl min-w-max max-w-[calc(100vw-1rem)] flex-col items-center gap-1.5 z-50",
+                      "absolute top-full right-0 mt-2 bg-[var(--modal-bg)] border border-[var(--border-color)] p-2 rounded-xl shadow-2xl min-w-max max-w-[calc(100vw-1rem)] flex-col items-center gap-1.5 z-50",
                       showMobileTools1 ? "flex" : "hidden"
                     )
                   : "flex flex-row items-center gap-1 bg-slate-800/30 border border-slate-700/30 p-1 rounded-xl static shadow-none mt-0 z-10"
@@ -595,7 +595,7 @@ export const Header: React.FC<HeaderProps> = (props) => {
                 <IconButton icon={ListIcon} onClick={() => { setActiveModal('queue'); setShowMobileTools1(false); }} title={t('queue')} className="shrink-0 size-8 sm:size-9" />
                 <IconButton icon={FolderOpen} onClick={() => { setActiveModal('drafts'); setShowMobileTools1(false); }} title={t('drafts')} className="shrink-0 size-8 sm:size-9" />
                 <div className={cn("shrink-0 bg-slate-700", isHeaderCompact ? "w-full h-px my-0.5" : "w-px h-5 mx-0.5")} />
-                <label className="size-8 sm:size-9 bg-cyan-950/20 border border-cyan-500/30 text-cyan-400 hover:text-cyan-300 hover:bg-cyan-900/30 rounded-lg transition-colors cursor-pointer shrink-0 flex items-center justify-center shadow-lg shadow-cyan-950/50" title={t('importMd') || 'Import MD'}>
+                <label className="size-8 sm:size-9 bg-cyan-950/20 border border-cyan-500/30 text-cyan-400 hover:text-cyan-300 hover:bg-cyan-900/30 rounded-lg transition-colors cursor-pointer shrink-0 flex items-center justify-center shadow-lg shadow-cyan-950/50" title={t('importMd')}>
                    <FileDown size={18} />
                    <input type="file" accept=".md,.txt" className="hidden" onChange={(e) => {
                       const f = e.target.files?.[0];
@@ -639,7 +639,7 @@ export const Header: React.FC<HeaderProps> = (props) => {
                       }
                    }} />
                 </label>
-                <IconButton icon={FileUp} onClick={() => { downloadFile(); setShowMobileTools1(false); }} title={t('exportMd') || 'Export MD'} className="shrink-0 size-8 sm:size-9 text-slate-400 hover:text-cyan-400" />
+                <IconButton icon={FileUp} onClick={() => { downloadFile(); setShowMobileTools1(false); }} title={t('exportMd')} className="shrink-0 size-8 sm:size-9 text-slate-400 hover:text-cyan-400" />
              </div>
           </div>
 
@@ -659,14 +659,14 @@ export const Header: React.FC<HeaderProps> = (props) => {
                   }
                 }}
                 className={cn("flex items-center justify-center bg-slate-800/30 rounded-xl border border-slate-700/30 text-slate-400 hover:text-white hover:bg-slate-700/50 transition-all size-8 sm:size-9", !isHeaderCompact && "hidden")}
-                title="Files"
+                title={t('files')}
              >
                 <FilePlus className="shrink-0" style={{ width: 'var(--header-icon-size, 18px)', height: 'var(--header-icon-size, 18px)' }} />
              </button>
              <div className={cn(
                 isHeaderCompact
                   ? cn(
-                      "absolute top-full right-0 mt-2 bg-slate-900 border border-slate-700/80 p-2 rounded-xl shadow-2xl min-w-max max-w-[calc(100vw-1rem)] flex-col items-stretch gap-1.5 z-40",
+                      "absolute top-full right-0 mt-2 bg-[var(--modal-bg)] border border-[var(--border-color)] p-2 rounded-xl shadow-2xl min-w-max max-w-[calc(100vw-1rem)] flex-col items-stretch gap-1.5 z-40",
                       showMobileTools2 ? "flex" : "hidden"
                     )
                   : "flex flex-row items-center gap-1 bg-slate-800/30 border border-slate-700/30 p-1 rounded-xl static shadow-none mt-0 z-10"
@@ -676,7 +676,7 @@ export const Header: React.FC<HeaderProps> = (props) => {
                   onClick={async () => {
                     setShowMobileTools2(false);
                     if (useEditorStore.getState().content.trim() !== '') {
-                      const saveFirst = await confirmDialog(t('saveDraftBeforeNew') || "Save draft before starting new?");
+                      const saveFirst = await confirmDialog(t('saveDraftBeforeNew'));
                       if (saveFirst) saveDraft();
                       else if (!await confirmDialog(t('confirmNewPost'))) return;
                     }
@@ -712,7 +712,7 @@ export const Header: React.FC<HeaderProps> = (props) => {
               <IconButton 
                 icon={Download} 
                 onClick={handleInstallPwa} 
-                title={t('installApp') || "Встановити PWA"} 
+                title={t('installApp')} 
                 className={cn("shrink-0 size-8 text-cyan-400 bg-cyan-950/60 border border-cyan-800/60 hover:bg-cyan-900/80 active:scale-95 transition-transform", isHeaderCompact ? "hidden" : "flex")} 
               />
             )}

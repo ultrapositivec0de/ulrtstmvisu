@@ -10,6 +10,7 @@ export interface TableSelectorPopupProps {
   tableImportFormat: 'markdown' | 'html';
   setTableImportFormat: (format: 'markdown' | 'html') => void;
   insertAtCursor: (text: string) => void;
+  t?: (key: any) => string;
 }
 
 export const TableSelectorPopup: React.FC<TableSelectorPopupProps> = React.memo(({
@@ -19,6 +20,7 @@ export const TableSelectorPopup: React.FC<TableSelectorPopupProps> = React.memo(
   tableImportFormat,
   setTableImportFormat,
   insertAtCursor,
+  t = (k: string) => k,
 }) => {
   const [tableHover, setTableHover] = useState({ r: 0, c: 0 });
   const [customRows, setCustomRows] = useState(3);
@@ -73,7 +75,7 @@ export const TableSelectorPopup: React.FC<TableSelectorPopupProps> = React.memo(
           }}
         >
           <div className="flex items-center justify-between mb-3">
-            <h3 className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Insert Table</h3>
+            <h3 className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{t('tableSelectorInsertTitle')}</h3>
           </div>
           
           <div className="flex flex-col gap-2 mb-4 border-b border-slate-800 pb-3">
@@ -108,7 +110,7 @@ export const TableSelectorPopup: React.FC<TableSelectorPopupProps> = React.memo(
                 }}
                 className="p-1.5 bg-purple-500/10 hover:bg-purple-500/20 text-purple-400 text-[10px] rounded border border-purple-500/30 flex items-center justify-center transition-colors font-medium"
               >
-                1 Col Separator
+                {t('tableSelector1ColSep')}
               </button>
               <button 
                 type="button"
@@ -118,7 +120,7 @@ export const TableSelectorPopup: React.FC<TableSelectorPopupProps> = React.memo(
                 }}
                 className="p-1.5 bg-purple-500/10 hover:bg-purple-500/20 text-purple-400 text-[10px] rounded border border-purple-500/30 flex items-center justify-center transition-colors font-medium"
               >
-                2 Col Header
+                {t('tableSelector2ColHeader')}
               </button>
               <button 
                 type="button"
@@ -128,7 +130,7 @@ export const TableSelectorPopup: React.FC<TableSelectorPopupProps> = React.memo(
                 }}
                 className="p-1.5 bg-cyan-500/10 hover:bg-cyan-500/20 text-cyan-400 text-[10px] rounded border border-cyan-500/30 flex items-center justify-center transition-colors font-medium"
               >
-                2x2 Table
+                {t('tableSelector2x2')}
               </button>
               <button 
                 type="button"
@@ -138,12 +140,12 @@ export const TableSelectorPopup: React.FC<TableSelectorPopupProps> = React.memo(
                 }}
                 className="p-1.5 bg-cyan-500/10 hover:bg-cyan-500/20 text-cyan-400 text-[10px] rounded border border-cyan-500/30 flex items-center justify-center transition-colors font-medium"
               >
-                3x3 Table
+                {t('tableSelector3x3')}
               </button>
             </div>
           </div>
 
-          <div className="text-[9px] font-bold text-slate-500 uppercase tracking-widest mb-2 text-center">Or draw standard matrix</div>
+          <div className="text-[9px] font-bold text-slate-500 uppercase tracking-widest mb-2 text-center">{t('tableSelectorOrDraw')}</div>
           <div className="flex flex-col gap-1 items-center">
             {Array.from({ length: 10 }).map((_, rowIndex) => (
               <div key={rowIndex} className="flex gap-1">
@@ -169,9 +171,9 @@ export const TableSelectorPopup: React.FC<TableSelectorPopupProps> = React.memo(
           
           <div className="mt-3 text-center text-[10px] font-mono font-bold text-cyan-400 bg-cyan-500/10 py-1 rounded flex items-center justify-center gap-2">
             {tableHover.r === 0 ? (
-              <><span className="text-purple-400">{tableHover.c + 1} Cols</span> <span className="text-purple-400/70">(Header / Separator)</span></>
+              <><span className="text-purple-400">{tableHover.c + 1} {t('tableSelectorCols')}</span> <span className="text-purple-400/70">{t('tableSelectorHeaderSepHint')}</span></>
             ) : (
-              <><span className="text-cyan-400">{tableHover.c + 1} Cols</span> <span className="opacity-50">x</span> <span className="text-cyan-400">{tableHover.r + 1} Rows</span></>
+              <><span className="text-cyan-400">{tableHover.c + 1} {t('tableSelectorCols')}</span> <span className="opacity-50">x</span> <span className="text-cyan-400">{tableHover.r + 1} {t('tableSelectorRows')}</span></>
             )}
           </div>
           
@@ -180,7 +182,7 @@ export const TableSelectorPopup: React.FC<TableSelectorPopupProps> = React.memo(
               type="number" 
               min="0" 
               max="50" 
-              title="Rows"
+              title={t('tableSelectorRows')}
               value={customRows}
               onChange={(e) => setCustomRows(parseInt(e.target.value, 10) || 0)}
               id="customTableRowInput"
@@ -191,7 +193,7 @@ export const TableSelectorPopup: React.FC<TableSelectorPopupProps> = React.memo(
               type="number" 
               min="1" 
               max="50"
-              title="Cols" 
+              title={t('tableSelectorCols')} 
               value={customCols}
               onChange={(e) => setCustomCols(parseInt(e.target.value, 10) || 1)}
               id="customTableColInput"
@@ -202,7 +204,7 @@ export const TableSelectorPopup: React.FC<TableSelectorPopupProps> = React.memo(
               className="flex-1 bg-cyan-600 hover:bg-cyan-500 text-white text-[10px] font-bold rounded flex items-center justify-center gap-1"
               onClick={handleInsertCustom}
             >
-              <Plus size={10} /> Add
+              <Plus size={10} /> {t('tableSelectorAddBtn')}
             </button>
           </div>
         </motion.div>

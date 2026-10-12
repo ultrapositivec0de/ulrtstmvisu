@@ -91,7 +91,7 @@ export const SystemDialogModal: React.FC<SystemDialogModalProps> = ({
               onClick={handleCancel}
               className="px-4 py-2 text-[var(--text-muted)] hover:text-[var(--text-main)] hover:bg-[var(--bg-card)] rounded-xl transition-colors text-xs font-bold uppercase cursor-pointer"
             >
-              {t('cancel') || 'Скасувати'}
+              {t('cancel')}
             </button>
           )}
           <button 
@@ -99,7 +99,7 @@ export const SystemDialogModal: React.FC<SystemDialogModalProps> = ({
             onClick={handleConfirm}
             className="px-5 py-2 bg-cyan-600 hover:bg-cyan-500 text-white rounded-xl text-xs font-bold transition-all shadow-md shadow-cyan-900/20 uppercase cursor-pointer active:scale-95"
           >
-            {systemDialog.type === 'alert' ? 'OK' : (t('confirm') || 'OK')}
+            {systemDialog.type === 'alert' ? 'OK' : t('confirm')}
           </button>
         </div>
       }

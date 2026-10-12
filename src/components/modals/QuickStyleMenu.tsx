@@ -80,15 +80,15 @@ export const QuickStyleMenu: React.FC<QuickStyleMenuProps> = ({
       onClose={onClose}
       size="md"
       icon={Palette}
-      title="Settings Hub"
-      subtitle="Personalize experience"
+      title={t('settingsHubTitle')}
+      subtitle={t('settingsHubSubtitle')}
       modalKey="modal-quick-style"
       bodyClassName="p-5 sm:p-6 overflow-y-auto custom-scrollbar space-y-6 max-h-[80vh]"
     >
       {/* Theme Color Selector */}
       <div className="space-y-2">
         <label className="text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-widest flex items-center gap-2">
-          <Palette size={14} className="text-cyan-400" /> Theme Color
+          <Palette size={14} className="text-cyan-400" /> {t('quickStyleThemeColor')}
         </label>
         <div className="grid grid-cols-5 gap-2">
           {themes.map(tItem => (
@@ -115,7 +115,7 @@ export const QuickStyleMenu: React.FC<QuickStyleMenuProps> = ({
       {/* Typography Selector */}
       <div className="space-y-2">
         <label className="text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-widest flex items-center gap-2">
-          <Edit3 size={14} className="text-cyan-400" /> Typography
+          <Edit3 size={14} className="text-cyan-400" /> {t('quickStyleTypography')}
         </label>
         <div className="flex flex-wrap gap-1.5">
           {fontOptions.map(f => (
@@ -147,8 +147,8 @@ export const QuickStyleMenu: React.FC<QuickStyleMenuProps> = ({
             <Eye size={18} />
           </div>
           <div>
-            <span className="text-xs sm:text-sm font-bold text-[var(--text-main)] block">Beautification</span>
-            <span className="text-[10px] text-[var(--text-muted)] font-medium uppercase tracking-wider">Enhanced styling</span>
+            <span className="text-xs sm:text-sm font-bold text-[var(--text-main)] block">{t('quickStyleBeautification')}</span>
+            <span className="text-[10px] text-[var(--text-muted)] font-medium uppercase tracking-wider">{t('quickStyleBeautificationDesc')}</span>
           </div>
         </div>
         <button 
@@ -181,7 +181,7 @@ export const QuickStyleMenu: React.FC<QuickStyleMenuProps> = ({
           className="py-3 px-4 rounded-xl text-xs sm:text-sm font-bold flex items-center justify-center gap-2.5 transition-all bg-[var(--bg-main)]/70 hover:bg-[var(--border-color)] text-[var(--text-main)] border border-[var(--border-color)] cursor-pointer"
         >
           {isDarkMode ? <Sun size={17} className="text-amber-400" /> : <Moon size={17} className="text-indigo-400" />} 
-          {isDarkMode ? "Light" : "Dark"}
+          {isDarkMode ? t('light') : t('dark')}
         </button>
         <button 
           onClick={() => {
@@ -196,7 +196,7 @@ export const QuickStyleMenu: React.FC<QuickStyleMenuProps> = ({
               : "bg-[var(--bg-main)]/70 hover:bg-[var(--border-color)] text-[var(--text-main)] border-[var(--border-color)]"
           )}
         >
-          <Zap size={17} className={visualStyle === 'neon' ? "text-purple-400" : "text-[var(--text-muted)]"} /> Neon
+          <Zap size={17} className={visualStyle === 'neon' ? "text-purple-400" : "text-[var(--text-muted)]"} /> {t('neon')}
         </button>
       </div>
 
@@ -210,7 +210,7 @@ export const QuickStyleMenu: React.FC<QuickStyleMenuProps> = ({
             }}
             className="w-full py-3 bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 rounded-xl text-xs sm:text-sm font-bold text-white flex items-center justify-center gap-2.5 transition-all shadow-md shadow-cyan-600/20 cursor-pointer"
           >
-            <Download size={16} /> {t('installApp') || "Встановити додаток (PWA)"}
+            <Download size={16} /> {t('installApp')}
           </button>
         )}
         <button 

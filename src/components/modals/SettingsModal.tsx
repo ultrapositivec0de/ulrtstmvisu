@@ -215,7 +215,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = (props) => {
                 <div className="p-2 bg-yellow-500/10 text-yellow-500 rounded-lg"><Zap size={18} /></div>
                 <div>
                   <p className="text-sm font-bold text-[var(--text-main)]">{t('performanceMode')}</p>
-                  <p className="text-[10px] text-[var(--text-muted)] uppercase tracking-wider">{t('performanceDesc') || 'Вимикає деякі анімації'}</p>
+                  <p className="text-[10px] text-[var(--text-muted)] uppercase tracking-wider">{t('performanceDesc')}</p>
                 </div>
               </div>
               <button 
@@ -234,7 +234,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = (props) => {
 
             {/* Visual Style Selector */}
             <div>
-              <label className="text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-widest block mb-2">{t('appearance') || 'Style'}</label>
+              <label className="text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-widest block mb-2">{t('appearance')}</label>
               <div className="grid grid-cols-2 gap-2">
                 <button
                   onClick={() => {
@@ -248,7 +248,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = (props) => {
                       : "bg-[var(--bg-card)] border-[var(--border-color)] text-[var(--text-muted)] hover:text-[var(--text-main)]"
                   )}
                 >
-                  <Sun size={14} /> {isDarkMode ? 'Dark' : 'Light'}
+                  <Sun size={14} /> {isDarkMode ? t('dark') : t('light')}
                 </button>
                 <button
                   onClick={() => {
@@ -359,17 +359,16 @@ export const SettingsModal: React.FC<SettingsModalProps> = (props) => {
             <div className="space-y-4 pt-4 border-t border-[var(--border-color)]">
               {/* Widget Mode Selector */}
               <div>
-                <label className="text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-widest block mb-2">{t('widgetPos') || 'Режим плаваючого віджета'}</label>
+                <label className="text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-widest block mb-2">{t('widgetPos')}</label>
                 <div className="grid grid-cols-3 gap-2">
                   {[
-                    { id: 'bottom', label: lang === 'uk' ? '🔒 Внизу' : '🔒 Bottom' },
-                    { id: 'floating', label: lang === 'uk' ? '🎈 Плаваючий' : '🎈 Floating' },
-                    { id: 'hidden', label: lang === 'uk' ? '🚫 Вимкнено' : '🚫 Hidden' }
+                    { id: 'bottom', label: t('widgetPosBottomIcon') },
+                    { id: 'floating', label: t('widgetPosFloatingIcon') },
+                    { id: 'hidden', label: t('widgetPosHiddenIcon') }
                   ].map(pos => (
                     <button
                       key={pos.id}
                       type="button"
-                      onMouseDown={(e) => e.preventDefault()}
                       onClick={() => {
                         setWidgetPos(pos.id as any);
                         localStorage.setItem('steem_widget_pos', pos.id);
@@ -422,10 +421,10 @@ export const SettingsModal: React.FC<SettingsModalProps> = (props) => {
                 
                 <div className="grid grid-cols-4 gap-1.5 bg-[var(--bg-main)]/60 p-1 rounded-xl border border-[var(--border-color)]">
                   {[
-                    { id: 14, label: lang === 'uk' ? "Дрібний" : "Small" },
-                    { id: 16, label: lang === 'uk' ? "Стандарт" : "Normal" },
-                    { id: 18, label: lang === 'uk' ? "Великий" : "Large" },
-                    { id: 22, label: lang === 'uk' ? "Макс" : "Max" }
+                    { id: 14, label: t('fontSizeSmall') },
+                    { id: 16, label: t('fontSizeNormal') },
+                    { id: 18, label: t('fontSizeLarge') },
+                    { id: 22, label: t('fontSizeMax') }
                   ].map(preset => (
                     <button
                       key={preset.id}
@@ -476,9 +475,9 @@ export const SettingsModal: React.FC<SettingsModalProps> = (props) => {
                 
                 <div className="grid grid-cols-3 gap-1.5 bg-[var(--bg-main)]/60 p-1 rounded-xl border border-[var(--border-color)]">
                   {[
-                    { id: 14, label: lang === 'uk' ? "Дрібні" : "Small" },
-                    { id: 20, label: lang === 'uk' ? "Стандарт" : "Normal" },
-                    { id: 26, label: lang === 'uk' ? "Великі" : "Large" }
+                    { id: 14, label: t('iconSizeSmall') },
+                    { id: 20, label: t('iconSizeNormal') },
+                    { id: 26, label: t('iconSizeLarge') }
                   ].map(preset => (
                     <button
                       key={preset.id}
@@ -529,10 +528,10 @@ export const SettingsModal: React.FC<SettingsModalProps> = (props) => {
                 
                 <div className="grid grid-cols-4 gap-1.5 bg-[var(--bg-main)]/60 p-1 rounded-xl border border-[var(--border-color)]">
                   {[
-                    { id: 6, label: lang === 'uk' ? "Компакт" : "Compact" },
-                    { id: 14, label: lang === 'uk' ? "Збаланс" : "Balanced" },
-                    { id: 20, label: lang === 'uk' ? "Стандарт" : "Normal" },
-                    { id: 28, label: lang === 'uk' ? "Просторі" : "Spacious" }
+                    { id: 6, label: t('uiScaleCompact') },
+                    { id: 14, label: t('spacingBalanced') },
+                    { id: 20, label: t('uiScaleNormal') },
+                    { id: 28, label: t('spacingSpacious') }
                   ].map(preset => (
                     <button
                       key={preset.id}
@@ -580,10 +579,10 @@ export const SettingsModal: React.FC<SettingsModalProps> = (props) => {
                   </div>
                   <div>
                     <p className="text-sm font-bold text-[var(--text-main)]">
-                      {lang === 'uk' ? "Масштаб інтерфейсу та розміри" : "UI Scale & Element Sizing"}
+                      {t('uiScaleTitle')}
                     </p>
                     <p className="text-[10px] text-[var(--text-muted)] uppercase tracking-wider">
-                      {lang === 'uk' ? "Іконки хедера, бічної панелі та висота" : "Header icons, gallery & toolbar sizes"}
+                      {t('uiScaleSubtitle')}
                     </p>
                   </div>
                 </div>
@@ -595,10 +594,10 @@ export const SettingsModal: React.FC<SettingsModalProps> = (props) => {
                     setHeaderHeightAuto?.(true);
                   }}
                   className="text-[10px] text-cyan-400 hover:text-cyan-300 flex items-center gap-1 font-semibold px-2 py-1 rounded bg-cyan-500/10 border border-cyan-500/20 transition-all cursor-pointer"
-                  title={lang === 'uk' ? "Скинути до стандартних значень" : "Reset to default"}
+                  title={t('uiScaleResetTitle')}
                 >
                   <RotateCcw size={12} />
-                  <span>{lang === 'uk' ? "Скинути" : "Reset"}</span>
+                  <span>{t('uiScaleResetBtn')}</span>
                 </button>
               </div>
 
@@ -606,20 +605,20 @@ export const SettingsModal: React.FC<SettingsModalProps> = (props) => {
               <div className="space-y-1.5 pt-1">
                 <div className="flex justify-between items-center">
                   <label className="text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-widest block">
-                    {lang === 'uk' ? "Готові пресети масштабу" : "Scale Presets"}
+                    {t('uiScalePresetsLabel')}
                   </label>
                   {uiScalePreset === 'custom' && (
                     <span className="text-[9px] font-mono text-amber-400 bg-amber-500/10 border border-amber-500/30 px-1.5 py-0.2 rounded uppercase">
-                      {lang === 'uk' ? "Ручний" : "Custom"}
+                      {t('uiScaleCustomBadge')}
                     </span>
                   )}
                 </div>
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5 bg-[var(--bg-main)]/60 p-1 rounded-xl border border-[var(--border-color)]">
                   {[
-                    { id: 'compact', label: lang === 'uk' ? "Компакт" : "Compact", desc: "16px" },
-                    { id: 'normal', label: lang === 'uk' ? "Стандарт" : "Normal", desc: "18px" },
-                    { id: 'large', label: lang === 'uk' ? "Збільшений" : "Large", desc: "20px" },
-                    { id: 'touch', label: lang === 'uk' ? "Сенсорний" : "Touch / Mob", desc: "22px" },
+                    { id: 'compact', label: t('uiScaleCompact'), desc: "16px" },
+                    { id: 'normal', label: t('uiScaleNormal'), desc: "18px" },
+                    { id: 'large', label: t('uiScaleLarge'), desc: "20px" },
+                    { id: 'touch', label: t('uiScaleTouch'), desc: "22px" },
                   ].map(preset => (
                     <button
                       key={preset.id}
@@ -642,10 +641,10 @@ export const SettingsModal: React.FC<SettingsModalProps> = (props) => {
               <div className="flex items-center justify-between p-2.5 bg-[var(--bg-card)]/40 rounded-xl border border-[var(--border-color)]">
                 <div>
                   <p className="text-xs font-semibold text-[var(--text-main)]">
-                    {lang === 'uk' ? "Автоматична висота хедера" : "Auto header height"}
+                    {t('headerAutoHeightTitle')}
                   </p>
                   <p className="text-[10px] text-[var(--text-muted)] leading-tight">
-                    {lang === 'uk' ? "Підлаштовує висоту під розмір іконок і відступи" : "Calculates height dynamically based on icon size"}
+                    {t('headerAutoHeightDesc')}
                   </p>
                 </div>
                 <button 
@@ -668,7 +667,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = (props) => {
                 <div className="space-y-1">
                   <div className="flex justify-between items-center">
                     <label className="text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-widest">
-                      {lang === 'uk' ? "Розмір іконок хедера" : "Header Icon Size"}
+                      {t('headerIconSizeLabel')}
                     </label>
                     <span className="text-xs font-mono font-bold text-cyan-400 bg-cyan-950/40 border border-cyan-800/30 px-2 py-0.5 rounded">
                       {headerIconSize || 18} px
@@ -697,11 +696,11 @@ export const SettingsModal: React.FC<SettingsModalProps> = (props) => {
                   <div className="flex justify-between items-center">
                     <div className="flex items-center gap-2">
                       <label className="text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-widest">
-                        {lang === 'uk' ? "Висота хедера" : "Header Height"}
+                        {t('headerHeightLabel')}
                       </label>
                       {headerHeightAuto && (
                         <span className="text-[9px] text-cyan-400 font-semibold bg-cyan-950/50 px-1.5 py-0.2 rounded border border-cyan-800/40">
-                          {lang === 'uk' ? "авто розрахунок" : "auto calculated"}
+                          {t('headerHeightAutoBadge')}
                         </span>
                       )}
                     </div>
@@ -736,7 +735,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = (props) => {
                 <div className="space-y-1">
                   <div className="flex justify-between items-center">
                     <label className="text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-widest">
-                      {lang === 'uk' ? "Розмір іконок галереї / панелі" : "Gallery / Sidebar Icon Size"}
+                      {t('galleryIconSizeLabel')}
                     </label>
                     <span className="text-xs font-mono font-bold text-cyan-400 bg-cyan-950/40 border border-cyan-800/30 px-2 py-0.5 rounded">
                       {galleryIconSize || 16} px
@@ -771,9 +770,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = (props) => {
                     {t('clearAppCache')}
                   </h3>
                   <p className="text-[10px] text-[var(--text-muted)] max-w-[200px] sm:max-w-[300px] leading-tight mt-0.5">
-                    {lang === 'uk'
-                      ? 'Очищує кеш зображень, завантажені списки та тимчасові файли. Чернетки, шаблони та ключі НЕ видаляються.'
-                      : 'Clear images, loaded lists & temporary files. Drafts, templates, and keys will NOT be deleted.'}
+                    {t('clearAppCacheDesc')}
                   </p>
                 </div>
               </div>
@@ -790,7 +787,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = (props) => {
         {settingsTab === 'gallery' && (
           <section className="space-y-6">
             <div className="space-y-4 pt-2">
-              <label className="text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-widest block">{t('gallerySettings') || "Gallery"}</label>
+              <label className="text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-widest block">{t('gallerySettings')}</label>
               
               <div className="grid grid-cols-2 gap-4">
                  <div className="space-y-2">
@@ -887,13 +884,13 @@ export const SettingsModal: React.FC<SettingsModalProps> = (props) => {
                   }}
                   className="py-2 bg-[var(--bg-card)] border border-[var(--border-color)] text-[var(--text-muted)] hover:text-[var(--text-main)] rounded-lg font-bold text-xs transition-colors cursor-pointer"
                 >
-                   {t('confirmResetVault') || "Reset"}
+                   {t('confirmResetVault')}
                 </button>
               </div>
             </div>
 
             <div className="space-y-2">
-              <label className="text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-widest px-1">{t('accounts') || "Accounts"}</label>
+              <label className="text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-widest px-1">{t('accounts')}</label>
               <div className="space-y-2">
                 {vaultAccounts.filter(Boolean).map((acc, idx) => (
                   <div key={acc || `settings-vault-acc-${idx}`} className="flex items-center justify-between p-3 bg-[var(--bg-main)]/50 border border-[var(--border-color)] rounded-xl">
@@ -936,11 +933,11 @@ export const SettingsModal: React.FC<SettingsModalProps> = (props) => {
                         }
                       }}
                       className="w-full bg-[var(--bg-card)] border border-[var(--border-color)] text-[var(--text-main)] rounded-lg py-2.5 pl-9 pr-3 text-xs outline-none focus:ring-1 focus:ring-cyan-500"
-                      placeholder="Pexels API Key"
+                      placeholder={t('pexelsKey')}
                     />
                   </div>
                   <p className="text-[9px] text-[var(--text-muted)] leading-tight">
-                    {isUnlocked ? "Stored securely in vault" : "Stored unencrypted in local storage"}
+                    {isUnlocked ? t('storedInVault') : t('storedUnencrypted')}
                   </p>
                </div>
 
@@ -1028,7 +1025,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = (props) => {
                {/* Credits & Development (Fair Transparency: Human + AI) */}
                <div className="space-y-3">
                   <label className="text-[10px] font-black text-[var(--text-muted)] uppercase tracking-[0.2em] px-1 flex items-center gap-1.5">
-                    <Sparkles size={12} className="text-cyan-400" /> {t('credits') || 'Авторство та розробка'}
+                    <Sparkles size={12} className="text-cyan-400" /> {t('credits')}
                   </label>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     {/* Human Role */}
@@ -1038,12 +1035,12 @@ export const SettingsModal: React.FC<SettingsModalProps> = (props) => {
                           <User size={16} />
                         </div>
                         <div>
-                          <span className="text-xs font-bold text-[var(--text-main)] block">{t('humanCredits') || 'Людина (Автор проєкту)'}</span>
-                          <span className="text-[9px] text-[var(--text-muted)] font-medium">{t('developer') || 'Розробник'} / Архітектор</span>
+                          <span className="text-xs font-bold text-[var(--text-main)] block">{t('humanCredits')}</span>
+                          <span className="text-[9px] text-[var(--text-muted)] font-medium">{t('developer')} / {t('architectRole')}</span>
                         </div>
                       </div>
                       <p className="text-[11px] text-[var(--text-muted)] leading-snug">
-                        {t('humanTasks') || 'Ідея, концепція, творче спрямування, тестування, архітектурне бачення та асистування.'}
+                        {t('humanTasks')}
                       </p>
                     </div>
 
@@ -1054,40 +1051,40 @@ export const SettingsModal: React.FC<SettingsModalProps> = (props) => {
                           <Bot size={16} />
                         </div>
                         <div>
-                          <span className="text-xs font-bold text-cyan-400 block">{t('aiCredits') || 'ШІ (Gemini AI / AI Studio)'}</span>
-                          <span className="text-[9px] text-[var(--text-muted)] font-medium">Технічна реалізація</span>
+                          <span className="text-xs font-bold text-cyan-400 block">{t('aiCredits')}</span>
+                          <span className="text-[9px] text-[var(--text-muted)] font-medium">{t('techImplementationRole')}</span>
                         </div>
                       </div>
                       <p className="text-[11px] text-[var(--text-muted)] leading-snug">
-                        {t('aiTasks') || 'Написання коду, глибока технічна оптимізація, алгоритми та реалізація логіки.'}
+                        {t('aiTasks')}
                       </p>
                     </div>
                   </div>
                   
                   <div className="p-2.5 bg-[var(--bg-card)] border border-[var(--border-color)] rounded-xl flex items-center justify-between text-[10px] text-[var(--text-muted)] px-3">
                     <span className="flex items-center gap-1.5">
-                      <Code size={12} className="text-cyan-400" /> {t('license') || 'Ліцензія'}: Apache 2.0 (Open Source)
+                      <Code size={12} className="text-cyan-400" /> {t('license')}: Apache 2.0 (Open Source)
                     </span>
                     <span className="text-[var(--text-muted)] font-mono text-[9px]">© 2026 SteemEditor Pro</span>
                   </div>
                </div>
 
                <div className="pt-2">
-                  <label className="text-[10px] font-black text-[var(--text-muted)] uppercase tracking-[0.2em] px-1">Пакетний Аудит (NPM Packages)</label>
+                  <label className="text-[10px] font-black text-[var(--text-muted)] uppercase tracking-[0.2em] px-1">{t('npmPackagesAudit')}</label>
                   <div className="mt-2 space-y-2 max-h-64 overflow-y-auto custom-scrollbar pr-1">
                      {[
-                       { n: 'react', v: '19.0.0', d: 'Ядро інтерфейсу, реактивність та керування станом компонентів.' },
-                       { n: '@blazeapps/dsteem', v: '0.12.2', d: 'Повноцінна клієнтська інтеграція з блокчейном Steem (транзакції, підписи, апвоути).' },
-                       { n: 'motion', v: '13.1.0', d: 'Професійні та плавні анімації інтерфейсу для відмінного UX.' },
-                       { n: 'marked', v: '18.0.7', d: 'Швидкісний і безпечний парсер Markdown розмітки в чистий HTML.' },
-                       { n: 'dompurify', v: '3.4.13', d: 'Надійне очищення HTML від XSS-загроз при читанні стрічки дописів.' },
-                       { n: 'lucide-react', v: '1.31.0', d: 'Набір сучасних та лаконічних векторних іконок для UI.' },
-                       { n: 'buffer', v: '6.0.3', d: 'Поліфіл буфера для криптографічних підписів у браузерному оточенні.' },
-                       { n: 'fflate', v: '0.8.3', d: 'Ультра-швидке та легковажне стиснення й розархівування чернеток у ZIP.' },
-                       { n: 'exifreader', v: '4.38.1', d: 'Зчитування та аналіз метаданих EXIF з фотографій для параметрів зйомки.' },
-                       { n: 'idb-keyval', v: '6.2.2', d: 'Надшвидке сховище автозбереження чернеток в IndexedDB браузера.' },
-                       { n: 'idiomorph', v: '0.7.4', d: 'Інтелектуальне зіставлення (morphing) DOM для безшовної синхронізації без втрати фокусу й курсору.' },
-                       { n: 'zustand', v: '5.0.14', d: 'Легковажне керування глобальним станом застосунку.' }
+                       { n: 'react', v: '19.0.0', d: t('pkgDesc_react') },
+                       { n: '@blazeapps/dsteem', v: '0.12.2', d: t('pkgDesc_dsteem') },
+                       { n: 'motion', v: '13.1.0', d: t('pkgDesc_motion') },
+                       { n: 'marked', v: '18.0.7', d: t('pkgDesc_marked') },
+                       { n: 'dompurify', v: '3.4.13', d: t('pkgDesc_dompurify') },
+                       { n: 'lucide-react', v: '1.31.0', d: t('pkgDesc_lucide') },
+                       { n: 'buffer', v: '6.0.3', d: t('pkgDesc_buffer') },
+                       { n: 'fflate', v: '0.8.3', d: t('pkgDesc_fflate') },
+                       { n: 'exifreader', v: '4.38.1', d: t('pkgDesc_exifreader') },
+                       { n: 'idb-keyval', v: '6.2.2', d: t('pkgDesc_idb') },
+                       { n: 'idiomorph', v: '0.7.4', d: t('pkgDesc_idiomorph') },
+                       { n: 'zustand', v: '5.0.14', d: t('pkgDesc_zustand') }
                      ].map(pkg => (
                        <div key={pkg.n} className="p-2.5 bg-[var(--bg-main)]/50 border border-[var(--border-color)] rounded-xl flex flex-col gap-1 hover:border-slate-500 transition-all">
                           <div className="flex justify-between items-center">
@@ -1100,7 +1097,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = (props) => {
                   </div>
                </div>
 
-               <p className="text-[9px] text-[var(--text-muted)] italic px-2 text-center pt-2">Усі активи та залежності верифіковані в межах безпечного релізу Steem Editor Pro.</p>
+               <p className="text-[9px] text-[var(--text-muted)] italic px-2 text-center pt-2">{t('aboutSecurityDisclaimer')}</p>
             </div>
 
             <section className="space-y-4 border-t border-[var(--border-color)] pt-6">
@@ -1147,7 +1144,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = (props) => {
                           localStorage.setItem('steem_app_agent', e.target.value);
                         }}
                         className="w-full bg-[var(--bg-card)] border border-[var(--border-color)] rounded-lg p-2.5 text-xs text-[var(--text-main)] outline-none focus:ring-1 focus:ring-cyan-500 font-mono"
-                        placeholder="ultrasteemeditor/4.8.0"
+                        placeholder={t('appAgentPlaceholder')}
                       />
                     </div>
                   </motion.div>
@@ -1189,7 +1186,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = (props) => {
                       onClick={() => setShowPwaInstructionsModal(true)}
                       className="w-full py-2.5 px-3 rounded-xl font-bold text-xs text-[var(--text-muted)] hover:text-cyan-400 bg-[var(--bg-card)] border border-[var(--border-color)] transition-colors cursor-pointer"
                     >
-                      {t('pwaHowToInstall') || "Інструкція зі встановлення"}
+                      {t('pwaHowToInstall')}
                     </button>
                   </div>
                 )}

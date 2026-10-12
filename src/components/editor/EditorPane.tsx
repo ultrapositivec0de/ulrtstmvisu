@@ -379,13 +379,13 @@ export const EditorPane: React.FC<EditorPaneProps> = ({
                   ? "bg-cyan-600 text-white shadow-sm" 
                   : (isDarkMode || visualStyle === 'neon' ? "text-slate-500 hover:text-slate-300" : "text-slate-600 hover:text-slate-900")
               )}
-              title="Перейти в повноцінний режим читання документа"
+              title={t('modeReadingSwitchTitle')}
             >
               <BookOpen size={12} />
               <span className={cn(
                 isLivePreviewEnabled ? "hidden xl:inline" : "hidden sm:inline"
               )}>
-                {lang === 'uk' ? 'Читання' : 'Reader'}
+                {t('modeReading')}
               </span>
             </button>
 
@@ -393,6 +393,7 @@ export const EditorPane: React.FC<EditorPaneProps> = ({
             {editorMode === 'reading' && (
               <div className="flex items-center gap-1 ml-1 pl-1.5 border-l border-slate-700/60">
                 <button
+                  data-drawer-trigger="toc"
                   onMouseDown={(e) => e.preventDefault()}
                   onClick={() => setIsTOCOpen(prev => !prev)}
                   className={cn(
@@ -403,12 +404,13 @@ export const EditorPane: React.FC<EditorPaneProps> = ({
                           ? "bg-slate-900 border-slate-800 text-slate-300 hover:text-white hover:bg-slate-800" 
                           : "bg-white border-slate-300 text-slate-700 hover:text-slate-900 hover:bg-slate-100")
                   )}
-                  title="Зміст / Структура документа"
+                  title={t('docReaderTocTitle')}
                 >
                   <ListTree size={12} className={isTOCOpen ? "text-white" : "text-cyan-400"} />
-                  <span className="hidden sm:inline">Зміст</span>
+                  <span className="hidden sm:inline">{t('docReaderTocButton')}</span>
                 </button>
                 <button
+                  data-drawer-trigger="source"
                   onMouseDown={(e) => e.preventDefault()}
                   onClick={() => setIsSourceDrawerOpen(prev => !prev)}
                   className={cn(
@@ -419,10 +421,10 @@ export const EditorPane: React.FC<EditorPaneProps> = ({
                           ? "bg-slate-900 border-slate-800 text-slate-300 hover:text-white hover:bg-slate-800" 
                           : "bg-white border-slate-300 text-slate-700 hover:text-slate-900 hover:bg-slate-100")
                   )}
-                  title="Джерело документа (Чернетки / Файли)"
+                  title={t('docReaderSourceTitle')}
                 >
                   <FolderOpen size={12} className={isSourceDrawerOpen ? "text-white" : "text-cyan-400"} />
-                  <span className="hidden sm:inline">Джерело</span>
+                  <span className="hidden sm:inline">{t('docReaderSourceButton')}</span>
                 </button>
               </div>
             )}
@@ -455,8 +457,8 @@ export const EditorPane: React.FC<EditorPaneProps> = ({
               localStorage.setItem('steem_on_demand_sync', String(next));
               notify(
                 next 
-                   ? (lang === 'uk' ? "Увімкнено оптимізовану фонову синхронізацію (без затримок)" : "Optimized background sync enabled (lag-free)") 
-                   : (lang === 'uk' ? "Увімкнено безперервну синхронізацію в реальному часі" : "Continuous real-time sync enabled"), 
+                   ? t('syncOnDemandNotifyOn')
+                   : t('syncOnDemandNotifyOff'), 
                 "success"
               );
             }}
@@ -495,7 +497,7 @@ export const EditorPane: React.FC<EditorPaneProps> = ({
             <span className={cn(
               isLivePreviewEnabled ? "hidden xl:inline" : "hidden xs:inline"
             )}>
-              {lang === 'uk' ? 'Прев\'ю' : 'Preview'}
+              {t('preview')}
             </span>
           </button>
 
@@ -508,8 +510,8 @@ export const EditorPane: React.FC<EditorPaneProps> = ({
               localStorage.setItem('steem_beautify', String(next));
               notify(
                 next
-                  ? (lang === 'uk' ? "Б'ютіфікацію увімкнено (покращене оформлення)" : "Beautification enabled (enhanced styling)")
-                  : (lang === 'uk' ? "Б'ютіфікацію вимкнено" : "Beautification disabled"),
+                  ? t('beautifyNotifyOn')
+                  : t('beautifyNotifyOff'),
                 "success"
               );
             }}
@@ -541,8 +543,8 @@ export const EditorPane: React.FC<EditorPaneProps> = ({
                 setNeonTextColored(next);
                 notify(
                   next 
-                    ? (lang === 'uk' ? "Кольоровий текст увімкнено" : "Colored text enabled") 
-                    : (lang === 'uk' ? "Кольоровий текст вимкнено" : "Colored text disabled"), 
+                    ? t('neonTextNotifyOn')
+                    : t('neonTextNotifyOff'), 
                   "success"
                 );
               }}
@@ -580,7 +582,16 @@ export const EditorPane: React.FC<EditorPaneProps> = ({
           <div className="relative">
             <button
               onMouseDown={(e) => e.preventDefault()}
-              onClick={() => setIsSpacingMenuOpen(!isSpacingMenuOpen)}
+              onClick={() => {
+                const nextOpen = !isSpacingMenuOpen;
+                if (nextOpen && typeof document !== 'undefined') {
+                  const activeEl = document.activeElement as HTMLElement | null;
+                  if (activeEl && (activeEl.id === 'main-editor' || activeEl.classList.contains('wysiwyg-editor') || activeEl.isContentEditable)) {
+                    activeEl.blur();
+                  }
+                }
+                setIsSpacingMenuOpen(nextOpen);
+              }}
               className={cn(
                 "p-1.5 rounded-lg border transition-all flex items-center gap-1.5 text-[10px] sm:text-xs font-bold relative",
                 isSpacingMenuOpen
@@ -611,7 +622,7 @@ export const EditorPane: React.FC<EditorPaneProps> = ({
                     exit={{ opacity: 0, y: 10, scale: 0.95 }}
                     transition={{ duration: 0.15 }}
                     className={cn(
-                      "absolute right-0 mt-2 w-64 rounded-xl border p-4 shadow-xl z-50 flex flex-col gap-4 select-none",
+                      "fixed left-2 right-2 top-[calc(var(--header-height,3.5rem)+4.75rem+env(safe-area-inset-top,0px))] mx-auto w-auto max-w-[calc(100vw-1rem)] sm:mx-0 sm:left-auto sm:right-0 sm:absolute sm:top-full sm:mt-2 sm:w-64 rounded-xl border p-4 shadow-xl z-50 flex flex-col gap-4 select-none",
                       isDarkMode || visualStyle === 'neon' ? "bg-slate-900 border-slate-800 text-slate-100" : "bg-white border-slate-200 text-slate-900"
                     )}
                   >
@@ -639,7 +650,7 @@ export const EditorPane: React.FC<EditorPaneProps> = ({
                         <Sparkles size={14} className="text-cyan-400" />
                         <div>
                           <span className="text-[10px] font-bold text-slate-300 uppercase tracking-wider block">
-                            {lang === 'uk' ? "Б'ютіфікація" : "Beautification"}
+                            {t('beautify')}
                           </span>
                           <span className="text-[9px] text-slate-500 font-medium block">
                             {t('enhancedStyling')}
@@ -853,7 +864,7 @@ export const EditorPane: React.FC<EditorPaneProps> = ({
             beautifyEnabled ? "px-4 lg:px-8 pt-4 lg:pt-6 max-w-[clamp(40rem,60vw,80rem)] mx-auto selection:bg-[rgb(var(--accent-color)/0.3)]" : "px-3 pt-3 lg:px-6 lg:pt-6",
             getEditorBottomSpacingClass()
           )}
-          placeholder={`${t('placeholder')}\n\n\n\n\nОМ АХ ХУМ СО ХА\n♡`}
+          placeholder={t('placeholder')}
         />
       ) : editorMode === 'reading' ? (
         <DocReaderContainer
@@ -865,18 +876,18 @@ export const EditorPane: React.FC<EditorPaneProps> = ({
             const currentContent = useEditorStore.getState().content || '';
             if (currentContent.trim() && currentContent !== newContent) {
               const shouldSave = await confirmDialog(
-                "У редакторі є набраний текст. Зберегти його у чернетки перед завантаженням нового документа?",
-                "Збереження тексту"
+                t('docReaderSaveCurrentPrompt'),
+                t('docReaderSaveCurrentTitle')
               );
               if (shouldSave) {
                 if (saveDraft) {
                   saveDraft('working');
                 }
-                notify("Поточний текст збережено у чернетки!", "success");
+                notify(t('docReaderSavedToDraftsNotify'), "success");
               } else {
                 const confirmOverwrite = await confirmDialog(
-                  "Завантажити новий документ та перезаписати поточний текст в редакторі без збереження?",
-                  "Підтвердження перезапису"
+                  t('docReaderConfirmOverwritePrompt'),
+                  t('docReaderConfirmOverwriteTitle')
                 );
                 if (!confirmOverwrite) {
                   return;
@@ -1013,7 +1024,7 @@ export const EditorPane: React.FC<EditorPaneProps> = ({
                 const pBefore = document.createElement('p');
                 pBefore.className = 'table-spacer top-spacer';
                 pBefore.setAttribute('data-empty', 'true');
-                pBefore.setAttribute('data-placeholder', lang === 'uk' ? '↵ Новий параграф...' : lang === 'es' ? '↵ Nuevo párrafo...' : lang === 'ko' ? '↵ 새 문단...' : '↵ New paragraph...');
+                pBefore.setAttribute('data-placeholder', t('newParagraphPlaceholder'));
                 pBefore.innerHTML = '<br>';
                 target.insertBefore(pBefore, firstEl);
               }
@@ -1025,7 +1036,7 @@ export const EditorPane: React.FC<EditorPaneProps> = ({
                 const pAfter = document.createElement('p');
                 pAfter.className = 'table-spacer bottom-spacer';
                 pAfter.setAttribute('data-empty', 'true');
-                pAfter.setAttribute('data-placeholder', lang === 'uk' ? '↵ Новий параграф...' : lang === 'es' ? '↵ Nuevo párrafo...' : lang === 'ko' ? '↵ 새 문단...' : '↵ New paragraph...');
+                pAfter.setAttribute('data-placeholder', t('newParagraphPlaceholder'));
                 pAfter.innerHTML = '<br>';
                 target.appendChild(pAfter);
               }
@@ -1138,7 +1149,7 @@ export const EditorPane: React.FC<EditorPaneProps> = ({
                     localStorage.setItem('steem_table_menu_pinned', newPinned.toString());
                   }} 
                   className={cn("p-1.5 rounded-lg transition-colors flex items-center justify-center cursor-pointer", isTableMenuPinned ? "text-cyan-400 bg-cyan-900/40" : "text-slate-400 hover:text-white hover:bg-slate-800")}
-                  title={isTableMenuPinned ? "Unpin Table Menu" : "Pin Table Menu"}
+                  title={isTableMenuPinned ? t('tablePinUnlockTitle') : t('tablePinLockTitle')}
                 >
                   <Settings size={15} />
                 </button>
@@ -1147,29 +1158,29 @@ export const EditorPane: React.FC<EditorPaneProps> = ({
                   type="button"
                   onClick={deleteActiveTableRow} 
                   className="p-1.5 text-slate-400 hover:text-white hover:bg-red-500/80 rounded-lg transition-colors flex items-center gap-1 cursor-pointer text-xs" 
-                  title="Delete Row"
+                  title={t('tableDeleteRowTitle')}
                 >
                   <Trash2 size={15} />
-                  <span className="hidden sm:inline text-[11px] text-slate-300">Рядок</span>
+                  <span className="hidden sm:inline text-[11px] text-slate-300">{t('tableDeleteRowLabel')}</span>
                 </button>
                 <button 
                   type="button"
                   onClick={deleteActiveTableCol} 
                   className="p-1.5 text-slate-400 hover:text-white hover:bg-red-500/80 rounded-lg transition-colors flex items-center gap-1 cursor-pointer text-xs" 
-                  title="Delete Column"
+                  title={t('tableDeleteColTitle')}
                 >
                   <Trash2 size={15} className="rotate-90" />
-                  <span className="hidden sm:inline text-[11px] text-slate-300">Колонка</span>
+                  <span className="hidden sm:inline text-[11px] text-slate-300">{t('tableDeleteColLabel')}</span>
                 </button>
                 <div className="h-4 w-px bg-slate-700/70 mx-0.5" />
                 <button 
                   type="button"
                   onClick={deleteActiveTable} 
                   className="p-1.5 text-red-400 hover:text-white hover:bg-red-600 rounded-lg transition-colors flex items-center gap-1 cursor-pointer text-xs font-medium" 
-                  title="Delete Entire Table"
+                  title={t('tableDeleteTableTitle')}
                 >
                   <Trash2 size={15} />
-                  <span className="hidden sm:inline text-[11px]">Таблиця</span>
+                  <span className="hidden sm:inline text-[11px]">{t('tableDeleteTableLabel')}</span>
                 </button>
               </>
             ) : (
@@ -1177,10 +1188,10 @@ export const EditorPane: React.FC<EditorPaneProps> = ({
                 type="button"
                 onClick={() => setIsTableMenuExpanded(true)}
                 className="px-2 py-1 text-[var(--text-main)] bg-[var(--bg-overlay-surface)] border border-[var(--border-subtle)] hover:bg-[var(--bg-card)] rounded-lg transition-all shadow-md flex items-center gap-1.5 cursor-pointer text-xs backdrop-blur-dynamic" 
-                title="Опції таблиці"
+                title={t('tableOperationsTitle')}
               >
                 <Settings size={14} className="text-cyan-400" />
-                <span className="text-[11px] font-medium text-[var(--text-main)]">Таблиця</span>
+                <span className="text-[11px] font-medium text-[var(--text-main)]">{t('tableDeleteTableLabel')}</span>
               </button>
             )}
           </div>
@@ -1229,7 +1240,7 @@ export const EditorPane: React.FC<EditorPaneProps> = ({
                   onMouseDown={(e) => e.preventDefault()}
                   onClick={() => fileInputRef.current?.click()}
                   className="px-2 py-0.5 text-[10px] font-bold bg-cyan-600/80 hover:bg-cyan-500 text-white rounded-md flex items-center gap-1 transition-colors"
-                  title="Upload more"
+                  title={t('miniGalleryUploadMoreTitle')}
                 >
                   <Plus size={12} />
                   <span>+</span>
