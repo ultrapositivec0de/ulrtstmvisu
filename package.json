@@ -47,6 +47,7 @@
     "@tauri-apps/api": "^2.12.3",
     "@tauri-apps/plugin-dialog": "^2.8.2",
     "@tauri-apps/plugin-fs": "^2.7.0",
+    "@tauri-apps/plugin-os": "^2.4.0",
     "@tauri-apps/plugin-shell": "^2.5.0",
     "buffer": "^6.0.3",
     "clsx": "^2.1.1",
@@ -88,6 +89,11 @@
     "vite": "^8.3.4"
   },
   "overrides": {
+    "glob": "^13.0.6",
+    "yaeti": "npm:event-target-shim@^6.0.2",
+    "postcss-selector-parser": "^7.1.6"
+  },
+  "resolutions": {
     "glob": "^13.0.6",
     "yaeti": "npm:event-target-shim@^6.0.2",
     "postcss-selector-parser": "^7.1.6"
