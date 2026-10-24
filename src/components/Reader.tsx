@@ -56,6 +56,7 @@ import { ReaderConfig, SteemPost } from "../types";
 import { getTranslation, type TranslationKey } from "../locales";
 import { POPULAR_COMMUNITIES, POPULAR_TAGS } from "../data/communities";
 import { ReaderMobileBottomBar } from "./reader/ReaderMobileBottomBar";
+import { useDeviceStore } from "../store/deviceStore";
 
 function getWordCounts(body: string) {
   const dirtyWords = body.trim().split(/\s+/).length;
@@ -740,6 +741,8 @@ export default function Reader({
   });
   const [hasInitiatedCuration, setHasInitiatedCuration] = useState(false);
   const [showQuickPanel, setShowQuickPanel] = useState(false);
+  const showMobileBottomBar = useDeviceStore((s) => s.showMobileBottomBar);
+  const isMobileLayout = useDeviceStore((s) => s.isMobileLayout);
 
   const mutedUsersRef = useRef<string[]>(mutedUsers);
   useEffect(() => {
@@ -1667,7 +1670,7 @@ export default function Reader({
 
   return (
     <div className="flex flex-col h-full bg-[var(--bg-main)] text-[var(--text-main)] overflow-hidden font-sans">
-      <div className="border-b border-[var(--border-color)] bg-[var(--bg-card)] hidden sm:block">
+      <div className={cn("border-b border-[var(--border-color)] bg-[var(--bg-card)]", (showMobileBottomBar || isMobileLayout) && "hidden")}>
         <AnimatePresence initial={false}>
           {isReaderHeaderOpen && (
             <motion.div
@@ -2367,12 +2370,12 @@ export default function Reader({
                                                     body: item.body,
                                                   })
                                                 }
-                                                className="hidden group-hover:block text-[8px] text-yellow-500/70 hover:text-yellow-400 uppercase font-bold"
+                                                className="block sm:hidden sm:group-hover:block text-[8px] text-yellow-500/70 hover:text-yellow-400 uppercase font-bold"
                                               >
                                                 Edit
                                               </button>
                                             ) : (
-                                              <div className="hidden group-hover:flex items-center gap-2">
+                                              <div className="flex sm:hidden sm:group-hover:flex items-center gap-2">
                                                 <button
                                                   onClick={() =>
                                                     handleLocalVote(
@@ -4754,11 +4757,11 @@ export default function Reader({
       <AnimatePresence>
         {showQuickPanel && (
           <motion.div
-            initial={{ opacity: 0, y: 120 }}
+            initial={{ opacity: 1, y: "100%" }}
             animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: 120 }}
-            transition={{ type: "spring", damping: 25, stiffness: 300 }}
-            className="fixed left-0 right-0 z-[65] bg-slate-900/98 backdrop-blur-xl border-t border-slate-700/80 shadow-[0_-8px_30px_rgba(0,0,0,0.7)] p-4 sm:hidden flex flex-col gap-3"
+            exit={{ opacity: 1, y: "100%" }}
+            transition={{ type: "spring", damping: 30, stiffness: 220 }}
+            className="fixed left-0 right-0 z-[65] bg-slate-900 border-t border-slate-800 p-4 flex flex-col gap-3 pointer-events-auto"
             style={{
               bottom: 'calc(4rem + env(safe-area-inset-bottom, 0px))',
               maxHeight: 'calc(100dvh - 5rem - env(safe-area-inset-top, 0px))',
@@ -5046,7 +5049,7 @@ function CommentItem({
         </div>
         {isOwn && (
           <div
-            className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity"
+            className="flex items-center gap-2 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity"
             style={{ opacity: isEditing ? 1 : undefined }}
           >
             {canDelete && (
