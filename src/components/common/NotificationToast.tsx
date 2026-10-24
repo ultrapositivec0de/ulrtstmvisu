@@ -37,7 +37,10 @@ export const NotificationToast: React.FC<NotificationToastProps> = React.memo(({
         initial={{ opacity: 0, scale: 0.9, y: 50, x: 50 }}
         animate={{ opacity: 1, scale: 1, y: 0, x: 0 }}
         exit={{ opacity: 0, scale: 0.9, y: 50, x: 50 }}
-        className="fixed bottom-4 left-4 right-4 sm:bottom-6 sm:left-auto sm:right-6 z-[200] max-w-sm w-auto sm:w-full bg-slate-900 border-2 border-lime-500 rounded-3xl shadow-[0_10px_50px_rgba(163,230,53,0.3)] p-5 overflow-hidden"
+        className="fixed bottom-16 left-4 right-4 sm:bottom-20 sm:left-auto sm:right-6 z-[250] max-w-sm w-auto sm:w-full bg-slate-900 border-2 border-lime-500 rounded-3xl p-5 overflow-hidden"
+        style={{
+          bottom: 'calc(var(--has-bottom-bar, 0) * 4rem + env(safe-area-inset-bottom, 0px) + 1.25rem)',
+        }}
       >
         <div className="absolute top-0 right-0 p-2">
           <button 

@@ -458,6 +458,9 @@ export const translations = {
   "on": "УВІМК",
   "off": "ВИМК",
   "markAllRead": "Позначити всі як прочитані",
+  "listInputHint": "Натисніть Enter або пробіл, щоб додати нікнейм(и)",
+  "welcomeAutoInboxLabel": "Автоматично показувати вхідні при старті",
+  "mobileQuickControls": "Швидкі керування",
   "loadingReplies": "Завантаження відповідей...",
   "noRepliesFound": "Нових відповідей не знайдено.",
   "markThreadAsRead": "Позначити гілку як прочитану",
@@ -1122,6 +1125,10 @@ export const translations = {
   "readerNavInbox": "Вхідні",
   "readerNavRefresh": "Оновити",
   "readerNavSettings": "Налаштування",
+  "pressEnterToAdd": "Натисніть Enter або розділіть пробілами для додавання",
+  "autoInboxActive": "Авто-вхідні",
+  "searchTag": "Пошук за тегом",
+  "tagSearchPlaceholder": "Введіть тег або спільноту...",
 } as const;
 
 export default { meta, translations };

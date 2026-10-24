@@ -224,7 +224,10 @@ export const Header: React.FC<HeaderProps> = (props) => {
   return (
 <header 
         id="main-header"
-        className="border-b border-slate-800 bg-slate-900 flex items-center justify-between px-2 sm:px-4 z-[200] relative shrink-0 transition-[min-height] duration-150 gap-1 sm:gap-2"
+        className={cn(
+          "border-b border-slate-800 bg-slate-900 flex items-center justify-between px-2 sm:px-4 z-[200] relative shrink-0 transition-[min-height] duration-150 gap-1 sm:gap-2",
+          activeView === 'reader' && "hidden sm:flex"
+        )}
         style={{
           paddingTop: 'env(safe-area-inset-top, 0px)',
           minHeight: 'calc(var(--header-height, 3.5rem) + env(safe-area-inset-top, 0px))',

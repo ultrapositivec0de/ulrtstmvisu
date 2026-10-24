@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { AnimatePresence } from 'motion/react';
+import { motion, AnimatePresence } from 'motion/react';
+import { X } from 'lucide-react';
 import { marked } from 'marked';
 import DOMPurify from 'dompurify';
 // @ts-ignore
@@ -94,6 +95,30 @@ function App() {
     setUnsplashAccessKey,
     initVault,
   } = useSteemAuth();
+
+  const [autoInbox, setAutoInbox] = useState<boolean>(() => {
+    try {
+      const saved = localStorage.getItem('steem_reader_config_v1');
+      if (saved) {
+        return Boolean(JSON.parse(saved).autoShowInbox);
+      }
+    } catch (e) {
+      void e;
+    }
+    return false;
+  });
+
+  const handleSetAutoInbox = useCallback((enabled: boolean) => {
+    setAutoInbox(enabled);
+    try {
+      const saved = localStorage.getItem('steem_reader_config_v1');
+      const cfg = saved ? JSON.parse(saved) : {};
+      cfg.autoShowInbox = enabled;
+      localStorage.setItem('steem_reader_config_v1', JSON.stringify(cfg));
+    } catch (e) {
+      void e;
+    }
+  }, []);
 
   // 2. Localization
   const [lang, setLang] = useState<Language>(() => {
@@ -464,6 +489,7 @@ function App() {
   }, [showMobileTools1, showMobileTools2, showMobileToolsOpen, showNotificationList, showLangMenu, setShowNotificationList]);
 
   const [targetReaderPost, setTargetReaderPost] = useState<{ author: string, permlink: string, commentAuthor?: string, commentPermlink?: string } | null>(null);
+  const [editingPermlink, setEditingPermlink] = useState<string | null>(null);
   const [isSMenuOpen, setIsSMenuOpen] = useState(false);
   const [beautifyEnabled, setBeautifyEnabled] = useState(() => localStorage.getItem('steem_beautify') !== 'false');
 
@@ -629,6 +655,9 @@ function App() {
     pubTags,
     pubTitle,
     removeTitleLine,
+    isEditingPost: editingPermlink !== null,
+    editingPermlink,
+    setEditingPermlink,
     authType,
     selectedVaultUser,
     username,
@@ -1128,6 +1157,7 @@ function App() {
     setPubTitle(post.title);
     setContent(post.body);
     setPubTags(JSON.parse(post.json_metadata || '{}').tags?.join(' ') || post.category);
+    setEditingPermlink(post.permlink);
     setActiveView('editor');
     lastSyncContentRef.current = post.body;
     setTimeout(() => {
@@ -1705,8 +1735,41 @@ function App() {
         setShowAccountPrompt={setShowAccountPrompt}
         username={username}
         setUsername={setUsername}
+        autoInbox={autoInbox}
+        setAutoInbox={handleSetAutoInbox}
         t={t}
       />
+
+      {/* Result Status Notifications (Published, Uploaded, Saved, Error, etc.) */}
+      <AnimatePresence>
+        {pubLog.msg && activeModal !== 'publish' && (
+          <motion.div
+            initial={{ opacity: 0, y: -10 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -10 }}
+            transition={{ duration: 0.15 }}
+            className={cn(
+              "fixed left-1/2 -translate-x-1/2 z-[220] px-4 py-2.5 rounded-xl text-xs sm:text-sm font-bold border flex items-center gap-2 max-w-[calc(100vw-2rem)] shrink-0 pointer-events-auto shadow-lg",
+              pubLog.type === 'success' && "bg-slate-900 border-green-500 text-green-400",
+              pubLog.type === 'error' && "bg-slate-900 border-red-500 text-red-400",
+              pubLog.type === 'loading' && "bg-slate-900 border-cyan-500 text-cyan-400"
+            )}
+            style={{
+              top: 'calc(var(--header-height, 3.5rem) + env(safe-area-inset-top, 0px) + 0.75rem)',
+            }}
+          >
+            <span>{pubLog.msg}</span>
+            <button
+              type="button"
+              onClick={() => setPubLog({ msg: '', type: null })}
+              className="ml-1.5 p-0.5 hover:bg-slate-800 rounded transition-colors text-slate-400 hover:text-white"
+              title={t("closeModalAria")}
+            >
+              <X size={14} />
+            </button>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* Toast Notifications */}
       <NotificationToast

@@ -1122,6 +1122,10 @@ export const translations = {
   "readerNavInbox": "Bandeja",
   "readerNavRefresh": "Actualizar",
   "readerNavSettings": "Ajustes",
+  "pressEnterToAdd": "Presione Enter o separe con espacios para agregar",
+  "autoInboxActive": "Bandeja automática",
+  "searchTag": "Buscar por etiqueta",
+  "tagSearchPlaceholder": "Ingrese etiqueta o comunidad...",
 } as const;
 
 export default { meta, translations };

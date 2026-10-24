@@ -14,6 +14,9 @@ export interface UsePublishingManagerOptions {
   pubTags: string;
   pubTitle: string;
   removeTitleLine: boolean;
+  isEditingPost?: boolean;
+  editingPermlink?: string | null;
+  setEditingPermlink?: (permlink: string | null) => void;
   authType: AuthType;
   selectedVaultUser: string;
   username: string;
@@ -29,7 +32,8 @@ export interface UsePublishingManagerOptions {
     tags: string,
     authType: AuthType,
     rewardType?: 'SP' | '50' | '0',
-    beneficiaries?: { account: string; weight: number }[]
+    beneficiaries?: { account: string; weight: number }[],
+    customPermlink?: string
   ) => Promise<any>;
   processContentForSteem: (content: string) => string;
   addToQueue: (content: string) => void;
@@ -49,6 +53,9 @@ export function usePublishingManager(options: UsePublishingManagerOptions) {
     pubTags,
     pubTitle,
     removeTitleLine,
+    isEditingPost,
+    editingPermlink,
+    setEditingPermlink,
     authType,
     selectedVaultUser,
     username,
@@ -180,7 +187,7 @@ export function usePublishingManager(options: UsePublishingManagerOptions) {
       finalTitle = firstLine.replace(/[#*`]/g, '').trim().substring(0, 100);
     }
     
-    if (removeTitleLine) {
+    if (removeTitleLine && !isEditingPost) {
       actualContent = lines.slice(1).join('\n').trim();
     }
 
@@ -214,8 +221,11 @@ export function usePublishingManager(options: UsePublishingManagerOptions) {
     setPubLog({ msg: t('publishing'), type: 'loading' });
     
     try {
-      await performBroadcast(activeUser, finalTitle, processedContent, pubTags, authType, rewardType, beneficiaries);
+      await performBroadcast(activeUser, finalTitle, processedContent, pubTags, authType, rewardType, beneficiaries, editingPermlink || undefined);
       setPubLog({ msg: t('publishedSuccess'), type: 'success' });
+      if (setEditingPermlink) {
+        setEditingPermlink(null);
+      }
       setTimeout(() => setActiveModal(null), 2000);
     } catch (err: any) {
       setPubLog({ msg: `❌ ${t('error')}: ${err.message}`, type: 'error' });
@@ -224,6 +234,9 @@ export function usePublishingManager(options: UsePublishingManagerOptions) {
     syncWysiwygToContentIfVisual,
     pubTitle,
     removeTitleLine,
+    isEditingPost,
+    editingPermlink,
+    setEditingPermlink,
     processContentForSteem,
     authType,
     selectedVaultUser,

@@ -1,4 +1,8 @@
 # Changelog
+## [2026-10-24] - Version 4.8.8 (ultrasteemeditor/4.8.8)
+### Added & Improved
+- **Release Updates**: Reader feed UX optimization, post editing preservation on broadcast, mobile bottom bar with 5-action layout and quick controls sheet, safe-area statusbar inbox overlay, and whitelist/blacklist input improvements.
+
 ## [2026-10-12] - Version 4.8.7 (ultrasteemeditor/4.8.7)
 ### Added & Improved
 - **Release Updates**: Cross-platform release synchronization and system improvements.

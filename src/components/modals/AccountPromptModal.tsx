@@ -1,12 +1,15 @@
 import React from 'react';
 import { AtSign } from 'lucide-react';
 import { BaseModal } from './BaseModal';
+import { cn } from '../../lib/utils';
 
 export interface AccountPromptModalProps {
   showAccountPrompt: boolean;
   setShowAccountPrompt: (show: boolean) => void;
   username: string;
   setUsername: (username: string) => void;
+  autoInbox?: boolean;
+  setAutoInbox?: (auto: boolean) => void;
   t: (key: any) => string;
 }
 
@@ -15,6 +18,8 @@ export const AccountPromptModal: React.FC<AccountPromptModalProps> = ({
   setShowAccountPrompt,
   username,
   setUsername,
+  autoInbox = false,
+  setAutoInbox,
   t,
 }) => {
   return (
@@ -69,6 +74,21 @@ export const AccountPromptModal: React.FC<AccountPromptModalProps> = ({
             autoFocus
           />
         </div>
+        {setAutoInbox && (
+          <div className="flex items-center justify-between pt-2">
+            <span className="text-xs text-[var(--text-muted)] font-medium">{t('welcomeAutoInboxLabel')}</span>
+            <button
+              type="button"
+              onClick={() => setAutoInbox(!autoInbox)}
+              className={cn(
+                "px-3 py-1 rounded-lg text-xs font-bold transition-all border",
+                autoInbox ? "bg-cyan-600/20 text-cyan-300 border-cyan-500/40" : "bg-[var(--bg-main)] text-[var(--text-muted)] border-[var(--border-color)]"
+              )}
+            >
+              {autoInbox ? t('on') : t('off')}
+            </button>
+          </div>
+        )}
       </div>
     </BaseModal>
   );

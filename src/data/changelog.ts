@@ -6,6 +6,13 @@ export interface ChangelogEntry {
 
 export const APP_CHANGELOG: ChangelogEntry[] = [
   {
+    version: "v4.8.8",
+    date: "2026-10-24",
+    changes: [
+      "Reader feed UX optimization, post editing preservation on broadcast, mobile bottom bar with 5-action layout and quick controls sheet, safe-area statusbar inbox overlay, and whitelist/blacklist input improvements."
+    ]
+  },
+  {
     version: "v4.8.7",
     date: "2026-10-12",
     changes: [

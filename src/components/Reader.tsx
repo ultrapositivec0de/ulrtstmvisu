@@ -45,6 +45,7 @@ import {
   VolumeX,
   Download,
   Upload,
+  Sliders,
 } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import { marked } from "marked";
@@ -410,6 +411,7 @@ export default function Reader({
     
     setCurationTag(tagToUse);
     setCurationTagInput(tagToUse);
+    setShowQuickPanel(false);
     
     setHasInitiatedCuration(true);
     if (config.excludeMuted && !currentUser) {
@@ -728,8 +730,16 @@ export default function Reader({
   const [loadingContext, setLoadingContext] = useState<Set<string>>(new Set());
   const [isRefreshingInbox, setIsRefreshingInbox] = useState(false);
   const [hasAutoFetchedInbox, setHasAutoFetchedInbox] = useState(false);
-  const [hasInitiatedFeed, setHasInitiatedFeed] = useState(false);
+  const [hasInitiatedFeed, setHasInitiatedFeed] = useState(() => {
+    try {
+      const saved = localStorage.getItem('steem_cached_posts');
+      return saved ? JSON.parse(saved).length > 0 : false;
+    } catch {
+      return false;
+    }
+  });
   const [hasInitiatedCuration, setHasInitiatedCuration] = useState(false);
+  const [showQuickPanel, setShowQuickPanel] = useState(false);
 
   const mutedUsersRef = useRef<string[]>(mutedUsers);
   useEffect(() => {
@@ -1340,6 +1350,7 @@ export default function Reader({
 
     setHasInitiatedFeed(true);
     setLoading(true);
+    setShowQuickPanel(false);
     try {
       const query = {
         tag: activeTags[0],
@@ -1656,7 +1667,7 @@ export default function Reader({
 
   return (
     <div className="flex flex-col h-full bg-[var(--bg-main)] text-[var(--text-main)] overflow-hidden font-sans">
-      <div className="border-b border-[var(--border-color)] bg-[var(--bg-card)]">
+      <div className="border-b border-[var(--border-color)] bg-[var(--bg-card)] hidden sm:block">
         <AnimatePresence initial={false}>
           {isReaderHeaderOpen && (
             <motion.div
@@ -1931,65 +1942,77 @@ export default function Reader({
 
       <AnimatePresence>
         {showInbox && (
+          /* Inbox Drawer */
           <motion.div
             initial={{ opacity: 0, x: 300 }}
             animate={{ opacity: 1, x: 0 }}
             exit={{ opacity: 0, x: 300 }}
-            className="fixed inset-y-0 right-0 z-[9999] w-full max-w-md bg-[var(--modal-bg)] border-l border-[var(--border-color)] shadow-2xl flex flex-col pointer-events-auto"
+            className="fixed right-0 z-[160] w-full max-w-md bg-[var(--modal-bg)] border-l border-[var(--border-color)] shadow-2xl flex flex-col pointer-events-auto top-[env(safe-area-inset-top,0px)] sm:top-[calc(var(--header-height,3.5rem)+env(safe-area-inset-top,0px))]"
+            style={{
+              bottom: 'calc(var(--has-bottom-bar, 0) * 4rem + env(safe-area-inset-bottom, 0px))',
+              maxHeight: 'calc(100dvh - calc(var(--header-height, 3.5rem) + env(safe-area-inset-top, 0px)) - calc(var(--has-bottom-bar, 0) * 4rem + env(safe-area-inset-bottom, 0px)))',
+            }}
           >
-            <div className="p-4 border-b border-[var(--border-color)] flex items-center justify-between bg-[var(--bg-card)]">
-              <div className="flex items-center gap-2">
-                <h2 className="text-lg font-bold flex items-center gap-2">
-                  <Bell
-                    size={20}
-                    className={cn(
-                      "text-cyan-400",
-                      isRefreshingInbox && "animate-pulse",
-                    )}
-                  />
-                  Recent Replies
-                </h2>
-                {inbox.filter((r) => !hiddenReplies.has(r.permlink)).length >
-                  0 && (
-                  <button
-                    onClick={() => {
-                      const visiblePermlinks = inbox
-                        .filter((r) => !hiddenReplies.has(r.permlink))
-                        .map((r) => r.permlink);
-                      setHiddenReplies((prev) => {
-                        const next = new Set(prev);
-                        visiblePermlinks.forEach((p) => next.add(p));
-                        return next;
-                      });
-                    }}
-                    className="text-[10px] text-slate-500 hover:text-red-400 flex items-center gap-1 ml-2 transition-colors px-2 py-1 bg-slate-800/50 rounded-lg hover:bg-red-500/10"
-                  >
-                    <CheckCheck size={16} /> {t("markAllRead")}
-                  </button>
-                )}
-              </div>
-              <div className="flex items-center gap-2">
-                {currentUser && (
-                  <button
-                    onClick={() => fetchInbox(true)}
-                    className="p-2 hover:bg-slate-800 rounded-full text-slate-500 hover:text-cyan-500 transition-colors"
-                  >
-                    <RefreshCw
-                      size={18}
+              <div className="p-3 sm:p-4 border-b border-[var(--border-color)] flex items-center justify-between gap-2 bg-[var(--bg-card)] shrink-0">
+                <div className="flex items-center gap-2 min-w-0">
+                  <h2 className="text-base sm:text-lg font-bold flex items-center gap-2 truncate">
+                    <Bell
+                      size={20}
                       className={cn(
-                        (loadingInbox || isRefreshingInbox) && "animate-spin",
+                        "text-cyan-400 shrink-0",
+                        isRefreshingInbox && "animate-pulse",
                       )}
                     />
+                    <span className="truncate">{t("inbox")}</span>
+                  </h2>
+                  {inbox.filter((r) => !hiddenReplies.has(r.permlink)).length >
+                    0 && (
+                    <button
+                      onClick={() => {
+                        const visiblePermlinks = inbox
+                          .filter((r) => !hiddenReplies.has(r.permlink))
+                          .map((r) => r.permlink);
+                        setHiddenReplies((prev) => {
+                          const next = new Set(prev);
+                          visiblePermlinks.forEach((p) => next.add(p));
+                          return next;
+                        });
+                      }}
+                      className="text-[10px] text-slate-400 hover:text-red-400 flex items-center gap-1 transition-colors px-2 py-1 bg-slate-800/80 rounded-lg hover:bg-red-500/10 shrink-0 border border-slate-700/50"
+                      title={t("markAllRead")}
+                    >
+                      <CheckCheck size={14} />
+                      <span className="hidden sm:inline">{t("markAllRead")}</span>
+                    </button>
+                  )}
+                </div>
+                <div className="flex items-center gap-1 sm:gap-2 shrink-0">
+                  {currentUser && (
+                    <button
+                      type="button"
+                      onClick={() => fetchInbox(true)}
+                      className="p-1.5 sm:p-2 bg-slate-800/60 hover:bg-slate-800 border border-slate-700/60 rounded-xl text-slate-400 hover:text-cyan-400 transition-colors cursor-pointer"
+                      title={t("readerNavRefresh")}
+                    >
+                      <RefreshCw
+                        size={17}
+                        className={cn(
+                          (loadingInbox || isRefreshingInbox) && "animate-spin text-cyan-400",
+                        )}
+                      />
+                    </button>
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => setShowInbox(false)}
+                    className="p-1.5 sm:p-2 bg-slate-800/80 hover:bg-red-500/20 text-slate-300 hover:text-red-400 rounded-xl border border-slate-700/70 hover:border-red-500/40 transition-all cursor-pointer shadow-sm active:scale-95"
+                    title={t("closeModalAria")}
+                    aria-label={t("closeModalAria")}
+                  >
+                    <X size={18} />
                   </button>
-                )}
-                <button
-                  onClick={() => setShowInbox(false)}
-                  className="p-2 hover:bg-slate-800 rounded-full text-slate-500 hover:text-slate-100"
-                >
-                  <X size={20} />
-                </button>
+                </div>
               </div>
-            </div>
 
             <div 
               className="flex-1 overflow-y-auto p-4 space-y-4 custom-scrollbar"
@@ -2592,7 +2615,7 @@ export default function Reader({
           <AnimatePresence>
             {viewMode === "feed" ? (
               <div className="space-y-6">
-                {!hasInitiatedFeed && !loading && (
+                {!hasInitiatedFeed && !loading && posts.length === 0 && (
                   <div className="flex flex-col items-center justify-center py-32 text-slate-500 border-2 border-dashed border-slate-800 rounded-3xl bg-slate-900/10">
                     <Layout
                       size={48}
@@ -4345,32 +4368,54 @@ export default function Reader({
                           </button>
                         </div>
                       </div>
-                      <div className="flex gap-2">
-                        <input
-                          type="text"
-                          placeholder={t("addUsernamePlaceholder")}
-                          className="flex-1 bg-slate-950 border border-slate-800 rounded-lg px-3 py-1.5 text-sm outline-none focus:ring-1 focus:ring-green-500"
-                          onKeyDown={(e) => {
-                            if (e.key === "Enter") {
-                              const val = (e.target as HTMLInputElement).value
-                                .trim()
-                                .toLowerCase()
-                                .replace("@", "");
-                              if (val && !config.whiteList.includes(val)) {
+                      <div className="space-y-1">
+                        <div className="flex gap-2">
+                          <input
+                            type="text"
+                            placeholder={t("addUsernamePlaceholder")}
+                            className="flex-1 bg-slate-950 border border-slate-800 rounded-lg px-3 py-1.5 text-sm outline-none focus:ring-1 focus:ring-green-500"
+                            onKeyDown={(e) => {
+                              if (e.key === "Enter") {
+                                const input = e.target as HTMLInputElement;
+                                const raw = input.value.trim().toLowerCase();
+                                if (!raw) return;
+                                const items = raw.split(/[\s,]+/).map(s => s.replace("@", "").trim()).filter(Boolean);
+                                if (items.length > 0) {
+                                  setConfig((c) => ({
+                                    ...c,
+                                    whiteList: Array.from(new Set([...c.whiteList, ...items])),
+                                    blackList: c.blackList.filter((u) => !items.includes(u)),
+                                  }));
+                                  input.value = "";
+                                }
+                              }
+                            }}
+                          />
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              const input = (e.currentTarget.previousElementSibling as HTMLInputElement);
+                              if (!input) return;
+                              const raw = input.value.trim().toLowerCase();
+                              if (!raw) return;
+                              const items = raw.split(/[\s,]+/).map(s => s.replace("@", "").trim()).filter(Boolean);
+                              if (items.length > 0) {
                                 setConfig((c) => ({
                                   ...c,
-                                  whiteList: Array.from(
-                                    new Set([...c.whiteList, val]),
-                                  ),
-                                  blackList: c.blackList.filter(
-                                    (u) => u !== val,
-                                  ),
+                                  whiteList: Array.from(new Set([...c.whiteList, ...items])),
+                                  blackList: c.blackList.filter((u) => !items.includes(u)),
                                 }));
-                                (e.target as HTMLInputElement).value = "";
+                                input.value = "";
                               }
-                            }
-                          }}
-                        />
+                            }}
+                            className="px-3 py-1.5 bg-green-600/20 hover:bg-green-600/30 text-green-400 border border-green-500/30 rounded-lg text-xs font-bold transition-all cursor-pointer shrink-0"
+                          >
+                            {t("add")}
+                          </button>
+                        </div>
+                        <p className="text-[11px] text-slate-500 px-1">
+                          {t("pressEnterToAdd")}
+                        </p>
                       </div>
                       <div className="p-3 bg-slate-950 rounded-xl border border-slate-800 h-32 overflow-y-auto custom-scrollbar space-y-1">
                         {config.whiteList.filter(Boolean).map((username, idx) => (
@@ -4467,32 +4512,54 @@ export default function Reader({
                           </button>
                         </div>
                       </div>
-                      <div className="flex gap-2">
-                        <input
-                          type="text"
-                          placeholder={t("addUsernamePlaceholder")}
-                          className="flex-1 bg-slate-950 border border-slate-800 rounded-lg px-3 py-1.5 text-sm outline-none focus:ring-1 focus:ring-red-500"
-                          onKeyDown={(e) => {
-                            if (e.key === "Enter") {
-                              const val = (e.target as HTMLInputElement).value
-                                .trim()
-                                .toLowerCase()
-                                .replace("@", "");
-                              if (val && !config.blackList.includes(val)) {
+                      <div className="space-y-1">
+                        <div className="flex gap-2">
+                          <input
+                            type="text"
+                            placeholder={t("addUsernamePlaceholder")}
+                            className="flex-1 bg-slate-950 border border-slate-800 rounded-lg px-3 py-1.5 text-sm outline-none focus:ring-1 focus:ring-red-500"
+                            onKeyDown={(e) => {
+                              if (e.key === "Enter") {
+                                const input = e.target as HTMLInputElement;
+                                const raw = input.value.trim().toLowerCase();
+                                if (!raw) return;
+                                const items = raw.split(/[\s,]+/).map(s => s.replace("@", "").trim()).filter(Boolean);
+                                if (items.length > 0) {
+                                  setConfig((c) => ({
+                                    ...c,
+                                    blackList: Array.from(new Set([...c.blackList, ...items])),
+                                    whiteList: c.whiteList.filter((u) => !items.includes(u)),
+                                  }));
+                                  input.value = "";
+                                }
+                              }
+                            }}
+                          />
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              const input = (e.currentTarget.previousElementSibling as HTMLInputElement);
+                              if (!input) return;
+                              const raw = input.value.trim().toLowerCase();
+                              if (!raw) return;
+                              const items = raw.split(/[\s,]+/).map(s => s.replace("@", "").trim()).filter(Boolean);
+                              if (items.length > 0) {
                                 setConfig((c) => ({
                                   ...c,
-                                  blackList: Array.from(
-                                    new Set([...c.blackList, val]),
-                                  ),
-                                  whiteList: c.whiteList.filter(
-                                    (u) => u !== val,
-                                  ),
+                                  blackList: Array.from(new Set([...c.blackList, ...items])),
+                                  whiteList: c.whiteList.filter((u) => !items.includes(u)),
                                 }));
-                                (e.target as HTMLInputElement).value = "";
+                                input.value = "";
                               }
-                            }
-                          }}
-                        />
+                            }}
+                            className="px-3 py-1.5 bg-red-600/20 hover:bg-red-600/30 text-red-400 border border-red-500/30 rounded-lg text-xs font-bold transition-all cursor-pointer shrink-0"
+                          >
+                            {t("add")}
+                          </button>
+                        </div>
+                        <p className="text-[11px] text-slate-500 px-1">
+                          {t("pressEnterToAdd")}
+                        </p>
                       </div>
                       <div className="p-3 bg-slate-950 rounded-xl border border-slate-800 h-32 overflow-y-auto custom-scrollbar space-y-1">
                         {config.blackList.filter(Boolean).map((username, idx) => (
@@ -4683,6 +4750,167 @@ export default function Reader({
         )}
       </AnimatePresence>
 
+      {/* Mobile Reader Quick Controls Drawer (Bottom Sheet) */}
+      <AnimatePresence>
+        {showQuickPanel && (
+          <motion.div
+            initial={{ opacity: 0, y: 120 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: 120 }}
+            transition={{ type: "spring", damping: 25, stiffness: 300 }}
+            className="fixed left-0 right-0 z-[65] bg-slate-900/98 backdrop-blur-xl border-t border-slate-700/80 shadow-[0_-8px_30px_rgba(0,0,0,0.7)] p-4 sm:hidden flex flex-col gap-3"
+            style={{
+              bottom: 'calc(4rem + env(safe-area-inset-bottom, 0px))',
+              maxHeight: 'calc(100dvh - 5rem - env(safe-area-inset-top, 0px))',
+            }}
+          >
+            {/* Header & Close */}
+            <div className="flex items-center justify-between pb-1.5 border-b border-slate-800">
+              <div className="flex items-center gap-2">
+                <Sliders size={16} className="text-cyan-400" />
+                <span className="text-xs font-bold text-slate-200 uppercase tracking-wider">{t("mobileQuickControls")}</span>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowQuickPanel(false)}
+                className="p-1 text-slate-400 hover:text-slate-100 rounded-lg hover:bg-slate-800 transition-colors cursor-pointer"
+              >
+                <X size={16} />
+              </button>
+            </div>
+
+            {/* Tag Search */}
+            <div className="flex flex-col gap-1.5">
+              <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+                {t("searchTag")}
+              </label>
+              <div className="flex gap-2">
+                <div className="relative flex-1">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" size={15} />
+                  <input
+                    type="text"
+                    value={viewMode === "curation" ? (curationTagInput || "") : (searchTag || "")}
+                    onChange={(e) => {
+                      if (viewMode === "curation") {
+                        setCurationTagInput(e.target.value);
+                      } else {
+                        setSearchTag(e.target.value);
+                      }
+                    }}
+                    placeholder={t("tagSearchPlaceholder")}
+                    className="w-full bg-slate-950 border border-slate-800 rounded-xl py-2 pl-9 pr-3 text-xs text-slate-200 outline-none focus:ring-1 focus:ring-cyan-500"
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") {
+                        if (viewMode === "curation") {
+                          fetchCurationFeed(curationTagInput.trim());
+                        } else {
+                          handleSearch();
+                        }
+                        setShowQuickPanel(false);
+                      }
+                    }}
+                  />
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (viewMode === "curation") {
+                      fetchCurationFeed(curationTagInput.trim());
+                    } else {
+                      handleSearch();
+                    }
+                    setShowQuickPanel(false);
+                  }}
+                  className="px-3.5 py-2 bg-cyan-600 hover:bg-cyan-500 text-white rounded-xl text-xs font-bold transition-all shrink-0 cursor-pointer shadow-sm active:scale-95"
+                >
+                  {t("search")}
+                </button>
+              </div>
+            </div>
+
+            {/* Auto-Inbox & Font Size Controls */}
+            <div className="grid grid-cols-2 gap-2 pt-0.5">
+              <button
+                type="button"
+                onClick={() => setConfig((c) => ({ ...c, autoShowInbox: !c.autoShowInbox }))}
+                className={cn(
+                  "flex items-center justify-between p-2.5 rounded-xl border transition-all text-xs font-bold cursor-pointer",
+                  config.autoShowInbox
+                    ? "bg-cyan-600/20 text-cyan-300 border-cyan-500/40"
+                    : "bg-slate-950/80 text-slate-400 border-slate-800 hover:bg-slate-800"
+                )}
+              >
+                <div className="flex items-center gap-1.5">
+                  <BellRing size={15} className={config.autoShowInbox ? "text-cyan-400" : "opacity-60"} />
+                  <span className="truncate">{t("autoInboxActive")}</span>
+                </div>
+                <span className="text-[10px] px-1.5 py-0.5 rounded bg-slate-900 border border-slate-700/60 font-mono shrink-0">
+                  {config.autoShowInbox ? t("on") : t("off")}
+                </span>
+              </button>
+
+              <div className="flex items-center justify-between p-1.5 bg-slate-950/80 border border-slate-800 rounded-xl">
+                <button
+                  type="button"
+                  onClick={handleDecreaseFontSize}
+                  className="p-1 text-slate-400 hover:text-white hover:bg-slate-800 rounded-lg transition-colors cursor-pointer"
+                  title={t("headerFontDecreaseTitle")}
+                >
+                  <span className="font-bold text-xs">A-</span>
+                </button>
+                <span className="text-xs font-mono font-bold text-cyan-400">
+                  {currentFontSize}px
+                </span>
+                <button
+                  type="button"
+                  onClick={handleIncreaseFontSize}
+                  className="p-1 text-slate-400 hover:text-white hover:bg-slate-800 rounded-lg transition-colors cursor-pointer"
+                  title={t("headerFontIncreaseTitle")}
+                >
+                  <span className="font-bold text-xs">A+</span>
+                </button>
+              </div>
+            </div>
+
+            {/* Quick Actions (Refresh & Expand/Collapse) */}
+            <div className="flex items-center gap-2 pt-0.5">
+              <button
+                type="button"
+                onClick={() => {
+                  if (viewMode === "feed") {
+                    fetchPosts();
+                  } else if (viewMode === "curation") {
+                    fetchCurationFeed();
+                  }
+                  setShowQuickPanel(false);
+                }}
+                className="flex-1 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 rounded-xl text-xs font-bold flex items-center justify-center gap-2 transition-all active:scale-95 cursor-pointer"
+              >
+                <RefreshCw size={14} className={cn((loading || isCurationLoading) && "animate-spin text-cyan-400")} />
+                <span>{t("refresh")}</span>
+              </button>
+
+              {(viewMode === "feed" || viewMode === "curation") && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    const postList = viewMode === "feed" ? posts : curationPosts;
+                    if (expandedPosts.size > 0) {
+                      setExpandedPosts(new Set());
+                    } else {
+                      setExpandedPosts(new Set(postList.map((p) => p.permlink)));
+                    }
+                  }}
+                  className="px-3 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 rounded-xl text-xs font-bold transition-all cursor-pointer"
+                >
+                  {expandedPosts.size > 0 ? t("collapseAll") : t("expandAll")}
+                </button>
+              )}
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       {/* Mobile Reader Bottom Navigation Bar */}
       <ReaderMobileBottomBar
         viewMode={viewMode}
@@ -4691,6 +4919,8 @@ export default function Reader({
         onToggleInbox={() => setShowInbox(!showInbox)}
         inboxCount={inbox.length}
         unreadCount={unreadRepliesCount}
+        showQuickPanel={showQuickPanel}
+        onToggleQuickPanel={() => setShowQuickPanel((prev) => !prev)}
         onRefresh={() => {
           if (viewMode === "feed") {
             fetchPosts();

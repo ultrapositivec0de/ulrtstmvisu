@@ -412,6 +412,9 @@ export const translations = {
   "on": "ON",
   "off": "OFF",
   "markAllRead": "Mark All Read",
+  "listInputHint": "Press Enter or space to add username(s)",
+  "welcomeAutoInboxLabel": "Auto-show inbox on new replies on startup",
+  "mobileQuickControls": "Quick Controls",
   "loadingReplies": "Loading replies...",
   "noRepliesFound": "No recent replies found.",
   "markThreadAsRead": "Mark thread as read",
@@ -1122,6 +1125,10 @@ export const translations = {
   "readerNavInbox": "Inbox",
   "readerNavRefresh": "Refresh",
   "readerNavSettings": "Settings",
+  "pressEnterToAdd": "Press Enter or separate with spaces to add",
+  "autoInboxActive": "Auto-Inbox",
+  "searchTag": "Search by tag",
+  "tagSearchPlaceholder": "Enter tag or community...",
 } as const;
 
 export default { meta, translations };

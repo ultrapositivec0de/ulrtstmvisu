@@ -1122,6 +1122,10 @@ export const translations = {
   "readerNavInbox": "수신함",
   "readerNavRefresh": "새로고침",
   "readerNavSettings": "설정",
+  "pressEnterToAdd": "추가하려면 Enter를 누르거나 공백으로 구분하세요",
+  "autoInboxActive": "자동 수신함",
+  "searchTag": "태그로 검색",
+  "tagSearchPlaceholder": "태그 또는 커뮤니티 입력...",
 } as const;
 
 export default { meta, translations };
