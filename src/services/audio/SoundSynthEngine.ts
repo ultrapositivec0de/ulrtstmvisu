@@ -649,7 +649,7 @@ export class SoundSynthEngine {
   }
 
   /**
-   * FM Crystal Bell Synth core logic
+   * FM Crystal Bell Synth core logic - Pristine Glass/Crystal Resonance
    */
   private synthesizeBellTone(
     ctx: BaseAudioContext,
@@ -661,42 +661,67 @@ export class SoundSynthEngine {
     startTime: number,
     registerNode: (node: AudioNode) => void
   ): void {
-    filter.type = 'lowpass';
-    filter.frequency.setValueAtTime(12000, startTime);
+    // Open highpass EQ to let pristine upper frequencies (14k-18kHz) shimmer unconstrained
+    filter.type = 'highpass';
+    filter.frequency.setValueAtTime(100, startTime);
+    filter.Q.setValueAtTime(0.7, startTime);
 
+    // Fundamental Sine Tone
     const osc = ctx.createOscillator();
     osc.type = 'sine';
     osc.frequency.setValueAtTime(freq, startTime);
 
+    // Primary FM Crystal Modulator (Ratio 2.756 for crystalline glass timbre)
     const mod = ctx.createOscillator();
     const modGain = ctx.createGain();
     mod.type = 'sine';
-    mod.frequency.setValueAtTime(freq * 1.5, startTime);
+    mod.frequency.setValueAtTime(freq * 2.756, startTime);
 
     modGain.gain.setValueAtTime(0.0001, startTime);
-    modGain.gain.linearRampToValueAtTime(freq * 0.22, startTime + 0.005);
+    modGain.gain.linearRampToValueAtTime(freq * 0.52, startTime + 0.001);
     modGain.gain.exponentialRampToValueAtTime(0.0001, startTime + decayTime * 0.45);
 
     mod.connect(modGain);
     modGain.connect(osc.frequency);
 
+    // Secondary Sparkling Glass/Crystal Shimmer Overtone (Ratio 4.12)
+    const shimmerOsc = ctx.createOscillator();
+    const shimmerGain = ctx.createGain();
+    shimmerOsc.type = 'sine';
+    shimmerOsc.frequency.setValueAtTime(freq * 4.12, startTime);
+
+    shimmerGain.gain.setValueAtTime(0.0001, startTime);
+    shimmerGain.gain.linearRampToValueAtTime(vol * 0.28, startTime + 0.001);
+    shimmerGain.gain.exponentialRampToValueAtTime(0.0001, startTime + decayTime * 0.22);
+
+    shimmerOsc.connect(shimmerGain);
+    shimmerGain.connect(filter);
+
+    // Crisp Crystal Attack Envelope
     voiceGain.gain.setValueAtTime(0.0001, startTime);
-    voiceGain.gain.linearRampToValueAtTime(vol * 0.65, startTime + 0.008);
+    voiceGain.gain.linearRampToValueAtTime(vol * 0.85, startTime + 0.001);
     voiceGain.gain.exponentialRampToValueAtTime(0.0001, startTime + decayTime);
 
     osc.connect(filter);
+
     registerNode(osc);
     registerNode(mod);
     registerNode(modGain);
+    registerNode(shimmerOsc);
+    registerNode(shimmerGain);
 
+    const stopTime = startTime + decayTime + 0.05;
     osc.start(startTime);
     mod.start(startTime);
-    osc.stop(startTime + decayTime + 0.05);
-    mod.stop(startTime + decayTime + 0.05);
+    shimmerOsc.start(startTime);
+
+    osc.stop(stopTime);
+    mod.stop(stopTime);
+    shimmerOsc.stop(stopTime);
   }
 
   /**
-   * Cathedral Bell Synth core logic
+   * Cathedral Bell Synth core logic - Noble Bronze Bell Resonance
    */
   private synthesizeCathedralBellTone(
     ctx: BaseAudioContext,
@@ -708,57 +733,76 @@ export class SoundSynthEngine {
     startTime: number,
     registerNode: (node: AudioNode) => void
   ): void {
-    filter.type = 'lowpass';
-    filter.frequency.setValueAtTime(10000, startTime);
+    filter.type = 'highpass';
+    filter.frequency.setValueAtTime(80, startTime);
 
     const osc = ctx.createOscillator();
     osc.type = 'sine';
     osc.frequency.setValueAtTime(freq, startTime);
 
+    // Bronze FM Overtone (Ratio 2.756)
     const mod = ctx.createOscillator();
     const modGain = ctx.createGain();
     mod.type = 'sine';
     mod.frequency.setValueAtTime(freq * 2.756, startTime);
     modGain.gain.setValueAtTime(0.0001, startTime);
-    modGain.gain.linearRampToValueAtTime(freq * 0.18, startTime + 0.006);
-    modGain.gain.exponentialRampToValueAtTime(0.0001, startTime + decayTime * 0.5);
+    modGain.gain.linearRampToValueAtTime(freq * 0.35, startTime + 0.002);
+    modGain.gain.exponentialRampToValueAtTime(0.0001, startTime + decayTime * 0.55);
 
     mod.connect(modGain);
     modGain.connect(osc.frequency);
 
+    // Bronze Strike Transient (Ratio 5.42)
+    const strikeOsc = ctx.createOscillator();
+    const strikeGain = ctx.createGain();
+    strikeOsc.type = 'sine';
+    strikeOsc.frequency.setValueAtTime(freq * 5.42, startTime);
+    strikeGain.gain.setValueAtTime(0.0001, startTime);
+    strikeGain.gain.linearRampToValueAtTime(vol * 0.22, startTime + 0.001);
+    strikeGain.gain.exponentialRampToValueAtTime(0.0001, startTime + decayTime * 0.18);
+
+    strikeOsc.connect(strikeGain);
+    strikeGain.connect(filter);
+
+    // Deep Bronze Hum Tone
     const humOsc = ctx.createOscillator();
     const humGain = ctx.createGain();
     humOsc.type = 'sine';
-    humOsc.frequency.setValueAtTime(Math.max(100, freq * 0.5), startTime);
+    humOsc.frequency.setValueAtTime(Math.max(80, freq * 0.5), startTime);
     humGain.gain.setValueAtTime(0.0001, startTime);
-    humGain.gain.linearRampToValueAtTime(vol * 0.08, startTime + 0.006);
+    humGain.gain.linearRampToValueAtTime(vol * 0.12, startTime + 0.004);
     humGain.gain.exponentialRampToValueAtTime(0.0001, startTime + decayTime * 0.85);
 
     humOsc.connect(humGain);
     humGain.connect(filter);
 
     voiceGain.gain.setValueAtTime(0.0001, startTime);
-    voiceGain.gain.linearRampToValueAtTime(vol * 0.70, startTime + 0.008);
+    voiceGain.gain.linearRampToValueAtTime(vol * 0.85, startTime + 0.002);
     voiceGain.gain.exponentialRampToValueAtTime(0.0001, startTime + decayTime);
 
     osc.connect(filter);
     registerNode(osc);
     registerNode(mod);
     registerNode(modGain);
+    registerNode(strikeOsc);
+    registerNode(strikeGain);
     registerNode(humOsc);
     registerNode(humGain);
 
+    const stopTime = startTime + decayTime + 0.05;
     osc.start(startTime);
     mod.start(startTime);
+    strikeOsc.start(startTime);
     humOsc.start(startTime);
 
-    osc.stop(startTime + decayTime + 0.05);
-    mod.stop(startTime + decayTime + 0.05);
-    humOsc.stop(startTime + decayTime + 0.05);
+    osc.stop(stopTime);
+    mod.stop(stopTime);
+    strikeOsc.stop(stopTime);
+    humOsc.stop(stopTime);
   }
 
   /**
-   * Leontovych Shchedryk Bell core logic
+   * Leontovych Shchedryk Bell core logic - Festive Silver Chimes
    */
   private synthesizeShchedrykChime(
     ctx: BaseAudioContext,
@@ -770,37 +814,56 @@ export class SoundSynthEngine {
     startTime: number,
     registerNode: (node: AudioNode) => void
   ): void {
-    filter.type = 'lowpass';
-    filter.frequency.setValueAtTime(11500, startTime);
+    filter.type = 'highpass';
+    filter.frequency.setValueAtTime(90, startTime);
 
     const osc = ctx.createOscillator();
     osc.type = 'sine';
     osc.frequency.setValueAtTime(freq, startTime);
 
+    // Silver FM Chime (Ratio 3.1415)
     const mod = ctx.createOscillator();
     const modGain = ctx.createGain();
     mod.type = 'sine';
-    mod.frequency.setValueAtTime(freq * 2.0, startTime);
+    mod.frequency.setValueAtTime(freq * 3.1415, startTime);
     modGain.gain.setValueAtTime(0.0001, startTime);
-    modGain.gain.linearRampToValueAtTime(freq * 0.20, startTime + 0.005);
-    modGain.gain.exponentialRampToValueAtTime(0.0001, startTime + decayTime * 0.45);
+    modGain.gain.linearRampToValueAtTime(freq * 0.42, startTime + 0.001);
+    modGain.gain.exponentialRampToValueAtTime(0.0001, startTime + decayTime * 0.40);
 
     mod.connect(modGain);
     modGain.connect(osc.frequency);
 
+    // Silver Shimmer Overtone (Ratio 4.85)
+    const silverOsc = ctx.createOscillator();
+    const silverGain = ctx.createGain();
+    silverOsc.type = 'sine';
+    silverOsc.frequency.setValueAtTime(freq * 4.85, startTime);
+    silverGain.gain.setValueAtTime(0.0001, startTime);
+    silverGain.gain.linearRampToValueAtTime(vol * 0.25, startTime + 0.001);
+    silverGain.gain.exponentialRampToValueAtTime(0.0001, startTime + decayTime * 0.20);
+
+    silverOsc.connect(silverGain);
+    silverGain.connect(filter);
+
     voiceGain.gain.setValueAtTime(0.0001, startTime);
-    voiceGain.gain.linearRampToValueAtTime(vol * 0.75, startTime + 0.008);
+    voiceGain.gain.linearRampToValueAtTime(vol * 0.82, startTime + 0.002);
     voiceGain.gain.exponentialRampToValueAtTime(0.0001, startTime + decayTime);
 
     osc.connect(filter);
     registerNode(osc);
     registerNode(mod);
     registerNode(modGain);
+    registerNode(silverOsc);
+    registerNode(silverGain);
 
+    const stopTime = startTime + decayTime + 0.05;
     osc.start(startTime);
     mod.start(startTime);
-    osc.stop(startTime + decayTime + 0.05);
-    mod.stop(startTime + decayTime + 0.05);
+    silverOsc.start(startTime);
+
+    osc.stop(stopTime);
+    mod.stop(stopTime);
+    silverOsc.stop(stopTime);
   }
 
   /**
