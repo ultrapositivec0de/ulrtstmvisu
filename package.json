@@ -92,13 +92,13 @@
     "glob": "^13.0.6",
     "yaeti": "npm:event-target-shim@^6.0.2",
     "postcss-selector-parser": "^7.1.6",
-    "undici": "^8.12.3"
+    "undici": "8.12.3"
   },
   "resolutions": {
     "glob": "^13.0.6",
     "yaeti": "npm:event-target-shim@^6.0.2",
     "postcss-selector-parser": "^7.1.6",
-    "undici": "^8.12.3"
+    "undici": "8.12.3"
   },
   "allowScripts": {
     "esbuild": true,
