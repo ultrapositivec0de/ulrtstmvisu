@@ -1126,6 +1126,19 @@ export const translations = {
   "autoInboxActive": "자동 수신함",
   "searchTag": "태그로 검색",
   "tagSearchPlaceholder": "태그 또는 커뮤니티 입력...",
+  "subscript": "아래 첨자 (sub)",
+  "superscript": "위 첨자 (sup)",
+  "listBullet": "글머리 기호 목록",
+  "listOrdered": "번호 매기기 목록",
+  "listTask": "체크리스트",
+  "escapeChar": "이스케이프 문자 (\\)",
+  "insertLocalImage": "이미지 삽입",
+  "lightboxZoomIn": "확대",
+  "lightboxZoomOut": "축소",
+  "lightboxResetZoom": "확대/축소 초기화",
+  "lightboxClose": "뷰어 닫기",
+  "lightboxCopyUrl": "링크 복사",
+  "lightboxUrlCopied": "이미지 링크가 복사되었습니다",
 } as const;
 
 export default { meta, translations };

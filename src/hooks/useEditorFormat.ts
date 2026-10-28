@@ -994,10 +994,384 @@ function unwrapPhishyFromRange(range: Range, wysiwyg: HTMLElement): boolean {
     }
   }, [ getSelectionOrWord, editorMode, insertHtmlAtCursor, getVisualSelectionHtml, restoreVisualSelection, handleMarkdownFormat, updateContentFromWysiwyg, activeFormats]);
 
+  const toggleVisualList = useCallback((type: 'ul' | 'ol') => {
+    if (!wysiwygRef.current) return;
+    restoreVisualSelection(false);
+
+    const sel = window.getSelection();
+    if (!sel || sel.rangeCount === 0) {
+      focusVisualEditorEnd();
+      return;
+    }
+
+    const range = sel.getRangeAt(0);
+    const wysiwyg = wysiwygRef.current;
+    if (!wysiwyg.contains(range.commonAncestorContainer)) {
+      focusVisualEditorEnd();
+      return;
+    }
+
+    // If multi-block selection, use execCommand to wrap multiple blocks
+    if (!range.collapsed) {
+      const isMultiBlock = range.startContainer !== range.endContainer &&
+        (range.cloneContents().querySelectorAll?.('p, div, li, h1, h2, h3, h4, h5, h6, blockquote').length > 0);
+      if (isMultiBlock) {
+        document.execCommand(type === 'ol' ? 'insertOrderedList' : 'insertUnorderedList', false);
+        updateContentFromWysiwyg();
+        return;
+      }
+    }
+
+    // Find the enclosing block element
+    let block: HTMLElement | null = null;
+    let curr: Node | null = range.startContainer;
+    while (curr && curr !== wysiwyg) {
+      if (curr.nodeType === Node.ELEMENT_NODE) {
+        const el = curr as HTMLElement;
+        const tag = el.tagName.toLowerCase();
+        if (['p', 'div', 'li', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'blockquote'].includes(tag)) {
+          block = el;
+          break;
+        }
+      }
+      curr = curr.parentNode;
+    }
+
+    // If caret is directly at wysiwyg root
+    if (!block) {
+      if (range.startContainer.nodeType === Node.TEXT_NODE && range.startContainer.parentNode === wysiwyg) {
+        const p = document.createElement('p');
+        wysiwyg.insertBefore(p, range.startContainer);
+        p.appendChild(range.startContainer);
+        block = p;
+      } else if (range.startContainer === wysiwyg) {
+        const child = wysiwyg.childNodes[range.startOffset];
+        if (child && child.nodeType === Node.ELEMENT_NODE) {
+          block = child as HTMLElement;
+        }
+      }
+    }
+
+    // If editor is completely empty
+    if (!block && wysiwyg.childNodes.length === 0) {
+      const newList = document.createElement(type);
+      const newLi = document.createElement('li');
+      newLi.innerHTML = '<br>';
+      newList.appendChild(newLi);
+      wysiwyg.appendChild(newList);
+
+      const newRange = document.createRange();
+      newRange.setStart(newLi, 0);
+      newRange.collapse(true);
+      sel.removeAllRanges();
+      sel.addRange(newRange);
+      savedVisualRangeRef.current = newRange.cloneRange();
+      wysiwyg.focus({ preventScroll: true });
+      scrollCaretIntoView?.('nearest');
+      updateContentFromWysiwyg();
+      return;
+    }
+
+    // Check if the current block is already an LI
+    let liElement: HTMLElement | null = null;
+    if (block && block.tagName.toLowerCase() === 'li') {
+      liElement = block;
+    } else {
+      let node: Node | null = range.startContainer;
+      while (node && node !== wysiwyg) {
+        if (node.nodeType === Node.ELEMENT_NODE && (node as HTMLElement).tagName.toLowerCase() === 'li') {
+          liElement = node as HTMLElement;
+          break;
+        }
+        node = node.parentNode;
+      }
+    }
+
+    if (liElement) {
+      const listParent = liElement.parentElement; // UL or OL
+      const currentListTag = listParent?.tagName.toLowerCase();
+
+      // Case A: Same list type -> Toggle OFF (convert LI to P)
+      if (currentListTag === type) {
+        const p = document.createElement('p');
+        while (liElement.firstChild) {
+          p.appendChild(liElement.firstChild);
+        }
+        if (!p.firstChild || (p.childNodes.length === 1 && p.firstChild.nodeName === 'BR')) {
+          p.innerHTML = '<br>';
+        }
+
+        if (listParent && listParent.parentElement) {
+          const allLis = Array.from(listParent.querySelectorAll('li'));
+          if (allLis.length <= 1) {
+            listParent.parentElement.replaceChild(p, listParent);
+          } else {
+            const index = allLis.indexOf(liElement as HTMLLIElement);
+            if (index === 0) {
+              listParent.parentElement.insertBefore(p, listParent);
+              liElement.remove();
+            } else if (index === allLis.length - 1) {
+              listParent.parentElement.insertBefore(p, listParent.nextSibling);
+              liElement.remove();
+            } else {
+              // Split list into before and after
+              const nextList = document.createElement(listParent.tagName);
+              let nextLi = liElement.nextElementSibling;
+              while (nextLi) {
+                const toMove = nextLi;
+                nextLi = nextLi.nextElementSibling;
+                nextList.appendChild(toMove);
+              }
+              listParent.parentElement.insertBefore(p, listParent.nextSibling);
+              listParent.parentElement.insertBefore(nextList, p.nextSibling);
+              liElement.remove();
+            }
+          }
+        } else {
+          liElement.replaceWith(p);
+        }
+
+        const newRange = document.createRange();
+        if (p.firstChild && p.firstChild.nodeName !== 'BR') {
+          newRange.selectNodeContents(p);
+          newRange.collapse(false);
+        } else {
+          newRange.setStart(p, 0);
+          newRange.collapse(true);
+        }
+        sel.removeAllRanges();
+        sel.addRange(newRange);
+        savedVisualRangeRef.current = newRange.cloneRange();
+        wysiwyg.focus({ preventScroll: true });
+        scrollCaretIntoView?.('nearest');
+        updateContentFromWysiwyg();
+        return;
+      }
+
+      // Case B: Different list type -> Switch UL <-> OL
+      if (listParent && listParent.parentElement) {
+        const newList = document.createElement(type);
+        while (listParent.firstChild) {
+          newList.appendChild(listParent.firstChild);
+        }
+        listParent.parentElement.replaceChild(newList, listParent);
+
+        const newRange = document.createRange();
+        if (liElement.firstChild && liElement.firstChild.nodeName !== 'BR') {
+          newRange.selectNodeContents(liElement);
+          newRange.collapse(false);
+        } else {
+          newRange.setStart(liElement, 0);
+          newRange.collapse(true);
+        }
+        sel.removeAllRanges();
+        sel.addRange(newRange);
+        savedVisualRangeRef.current = newRange.cloneRange();
+        wysiwyg.focus({ preventScroll: true });
+        scrollCaretIntoView?.('nearest');
+        updateContentFromWysiwyg();
+        return;
+      }
+    }
+
+    // Now, block is NOT an LI. Check if block is empty:
+    const cleanText = (block ? (block.textContent || '') : '').replace(/[\u200B-\u200D\uFEFF\r\n\t\s\u00A0]/g, '');
+    const hasMedia = block ? !!block.querySelector('img, iframe, video, table, input') : false;
+    const isBlockEmpty = !block || (cleanText.length === 0 && !hasMedia);
+
+    if (isBlockEmpty) {
+      // Create a brand new independent list block at this empty line!
+      const newList = document.createElement(type);
+      const newLi = document.createElement('li');
+      newLi.innerHTML = '<br>';
+      newList.appendChild(newLi);
+
+      if (block && block.parentElement) {
+        block.parentElement.replaceChild(newList, block);
+      } else {
+        wysiwyg.appendChild(newList);
+      }
+
+      const newRange = document.createRange();
+      newRange.setStart(newLi, 0);
+      newRange.collapse(true);
+      sel.removeAllRanges();
+      sel.addRange(newRange);
+      savedVisualRangeRef.current = newRange.cloneRange();
+      wysiwyg.focus({ preventScroll: true });
+      scrollCaretIntoView?.('nearest');
+      updateContentFromWysiwyg();
+      return;
+    }
+
+    // Block is not empty (contains text/media) and not an LI
+    // Check if block contains line breaks (<br>) and caret is on a specific visual line
+    const hasBr = !!block?.querySelector('br');
+    if (block && hasBr) {
+      // Group children into visual lines separated by <br>
+      const lines: Node[][] = [[]];
+      Array.from(block.childNodes).forEach((child) => {
+        if (child.nodeType === Node.ELEMENT_NODE && (child as HTMLElement).tagName.toLowerCase() === 'br') {
+          lines[lines.length - 1].push(child);
+          lines.push([]);
+        } else {
+          lines[lines.length - 1].push(child);
+        }
+      });
+
+      // Find which line index contains the caret
+      let caretLineIndex = -1;
+      for (let i = 0; i < lines.length; i++) {
+        for (const node of lines[i]) {
+          if (node === range.startContainer || node.contains(range.startContainer)) {
+            caretLineIndex = i;
+            break;
+          }
+        }
+        if (caretLineIndex !== -1) break;
+      }
+
+      if (caretLineIndex === -1 && range.startContainer === block) {
+        let count = 0;
+        for (let i = 0; i < lines.length; i++) {
+          count += lines[i].length;
+          if (range.startOffset <= count) {
+            caretLineIndex = i;
+            break;
+          }
+        }
+        if (caretLineIndex === -1) caretLineIndex = lines.length - 1;
+      }
+
+      if (caretLineIndex !== -1 && lines.length > 1) {
+        const caretLineNodes = lines[caretLineIndex] || [];
+        const caretLineText = caretLineNodes
+          .map((n) => (n.nodeType === Node.TEXT_NODE ? n.nodeValue || '' : n.textContent || ''))
+          .join('')
+          .replace(/[\u200B-\u200D\uFEFF\r\n\t\s\u00A0]/g, '');
+        const caretLineHasMedia = caretLineNodes.some(
+          (n) =>
+            (n.nodeType === Node.ELEMENT_NODE && (n as HTMLElement).matches?.('img, iframe, video, table, input')) ||
+            (n as HTMLElement).querySelector?.('img, iframe, video, table, input')
+        );
+        const isCaretLineEmpty = caretLineText.length === 0 && !caretLineHasMedia;
+
+        // Build pBefore for lines before caretLineIndex
+        const pBefore = document.createElement('p');
+        for (let i = 0; i < caretLineIndex; i++) {
+          lines[i].forEach((n) => pBefore.appendChild(n));
+        }
+        while (pBefore.lastChild && pBefore.lastChild.nodeName.toLowerCase() === 'br') {
+          pBefore.removeChild(pBefore.lastChild);
+        }
+        if (!pBefore.firstChild) pBefore.innerHTML = '<br>';
+
+        // Build new list for the caret line
+        const newList = document.createElement(type);
+        const newLi = document.createElement('li');
+        if (isCaretLineEmpty) {
+          newLi.innerHTML = '<br>';
+        } else {
+          caretLineNodes.forEach((n) => {
+            if (n.nodeType !== Node.ELEMENT_NODE || (n as HTMLElement).tagName.toLowerCase() !== 'br') {
+              newLi.appendChild(n);
+            }
+          });
+          if (!newLi.firstChild) newLi.innerHTML = '<br>';
+        }
+        newList.appendChild(newLi);
+
+        // Build pAfter for lines after caretLineIndex
+        const pAfter = document.createElement('p');
+        for (let i = caretLineIndex + 1; i < lines.length; i++) {
+          lines[i].forEach((n) => pAfter.appendChild(n));
+        }
+        while (pAfter.lastChild && pAfter.lastChild.nodeName.toLowerCase() === 'br') {
+          pAfter.removeChild(pAfter.lastChild);
+        }
+
+        const parent = block.parentElement || wysiwyg;
+        const hasBeforeContent =
+          (pBefore.textContent || '').replace(/[\u200B-\u200D\uFEFF\r\n\t\s\u00A0]/g, '').length > 0 ||
+          !!pBefore.querySelector('img, iframe, video, table, input');
+        const hasAfterContent =
+          (pAfter.textContent || '').replace(/[\u200B-\u200D\uFEFF\r\n\t\s\u00A0]/g, '').length > 0 ||
+          !!pAfter.querySelector('img, iframe, video, table, input');
+
+        if (hasBeforeContent) {
+          parent.insertBefore(pBefore, block);
+        }
+        parent.insertBefore(newList, block);
+        if (hasAfterContent) {
+          parent.insertBefore(pAfter, block);
+        }
+        block.remove();
+
+        const newRange = document.createRange();
+        if (newLi.firstChild && newLi.firstChild.nodeName !== 'BR') {
+          newRange.selectNodeContents(newLi);
+          newRange.collapse(false);
+        } else {
+          newRange.setStart(newLi, 0);
+          newRange.collapse(true);
+        }
+        sel.removeAllRanges();
+        sel.addRange(newRange);
+        savedVisualRangeRef.current = newRange.cloneRange();
+        wysiwyg.focus({ preventScroll: true });
+        scrollCaretIntoView?.('nearest');
+        updateContentFromWysiwyg();
+        return;
+      }
+    }
+
+    // Turn single-line block into its own brand new independent list block of the requested type
+    const newLi = document.createElement('li');
+    if (block) {
+      while (block.firstChild) {
+        newLi.appendChild(block.firstChild);
+      }
+    }
+    if (!newLi.firstChild) {
+      newLi.innerHTML = '<br>';
+    }
+
+    const newList = document.createElement(type);
+    newList.appendChild(newLi);
+    if (block && block.parentElement) {
+      block.parentElement.replaceChild(newList, block);
+    } else {
+      wysiwyg.appendChild(newList);
+    }
+
+    const newRange = document.createRange();
+    if (newLi.firstChild && newLi.firstChild.nodeName !== 'BR') {
+      newRange.selectNodeContents(newLi);
+      newRange.collapse(false);
+    } else {
+      newRange.setStart(newLi, 0);
+      newRange.collapse(true);
+    }
+    sel.removeAllRanges();
+    sel.addRange(newRange);
+    savedVisualRangeRef.current = newRange.cloneRange();
+    wysiwyg.focus({ preventScroll: true });
+    scrollCaretIntoView?.('nearest');
+    updateContentFromWysiwyg();
+  }, [restoreVisualSelection, focusVisualEditorEnd, updateContentFromWysiwyg, savedVisualRangeRef, wysiwygRef, scrollCaretIntoView]);
+
   const fmtLine = useCallback((prefix: string) => {
     const content = useEditorStore.getState().content;
     if (editorMode === 'visual') {
-      restoreVisualSelection(true);
+      if (prefix === '- ') {
+        toggleVisualList('ul');
+        return;
+      }
+      if (prefix === '1. ') {
+        toggleVisualList('ol');
+        return;
+      }
+      restoreVisualSelection(false);
       if (prefix === '# ') {
         document.execCommand('formatBlock', false, '<h1>');
       } else if (prefix === '## ') {
@@ -1006,10 +1380,6 @@ function unwrapPhishyFromRange(range: Range, wysiwyg: HTMLElement): boolean {
         document.execCommand('formatBlock', false, '<h3>');
       } else if (prefix === '> ') {
         document.execCommand('formatBlock', false, '<blockquote>');
-      } else if (prefix === '- ') {
-        document.execCommand('insertUnorderedList', false);
-      } else if (prefix === '1. ') {
-        document.execCommand('insertOrderedList', false);
       } else if (prefix === '- [ ] ') {
         insertHtmlAtCursor('<ul class="task-list"><li><input type="checkbox" style="margin-right: 0.5rem;" /> Task</li></ul>');
       } else {
@@ -1021,30 +1391,98 @@ function unwrapPhishyFromRange(range: Range, wysiwyg: HTMLElement): boolean {
     }
 
     if (!editorRef.current) return;
-    const start = editorRef.current.selectionStart;
-    const end = editorRef.current.selectionEnd;
+    const textarea = editorRef.current;
+    let start = textarea.selectionStart;
+    let end = textarea.selectionEnd;
+    const storeStart = useEditorStore.getState().selectionStart;
+    const storeEnd = useEditorStore.getState().selectionEnd;
+    if (document.activeElement !== textarea && storeStart !== null && storeEnd !== null) {
+      start = storeStart;
+      end = storeEnd;
+    }
     
     if (start === end) {
-      const lastNewline = content.lastIndexOf('\n', start - 1) + 1;
-      const newContent = content.substring(0, lastNewline) + prefix + content.substring(lastNewline);
+      const lineStart = content.lastIndexOf('\n', Math.max(0, start - 1)) + 1;
+      const lineEndIdx = content.indexOf('\n', start);
+      const lineEnd = lineEndIdx === -1 ? content.length : lineEndIdx;
+      const currentLine = content.slice(lineStart, lineEnd);
+      const cleanLine = currentLine.replace(/[\u200B\uFEFF]/g, '');
+
+      let effectivePrefix = prefix;
+      if (prefix === '1. ') {
+        const prevContent = content.slice(0, Math.max(0, lineStart - 1));
+        const prevLineStart = prevContent.lastIndexOf('\n') + 1;
+        const prevLine = prevContent.slice(prevLineStart).trim();
+        const prevNumMatch = prevLine.match(/^(\d+)[.)]\s+/);
+        if (prevNumMatch) {
+          const nextNum = parseInt(prevNumMatch[1], 10) + 1;
+          effectivePrefix = `${nextNum}. `;
+        }
+      }
+
+      const listMatch = cleanLine.match(/^(\s*)([-*+]|\d+[.)]|- \[[ xX]\]|>+)\s+/);
+
+      if (listMatch) {
+        const existingPrefix = listMatch[0];
+        const restOfLine = currentLine.slice(existingPrefix.length);
+        const isSamePrefix = existingPrefix.trim() === effectivePrefix.trim();
+        const replacement = isSamePrefix ? restOfLine : (effectivePrefix + restOfLine);
+        const newContent = content.slice(0, lineStart) + replacement + content.slice(lineEnd);
+        const newCaret = lineStart + (isSamePrefix ? Math.max(0, start - lineStart - existingPrefix.length) : effectivePrefix.length + Math.max(0, start - lineStart - existingPrefix.length));
+        useEditorStore.getState().setContent(newContent);
+        setTimeout(() => {
+          if (!editorRef.current) return;
+          editorRef.current.focus({ preventScroll: true });
+          editorRef.current.setSelectionRange(newCaret, newCaret);
+          saveCursorPosition();
+        }, 0);
+        return;
+      }
+
+      if (cleanLine.trim() === '') {
+        const newContent = content.slice(0, lineStart) + effectivePrefix + content.slice(lineEnd);
+        const newCaret = lineStart + effectivePrefix.length;
+        useEditorStore.getState().setContent(newContent);
+        setTimeout(() => {
+          if (!editorRef.current) return;
+          editorRef.current.focus({ preventScroll: true });
+          editorRef.current.setSelectionRange(newCaret, newCaret);
+          saveCursorPosition();
+        }, 0);
+        return;
+      }
+
+      const newContent = content.slice(0, lineStart) + effectivePrefix + content.slice(lineStart);
+      const newCaret = start + effectivePrefix.length;
       useEditorStore.getState().setContent(newContent);
       setTimeout(() => {
         if (!editorRef.current) return;
-        editorRef.current.focus({ preventScroll: true }); editorRef.current.setSelectionRange(start + prefix.length, start + prefix.length);
+        editorRef.current.focus({ preventScroll: true });
+        editorRef.current.setSelectionRange(newCaret, newCaret);
+        saveCursorPosition();
       }, 0);
     } else {
       // Multi-line selection
       const selectedText = content.substring(start, end);
       const lines = selectedText.split('\n');
-      const newText = lines.map(line => line.trim() ? prefix + line : line).join('\n');
+      let counter = 1;
+      const newText = lines.map(line => {
+        if (!line.trim()) return line;
+        if (prefix === '1. ') {
+          return `${counter++}. ${line}`;
+        }
+        return prefix + line;
+      }).join('\n');
       const newContent = content.substring(0, start) + newText + content.substring(end);
       useEditorStore.getState().setContent(newContent);
       setTimeout(() => {
         if (!editorRef.current) return;
-        editorRef.current.focus({ preventScroll: true }); editorRef.current.setSelectionRange(start, start + newText.length);
+        editorRef.current.focus({ preventScroll: true });
+        editorRef.current.setSelectionRange(start, start + newText.length);
+        saveCursorPosition();
       }, 0);
     }
-  }, [ editorMode, insertHtmlAtCursor, getVisualSelectionHtml, restoreVisualSelection, updateContentFromWysiwyg]);
+  }, [ editorMode, insertHtmlAtCursor, getVisualSelectionHtml, restoreVisualSelection, updateContentFromWysiwyg, saveCursorPosition]);
 
   const handleLink = useCallback(async () => {
     const content = useEditorStore.getState().content;

@@ -57,6 +57,7 @@ import { getTranslation, type TranslationKey } from "../locales";
 import { POPULAR_COMMUNITIES, POPULAR_TAGS } from "../data/communities";
 import { ReaderMobileBottomBar } from "./reader/ReaderMobileBottomBar";
 import { useDeviceStore } from "../store/deviceStore";
+import { useLightboxStore } from "../store/lightboxStore";
 
 function getWordCounts(body: string) {
   const dirtyWords = body.trim().split(/\s+/).length;
@@ -2852,7 +2853,17 @@ export default function Reader({
                           >
                             <div className="flex justify-center bg-[var(--bg-main)]/40 px-3 sm:px-4 py-5 sm:py-8 overflow-x-hidden">
                               <div
-                                className="markdown-body transition-all"
+                                className="markdown-body transition-all [&_img]:cursor-zoom-in [&_img]:transition-transform hover:[&_img]:opacity-95"
+                                onClick={(e) => {
+                                  const target = e.target as HTMLElement | null;
+                                  if (!target) return;
+                                  const img = target.tagName === 'IMG' ? (target as HTMLImageElement) : target.closest('img');
+                                  if (img && img.src) {
+                                    e.preventDefault();
+                                    e.stopPropagation();
+                                    useLightboxStore.getState().openLightbox(img.src, img.alt || '');
+                                  }
+                                }}
                                 style={{
                                   fontSize: `${currentFontSize}px`,
                                   fontWeight: config.fontWeight,
@@ -5116,7 +5127,17 @@ function CommentItem({
         </div>
       ) : (
         <div
-          className="text-sm markdown-body opacity-90 leading-relaxed transition-all"
+          className="text-sm markdown-body opacity-90 leading-relaxed transition-all [&_img]:cursor-zoom-in [&_img]:transition-transform hover:[&_img]:opacity-95"
+          onClick={(e) => {
+            const target = e.target as HTMLElement | null;
+            if (!target) return;
+            const img = target.tagName === 'IMG' ? (target as HTMLImageElement) : target.closest('img');
+            if (img && img.src) {
+              e.preventDefault();
+              e.stopPropagation();
+              useLightboxStore.getState().openLightbox(img.src, img.alt || '');
+            }
+          }}
           style={fontSize ? { fontSize: `${Math.max(12, fontSize - 2)}px` } : undefined}
           dangerouslySetInnerHTML={{ __html: renderContent(localComment.body) }}
         />

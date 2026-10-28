@@ -1129,6 +1129,19 @@ export const translations = {
   "autoInboxActive": "Auto-Inbox",
   "searchTag": "Search by tag",
   "tagSearchPlaceholder": "Enter tag or community...",
+  "subscript": "Subscript (sub)",
+  "superscript": "Superscript (sup)",
+  "listBullet": "Bulleted list",
+  "listOrdered": "Numbered list",
+  "listTask": "Task checklist",
+  "escapeChar": "Escape character (\\)",
+  "insertLocalImage": "Insert image",
+  "lightboxZoomIn": "Zoom in",
+  "lightboxZoomOut": "Zoom out",
+  "lightboxResetZoom": "Reset zoom",
+  "lightboxClose": "Close viewer",
+  "lightboxCopyUrl": "Copy link",
+  "lightboxUrlCopied": "Image link copied",
 } as const;
 
 export default { meta, translations };

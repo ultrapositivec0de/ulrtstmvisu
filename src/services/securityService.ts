@@ -353,9 +353,10 @@ export class SecurityService {
   static async signBuffer(buffer: Buffer | Uint8Array, username: string): Promise<string> {
     if (this.isLocked()) throw new Error('Vault is locked');
     
+    const cleanUser = (username || '').replace(/^@+/, '').trim();
     const accounts = await this.getAccounts();
-    const account = accounts.find(a => a.username === username);
-    if (!account) throw new Error(`Account @${username} not found`);
+    const account = accounts.find(a => (a.username || '').replace(/^@+/, '').trim() === cleanUser);
+    if (!account) throw new Error(`Account @${cleanUser} not found in Vault`);
 
     const wif = await this.decryptData(account.ciphertext, account.iv);
 

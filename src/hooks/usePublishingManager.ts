@@ -226,7 +226,10 @@ export function usePublishingManager(options: UsePublishingManagerOptions) {
       if (setEditingPermlink) {
         setEditingPermlink(null);
       }
-      setTimeout(() => setActiveModal(null), 2000);
+      setTimeout(() => {
+        setActiveModal(null);
+        setPubLog({ msg: '', type: null });
+      }, 2000);
     } catch (err: any) {
       setPubLog({ msg: `❌ ${t('error')}: ${err.message}`, type: 'error' });
     }

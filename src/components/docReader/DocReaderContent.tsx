@@ -1,10 +1,11 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { TOCHeadingItem } from './types';
 import { getMarked, DOM_PURIFY_CONFIG } from '../../utils/markdownParser';
 import DOMPurify from 'dompurify';
 import { Tag } from 'lucide-react';
 import { cn } from '../../lib/utils';
 import { useEditorStore } from '../../store';
+import { useLightboxStore } from '../../store/lightboxStore';
 import { getTranslation, TranslationKey } from '../../locales';
 
 interface DocReaderContentProps {
@@ -107,6 +108,17 @@ export const DocReaderContent = React.memo<DocReaderContentProps>(({
     return tags.trim().split(/\s+/).filter(Boolean);
   }, [tags]);
 
+  const handleContentClick = useCallback((e: React.MouseEvent) => {
+    const target = e.target as HTMLElement | null;
+    if (!target) return;
+    const img = target.tagName === 'IMG' ? (target as HTMLImageElement) : target.closest('img');
+    if (img && img.src) {
+      e.preventDefault();
+      e.stopPropagation();
+      useLightboxStore.getState().openLightbox(img.src, img.alt || '');
+    }
+  }, []);
+
   return (
     <article 
       className={cn(
@@ -143,6 +155,7 @@ export const DocReaderContent = React.memo<DocReaderContentProps>(({
       {content ? (
         <div 
           ref={contentContainerRef}
+          onClick={handleContentClick}
           className={cn(
             "doc-reader-body markdown-body max-w-none break-words [overflow-wrap:anywhere] hyphens-auto",
             "[&_h1]:scroll-mt-20 [&_h2]:scroll-mt-20 [&_h3]:scroll-mt-20 [&_h4]:scroll-mt-20 [&_h5]:scroll-mt-20 [&_h6]:scroll-mt-20",
@@ -152,7 +165,7 @@ export const DocReaderContent = React.memo<DocReaderContentProps>(({
             "[&_h4]:break-words [&_h4]:[overflow-wrap:anywhere] [&_h4]:hyphens-auto",
             "[&_h5]:break-words [&_h5]:[overflow-wrap:anywhere] [&_h5]:hyphens-auto",
             "[&_h6]:break-words [&_h6]:[overflow-wrap:anywhere] [&_h6]:hyphens-auto",
-            "[&_img]:max-w-full [&_img]:h-auto [&_img]:rounded-xl [&_img]:my-4 [&_img]:object-contain",
+            "[&_img]:max-w-full [&_img]:h-auto [&_img]:rounded-xl [&_img]:my-4 [&_img]:object-contain [&_img]:cursor-zoom-in [&_img]:transition-transform hover:[&_img]:opacity-95",
             themeProseClasses
           )}
           dangerouslySetInnerHTML={{ __html: renderedHtml }}

@@ -26,6 +26,7 @@ export interface UseEditorEventsOptions {
   saveCursorPosition: () => void;
   updateContentFromWysiwygRef: React.MutableRefObject<((forceImmediate?: boolean) => void) | null>;
   fmt: (marker: string) => void;
+  fmtLine?: (prefix: string) => void;
   handleLink: () => void;
   insertHtmlAtCursor: (html: string) => void;
   handleIndent: () => void;
@@ -33,6 +34,7 @@ export interface UseEditorEventsOptions {
 
 export function useEditorEvents(options: UseEditorEventsOptions) {
   const {
+    fmtLine,
     editorRef,
     wysiwygRef,
     previewPaneRef,
@@ -182,26 +184,21 @@ export function useEditorEvents(options: UseEditorEventsOptions) {
         const unorderedListMatch = currentLine.match(/^(\s*[-*+]\s+(?:\[[ xX]\]\s+)?)/);
         const orderedListMatch = currentLine.match(/^(\s*)(\d+)([.)]\s+)/);
 
-        const cleanLineTrimmed = currentLine.trim();
+        const cleanLineTrimmed = currentLine.replace(/[\u200B\uFEFF]/g, '').trim();
 
         // Check if this line is an empty list or quote item
         const isEmptyUnorderedList =
-          cleanLineTrimmed === '-' ||
-          cleanLineTrimmed === '*' ||
-          cleanLineTrimmed === '+' ||
-          cleanLineTrimmed === '- [ ]' ||
-          cleanLineTrimmed === '- [x]' ||
-          cleanLineTrimmed === '- [X]';
+          unorderedListMatch && /^([-*+]|[-*+]\s*\[[ xX]\])$/.test(cleanLineTrimmed);
         const isEmptyOrderedList =
-          orderedListMatch && (cleanLineTrimmed === `${orderedListMatch[2]}.` || cleanLineTrimmed === `${orderedListMatch[2]}`);
-        const isEmptyQuote = cleanLineTrimmed === '>';
+          orderedListMatch && new RegExp(`^${orderedListMatch[2]}[.)]?$`).test(cleanLineTrimmed);
+        const isEmptyQuote = quoteMatch && /^>+$/.test(cleanLineTrimmed);
 
         if (isEmptyUnorderedList || isEmptyOrderedList || isEmptyQuote) {
           e.preventDefault();
           const before = text.slice(0, lineStart);
           const after = text.slice(actualLineEnd);
-          const newText = before + '\n' + after;
-          const newCaretPos = lineStart + 1;
+          const newText = before + after;
+          const newCaretPos = lineStart;
           setContent(newText);
           setTimeout(() => {
             if (!editorRef.current) return;
@@ -797,11 +794,65 @@ export function useEditorEvents(options: UseEditorEventsOptions) {
         }
       }
 
-      // 1. Single Enter on Heading breakout
+      // 1. Single Enter on Heading or List breakout
       if ((e.key === 'Enter' || e.keyCode === 13) && !isMod && !e.shiftKey) {
         if (tryHeadingEnterBreakout(e.shiftKey)) {
           e.preventDefault();
           return;
+        }
+
+        // List item Enter breakout: if pressing Enter on an empty list item (UL, OL, task list),
+        // cleanly exit the list and create a standard paragraph <p><br></p>
+        const sel = window.getSelection();
+        if (sel && sel.rangeCount > 0 && wysiwygRef.current) {
+          const range = sel.getRangeAt(0);
+          let liNode: HTMLElement | null = null;
+          let curr: Node | null = range.startContainer;
+          while (curr && curr !== wysiwygRef.current) {
+            if (curr.nodeType === Node.ELEMENT_NODE && (curr as HTMLElement).tagName === 'LI') {
+              liNode = curr as HTMLElement;
+              break;
+            }
+            curr = curr.parentNode;
+          }
+
+          if (liNode) {
+            const rawText = liNode.textContent || '';
+            const cleanText = rawText.replace(/[\u200B\uFEFF\r\n\t\s\u00A0]/g, '');
+            const hasMedia = !!liNode.querySelector('img, iframe, video, table');
+            const isLiEmpty = cleanText.length === 0 && !hasMedia;
+
+            if (isLiEmpty) {
+              e.preventDefault();
+              const listParent = liNode.parentElement; // UL or OL
+              const p = document.createElement('p');
+              p.innerHTML = '<br>';
+
+              if (listParent && listParent.parentElement) {
+                const allLis = Array.from(listParent.querySelectorAll('li'));
+                if (allLis.length <= 1) {
+                  listParent.parentElement.replaceChild(p, listParent);
+                } else {
+                  liNode.remove();
+                  listParent.parentElement.insertBefore(p, listParent.nextSibling);
+                }
+              } else {
+                liNode.replaceWith(p);
+              }
+
+              const newRange = document.createRange();
+              newRange.selectNodeContents(p);
+              newRange.collapse(true);
+              sel.removeAllRanges();
+              sel.addRange(newRange);
+              savedVisualRangeRef.current = newRange.cloneRange();
+              if (wysiwygRef.current) {
+                wysiwygRef.current.focus({ preventScroll: true });
+              }
+              updateContentFromWysiwyg();
+              return;
+            }
+          }
         }
       }
 
@@ -868,12 +919,14 @@ export function useEditorEvents(options: UseEditorEventsOptions) {
               if (text === '-') {
                 e.preventDefault();
                 node.textContent = '';
-                document.execCommand('insertUnorderedList', false);
+                if (fmtLine) fmtLine('- ');
+                else document.execCommand('insertUnorderedList', false);
                 return;
               } else if (text === '1.') {
                 e.preventDefault();
                 node.textContent = '';
-                document.execCommand('insertOrderedList', false);
+                if (fmtLine) fmtLine('1. ');
+                else document.execCommand('insertOrderedList', false);
                 return;
               } else if (format) {
                 e.preventDefault();
@@ -967,7 +1020,13 @@ export function useEditorEvents(options: UseEditorEventsOptions) {
               startNode.nodeValue = textValue.substring(offset);
 
               if (cmd) {
-                document.execCommand(cmd, false);
+                if (cmd === 'insertUnorderedList' && fmtLine) {
+                  fmtLine('- ');
+                } else if (cmd === 'insertOrderedList' && fmtLine) {
+                  fmtLine('1. ');
+                } else {
+                  document.execCommand(cmd, false);
+                }
               } else if (blockTag === 'checklist') {
                 insertHtmlAtCursor('<ul class="task-list"><li><input type="checkbox" style="margin-right: 0.5rem;" /> </li></ul>');
               } else if (blockTag === 'blockquote') {

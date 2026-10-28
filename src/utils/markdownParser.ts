@@ -36,27 +36,43 @@ export const getMarked = () => {
         // Normalize line endings
         let normalizedText = text.replace(/\r\n/g, '\n');
 
-        // Prevent non-table text from being merged into preceding tables
+        // Prevent non-table text from being merged into preceding tables (standalone and inside blockquotes)
         const strictTableLines = [];
         const lines = normalizedText.split('\n');
         let inTable = false;
+        let tableQuotePrefix = '';
         
         for (let i = 0; i < lines.length; i++) {
           const line = lines[i];
-          const isSeparator = /^[\s|:-]+$/.test(line) && line.includes('-') && line.includes('|');
+          const quoteMatch = line.match(/^(\s*(?:>\s*)+)/);
+          const prefix = quoteMatch ? quoteMatch[1] : '';
+          const content = line.slice(prefix.length);
+
+          const isSeparator = /^[\s|:-]+$/.test(content) && content.includes('-') && content.includes('|');
           
-          if (isSeparator && i > 0 && lines[i-1].includes('|')) {
-            inTable = true;
-            strictTableLines.push(line);
-            continue;
+          if (isSeparator && i > 0) {
+            const prevLine = lines[i - 1];
+            const prevQuoteMatch = prevLine.match(/^(\s*(?:>\s*)+)/);
+            const prevPrefix = prevQuoteMatch ? prevQuoteMatch[1] : '';
+            const prevContent = prevLine.slice(prevPrefix.length);
+
+            if (prevContent.includes('|')) {
+              inTable = true;
+              tableQuotePrefix = prefix;
+              strictTableLines.push(line);
+              continue;
+            }
           }
           
           if (inTable) {
-            if (line.trim() === '') {
+            if (content.trim() === '') {
               inTable = false;
-            } else if (!line.includes('|')) {
-              strictTableLines.push('');
+              tableQuotePrefix = '';
+            } else if (!content.includes('|')) {
+              // Table ended inside quote or standalone, insert empty separator line to prevent lazy merge
+              strictTableLines.push(tableQuotePrefix ? tableQuotePrefix.trimEnd() : '');
               inTable = false;
+              tableQuotePrefix = '';
             }
           }
           
@@ -81,13 +97,15 @@ export const getMarked = () => {
           });
         }
 
-        // Prevent distinct tables separated by blank lines from sticking together; generate a real break/paragraph so cursor can be placed between them
+        // Prevent distinct tables separated by blank lines from sticking together; generate a real break/paragraph so cursor can be placed between them (standalone and quoted)
         let prevTables = '';
         while (prevTables !== normalizedText) {
           prevTables = normalizedText;
-          normalizedText = normalizedText.replace(/(```[\s\S]*?```|`[^`\n]*`)|(\|[^\n]+\|)(\n\s*\n)(\|[^\n]+\|)/g, (match, code, row1, newlines, row2) => {
+          normalizedText = normalizedText.replace(/(```[\s\S]*?```|`[^`\n]*`)|((?:(?:>\s*)*)\|[^\n]+\|)(\n(?:\s*(?:>\s*)*\n)+)((?:(?:>\s*)*)\|[^\n]+\|)/g, (match, code, row1, newlines, row2) => {
             if (code) return code;
-            return `${row1}\n\n<br>\n\n${row2}`;
+            const qMatch = row1.match(/^(\s*(?:>\s*)+)/);
+            const prefix = qMatch ? qMatch[1] : '';
+            return `${row1}\n${prefix}\n${prefix}<br>\n${prefix}\n${row2}`;
           });
         }
 
@@ -124,7 +142,12 @@ export const getMarked = () => {
         });
 
         if (DOMPurify) {
-          return DOMPurify.sanitize(html, DOM_PURIFY_CONFIG as any) as unknown as string;
+          const purify = (DOMPurify as any).sanitize 
+            ? DOMPurify 
+            : (typeof (DOMPurify as any) === 'function' ? (DOMPurify as any)(typeof window !== 'undefined' ? window : undefined) : DOMPurify);
+          if (purify && typeof purify.sanitize === 'function') {
+            return purify.sanitize(html, DOM_PURIFY_CONFIG as any) as unknown as string;
+          }
         }
         return html;
       } catch (e) {

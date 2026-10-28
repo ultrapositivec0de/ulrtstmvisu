@@ -44,9 +44,10 @@ export function isOffsetInTechnicalZone(markdown: string, offset: number): Techn
   const actualLineEnd = lineEnd === -1 ? markdown.length : lineEnd;
   const currentLine = markdown.substring(lineStart, actualLineEnd);
   const colInLine = offset - lineStart;
+  const unquotedLine = currentLine.trim().replace(/^>+\s*/, '');
 
-  // 2a. Table separator row: | --- | --- | or |:---|---:|
-  if (/^\|?(\s*:?-+:?\s*\|?)+\s*$/.test(currentLine.trim()) && currentLine.includes('-')) {
+  // 2a. Table separator row: | --- | --- | or |:---|---:| (standalone or in blockquote)
+  if (/^\|?(\s*:?-+:?\s*\|?)+\s*$/.test(unquotedLine) && unquotedLine.includes('-')) {
     return { 
       inTechnicalZone: true, 
       zoneType: 'table_separator',
@@ -54,8 +55,8 @@ export function isOffsetInTechnicalZone(markdown: string, offset: number): Techn
     };
   }
 
-  // 2b. Table border pipe '|' in table rows
-  if ((currentLine.trim().startsWith('|') || currentLine.trim().endsWith('|')) && currentLine.includes('|')) {
+  // 2b. Table border pipe '|' in table rows (standalone or in blockquote)
+  if ((unquotedLine.startsWith('|') || unquotedLine.endsWith('|')) && unquotedLine.includes('|')) {
     if (colInLine >= 0 && colInLine < currentLine.length && currentLine[colInLine] === '|') {
       return {
         inTechnicalZone: true,

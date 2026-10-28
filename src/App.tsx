@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { X } from 'lucide-react';
+import { X, CheckCircle, AlertCircle, Loader2 } from 'lucide-react';
 import { marked } from 'marked';
 import DOMPurify from 'dompurify';
 // @ts-ignore
@@ -57,6 +57,7 @@ import { NotificationToast } from './components/common/NotificationToast';
 import { SystemDialogModal, AudioPresetsModal } from './components/modals';
 import { createToolsMap } from './components/editor/toolsMap';
 import { useTypingSound } from './services/audio/useTypingSound';
+import { ImageLightboxModal } from './components/common/ImageLightboxModal';
 
 // Global environment setups
 if (typeof window !== 'undefined') {
@@ -376,20 +377,60 @@ function App() {
   });
   const [newMention, setNewMention] = useState('');
 
-  const [pubLog, setPubLog] = useState<{ msg: string, type: 'success' | 'error' | 'loading' | null }>({ msg: '', type: null });
+  const [pubLog, setPubLogState] = useState<{ msg: string, type: 'success' | 'error' | 'loading' | null }>({ msg: '', type: null });
+  const pubLogTimerRef = useRef<any>(null);
+
+  const clearPubLogTimer = useCallback(() => {
+    if (pubLogTimerRef.current) {
+      clearTimeout(pubLogTimerRef.current);
+      pubLogTimerRef.current = null;
+    }
+  }, []);
+
+  const setPubLog = useCallback((logOrFn: any) => {
+    clearPubLogTimer();
+    setPubLogState(prev => {
+      const next = typeof logOrFn === 'function' ? logOrFn(prev) : logOrFn;
+      if (!next || !next.msg) {
+        return { msg: '', type: null };
+      }
+      const timeout = next.type === 'loading' ? 25000 : 3800;
+      pubLogTimerRef.current = setTimeout(() => {
+        setPubLogState(current => (current.msg === next.msg ? { msg: '', type: null } : current));
+      }, timeout);
+      return next;
+    });
+  }, [clearPubLogTimer]);
 
   const notify = useCallback((msg: string, type: 'success' | 'error' | 'loading' = 'success') => {
-    setPubLog({ msg, type });
-    if (type !== 'loading') {
-      const timeout = type === 'success' ? 3000 : 5000;
-      setTimeout(() => {
-        setPubLog(prev => prev.msg === msg ? { msg: '', type: null } : prev);
-      }, timeout);
-    } else {
-      setTimeout(() => {
-        setPubLog(prev => prev.type === 'loading' && prev.msg === msg ? { msg: '', type: null } : prev);
-      }, 15000);
+    if (!msg) {
+      clearPubLogTimer();
+      setPubLogState({ msg: '', type: null });
+      return;
     }
+    // Deduplication: refresh timer if identical message is already showing
+    setPubLogState(current => {
+      if (current.msg === msg && current.type === type) {
+        clearPubLogTimer();
+        const timeout = type === 'loading' ? 25000 : 3800;
+        pubLogTimerRef.current = setTimeout(() => {
+          setPubLogState(c => (c.msg === msg ? { msg: '', type: null } : c));
+        }, timeout);
+        return current;
+      }
+      clearPubLogTimer();
+      const timeout = type === 'loading' ? 25000 : 3800;
+      pubLogTimerRef.current = setTimeout(() => {
+        setPubLogState(c => (c.msg === msg ? { msg: '', type: null } : c));
+      }, timeout);
+      return { msg, type };
+    });
+  }, [clearPubLogTimer]);
+
+  useEffect(() => {
+    return () => {
+      if (pubLogTimerRef.current) clearTimeout(pubLogTimerRef.current);
+    };
   }, []);
 
   const [quickTags, setQuickTags] = useState<string[]>(() => {
@@ -743,6 +784,7 @@ function App() {
     saveCursorPosition,
     updateContentFromWysiwygRef,
     fmt,
+    fmtLine,
     handleLink,
     insertHtmlAtCursor,
     handleIndent,
@@ -1744,28 +1786,42 @@ function App() {
       <AnimatePresence>
         {pubLog.msg && activeModal !== 'publish' && (
           <motion.div
-            initial={{ opacity: 0, y: -10 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -10 }}
-            transition={{ duration: 0.15 }}
+            initial={{ opacity: 0, y: -12, scale: 0.96 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: -12, scale: 0.96 }}
+            transition={{ duration: 0.2 }}
             className={cn(
-              "fixed left-1/2 -translate-x-1/2 z-[220] px-4 py-2.5 rounded-xl text-xs sm:text-sm font-bold border flex items-center gap-2 max-w-[calc(100vw-2rem)] shrink-0 pointer-events-auto shadow-lg",
-              pubLog.type === 'success' && "bg-slate-900 border-green-500 text-green-400",
-              pubLog.type === 'error' && "bg-slate-900 border-red-500 text-red-400",
-              pubLog.type === 'loading' && "bg-slate-900 border-cyan-500 text-cyan-400"
+              "fixed z-[260] px-4 py-2.5 rounded-2xl text-xs sm:text-sm font-bold border-2 flex items-center gap-3 shrink-0 pointer-events-auto shadow-2xl backdrop-blur-md",
+              "left-3 right-3 sm:left-auto sm:right-6 max-w-sm sm:max-w-md w-auto",
+              pubLog.type === 'success' && "bg-slate-900/95 border-emerald-500 text-emerald-400 shadow-emerald-950/40",
+              pubLog.type === 'error' && "bg-slate-900/95 border-rose-500 text-rose-400 shadow-rose-950/40",
+              pubLog.type === 'loading' && "bg-slate-900/95 border-cyan-500 text-cyan-400 shadow-cyan-950/40"
             )}
             style={{
               top: 'calc(var(--header-height, 3.5rem) + env(safe-area-inset-top, 0px) + 0.75rem)',
             }}
           >
-            <span>{pubLog.msg}</span>
+            {pubLog.type === 'loading' && (
+              <Loader2 size={16} className="animate-spin text-cyan-400 shrink-0" />
+            )}
+            {pubLog.type === 'success' && (
+              <CheckCircle size={16} className="text-emerald-400 shrink-0" />
+            )}
+            {pubLog.type === 'error' && (
+              <AlertCircle size={16} className="text-rose-400 shrink-0" />
+            )}
+            <span className="flex-1 min-w-0 break-words leading-tight">{pubLog.msg}</span>
             <button
               type="button"
-              onClick={() => setPubLog({ msg: '', type: null })}
-              className="ml-1.5 p-0.5 hover:bg-slate-800 rounded transition-colors text-slate-400 hover:text-white"
-              title={t("closeModalAria")}
+              onClick={() => {
+                clearPubLogTimer();
+                setPubLog({ msg: '', type: null });
+              }}
+              className="p-1 hover:bg-slate-800 rounded-full transition-colors text-slate-400 hover:text-white shrink-0 cursor-pointer"
+              aria-label={t("closeNotificationAria")}
+              title={t("closeNotificationAria")}
             >
-              <X size={14} />
+              <X size={15} />
             </button>
           </motion.div>
         )}
@@ -1819,6 +1875,9 @@ function App() {
           />
         )}
       </AnimatePresence>
+
+      {/* Global Image Lightbox Modal */}
+      <ImageLightboxModal />
     </div>
   );
 }

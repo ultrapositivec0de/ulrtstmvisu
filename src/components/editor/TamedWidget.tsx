@@ -1,5 +1,5 @@
 import React from 'react';
-import { motion, AnimatePresence, Reorder } from 'motion/react';
+import { motion, AnimatePresence, Reorder, useDragControls } from 'motion/react';
 import {
   Sparkles,
   Move,
@@ -99,6 +99,83 @@ export interface TamedWidgetProps {
   toggleTool?: any;
   t: (key: any) => string;
 }
+
+interface ToolReorderRowProps {
+  toolKey: string;
+  idx: number;
+  total: number;
+  toolsMap: any;
+  moveTool: (key: string, dir: 'up' | 'down') => void;
+}
+
+const ToolReorderRow: React.FC<ToolReorderRowProps> = ({
+  toolKey,
+  idx,
+  total,
+  toolsMap,
+  moveTool,
+}) => {
+  const dragControls = useDragControls();
+
+  return (
+    <Reorder.Item 
+      key={toolKey || `tool-order-${idx}`} 
+      value={toolKey}
+      transition={{ duration: 0.1 }}
+      dragListener={false}
+      dragControls={dragControls}
+      whileDrag={{ 
+        scale: 1.02, 
+        backgroundColor: "rgba(255, 255, 255, 0.1)",
+        borderColor: "rgba(6, 182, 212, 0.3)",
+        boxShadow: "0 4px 6px rgba(0,0,0,0.3)",
+        zIndex: 200
+      }}
+      className="flex items-center justify-between bg-white/5 border border-white/5 px-3 py-2.5 rounded-2xl hover:border-cyan-500/10 group relative select-none"
+      style={{ touchAction: 'pan-y' }}
+    >
+      <div className="flex items-center gap-3">
+        <div
+          onPointerDown={(e) => {
+            e.preventDefault();
+            dragControls.start(e);
+          }}
+          className="p-1 cursor-grab active:cursor-grabbing text-slate-500 hover:text-cyan-400 touch-none flex items-center justify-center rounded-lg hover:bg-white/5"
+          title="Drag to reorder"
+        >
+          <MoveVertical size={18} />
+        </div>
+        <span className="text-[11px] font-bold text-slate-200">{toolsMap[toolKey]?.label}</span>
+      </div>
+      <div className="flex items-center gap-1.5 opacity-80 sm:opacity-0 group-hover:opacity-100 transition-opacity">
+        <button 
+          type="button"
+          onPointerDown={(e) => e.preventDefault()}
+          onClick={(e) => {
+            e.stopPropagation();
+            moveTool(toolKey, 'up');
+          }}
+          disabled={idx === 0}
+          className="text-slate-500 hover:text-cyan-400 disabled:opacity-0 transition-all p-1"
+        >
+          <ChevronUp size={20} />
+        </button>
+        <button 
+          type="button"
+          onPointerDown={(e) => e.preventDefault()}
+          onClick={(e) => {
+            e.stopPropagation();
+            moveTool(toolKey, 'down');
+          }}
+          disabled={idx === total - 1}
+          className="text-slate-500 hover:text-cyan-400 disabled:opacity-0 transition-all p-1"
+        >
+          <ChevronDown size={20} />
+        </button>
+      </div>
+    </Reorder.Item>
+  );
+};
 
 export const TamedWidget: React.FC<TamedWidgetProps> = (props) => {
   const {
@@ -442,6 +519,15 @@ export const TamedWidget: React.FC<TamedWidgetProps> = (props) => {
                                       <button
                                         key={pos.id}
                                         type="button"
+                                        onPointerDown={(e) => {
+                                          e.preventDefault();
+                                          if (typeof document !== 'undefined') {
+                                            const activeEl = document.activeElement as HTMLElement | null;
+                                            if (activeEl && (activeEl.id === 'main-editor' || activeEl.classList.contains('wysiwyg-editor') || activeEl.isContentEditable)) {
+                                              activeEl.blur();
+                                            }
+                                          }
+                                        }}
                                         onClick={() => {
                                           if (typeof document !== 'undefined') {
                                             const activeEl = document.activeElement as HTMLElement | null;
@@ -478,49 +564,17 @@ export const TamedWidget: React.FC<TamedWidgetProps> = (props) => {
                                     localStorage.setItem('steem_enabled_tools', JSON.stringify(newOrder));
                                   }} 
                                   className="space-y-2"
+                                  style={{ touchAction: 'pan-y' }}
                                 >
-                                  {enabledTools.filter((k: any) => Boolean(k && TOOLS_MAP[k])).map((key: string, idx: number) => (
-                                    <Reorder.Item 
-                                      key={key || `tool-order-${idx}`} 
-                                      value={key}
-                                      transition={{ duration: 0.1 }}
-                                      dragListener={true}
-                                      whileDrag={{ 
-                                        scale: 1, 
-                                        backgroundColor: "rgba(255, 255, 255, 0.1)",
-                                        borderColor: "rgba(6, 182, 212, 0.3)",
-                                        boxShadow: "0 4px 6px rgba(0,0,0,0.3)",
-                                        zIndex: 200
-                                      }}
-                                      className="flex items-center justify-between bg-white/5 border border-white/5 px-3 py-2.5 rounded-2xl cursor-grab active:cursor-grabbing hover:border-cyan-500/10 group relative"
-                                    >
-                                      <div className="flex items-center gap-3">
-                                        <MoveVertical size={18} className="text-slate-600 group-hover:text-cyan-500 transition-colors" />
-                                        <span className="text-[11px] font-bold text-slate-200">{TOOLS_MAP[key]?.label}</span>
-                                      </div>
-                                      <div className="flex items-center gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity">
-                                        <button 
-                                          onClick={(e) => {
-                                            e.stopPropagation();
-                                            moveTool(key, 'up');
-                                          }}
-                                          disabled={idx === 0}
-                                          className="text-slate-500 hover:text-cyan-400 disabled:opacity-0 transition-all p-1"
-                                        >
-                                          <ChevronUp size={20} />
-                                        </button>
-                                        <button 
-                                          onClick={(e) => {
-                                            e.stopPropagation();
-                                            moveTool(key, 'down');
-                                          }}
-                                          disabled={idx === enabledTools.length - 1}
-                                          className="text-slate-500 hover:text-cyan-400 disabled:opacity-0 transition-all p-1"
-                                        >
-                                          <ChevronDown size={20} />
-                                        </button>
-                                      </div>
-                                    </Reorder.Item>
+                                  {enabledTools.filter((k: any) => Boolean(k && TOOLS_MAP[k])).map((key: string, idx: number, arr: string[]) => (
+                                    <ToolReorderRow
+                                      key={key || `tool-order-${idx}`}
+                                      toolKey={key}
+                                      idx={idx}
+                                      total={arr.length}
+                                      toolsMap={TOOLS_MAP}
+                                      moveTool={moveTool}
+                                    />
                                   ))}
                                 </Reorder.Group>
 
@@ -528,6 +582,8 @@ export const TamedWidget: React.FC<TamedWidgetProps> = (props) => {
                                   {Object.keys(TOOLS_MAP).filter(Boolean).map((key, idx) => (
                                     <button
                                       key={`toggle-${key || idx}`}
+                                      type="button"
+                                      onPointerDown={(e) => e.preventDefault()}
                                       onClick={() => toggleTool(key)}
                                       className={cn(
                                         "text-[9px] py-1.5 px-2 rounded-lg border text-center transition-all font-medium truncate",

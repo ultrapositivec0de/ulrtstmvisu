@@ -2,6 +2,7 @@ import React from 'react';
 import { Eye, EyeOff, MoveVertical, Maximize2, X } from 'lucide-react';
 import { cn } from '../../lib/utils';
 import { useDeviceStore } from '../../store/deviceStore';
+import { useLightboxStore } from '../../store/lightboxStore';
 
 export interface PreviewPaneProps {
   previewRef?: React.RefObject<any>;
@@ -88,8 +89,18 @@ export const PreviewPane: React.FC<PreviewPaneProps> = ({
 
       <div 
         ref={previewPaneRef}
+        onClick={(e) => {
+          const target = e.target as HTMLElement | null;
+          if (!target) return;
+          const img = target.tagName === 'IMG' ? (target as HTMLImageElement) : target.closest('img');
+          if (img && img.src) {
+            e.preventDefault();
+            e.stopPropagation();
+            useLightboxStore.getState().openLightbox(img.src, img.alt || '');
+          }
+        }}
         className={cn(
-          "flex-1 overflow-y-auto p-4 sm:p-8 custom-scrollbar",
+          "flex-1 overflow-y-auto p-4 sm:p-8 custom-scrollbar [&_img]:cursor-zoom-in [&_img]:transition-transform hover:[&_img]:opacity-95",
           isFullScreen && "h-full max-w-4xl mx-auto"
         )}
         style={{

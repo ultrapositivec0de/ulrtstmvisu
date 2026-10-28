@@ -142,6 +142,7 @@ export function useTypingSound() {
   }, []);
 
   const lastPhysicalKeyDownTimeRef = useRef<number>(0);
+  const lastVirtualKeyDownTimeRef = useRef<number>(0);
   const lastKeyRepeatTimeRef = useRef<number>(0);
 
   // Listeners for physical typing, user gesture wake-up, and mobile touch input
@@ -159,11 +160,31 @@ export function useTypingSound() {
     window.addEventListener('click', handleGestureWake, { passive: true });
     window.addEventListener('keydown', handleGestureWake, { passive: true });
 
-    // 1. Physical Keyboard listener
+    // 1. Keyboard listener (both Physical and Android soft keyboard keydown)
     const handleKeyDown = (e: KeyboardEvent) => {
       handleGestureWake();
-      // Ignore Android Virtual Keyboard 229 placeholder events (handled accurately via beforeinput)
+      const now = performance.now();
+
+      const target = e.target as HTMLElement | null;
+      const isInputOrEditor = target && (
+        target.tagName === 'INPUT' ||
+        target.tagName === 'TEXTAREA' ||
+        target.isContentEditable ||
+        target.closest('[contenteditable="true"]') ||
+        target.closest('.editor-area')
+      );
+
+      // Handle Android Virtual Keyboard (keyCode 229 / Unidentified) immediately on key press touch
       if (e.keyCode === 229 || e.which === 229 || e.key === 'Unidentified') {
+        if (isInputOrEditor) {
+          lastPhysicalKeyDownTimeRef.current = now;
+          lastVirtualKeyDownTimeRef.current = now;
+          triggerSound({
+            key: 'KeyA',
+            isVirtual: true,
+            isRepeat: false
+          });
+        }
         return;
       }
 
@@ -171,7 +192,6 @@ export function useTypingSound() {
       if (e.isComposing) return;
 
       // Throttle OS key-repeat events to ~13Hz (min 75ms) to prevent sound buffer flooding when holding keys down
-      const now = performance.now();
       if (e.repeat) {
         if (now - lastKeyRepeatTimeRef.current < 75) {
           return;
@@ -191,15 +211,6 @@ export function useTypingSound() {
         return;
       }
 
-      const target = e.target as HTMLElement | null;
-      const isInputOrEditor = target && (
-        target.tagName === 'INPUT' ||
-        target.tagName === 'TEXTAREA' ||
-        target.isContentEditable ||
-        target.closest('[contenteditable="true"]') ||
-        target.closest('.editor-area')
-      );
-
       // We focus on text input elements to avoid triggering sound on general page hotkeys
       if (!isInputOrEditor) return;
 
@@ -215,8 +226,9 @@ export function useTypingSound() {
 
     // 2. Mobile Touch Keyboard & IME (beforeinput event)
     const handleBeforeInput = (e: InputEvent) => {
-      // Deduplicate: if a physical keydown just fired within 90ms, skip beforeinput to prevent double-click glitch
-      if (performance.now() - lastPhysicalKeyDownTimeRef.current < 90) {
+      const now = performance.now();
+      // Deduplicate: if a physical or virtual keydown just fired within 160ms, skip beforeinput to prevent double sound
+      if (now - lastPhysicalKeyDownTimeRef.current < 160 || now - lastVirtualKeyDownTimeRef.current < 160) {
         return;
       }
 
@@ -240,8 +252,24 @@ export function useTypingSound() {
       });
     };
 
+    // 3. PointerDown listener for in-app virtual keys & toolbar buttons (instant touch response)
+    const handlePointerDown = (e: PointerEvent) => {
+      const target = e.target as HTMLElement | null;
+      if (!target) return;
+      const virtualBtn = target.closest('[data-sound-key], .virtual-key');
+      if (virtualBtn) {
+        const keyName = virtualBtn.getAttribute('data-sound-key') || virtualBtn.getAttribute('data-key') || 'Space';
+        lastPhysicalKeyDownTimeRef.current = performance.now();
+        triggerSound({
+          key: keyName,
+          isVirtual: true
+        });
+      }
+    };
+
     window.addEventListener('keydown', handleKeyDown, { passive: true, capture: true });
     window.addEventListener('beforeinput', handleBeforeInput as EventListener, { passive: true, capture: true });
+    window.addEventListener('pointerdown', handlePointerDown, { passive: true, capture: true });
 
     return () => {
       window.removeEventListener('touchstart', handleGestureWake);
@@ -251,6 +279,7 @@ export function useTypingSound() {
       window.removeEventListener('keydown', handleGestureWake);
       window.removeEventListener('keydown', handleKeyDown, { capture: true });
       window.removeEventListener('beforeinput', handleBeforeInput as EventListener, { capture: true });
+      window.removeEventListener('pointerdown', handlePointerDown, { capture: true });
     };
   }, [settings.enabled, triggerSound]);
 

@@ -599,7 +599,6 @@ export function useSteemGallery(config: SteemGalleryConfig) {
         } catch (e: any) {
           pinErrorMsg = e.message || 'Incorrect PIN';
           config.notify(`❌ ${pinErrorMsg}`, 'error');
-          config.setPubLog({ msg: `❌ ${pinErrorMsg}`, type: 'error' });
         }
       }
     } else if (uploadAuthType === 'KEYCHAIN') {
@@ -627,38 +626,34 @@ export function useSteemGallery(config: SteemGalleryConfig) {
       }
 
       const file = new File([blob], fileName, { type: blob.type });
+      const cleanUser = (activeUser || '').replace(/^@+/, '').trim();
       let signature = '';
       if (uploadAuthType === 'VAULT') {
         const arrayBuffer = await blob.arrayBuffer();
         const fileBuffer = Buffer.from(arrayBuffer);
         const prefix = Buffer.from("ImageSigningChallenge", 'utf8');
         const dataToSign = Buffer.concat([prefix, fileBuffer]);
-        signature = await SecurityService.signBuffer(dataToSign, activeUser);
+        signature = await SecurityService.signBuffer(dataToSign, cleanUser);
       } else {
-        signature = await SecurityService.signImageChallengeWithKeychain(file, activeUser);
+        signature = await SecurityService.signImageChallengeWithKeychain(file, cleanUser);
       }
 
       const formData = new FormData();
       formData.append("file", file);
-      const uploadUrl = `https://steemitimages.com/${activeUser}/${signature}`;
+      const uploadUrl = `https://steemitimages.com/${cleanUser}/${signature}`;
       
       const response = await fetch(uploadUrl, { method: "POST", body: formData });
-      if (!response.ok) {
-        let errText = '';
-        try {
-          errText = await response.text();
-        } catch {
-          errText = '';
-        }
-        throw new Error(config.t('serverError') + ': ' + response.status + (errText ? ` (${errText.substring(0, 100)})` : ''));
-      }
-      
       let data: any;
       try {
         data = await response.json();
       } catch {
         const rawText = await response.text();
         throw new Error(`Invalid JSON response: ${rawText.substring(0, 100)}`);
+      }
+
+      if (!response.ok || data.success === false || data.error) {
+        const errMsg = data.error?.message || data.error?.name || data.message || (typeof data.error === 'string' ? data.error : `HTTP ${response.status}`);
+        throw new Error(`${config.t('serverError')}: ${errMsg}`);
       }
       
       const finalUrl = data.url || data.link || data.data?.url;
@@ -740,7 +735,6 @@ export function useSteemGallery(config: SteemGalleryConfig) {
         } catch (e: any) {
           pinErrorMsg = e.message || 'Incorrect PIN';
           config.notify(`❌ ${pinErrorMsg}`, 'error');
-          config.setPubLog({ msg: `❌ ${pinErrorMsg}`, type: 'error' });
         }
       }
     } else if (uploadAuthType === 'KEYCHAIN') {
@@ -791,6 +785,11 @@ export function useSteemGallery(config: SteemGalleryConfig) {
           if (xhr.status >= 200 && xhr.status < 300) {
             try {
               const parsed = JSON.parse(xhr.responseText);
+              if (parsed.success === false || parsed.error) {
+                const errMsg = parsed.error?.message || parsed.error?.name || parsed.message || (typeof parsed.error === 'string' ? parsed.error : 'Image host rejected signature');
+                safeReject(new Error(`${config.t('serverError')}: ${errMsg}`));
+                return;
+              }
               safeResolve(parsed);
             } catch (err: any) {
               safeReject(new Error(`Invalid JSON response: ${xhr.responseText ? xhr.responseText.substring(0, 100) : 'empty'}`));
@@ -799,7 +798,7 @@ export function useSteemGallery(config: SteemGalleryConfig) {
             let errorDetail: string;
             try {
               const errParsed = JSON.parse(xhr.responseText);
-              errorDetail = errParsed.message || errParsed.error || '';
+              errorDetail = errParsed.error?.message || errParsed.error?.name || errParsed.message || (typeof errParsed.error === 'string' ? errParsed.error : '');
             } catch {
               errorDetail = xhr.responseText ? xhr.responseText.substring(0, 100) : '';
             }
@@ -815,6 +814,7 @@ export function useSteemGallery(config: SteemGalleryConfig) {
     };
 
     try {
+      const cleanUser = (activeUser || '').replace(/^@+/, '').trim();
       for (let i = 0; i < files.length; i++) {
         const originalFile = files[i];
         const sanitizedName = sanitizeFilename(originalFile.name);
@@ -842,8 +842,8 @@ export function useSteemGallery(config: SteemGalleryConfig) {
                   msg: `[${i + 1}/${files.length}] ` + config.t('signingImage').replace('{name}', file.name) + (attempt > 1 ? config.t('signingImageAttempt').replace('{attempt}', attempt.toString()) : ''), 
                   type: 'loading' 
                 });
-                signature = await SecurityService.signBuffer(dataToSign, activeUser);
-                const data = await uploadVaultWithProgress(file, signature, activeUser, i);
+                signature = await SecurityService.signBuffer(dataToSign, cleanUser);
+                const data = await uploadVaultWithProgress(file, signature, cleanUser, i);
                 const url = data.url || data.link || data.data?.url;
                 if (url) {
                   setImages(prev => [
@@ -858,7 +858,8 @@ export function useSteemGallery(config: SteemGalleryConfig) {
                     insertImage(url, file.name, 'plain');
                   }
                 } else {
-                  throw new Error(data.message || data.error || 'No URL returned from image host');
+                  const errMsg = data.error?.message || data.error?.name || data.message || (typeof data.error === 'string' ? data.error : 'No URL returned from image host');
+                  throw new Error(errMsg);
                 }
               } catch (err: any) {
                 lastErr = err;
@@ -880,11 +881,11 @@ export function useSteemGallery(config: SteemGalleryConfig) {
               type: 'loading' 
             });
 
-            signature = await SecurityService.signImageChallengeWithKeychain(file, activeUser);
+            signature = await SecurityService.signImageChallengeWithKeychain(file, cleanUser);
             
             const formData = new FormData();
             formData.append("file", file);
-            const resp = await fetch(`https://steemitimages.com/${activeUser}/${signature}`, { method: "POST", body: formData });
+            const resp = await fetch(`https://steemitimages.com/${cleanUser}/${signature}`, { method: "POST", body: formData });
             if (!resp.ok) {
               let errText = '';
               try {

@@ -156,7 +156,13 @@ export const ReaderMobileBottomBar: React.FC<ReaderMobileBottomBarProps> = ({
       {/* 5. Settings Tab */}
       <button
         type="button"
-        onClick={() => onSelectViewMode('settings')}
+        onClick={() => {
+          if (viewMode === 'settings') {
+            onSelectViewMode('feed');
+          } else {
+            onSelectViewMode('settings');
+          }
+        }}
         className={cn(
           "flex flex-col items-center justify-center py-1 rounded-xl transition-all relative group",
           viewMode === 'settings'

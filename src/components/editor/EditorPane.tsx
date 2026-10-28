@@ -14,6 +14,7 @@ import { normalizeHtmlForVisualEditor } from '../../utils/markdownParser';
 import { AudioControlWidget } from '../audio/AudioControlWidget';
 import { useTypingSound } from '../../services/audio/useTypingSound';
 import { DocReaderContainer } from '../docReader';
+import { useLightboxStore } from '../../store/lightboxStore';
 
 export interface EditorPaneProps {
   // refs
@@ -1075,6 +1076,14 @@ export const EditorPane: React.FC<EditorPaneProps> = ({
           }}
           onClick={(e) => {
             const trg = e.target as HTMLElement;
+            // Prevent accidental link navigation on wrapped images inside contenteditable
+            if (trg.tagName === 'IMG' || trg.closest('img')) {
+              const anchor = trg.closest('a');
+              if (anchor) {
+                e.preventDefault();
+              }
+            }
+
             const spacer = trg.closest?.('.table-spacer, [data-placeholder], [data-empty]') as HTMLElement | null;
             if (spacer && wysiwygRef.current?.contains(spacer)) {
               spacer.removeAttribute('data-empty');
@@ -1098,6 +1107,15 @@ export const EditorPane: React.FC<EditorPaneProps> = ({
 
             updateWysiwygEmptyStatus(wysiwygRef.current);
             saveVisualSelection();
+          }}
+          onDoubleClick={(e) => {
+            const trg = e.target as HTMLElement;
+            const img = trg.tagName === 'IMG' ? (trg as HTMLImageElement) : trg.closest('img');
+            if (img && img.src) {
+              e.preventDefault();
+              e.stopPropagation();
+              useLightboxStore.getState().openLightbox(img.src, img.alt || '');
+            }
           }}
           className={cn(
             "relative flex-1 w-full bg-transparent text-base outline-none overflow-y-auto custom-scrollbar editor-font prose prose-invert prose-cyan max-w-none wysiwyg-editor break-words overscroll-contain",

@@ -1129,6 +1129,19 @@ export const translations = {
   "autoInboxActive": "Авто-вхідні",
   "searchTag": "Пошук за тегом",
   "tagSearchPlaceholder": "Введіть тег або спільноту...",
+  "subscript": "Підрядковий текст (sub)",
+  "superscript": "Надрядковий текст (sup)",
+  "listBullet": "Маркований список",
+  "listOrdered": "Нумерований список",
+  "listTask": "Список завдань (чекбокс)",
+  "escapeChar": "Символ екранування (\\)",
+  "insertLocalImage": "Вставити зображення",
+  "lightboxZoomIn": "Збільшити",
+  "lightboxZoomOut": "Зменшити",
+  "lightboxResetZoom": "Скинути масштаб",
+  "lightboxClose": "Закрити перегляд",
+  "lightboxCopyUrl": "Копіювати посилання",
+  "lightboxUrlCopied": "Посилання на зображення скопійовано",
 } as const;
 
 export default { meta, translations };

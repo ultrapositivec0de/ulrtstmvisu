@@ -1126,6 +1126,19 @@ export const translations = {
   "autoInboxActive": "Bandeja automática",
   "searchTag": "Buscar por etiqueta",
   "tagSearchPlaceholder": "Ingrese etiqueta o comunidad...",
+  "subscript": "Subíndice (sub)",
+  "superscript": "Superíndice (sup)",
+  "listBullet": "Lista con viñetas",
+  "listOrdered": "Lista numerada",
+  "listTask": "Lista de tareas",
+  "escapeChar": "Carácter de escape (\\)",
+  "insertLocalImage": "Insertar imagen",
+  "lightboxZoomIn": "Acercar",
+  "lightboxZoomOut": "Alejar",
+  "lightboxResetZoom": "Restablecer zoom",
+  "lightboxClose": "Cerrar visor",
+  "lightboxCopyUrl": "Copiar enlace",
+  "lightboxUrlCopied": "Enlace de imagen copiado",
 } as const;
 
 export default { meta, translations };

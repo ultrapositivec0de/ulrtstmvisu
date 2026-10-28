@@ -6,6 +6,13 @@ export interface ChangelogEntry {
 
 export const APP_CHANGELOG: ChangelogEntry[] = [
   {
+    version: "v4.8.9",
+    date: "2026-10-28",
+    changes: [
+      "Cross-platform release synchronization and system improvements."
+    ]
+  },
+  {
     version: "v4.8.8",
     date: "2026-10-24",
     changes: [

@@ -130,10 +130,13 @@ export function htmlToMarkdown(html: string): string {
       }
       case 'center': return `\n<center>\n${inner.trim()}\n</center>\n`;
       case 'blockquote': {
-        const processedInner = inner.trim();
-        const parts = processedInner.split(/\n\s*\n/);
-        const mdParts = parts.map(part => `\n> ${part.replace(/\n/g, '\n> ')}\n`);
-        return mdParts.join('');
+        const processedInner = inner.replace(/^\n+|\n+$/g, '');
+        if (!processedInner) return '';
+        const lines = processedInner.split('\n');
+        const quotedLines = lines.map(line => {
+          return line.trim() ? `> ${line}` : '>';
+        });
+        return `\n${quotedLines.join('\n')}\n`;
       }
       case 'pre': {
         const codeElement = el.querySelector('code');
@@ -196,30 +199,47 @@ export function htmlToMarkdown(html: string): string {
         return `\n${olText.trim()}\n`;
       }
       case 'table': {
-        if (el.getAttribute('data-format') === 'html') {
-          return `\n${el.outerHTML}\n`;
+        if (insideTable || el.getAttribute('data-format') === 'html') {
+          const clone = el.cloneNode(true) as HTMLElement;
+          clone.removeAttribute('data-empty');
+          clone.removeAttribute('data-placeholder');
+          clone.classList?.remove('table-spacer', 'top-spacer', 'bottom-spacer');
+          const compact = clone.outerHTML.replace(/\r?\n+/g, ' ').replace(/\s{2,}/g, ' ').trim();
+          return insideTable ? compact : `\n${compact}\n`;
         }
-        const rows: string[][] = [];
-        const thead = el.querySelector('thead');
-        const tbody = el.querySelector('tbody') || el;
+
+        const getDirectChildren = (parent: Element, tagNames: string[]): HTMLElement[] => {
+          return Array.from(parent.children).filter(child => tagNames.includes(child.tagName.toLowerCase())) as HTMLElement[];
+        };
+
+        const thead = getDirectChildren(el, ['thead'])[0];
+        const tbodies = getDirectChildren(el, ['tbody']);
+        
+        const headerRow = thead 
+          ? getDirectChildren(thead, ['tr'])[0] 
+          : getDirectChildren(el, ['tr'])[0];
         
         const convertCell = (cell: HTMLElement) => {
           let cellMd = '';
           cell.childNodes.forEach(child => {
             cellMd += convertNode(child, false, true);
           });
-          // Replace newlines with <br> to not break the Markdown table row
-          return cellMd.replace(/\n/g, '<br>').replace(/^(<br>|\s)+/, '').replace(/(<br>|\s)+$/, '') || ' ';
+          // Escape unescaped pipe characters so they do not break Markdown table columns
+          cellMd = cellMd.replace(/(?<!\\)\|/g, '\\|');
+          // Replace newlines with <br> to keep row on a single line
+          return cellMd.replace(/\r?\n/g, '<br>').replace(/^(<br>|\s)+/, '').replace(/(<br>|\s)+$/, '') || ' ';
         };
 
-        const headerRow = thead ? thead.querySelector('tr') : el.querySelector('tr');
-        const headerCells = headerRow ? Array.from(headerRow.querySelectorAll('th, td')) : [];
-        const headers = headerCells.map(c => convertCell(c as HTMLElement));
+        const headerCells = headerRow ? getDirectChildren(headerRow, ['th', 'td']) : [];
+        const headers = headerCells.map(c => convertCell(c));
 
-        const bodyRows = Array.from(tbody.querySelectorAll('tr')).filter((tr: Element) => tr !== headerRow && (!thead || !thead.contains(tr)));
+        const bodyRows: HTMLElement[] = tbodies.length > 0
+          ? tbodies.flatMap(tb => getDirectChildren(tb, ['tr']))
+          : getDirectChildren(el, ['tr']).filter(r => r !== headerRow);
         
+        const rows: string[][] = [];
         for (let r = 0; r < bodyRows.length; r++) {
-          const cells = Array.from(bodyRows[r].querySelectorAll('td, th')).map(c => convertCell(c as HTMLElement));
+          const cells = getDirectChildren(bodyRows[r], ['td', 'th']).map(c => convertCell(c));
           if (cells.length > 0) {
             rows.push(cells);
           }
