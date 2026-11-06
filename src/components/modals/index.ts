@@ -17,3 +17,5 @@ export * from './TemplatesModal';
 export * from './UnlockPinModal';
 export * from './AccountPromptModal';
 export * from './AudioPresetsModal';
+export * from './AppModals';
+export * from './AppModalsHost';

@@ -1,6 +1,4 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { motion, AnimatePresence } from 'motion/react';
-import { X, CheckCircle, AlertCircle, Loader2 } from 'lucide-react';
 import { marked } from 'marked';
 import DOMPurify from 'dompurify';
 // @ts-ignore
@@ -11,7 +9,7 @@ import { Language, SteemPost } from './types';
 import { Buffer } from 'buffer';
 import { useEditorStore } from './store';
 import { useDeviceStore } from './store/deviceStore';
-import Reader from './components/Reader';
+
 import { htmlToMarkdown, convertBareImageUrlsToMarkdown, isImageAndProxyUrl } from './lib/editorSync';
 import { getMiniGalleryBottomStyle } from './lib/viewportLayout';
 import { translations, AVAILABLE_LANGUAGES, getTranslation, type TranslationKey } from './locales';
@@ -43,21 +41,14 @@ import { useEditorModeManager } from './hooks/useEditorModeManager';
 
 // Components
 import { Header } from './components/header/Header';
-import { Sidebar } from './components/sidebar/Sidebar';
-import { EditorPane } from './components/editor/EditorPane';
-import { PreviewPane } from './components/editor/PreviewPane';
-import { DocReaderContainer } from './components/docReader';
-import { DesktopStatsFooter } from './components/editor/StatusBar';
-import { AppModals } from './components/modals/AppModals';
-import { MobileBottomBar } from './components/common/MobileBottomBar';
-import { AccountPromptModal } from './components/modals/AccountPromptModal';
 import { GlobalEditorStyles } from './components/common/GlobalEditorStyles';
-import { TableSelectorPopup } from './components/editor/TableSelectorPopup';
-import { NotificationToast } from './components/common/NotificationToast';
-import { SystemDialogModal, AudioPresetsModal } from './components/modals';
+import { type SidebarProps } from './components/sidebar/Sidebar';
+import { type EditorPaneProps } from './components/editor/EditorPane';
 import { createToolsMap } from './components/editor/toolsMap';
 import { useTypingSound } from './services/audio/useTypingSound';
-import { ImageLightboxModal } from './components/common/ImageLightboxModal';
+import { EditorScreen, ReaderScreen } from './components/screens';
+import { AppModalsHost, type AppModalsProps } from './components/modals';
+
 
 // Global environment setups
 if (typeof window !== 'undefined') {
@@ -95,6 +86,10 @@ function App() {
     unsplashAccessKey,
     setUnsplashAccessKey,
     initVault,
+    keychainAccounts,
+    addKeychainAccount,
+    removeKeychainAccount,
+    switchIdentity,
   } = useSteemAuth();
 
   const [autoInbox, setAutoInbox] = useState<boolean>(() => {
@@ -805,7 +800,7 @@ function App() {
     isUnlocked, isVaultInitialized, setVaultPin, setPubLog,
     username, setUsername, selectedVaultUser, vaultAccounts,
     pexelsApiKey, pixabayApiKey, unsplashAccessKey, performanceMode,
-    setIsMiniGalleryOpen
+    setIsMiniGalleryOpen, authType
   });
 
   const {
@@ -1256,6 +1251,367 @@ function App() {
     t,
   });
 
+  const modalsProps: AppModalsProps = {
+    activeModal,
+    setActiveModal,
+    vaultPin,
+    setVaultPin,
+    initVault,
+    username,
+    setUsername,
+    isVaultInitialized,
+    isUnlocked,
+    vaultAccounts,
+    pexelsApiKey,
+    setPexelsApiKey,
+    pixabayApiKey,
+    setPixabayApiKey,
+    unsplashAccessKey,
+    setUnsplashAccessKey,
+    performanceMode,
+    setPerformanceMode,
+    notify,
+    confirmDialog,
+    promptDialog,
+    lang,
+    authType,
+    setAuthType,
+    selectedVaultUser,
+    setSelectedVaultUser,
+    keychainAccounts,
+    addKeychainAccount,
+    removeKeychainAccount,
+    switchIdentity,
+    pubTitle,
+    setPubTitle,
+    pubTags,
+    setPubTags,
+    rewardType,
+    setRewardType,
+    removeTitleLine,
+    setRemoveTitleLine,
+    beneficiaries,
+    setBeneficiaries,
+    benName,
+    setBenName,
+    benWeight,
+    setBenWeight,
+    showAdvancedPublish,
+    setShowAdvancedPublish,
+    scheduledTime,
+    setScheduledTime,
+    contentForPublish,
+    mentions,
+    extractMentions,
+    addToQueue: handleAddToQueue,
+    pubLog,
+    setPubLog,
+    handlePublish,
+    tagGroups,
+    templates,
+    setTemplates,
+    setContent,
+    insertAtCursor,
+    toggleTag,
+    splitWords,
+    setSplitWords,
+    handleSplitPost,
+    currentDraftId,
+    setCurrentDraftId,
+    drafts,
+    deleteDraft,
+    toggleDraftStatus,
+    editorMode,
+    wysiwygRef,
+    isSyncingRef,
+    getMarked,
+    exportBackup: handleExportBackup,
+    importBackup: handleImportBackup,
+    setMentions,
+    newMention,
+    setNewMention,
+    addMention,
+    isSMenuOpen,
+    setIsSMenuOpen,
+    themeColor,
+    setThemeColor,
+    activeAssortment,
+    editorFont,
+    setEditorFont,
+    fontOptions,
+    beautifyEnabled,
+    setBeautifyEnabled,
+    isDarkMode,
+    setIsDarkMode,
+    visualStyle,
+    setVisualStyle,
+    isPwaInstalled,
+    isTauriEnv,
+    isNeutralinoEnv,
+    handleInstallPwa,
+    setSettingsTab,
+    appAgent,
+    setAppAgent,
+    appChangelog: APP_CHANGELOG,
+    getChangelogText,
+    setTagGroups,
+    queue,
+    setQueue,
+    publishFromQueue,
+    tableImportText,
+    setTableImportText,
+    tableImportFormat,
+    setTableImportFormat,
+    processTableImport,
+    settingsTab,
+    setLang,
+    neonTextColored,
+    setNeonTextColored,
+    editorFontSize,
+    setEditorFontSize,
+    toolbarIconSize,
+    setToolbarIconSize,
+    uiScalePreset,
+    setUiScalePreset,
+    applyUiScalePreset,
+    headerIconSize,
+    setHeaderIconSize,
+    headerHeight,
+    setHeaderHeight,
+    headerHeightAuto,
+    setHeaderHeightAuto,
+    galleryIconSize,
+    setGalleryIconSize,
+    wysiwygSpacing,
+    setWysiwygSpacing,
+    widgetPos,
+    setWidgetPos,
+    isTrafficOptimized,
+    setIsTrafficOptimized,
+    syncScrollEnabled,
+    setSyncScrollEnabled,
+    showAdvancedSettings,
+    setShowAdvancedSettings,
+    imageInsertFormat,
+    setImageInsertFormat,
+    pexelsSettings,
+    setPexelsSettings,
+    images,
+    handleClearCache,
+    showPwaBanner,
+    setShowPwaBanner,
+    isEditorFullScreen,
+    isFullScreen,
+    showPwaInstructionsModal,
+    setShowPwaInstructionsModal,
+    deferredPrompt,
+    quickTags,
+    setQuickTags,
+    pinTag,
+    t
+  };
+
+  const editorPaneProps: EditorPaneProps = {
+    editorPaneRef,
+    editorRef,
+    wysiwygRef,
+    isSyncingRef,
+    wysiwygLocalBackupTimeoutRef,
+    wysiwygSyncTimeoutRef,
+    lastSyncContentRef,
+    fileInputRef,
+    isEditorFullScreen,
+    vvHeight,
+    activeMobileTab,
+    visualStyle,
+    isDarkMode,
+    t,
+    editorMode,
+    typingSound,
+    onOpenAudioPresetsModal: () => setIsAudioPresetsModalOpen(true),
+    isLivePreviewEnabled,
+    onDemandSyncEnabled,
+    beautifyEnabled,
+    neonTextColored,
+    isSpacingMenuOpen,
+    wysiwygSpacing,
+    editorFontSize,
+    toolbarIconSize,
+    activeTable,
+    tableRect,
+    isTableMenuExpanded,
+    isTableMenuPinned,
+    isMiniGalleryOpen,
+    images,
+    justInsertedUrl,
+    keyboardOffset,
+    isFullScreen,
+    widgetPos,
+    isWidgetVisible,
+    isWidgetMenuOpen,
+    activeFormats,
+    showMobileTools1,
+    showMobileTools2,
+    showMobileToolsOpen,
+    activeModal,
+    widgetNoBorder,
+    performanceMode,
+    floatingPos,
+    widgetRef,
+    offsetTop,
+    viewportHeight,
+    isKeyboardOpen,
+    isSidebarOpen,
+    scrollRef,
+    lockedToolsWidth,
+    enabledTools,
+    menuDirection,
+    widgetOpacity,
+    lang,
+    pubTitle,
+    setPubTitle,
+    pubTags,
+    setPubTags,
+    drafts,
+    saveDraft,
+    handleSetEditorMode,
+    toggleEditorFullScreen,
+    setOnDemandSyncEnabled,
+    notify,
+    toggleLivePreview,
+    setBeautifyEnabled,
+    setNeonTextColored,
+    setIsSpacingMenuOpen,
+    setWysiwygSpacing,
+    setEditorFontSize,
+    setToolbarIconSize,
+    setIsTableMenuExpanded,
+    setIsTableMenuPinned,
+    setIsMiniGalleryOpen,
+    setJustInsertedUrl,
+    setWidgetPos,
+    setIsWidgetVisible,
+    setIsWidgetMenuOpen,
+    setShowMobileTools1,
+    setShowMobileTools2,
+    setShowMobileToolsOpen,
+    setActiveModal,
+    setSettingsTab,
+    setLockedToolsWidth,
+    setEnabledTools,
+    setWidgetOpacity,
+    setWidgetNoBorder,
+    saveCursorPosition,
+    setIsEditorFocused,
+    handleEditorKeyDown,
+    handleEditorScroll,
+    showWidget,
+    handleWysiwygBeforeInput,
+    handleWysiwygKeyDown,
+    isImageAndProxyUrl,
+    insertHtmlAtCursor,
+    updateContentFromWysiwyg,
+    htmlToMarkdown,
+    convertBareImageUrlsToMarkdown,
+    getMarked,
+    setContent,
+    saveVisualSelection,
+    updateWysiwygEmptyStatus,
+    deleteActiveTableRow,
+    deleteActiveTableCol,
+    deleteActiveTable,
+    getMiniGalleryBottomStyle,
+    insertImage,
+    insertAtCursor,
+    confirmDialog,
+    handleWidgetAction,
+    moveTool,
+    toggleTool,
+    fmt,
+    fmtLine,
+    handleIndent,
+    handleLink,
+    importTable,
+    TOOLS_MAP,
+    scrollCaretIntoView,
+  };
+
+  const sidebarProps: SidebarProps = {
+    isSidebarOpen,
+    setIsSidebarOpen,
+    isGalleryCollapsed,
+    setIsGalleryCollapsed,
+    getSidebarMotionConfig,
+    username,
+    vaultAccounts,
+    selectedVaultUser,
+    imageUploadAccount,
+    setImageUploadAccount,
+    authType,
+    keychainAccounts,
+    onSelectAccount: (user, type) => {
+      switchIdentity(user, type);
+      if (type === 'VAULT') {
+        setImageUploadAccount(user);
+      } else {
+        setImageUploadAccount('');
+      }
+    },
+    onAddKeychainAccount: addKeychainAccount,
+    onOpenVaultManager: () => setActiveModal('keys'),
+    galleryMode,
+    toggleGalleryMode,
+    galleryView,
+    setGalleryView,
+    gallerySearch,
+    setGallerySearch,
+    filteredLocalImages,
+    images,
+    setImages,
+    toggleImageSelection,
+    moveImageLocal,
+    insertImage,
+    insertExternalImage,
+    uploadExternalImage,
+    insertGrid,
+    isSearchingPexels,
+    pexelsResults,
+    setPexelsResults,
+    pexelsPage,
+    handleExternalSearch,
+    pexelsApiKey,
+    pixabayApiKey,
+    unsplashAccessKey,
+    isTrafficOptimized,
+    setIsTrafficOptimized,
+    performanceMode,
+    setPerformanceMode,
+    pexelsSettings,
+    setPexelsSettings,
+    isGallerySettingsCollapsed,
+    setIsGallerySettingsCollapsed,
+    gridLayout,
+    setGridLayout,
+    gridWithCaptions,
+    setGridWithCaptions,
+    singleCaptionAlign,
+    setSingleCaptionAlign,
+    isTextWrapEnabled,
+    setIsTextWrapEnabled,
+    isExifEnabled,
+    setIsExifEnabled,
+    imageInsertFormat,
+    setImageInsertFormat,
+    isUploading,
+    fileInputRef,
+    sourceInput,
+    setSourceInput,
+    parseImages,
+    setActiveModal,
+    notify,
+    t,
+  };
+
   return (
     <div 
       className={cn(
@@ -1330,426 +1686,61 @@ function App() {
         t={t}
       />
 
-      {/* Main Workspace Area */}
+      {/* Main Workspace Area: Reader Screen & Editor Screen */}
       <div className="flex flex-1 overflow-hidden relative">
-        {/* Reader View */}
-        <div className={cn("flex-1 overflow-hidden bg-slate-900 flex flex-col", activeView !== 'reader' && "hidden")}>
-          <Reader 
-            lang={lang}
-            t={t}
-            editorFontSize={editorFontSize}
-            setEditorFontSize={setEditorFontSize}
-            onEditPost={handleEditPost}
-            onVote={handleReaderVote}
-            onComment={handleReaderComment}
-            onDeleteComment={handleDeleteComment}
-            onUploadImage={handleUploadImageForReader}
-            onUserUpdate={(u) => setUsername(u)}
-            currentUser={currentUser}
-            onMuteUser={handleMuteUser}
-            mutedUsers={mutedUsers || []}
-            targetReaderPost={targetReaderPost}
-            rawInboxData={rawNotifications}
-          />
-        </div>
+        <ReaderScreen
+          isVisible={activeView === 'reader'}
+          lang={lang}
+          t={t}
+          editorFontSize={editorFontSize}
+          setEditorFontSize={setEditorFontSize}
+          onEditPost={handleEditPost}
+          onVote={handleReaderVote}
+          onComment={handleReaderComment}
+          onDeleteComment={handleDeleteComment}
+          onUploadImage={handleUploadImageForReader}
+          onUserUpdate={(u) => setUsername(u)}
+          currentUser={currentUser}
+          onMuteUser={handleMuteUser}
+          mutedUsers={mutedUsers || []}
+          targetReaderPost={targetReaderPost}
+          rawInboxData={rawNotifications}
+          authType={authType}
+          keychainAccounts={keychainAccounts}
+          vaultAccounts={vaultAccounts}
+          onSelectAccount={(user, type) => {
+            switchIdentity(user, type);
+            if (type === 'VAULT') {
+              setImageUploadAccount(user);
+            } else {
+              setImageUploadAccount('');
+            }
+          }}
+          onAddKeychainAccount={addKeychainAccount}
+          onOpenVaultManager={() => setActiveModal('keys')}
+          selectedVaultUser={selectedVaultUser}
+        />
 
-        {/* Editor Workspace View */}
-        <div className={cn("flex-1 overflow-hidden flex", activeView !== 'editor' && "hidden")}>
-          {/* Sidebar */}
-          <Sidebar
-            isSidebarOpen={isSidebarOpen}
-            setIsSidebarOpen={setIsSidebarOpen}
-            isGalleryCollapsed={isGalleryCollapsed}
-            setIsGalleryCollapsed={setIsGalleryCollapsed}
-            getSidebarMotionConfig={getSidebarMotionConfig}
-            username={username}
-            vaultAccounts={vaultAccounts}
-            selectedVaultUser={selectedVaultUser}
-            imageUploadAccount={imageUploadAccount}
-            setImageUploadAccount={setImageUploadAccount}
-            galleryMode={galleryMode}
-            toggleGalleryMode={toggleGalleryMode}
-            galleryView={galleryView}
-            setGalleryView={setGalleryView}
-            gallerySearch={gallerySearch}
-            setGallerySearch={setGallerySearch}
-            filteredLocalImages={filteredLocalImages}
-            images={images}
-            setImages={setImages}
-            toggleImageSelection={toggleImageSelection}
-            moveImageLocal={moveImageLocal}
-            insertImage={insertImage}
-            insertExternalImage={insertExternalImage}
-            uploadExternalImage={uploadExternalImage}
-            insertGrid={insertGrid}
-            isSearchingPexels={isSearchingPexels}
-            pexelsResults={pexelsResults}
-            setPexelsResults={setPexelsResults}
-            pexelsPage={pexelsPage}
-            handleExternalSearch={handleExternalSearch}
-            pexelsApiKey={pexelsApiKey}
-            pixabayApiKey={pixabayApiKey}
-            unsplashAccessKey={unsplashAccessKey}
-            isTrafficOptimized={isTrafficOptimized}
-            setIsTrafficOptimized={setIsTrafficOptimized}
-            performanceMode={performanceMode}
-            setPerformanceMode={setPerformanceMode}
-            pexelsSettings={pexelsSettings}
-            setPexelsSettings={setPexelsSettings}
-            isGallerySettingsCollapsed={isGallerySettingsCollapsed}
-            setIsGallerySettingsCollapsed={setIsGallerySettingsCollapsed}
-            gridLayout={gridLayout}
-            setGridLayout={setGridLayout}
-            gridWithCaptions={gridWithCaptions}
-            setGridWithCaptions={setGridWithCaptions}
-            singleCaptionAlign={singleCaptionAlign}
-            setSingleCaptionAlign={setSingleCaptionAlign}
-            isTextWrapEnabled={isTextWrapEnabled}
-            setIsTextWrapEnabled={setIsTextWrapEnabled}
-            isExifEnabled={isExifEnabled}
-            setIsExifEnabled={setIsExifEnabled}
-            imageInsertFormat={imageInsertFormat}
-            setImageInsertFormat={setImageInsertFormat}
-            isUploading={isUploading}
-            fileInputRef={fileInputRef}
-            sourceInput={sourceInput}
-            setSourceInput={setSourceInput}
-            parseImages={parseImages}
-            setActiveModal={setActiveModal}
-            notify={notify}
-            t={t}
-          />
-
-          {/* Main Pane Container */}
-          <main 
-            className="flex-1 flex flex-col min-w-0 bg-slate-950 relative transition-all"
-            style={{
-              paddingBottom: (isEditorFullScreen || isFullScreen) ? '0px' : 'var(--app-content-bottom-padding, 0px)'
-            }}
-          >
-            <div className="flex-1 flex overflow-hidden">
-              {/* Markdown / Visual / Reader Editor Pane */}
-              <EditorPane
-                editorPaneRef={editorPaneRef}
-                editorRef={editorRef}
-                wysiwygRef={wysiwygRef}
-                isSyncingRef={isSyncingRef}
-                wysiwygLocalBackupTimeoutRef={wysiwygLocalBackupTimeoutRef}
-                wysiwygSyncTimeoutRef={wysiwygSyncTimeoutRef}
-                lastSyncContentRef={lastSyncContentRef}
-                fileInputRef={fileInputRef}
-                isEditorFullScreen={isEditorFullScreen}
-                vvHeight={vvHeight}
-                activeMobileTab={activeMobileTab}
-                visualStyle={visualStyle}
-                isDarkMode={isDarkMode}
-                t={t}
-                editorMode={editorMode}
-                typingSound={typingSound}
-                onOpenAudioPresetsModal={() => setIsAudioPresetsModalOpen(true)}
-                isLivePreviewEnabled={isLivePreviewEnabled}
-                onDemandSyncEnabled={onDemandSyncEnabled}
-                beautifyEnabled={beautifyEnabled}
-                neonTextColored={neonTextColored}
-                isSpacingMenuOpen={isSpacingMenuOpen}
-                wysiwygSpacing={wysiwygSpacing}
-                editorFontSize={editorFontSize}
-                toolbarIconSize={toolbarIconSize}
-                activeTable={activeTable}
-                tableRect={tableRect}
-                isTableMenuExpanded={isTableMenuExpanded}
-                isTableMenuPinned={isTableMenuPinned}
-                isMiniGalleryOpen={isMiniGalleryOpen}
-                images={images}
-                justInsertedUrl={justInsertedUrl}
-                keyboardOffset={keyboardOffset}
-                isFullScreen={isFullScreen}
-                widgetPos={widgetPos}
-                isWidgetVisible={isWidgetVisible}
-                isWidgetMenuOpen={isWidgetMenuOpen}
-                activeFormats={activeFormats}
-                showMobileTools1={showMobileTools1}
-                showMobileTools2={showMobileTools2}
-                showMobileToolsOpen={showMobileToolsOpen}
-                activeModal={activeModal}
-                widgetNoBorder={widgetNoBorder}
-                performanceMode={performanceMode}
-                floatingPos={floatingPos}
-                widgetRef={widgetRef}
-                offsetTop={offsetTop}
-                viewportHeight={viewportHeight}
-                isKeyboardOpen={isKeyboardOpen}
-                isSidebarOpen={isSidebarOpen}
-                scrollRef={scrollRef}
-                lockedToolsWidth={lockedToolsWidth}
-                enabledTools={enabledTools}
-                menuDirection={menuDirection}
-                widgetOpacity={widgetOpacity}
-                lang={lang}
-                pubTitle={pubTitle}
-                setPubTitle={setPubTitle}
-                pubTags={pubTags}
-                setPubTags={setPubTags}
-                drafts={drafts}
-                saveDraft={saveDraft}
-                handleSetEditorMode={handleSetEditorMode}
-                toggleEditorFullScreen={toggleEditorFullScreen}
-                setOnDemandSyncEnabled={setOnDemandSyncEnabled}
-                notify={notify}
-                toggleLivePreview={toggleLivePreview}
-                setBeautifyEnabled={setBeautifyEnabled}
-                setNeonTextColored={setNeonTextColored}
-                setIsSpacingMenuOpen={setIsSpacingMenuOpen}
-                setWysiwygSpacing={setWysiwygSpacing}
-                setEditorFontSize={setEditorFontSize}
-                setToolbarIconSize={setToolbarIconSize}
-                setIsTableMenuExpanded={setIsTableMenuExpanded}
-                setIsTableMenuPinned={setIsTableMenuPinned}
-                setIsMiniGalleryOpen={setIsMiniGalleryOpen}
-                setJustInsertedUrl={setJustInsertedUrl}
-                setWidgetPos={setWidgetPos}
-                setIsWidgetVisible={setIsWidgetVisible}
-                setIsWidgetMenuOpen={setIsWidgetMenuOpen}
-                setShowMobileTools1={setShowMobileTools1}
-                setShowMobileTools2={setShowMobileTools2}
-                setShowMobileToolsOpen={setShowMobileToolsOpen}
-                setActiveModal={setActiveModal}
-                setSettingsTab={setSettingsTab}
-                setLockedToolsWidth={setLockedToolsWidth}
-                setEnabledTools={setEnabledTools}
-                setWidgetOpacity={setWidgetOpacity}
-                setWidgetNoBorder={setWidgetNoBorder}
-                saveCursorPosition={saveCursorPosition}
-                setIsEditorFocused={setIsEditorFocused}
-                handleEditorKeyDown={handleEditorKeyDown}
-                handleEditorScroll={handleEditorScroll}
-                showWidget={showWidget}
-                handleWysiwygBeforeInput={handleWysiwygBeforeInput}
-                handleWysiwygKeyDown={handleWysiwygKeyDown}
-                isImageAndProxyUrl={isImageAndProxyUrl}
-                insertHtmlAtCursor={insertHtmlAtCursor}
-                updateContentFromWysiwyg={updateContentFromWysiwyg}
-                htmlToMarkdown={htmlToMarkdown}
-                convertBareImageUrlsToMarkdown={convertBareImageUrlsToMarkdown}
-                getMarked={getMarked}
-                setContent={setContent}
-                saveVisualSelection={saveVisualSelection}
-                updateWysiwygEmptyStatus={updateWysiwygEmptyStatus}
-                deleteActiveTableRow={deleteActiveTableRow}
-                deleteActiveTableCol={deleteActiveTableCol}
-                deleteActiveTable={deleteActiveTable}
-                getMiniGalleryBottomStyle={getMiniGalleryBottomStyle}
-                insertImage={insertImage}
-                insertAtCursor={insertAtCursor}
-                confirmDialog={confirmDialog}
-                handleWidgetAction={handleWidgetAction}
-                moveTool={moveTool}
-                toggleTool={toggleTool}
-                fmt={fmt}
-                fmtLine={fmtLine}
-                handleIndent={handleIndent}
-                handleLink={handleLink}
-                importTable={importTable}
-                TOOLS_MAP={TOOLS_MAP}
-                scrollCaretIntoView={scrollCaretIntoView}
-              />
-
-              {/* Preview Pane */}
-              <PreviewPane
-                editorMode={editorMode}
-                previewRef={previewRef}
-                previewPaneRef={previewPaneRef}
-                activeMobileTab={activeMobileTab}
-                isLivePreviewEnabled={isLivePreviewEnabled}
-                isFullScreen={isFullScreen}
-                toggleLivePreview={toggleLivePreview}
-                syncScrollEnabled={syncScrollEnabled}
-                setSyncScrollEnabled={setSyncScrollEnabled}
-                toggleFullScreen={toggleFullScreen}
-                widgetPos={widgetPos}
-                lang={lang}
-                t={t}
-              />
-            </div>
-
-            {/* Desktop Status Bar Footer */}
-            <DesktopStatsFooter
-              t={t}
-              visualStyle={visualStyle}
-              isDarkMode={isDarkMode}
-              isEditorFullScreen={isEditorFullScreen}
-              isFullScreen={isFullScreen}
-            />
-          </main>
-        </div>
-      </div>
-
-      {/* Application Modals Suite */}
-      <AppModals
-        activeModal={activeModal}
-        setActiveModal={setActiveModal}
-        vaultPin={vaultPin}
-        setVaultPin={setVaultPin}
-        initVault={initVault}
-        username={username}
-        setUsername={setUsername}
-        isVaultInitialized={isVaultInitialized}
-        isUnlocked={isUnlocked}
-        vaultAccounts={vaultAccounts}
-        pexelsApiKey={pexelsApiKey}
-        setPexelsApiKey={setPexelsApiKey}
-        pixabayApiKey={pixabayApiKey}
-        setPixabayApiKey={setPixabayApiKey}
-        unsplashAccessKey={unsplashAccessKey}
-        setUnsplashAccessKey={setUnsplashAccessKey}
-        performanceMode={performanceMode}
-        setPerformanceMode={setPerformanceMode}
-        notify={notify}
-        confirmDialog={confirmDialog}
-        promptDialog={promptDialog}
-        lang={lang}
-        authType={authType}
-        setAuthType={setAuthType}
-        selectedVaultUser={selectedVaultUser}
-        setSelectedVaultUser={setSelectedVaultUser}
-        pubTitle={pubTitle}
-        setPubTitle={setPubTitle}
-        pubTags={pubTags}
-        setPubTags={setPubTags}
-        rewardType={rewardType}
-        setRewardType={setRewardType}
-        removeTitleLine={removeTitleLine}
-        setRemoveTitleLine={setRemoveTitleLine}
-        beneficiaries={beneficiaries}
-        setBeneficiaries={setBeneficiaries}
-        benName={benName}
-        setBenName={setBenName}
-        benWeight={benWeight}
-        setBenWeight={setBenWeight}
-        showAdvancedPublish={showAdvancedPublish}
-        setShowAdvancedPublish={setShowAdvancedPublish}
-        scheduledTime={scheduledTime}
-        setScheduledTime={setScheduledTime}
-        contentForPublish={contentForPublish}
-        mentions={mentions}
-        extractMentions={extractMentions}
-        addToQueue={handleAddToQueue}
-        pubLog={pubLog}
-        setPubLog={setPubLog}
-        handlePublish={handlePublish}
-        tagGroups={tagGroups}
-        templates={templates}
-        setTemplates={setTemplates}
-        setContent={setContent}
-        insertAtCursor={insertAtCursor}
-        toggleTag={toggleTag}
-        splitWords={splitWords}
-        setSplitWords={setSplitWords}
-        handleSplitPost={handleSplitPost}
-        currentDraftId={currentDraftId}
-        setCurrentDraftId={setCurrentDraftId}
-        drafts={drafts}
-        deleteDraft={deleteDraft}
-        toggleDraftStatus={toggleDraftStatus}
-        editorMode={editorMode}
-        wysiwygRef={wysiwygRef}
-        isSyncingRef={isSyncingRef}
-        getMarked={getMarked}
-        exportBackup={handleExportBackup}
-        importBackup={handleImportBackup}
-        setMentions={setMentions}
-        newMention={newMention}
-        setNewMention={setNewMention}
-        addMention={addMention}
-        isSMenuOpen={isSMenuOpen}
-        setIsSMenuOpen={setIsSMenuOpen}
-        themeColor={themeColor}
-        setThemeColor={setThemeColor}
-        activeAssortment={activeAssortment}
-        editorFont={editorFont}
-        setEditorFont={setEditorFont}
-        fontOptions={fontOptions}
-        beautifyEnabled={beautifyEnabled}
-        setBeautifyEnabled={setBeautifyEnabled}
-        isDarkMode={isDarkMode}
-        setIsDarkMode={setIsDarkMode}
-        visualStyle={visualStyle}
-        setVisualStyle={setVisualStyle}
-        isPwaInstalled={isPwaInstalled}
-        isTauriEnv={isTauriEnv}
-        isNeutralinoEnv={isNeutralinoEnv}
-        handleInstallPwa={handleInstallPwa}
-        setSettingsTab={setSettingsTab}
-        appAgent={appAgent}
-        setAppAgent={setAppAgent}
-        appChangelog={APP_CHANGELOG}
-        getChangelogText={getChangelogText}
-        setTagGroups={setTagGroups}
-        queue={queue}
-        setQueue={setQueue}
-        publishFromQueue={publishFromQueue}
-        tableImportText={tableImportText}
-        setTableImportText={setTableImportText}
-        tableImportFormat={tableImportFormat}
-        setTableImportFormat={setTableImportFormat}
-        processTableImport={processTableImport}
-        settingsTab={settingsTab}
-        setLang={setLang}
-        neonTextColored={neonTextColored}
-        setNeonTextColored={setNeonTextColored}
-        editorFontSize={editorFontSize}
-        setEditorFontSize={setEditorFontSize}
-        toolbarIconSize={toolbarIconSize}
-        setToolbarIconSize={setToolbarIconSize}
-        uiScalePreset={uiScalePreset}
-        setUiScalePreset={setUiScalePreset}
-        applyUiScalePreset={applyUiScalePreset}
-        headerIconSize={headerIconSize}
-        setHeaderIconSize={setHeaderIconSize}
-        headerHeight={headerHeight}
-        setHeaderHeight={setHeaderHeight}
-        headerHeightAuto={headerHeightAuto}
-        setHeaderHeightAuto={setHeaderHeightAuto}
-        galleryIconSize={galleryIconSize}
-        setGalleryIconSize={setGalleryIconSize}
-        wysiwygSpacing={wysiwygSpacing}
-        setWysiwygSpacing={setWysiwygSpacing}
-        widgetPos={widgetPos}
-        setWidgetPos={setWidgetPos}
-        isTrafficOptimized={isTrafficOptimized}
-        setIsTrafficOptimized={setIsTrafficOptimized}
-        syncScrollEnabled={syncScrollEnabled}
-        setSyncScrollEnabled={setSyncScrollEnabled}
-        showAdvancedSettings={showAdvancedSettings}
-        setShowAdvancedSettings={setShowAdvancedSettings}
-        imageInsertFormat={imageInsertFormat}
-        setImageInsertFormat={setImageInsertFormat}
-        pexelsSettings={pexelsSettings}
-        setPexelsSettings={setPexelsSettings}
-        images={images}
-        handleClearCache={handleClearCache}
-        showPwaBanner={showPwaBanner}
-        setShowPwaBanner={setShowPwaBanner}
-        isEditorFullScreen={isEditorFullScreen}
-        isFullScreen={isFullScreen}
-        showPwaInstructionsModal={showPwaInstructionsModal}
-        setShowPwaInstructionsModal={setShowPwaInstructionsModal}
-        deferredPrompt={deferredPrompt}
-        quickTags={quickTags}
-        setQuickTags={setQuickTags}
-        pinTag={pinTag}
-        t={t}
-      />
-
-      {/* Mobile Bottom Navigation (Editor only) */}
-      {activeView === 'editor' && (
-        <MobileBottomBar
+        <EditorScreen
+          isVisible={activeView === 'editor'}
+          sidebarProps={sidebarProps}
+          editorPaneProps={editorPaneProps}
           isEditorFullScreen={isEditorFullScreen}
           isFullScreen={isFullScreen}
-          isKeyboardOpen={isKeyboardOpen}
+          visualStyle={visualStyle}
+          isDarkMode={isDarkMode}
+          editorMode={editorMode}
+          previewRef={previewRef}
+          previewPaneRef={previewPaneRef}
           activeMobileTab={activeMobileTab}
           setActiveMobileTab={setActiveMobileTab}
-          visualStyle={visualStyle}
+          isLivePreviewEnabled={isLivePreviewEnabled}
+          toggleLivePreview={toggleLivePreview}
+          syncScrollEnabled={syncScrollEnabled}
+          setSyncScrollEnabled={setSyncScrollEnabled}
+          toggleFullScreen={toggleFullScreen}
+          widgetPos={widgetPos}
+          lang={lang}
           pubTitle={pubTitle}
           setPubTitle={setPubTitle}
           activeModal={activeModal}
@@ -1757,127 +1748,43 @@ function App() {
           isSidebarOpen={isSidebarOpen}
           setIsSidebarOpen={setIsSidebarOpen}
           setSettingsTab={setSettingsTab}
+          isKeyboardOpen={isKeyboardOpen}
+          fileInputRef={fileInputRef}
+          handleFileUpload={handleFileUpload}
           t={t}
         />
-      )}
+      </div>
 
-      {/* Hidden File Input for local image uploads */}
-      <input 
-        type="file" 
-        ref={fileInputRef} 
-        className="hidden" 
-        accept="image/*" 
-        multiple 
-        onChange={handleFileUpload} 
-      />
-
-      {/* Account Prompt Overlay */}
-      <AccountPromptModal
+      {/* Global Modals, Dialogs and Popups Host */}
+      <AppModalsHost
+        modalsProps={modalsProps}
         showAccountPrompt={showAccountPrompt}
         setShowAccountPrompt={setShowAccountPrompt}
         username={username}
         setUsername={setUsername}
         autoInbox={autoInbox}
         setAutoInbox={handleSetAutoInbox}
-        t={t}
-      />
-
-      {/* Result Status Notifications (Published, Uploaded, Saved, Error, etc.) */}
-      <AnimatePresence>
-        {pubLog.msg && activeModal !== 'publish' && (
-          <motion.div
-            initial={{ opacity: 0, y: -12, scale: 0.96 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: -12, scale: 0.96 }}
-            transition={{ duration: 0.2 }}
-            className={cn(
-              "fixed z-[260] px-4 py-2.5 rounded-2xl text-xs sm:text-sm font-bold border-2 flex items-center gap-3 shrink-0 pointer-events-auto shadow-2xl backdrop-blur-md",
-              "left-3 right-3 sm:left-auto sm:right-6 max-w-sm sm:max-w-md w-auto",
-              pubLog.type === 'success' && "bg-slate-900/95 border-emerald-500 text-emerald-400 shadow-emerald-950/40",
-              pubLog.type === 'error' && "bg-slate-900/95 border-rose-500 text-rose-400 shadow-rose-950/40",
-              pubLog.type === 'loading' && "bg-slate-900/95 border-cyan-500 text-cyan-400 shadow-cyan-950/40"
-            )}
-            style={{
-              top: 'calc(var(--header-height, 3.5rem) + env(safe-area-inset-top, 0px) + 0.75rem)',
-            }}
-          >
-            {pubLog.type === 'loading' && (
-              <Loader2 size={16} className="animate-spin text-cyan-400 shrink-0" />
-            )}
-            {pubLog.type === 'success' && (
-              <CheckCircle size={16} className="text-emerald-400 shrink-0" />
-            )}
-            {pubLog.type === 'error' && (
-              <AlertCircle size={16} className="text-rose-400 shrink-0" />
-            )}
-            <span className="flex-1 min-w-0 break-words leading-tight">{pubLog.msg}</span>
-            <button
-              type="button"
-              onClick={() => {
-                clearPubLogTimer();
-                setPubLog({ msg: '', type: null });
-              }}
-              className="p-1 hover:bg-slate-800 rounded-full transition-colors text-slate-400 hover:text-white shrink-0 cursor-pointer"
-              aria-label={t("closeNotificationAria")}
-              title={t("closeNotificationAria")}
-            >
-              <X size={15} />
-            </button>
-          </motion.div>
-        )}
-      </AnimatePresence>
-
-      {/* Toast Notifications */}
-      <NotificationToast
+        pubLog={pubLog}
+        setPubLog={setPubLog}
+        clearPubLogTimer={clearPubLogTimer}
         showNotificationPopup={showNotificationPopup}
         setShowNotificationPopup={setShowNotificationPopup}
         setActiveView={setActiveView}
         setNotifications={setNotifications}
         setTargetReaderPost={setTargetReaderPost}
-      />
-
-      {/* Table Dimension Selector Popup */}
-      <TableSelectorPopup
         showTableSelector={showTableSelector}
         setShowTableSelector={setShowTableSelector}
         tableSelectorPos={tableSelectorPos}
         tableImportFormat={tableImportFormat}
         setTableImportFormat={setTableImportFormat}
         insertAtCursor={insertAtCursor}
+        isAudioPresetsModalOpen={isAudioPresetsModalOpen}
+        setIsAudioPresetsModalOpen={setIsAudioPresetsModalOpen}
+        typingSound={typingSound}
+        systemDialog={systemDialog}
+        setSystemDialog={setSystemDialog}
+        t={t}
       />
-
-      {/* Audio Typing Synth Presets Modal */}
-      <AudioPresetsModal
-        isOpen={isAudioPresetsModalOpen}
-        onClose={() => setIsAudioPresetsModalOpen(false)}
-        settings={typingSound.settings}
-        activePreset={typingSound.activePreset}
-        allPresets={typingSound.allPresets}
-        volume={typingSound.volume}
-        favoritePresetIds={typingSound.favoritePresetIds}
-        toggleEnabled={typingSound.toggleEnabled}
-        setVolume={typingSound.setVolume}
-        setActivePreset={typingSound.setActivePreset}
-        toggleFavoritePreset={typingSound.toggleFavoritePreset}
-        addCustomPreset={typingSound.addCustomPreset}
-        deleteCustomPreset={typingSound.deleteCustomPreset}
-        previewPreset={typingSound.previewPreset}
-        updateSettings={typingSound.updateSettings}
-      />
-
-      {/* System Dialog Confirmation / Input */}
-      <AnimatePresence>
-        {systemDialog && (
-          <SystemDialogModal
-            systemDialog={systemDialog}
-            setSystemDialog={setSystemDialog}
-            t={t}
-          />
-        )}
-      </AnimatePresence>
-
-      {/* Global Image Lightbox Modal */}
-      <ImageLightboxModal />
     </div>
   );
 }

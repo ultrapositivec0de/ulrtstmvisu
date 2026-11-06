@@ -98,11 +98,13 @@ export const DocReaderSettingsMenu: React.FC<DocReaderSettingsMenuProps> = ({
               {t('readerColorTheme')}
             </label>
             <div className="grid grid-cols-4 gap-2">
-              {themes.map(t => {
+              {themes.map((t, idx) => {
                 const isActive = settings.theme === t.id;
                 return (
                   <button
-                    key={t.id}
+                    key={`theme-${t.id}-${idx}`}
+                    type="button"
+                    onMouseDown={(e) => e.preventDefault()}
                     onClick={() => onUpdateSettings({ theme: t.id })}
                     className={cn(
                       "p-2.5 rounded-xl border flex flex-col items-center gap-1.5 transition-all text-xs font-medium",
@@ -128,11 +130,13 @@ export const DocReaderSettingsMenu: React.FC<DocReaderSettingsMenuProps> = ({
               <span>{t('readerColumnWidth')}</span>
             </label>
             <div className="grid grid-cols-3 gap-2">
-              {widths.map(w => {
+              {widths.map((w, idx) => {
                 const isActive = settings.width === w.id;
                 return (
                   <button
-                    key={w.id}
+                    key={`width-${w.id}-${idx}`}
+                    type="button"
+                    onMouseDown={(e) => e.preventDefault()}
                     onClick={() => onUpdateSettings({ width: w.id })}
                     className={cn(
                       "py-2 px-2.5 rounded-xl border text-center transition-all flex flex-col items-center",
@@ -164,11 +168,13 @@ export const DocReaderSettingsMenu: React.FC<DocReaderSettingsMenuProps> = ({
               <span>{t('readerFontFamily')}</span>
             </label>
             <div className="grid grid-cols-3 gap-2">
-              {fonts.map(f => {
+              {fonts.map((f, idx) => {
                 const isActive = settings.font === f.id;
                 return (
                   <button
-                    key={f.id}
+                    key={`font-${f.id}-${idx}`}
+                    type="button"
+                    onMouseDown={(e) => e.preventDefault()}
                     onClick={() => onUpdateSettings({ font: f.id })}
                     className={cn(
                       "py-2 px-2 rounded-xl border text-center transition-all",

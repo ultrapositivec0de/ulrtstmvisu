@@ -20,7 +20,7 @@ import { soundSynthEngine } from '../../services/audio/SoundSynthEngine';
 import { useEditorStore } from '../../store';
 import { getTranslation, TranslationKey } from '../../locales';
 
-interface AudioPresetsModalProps {
+export interface AudioPresetsModalProps {
   isOpen: boolean;
   onClose: () => void;
   settings: AudioTypingSettings;

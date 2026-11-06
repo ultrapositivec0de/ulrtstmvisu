@@ -15,6 +15,13 @@ import {
 } from 'lucide-react';
 import { useEditorStore } from '../../store';
 
+export interface ToolItem {
+  id: string;
+  title: string;
+  label: string | React.ReactNode;
+  action: (e?: React.MouseEvent) => void;
+}
+
 export interface CreateToolsMapProps {
   fmt: (before: string, after?: string) => void;
   fmtLine: (prefix: string) => void;
@@ -51,22 +58,24 @@ export function createToolsMap({
   fileInputRef,
   setIsMiniGalleryOpen,
   t,
-}: CreateToolsMapProps): Record<string, { label: string | React.ReactNode; action: (e?: React.MouseEvent) => void }> {
+}: CreateToolsMapProps): Record<string, ToolItem> {
   return {
-    'B': { label: 'B', action: () => fmt('**') },
-    'I': { label: 'I', action: () => fmt('*') },
-    'S': { label: '~~', action: () => fmt('~~') },
-    'sub': { label: 'sub', action: () => fmt('<sub>', '</sub>') },
-    'sup': { label: 'sup', action: () => fmt('<sup>', '</sup>') },
-    'H1': { label: 'H1', action: () => fmtLine('# ') },
-    'H2': { label: 'H2', action: () => fmtLine('## ') },
-    'H3': { label: 'H3', action: () => fmtLine('### ') },
-    'Link': { label: <LinkIcon size={20} />, action: handleLink },
-    'Quote': { label: <Quote size={20} />, action: () => fmtLine('> ') },
-    'List': { label: '•', action: () => fmtLine('- ') },
-    'Num': { label: '1.', action: () => fmtLine('1. ') },
-    'Task': { label: '☑', action: () => fmtLine('- [ ] ') },
+    'B': { id: 'B', title: t('bold'), label: 'B', action: () => fmt('**') },
+    'I': { id: 'I', title: t('italic'), label: 'I', action: () => fmt('*') },
+    'S': { id: 'S', title: t('strike'), label: '~~', action: () => fmt('~~') },
+    'sub': { id: 'sub', title: t('subscript'), label: 'sub', action: () => fmt('<sub>', '</sub>') },
+    'sup': { id: 'sup', title: t('superscript'), label: 'sup', action: () => fmt('<sup>', '</sup>') },
+    'H1': { id: 'H1', title: t('h1'), label: 'H1', action: () => fmtLine('# ') },
+    'H2': { id: 'H2', title: t('h2'), label: 'H2', action: () => fmtLine('## ') },
+    'H3': { id: 'H3', title: t('h3'), label: 'H3', action: () => fmtLine('### ') },
+    'Link': { id: 'Link', title: t('link'), label: <LinkIcon size={20} />, action: handleLink },
+    'Quote': { id: 'Quote', title: t('quote'), label: <Quote size={20} />, action: () => fmtLine('> ') },
+    'List': { id: 'List', title: t('listBullet'), label: '•', action: () => fmtLine('- ') },
+    'Num': { id: 'Num', title: t('listOrdered'), label: '1.', action: () => fmtLine('1. ') },
+    'Task': { id: 'Task', title: t('listTask'), label: '☑', action: () => fmtLine('- [ ] ') },
     'Table': {
+      id: 'Table',
+      title: t('table'),
       label: <LayoutGrid size={20} />,
       action: (e?: React.MouseEvent) => {
         if (e) {
@@ -85,11 +94,13 @@ export function createToolsMap({
         }
       }
     },
-    'Separator': { label: <SplitSquareHorizontal size={20} />, action: () => insertAtCursor('| Head |\n| --- |\n', 'end') },
-    'Import': { label: <TableIcon size={20} />, action: () => importTable() },
-    'Code': { label: <Code size={20} />, action: () => fmt('```\n', '\n```') },
-    'Inline': { label: <Terminal size={20} />, action: () => fmt('`') },
+    'Separator': { id: 'Separator', title: t('tableSelector1ColSep'), label: <SplitSquareHorizontal size={20} />, action: () => insertAtCursor('| Head |\n| --- |\n', 'end') },
+    'Import': { id: 'Import', title: t('importTable'), label: <TableIcon size={20} />, action: () => importTable() },
+    'Code': { id: 'Code', title: t('codeBlock'), label: <Code size={20} />, action: () => fmt('```\n', '\n```') },
+    'Inline': { id: 'Inline', title: t('inlineCode'), label: <Terminal size={20} />, action: () => fmt('`') },
     'Indent': {
+      id: 'Indent',
+      title: t('indent'),
       label: <Indent size={20} />,
       action: () => {
         if (!editorRef.current) return;
@@ -102,10 +113,12 @@ export function createToolsMap({
         setContent(newContent);
       }
     },
-    'Esc': { label: '\\', action: () => fmt('\\', '') },
-    'HR': { label: '—', action: () => insertAtCursor('\n\n---\n\n') },
-    'Color': { label: <span className="text-red-500 font-bold text-lg">A</span>, action: () => fmt('<div class="phishy">', '</div>') },
+    'Esc': { id: 'Esc', title: t('escapeChar'), label: '\\', action: () => fmt('\\', '') },
+    'HR': { id: 'HR', title: t('hr'), label: '—', action: () => insertAtCursor('\n\n---\n\n') },
+    'Color': { id: 'Color', title: t('redText'), label: <span className="text-red-500 font-bold text-lg">A</span>, action: () => fmt('<div class="phishy">', '</div>') },
     'Caption': {
+      id: 'Caption',
+      title: t('captionShort'),
       label: t('captionShort'),
       action: async () => {
         const url = await promptDialog(t('urlPrompt'));
@@ -114,12 +127,14 @@ export function createToolsMap({
         insertAtCursor(`<center>\n\n| <center>![image](${url})</center> |\n|:---:|\n| <center><sub>${cap || ' ✍️ '}</sub></center> |\n\n</center>\n`);
       }
     },
-    'Left': { label: '⬅', action: () => fmt('<div class="text-left">\n', '\n</div>') },
-    'Center': { label: t('toolAlignCenterShort'), action: () => fmt('<center>\n', '\n</center>') },
-    'Right': { label: '➡', action: () => fmt('<div class="text-right">\n', '\n</div>') },
-    'Justify': { label: t('toolAlignJustifyShort'), action: () => fmt('<div class="text-justify">\n', '\n</div>') },
-    'Templates': { label: <FileText size={20} />, action: () => setActiveModal('templates') },
+    'Left': { id: 'Left', title: t('leftText'), label: '⬅', action: () => fmt('<div class="text-left">\n', '\n</div>') },
+    'Center': { id: 'Center', title: t('center'), label: t('toolAlignCenterShort'), action: () => fmt('<center>\n', '\n</center>') },
+    'Right': { id: 'Right', title: t('rightText'), label: '➡', action: () => fmt('<div class="text-right">\n', '\n</div>') },
+    'Justify': { id: 'Justify', title: t('justify'), label: t('toolAlignJustifyShort'), action: () => fmt('<div class="text-justify">\n', '\n</div>') },
+    'Templates': { id: 'Templates', title: t('templates'), label: <FileText size={20} />, action: () => setActiveModal('templates') },
     'Mentions': {
+      id: 'Mentions',
+      title: t('mentions'),
       label: <AtSign size={20} />,
       action: async () => {
         const extracted = extractMentions(contentForPublish);
@@ -133,12 +148,16 @@ export function createToolsMap({
       }
     },
     'Img': {
+      id: 'Img',
+      title: t('insertLocalImage'),
       label: <ImageIcon size={20} />,
       action: () => {
         fileInputRef.current?.click();
       }
     },
     'Gallery': {
+      id: 'Gallery',
+      title: t('miniGallery'),
       label: <Images size={20} />,
       action: () => {
         setIsMiniGalleryOpen(prev => !prev);

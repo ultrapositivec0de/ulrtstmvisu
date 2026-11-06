@@ -1,73 +1,80 @@
-# Комплексний план оптимізації та виправлення 10 системних завдань
+# Unified Global & Reader Account Selector (Keychain & Vault)
 
-## 1. Стратегія виконання та економія ресурсів (Token-Saving Architecture)
+A unified account selection and signing method system that enables seamless switching between Keychain and Vault identities across Reader, Gallery, and Editor, with multi-account Keychain management and isolated or synchronized signing modes.
 
-Для збереження контексту та запобігання зайвому витрачанню вхідних токенів, загальний обсяг робіт розділено на **4 послідовні автономні етапи**. Кожен етап зафіксовано в окремому файлі в папці `./fix_test_patcn/`:
+## User Review & Critical Decisions
 
-1. **[Етап 1: Мобільні взаємодії, звук та Viewport](./fix_test_patcn/STAGE1_MOBILE_INTERACTIONS_PLAN.md)** (Завдання 1, 4, 5, 6, 7)
-2. **[Етап 2: Сповіщення та паритет панелей](./fix_test_patcn/STAGE2_NOTIFICATIONS_TOOLBAR_PLAN.md)** (Завдання 2, 8)
-3. **[Етап 3: Пайплайн зображень та Лайтбокс](./fix_test_patcn/STAGE3_IMAGE_PIPELINE_LIGHTBOX_PLAN.md)** (Завдання 3, 9)
-4. **[Етап 4: Санітизація таблиць та цитат](./fix_test_patcn/STAGE4_TABLES_QUOTES_SANITIZER_PLAN.md)** (Завдання 10)
+> [!IMPORTANT]
+> The account selector will follow the proven Gallery dropdown pattern (`🛡️ @username (Keychain)` vs `🔑 @username (Vault)`), allowing any username to be signed via Keychain or Vault key storage without forcing Keychain when a Vault account is active.
 
-Усі тимчасові тести та діагностичні скрипти розміщуються виключно в `./fix_test_patcn/` відповідно до правил проєкту.
-
----
-
-## 2. Ранжування завдань за черговістю та складністю
-
-| Черга | Завдання | Назва / Опис | Складність | Ризик | Цільові файли |
-|---|---|---|---|---|---|
-| **1.1** | Завдання 4 | Мобільний Reader: двопозиційний тогл налаштувань | Дуже низька | [ВИКОНАНО] | `ReaderMobileBottomBar.tsx` |
-| **1.2** | Завдання 5 | Header: усунення появи шестерні та виштовхування ракети при відкритті клавіатури | Низька | [ВИКОНАНО] | `Header.tsx` |
-| **1.3** | Завдання 6 | Віджет: ізоляція фокусу меню та перемикачів від віртуальної клавіатури | Низька | [ВИКОНАНО] | `TamedWidget.tsx` |
-| **1.4** | Завдання 7 | Віджет: drag-handle для reorder без блокування скролу | Середня | [ВИКОНАНО] | `TamedWidget.tsx` |
-| **1.5** | Завдання 1 | Звук клавіш: реакція на `pointerdown` без затримки | Середня | [ВИКОНАНО] | `useTypingSound.ts` |
-| **2.1** | Завдання 2 | Сповіщення: дедуплікація, позиція та таймер 3.5-4.5с | Середня | [ВИКОНАНО] | `App.tsx`, `usePublishingManager.ts`, `useSteemGallery.ts` |
-| **2.2** | Завдання 8 | Інструменти: паритет кнопок Header із віджетом | Середня | [ВИКОНАНО] | `Header.tsx`, `toolsMap.tsx`, `locales/*.ts` |
-| **3.1** | Завдання 9 | Лайтбокс: повноекранний перегляд зображень без переходу за лінками | Середня | Низький | `ImageLightboxModal.tsx`, `ReaderContent.tsx` |
-| **3.2** | Завдання 3 | Вивантаження Steem Vault: виправлення формату підпису Posting Key | Висока | Помірний | `useSteemGallery.ts`, `security.ts` |
-| **4.1** | Завдання 10| Таблиці та цитати: санітизація вкладених `<td>` та `>` | Висока | Середній | `markdownParser.ts`, `htmlToMarkdown.ts` |
+- **Confirmed Decision 1**: The account selector will be integrated directly into Reader top controls (desktop `ReaderTopHeader` & mobile `ReaderQuickPanel`) and synchronize with global state (`useSteemAuth`) so changes seamlessly reflect in Gallery and Editor.
+- **Confirmed Decision 2**: Support multiple Keychain usernames saved in local storage (`steem_keychain_accounts`), allowing quick addition and switching between test/real accounts.
+- **Confirmed Decision 3**: Each account in the selector explicitly indicates its signing method (Keychain vs Vault). Selecting a Vault account directs signing operations to the local encrypted Vault key, avoiding unwanted Keychain popups and expiration errors.
 
 ---
 
-## 3. Детальний зміст етапів з урахуванням внесених правок
+## 1. Overview & Core Concept
 
-### Етап 1: Мобільні взаємодії, звук та Viewport (Початок виконання)
-- **Завдання 4 (Тогл налаштувань Reader)**:
-  - У `ReaderMobileBottomBar.tsx` кнопка налаштувань перемикає стан: якщо `viewMode === 'settings'`, повертаємося до попереднього режиму (`feed` або `article`), інакше переходимо в `settings`.
-- **Завдання 5 (Фіксація кнопки публікації та шестерні в Header)**:
-  - Проблема: кнопка налаштувань (шестерня) у мобільному режимі живе в нижньому барі, а на ПК — за замовчуванням у хедері. Коли на телефоні відкривається клавіатура, нижній бар приховується, і через неточну перевірку події шестерня раптово з'являється у верхньому хедері, зсуваючи або виштовхуючи кнопку публікації (ракету).
-  - Рішення: у `Header.tsx` жорстко зафіксувати приховування шестерні для мобільного лейауту `(isMobileLayout || showMobileBottomBar) ? "hidden" : "flex"`, а кнопку ракети захистити пріоритетним `shrink-0`.
-- **Завдання 6 (Ізоляція фокусу у віджеті)**:
-  - У `TamedWidget.tsx` для меню та кнопок перемикання положення додати `onPointerDown={(e) => e.preventDefault()}`, щоб кліки по елементах панелі не забирали/не повертали фокус у текстове поле і не провокували появу клавіатури.
-- **Завдання 7 (Drag Handle для Reorder списків віджета)**:
-  - У `TamedWidget.tsx` відключити драг усього блоку (`dragListener={false}`), додати окрему іконку-рукоятку через `useDragControls()` та встановити `touch-action: pan-y` для вільного вертикального прокручування сторінки на сенсорних екранах.
-- **Завдання 1 (Миттєвий звук клавіш без затримки)**:
-  - У `useTypingSound.ts` та компонентах віртуальних клавіш перевести запуск звуку на `pointerdown` / `touchstart` з підтримкою підготовленого AudioContext, усуваючи затримку 100-150 мс очікування події `click`.
-
-### Етап 2: Сповіщення та паритет панелей інструментів
-- **Завдання 2**: Вирівнювання сповіщень у правому верхньому кутку ПК або під хедером на смартфонах без перекриття кнопками/віджетом. Повне усунення дублювання (один лог за раз) та гарантоване автозникнення через 3.5–4.5 с.
-- **Завдання 8**: Додавання до меню швидких дій Header усіх інструментів із `toolsMap.ts` (марковані та нумеровані списки, цитати, код, горизонтальні розділювачі).
-
-### Етап 3: Пайплайн зображень та Лайтбокс
-- **Завдання 9**:
-  - Розробка `ImageLightboxModal.tsx` із зумом, панорамуванням та кнопкою закриття.
-  - У `ReaderContent.tsx` та прев'ю редактора: якщо зображення загорнуто в зовнішнє посилання `<a>`, перехоплювати клік (`e.preventDefault()`, `e.stopPropagation()`), відкриваючи в лайтбоксі виключно зображення та повністю блокуючи перехід на сторонні вебсторінки.
-- **Завдання 3**:
-  - Ізольоване дослідження бінарного формату підпису Posting Key для SteemitImages API у `test_vault_image_signing.ts`.
-  - Коригування підпису для сховища Vault у `useSteemGallery.ts` без найменших змін у робочій гілці Steem Keychain.
-
-### Етап 4: Санітизація таблиць та цитат
-- **Завдання 10**:
-  - Санітизація вкладених `<table>` всередині `<td>` при експорті в Markdown, щоб запобігти розриву колонок.
-  - Коректний розбір таблиць всередині блочних цитат `>` у `markdownParser.ts`.
-  - Верифікація у `test_table_quote_sanitizer.ts`.
+- **What It Does**: Provides a dedicated, accessible account switcher in Reader mode and throughout the app, displaying all configured Keychain usernames and Vault accounts with clear visual indicators of the signing engine (`🛡️ Keychain` vs `🔑 Vault`).
+- **Target Audience**: Steem authors and curators managing multiple accounts or switching between browser extension signing and local encrypted keys.
+- **Key Value**: Eliminates the conflict where Keychain hijacked all signing operations even when the user intended to sign via Vault, and removes the friction of manual re-authentication when switching between multiple accounts.
 
 ---
 
-## 4. Контрольні критерії та верифікація
+## 2. User Experience & Visual Design
 
-1. **Строга компіляція**: відсутність помилок у `compile_applet`.
-2. **Чистий лінтер**: проходження `lint_applet` без зауважень.
-3. **Синхронізація i18n**: оновлення всіх 4 мовних файлів (`uk.ts`, `en.ts`, `es.ts`, `ko.ts`).
-4. **Стабільність розмітки**: збереження положення елементів хедера та в'юпорту при будь-яких взаємодіях з клавіатурою.
+- **Reader Top Header & Quick Panel Integration**:
+  - The current account badge in `ReaderTopHeader` (desktop) and `ReaderQuickPanel` (mobile) becomes an interactive dropdown trigger displaying the active identity (e.g., `🛡️ @alice` or `🔑 @bob`).
+  - Clicking opens a sleek popover with global design tokens (`var(--modal-bg)`, `var(--border-color)`):
+    - **Keychain Accounts Section**: Lists all added Keychain usernames with a quick `+ Add Keychain User` button.
+    - **Vault Accounts Section**: Lists all accounts stored in the local encrypted Vault, with unlock status indicator (`✓ Unlocked` or `🔒 Locked`).
+    - Clicking any item instantly switches `authType` and active username.
+- **Visual Identity & Theme**:
+  - Dark mode native with cyan/emerald accents for Keychain and amber/gold accents for Vault keys.
+  - Clear icon badges: `Shield` for Keychain, `Key` for Vault, with lock/unlock status indicators.
+- **Feedback & Motion**:
+  - Smooth spring popover animation via `motion/react`.
+  - Automatic prompt for Vault PIN when selecting a locked Vault account.
+
+---
+
+## 3. Key Product Decisions & Trade-Offs
+
+- **Decision 1: Unified Identity Model vs Separate Account States**:
+  - *Chosen Approach*: Update the shared `useSteemAuth` hook to manage `keychainAccounts: string[]` alongside `vaultAccounts: string[]`, while exposing `switchAccount(username: string, type: 'KEYCHAIN' | 'VAULT')`.
+  - *Why*: Ensures that choosing an account in Reader updates the active identity consistently, while respecting the user's explicit choice of signing provider.
+- **Decision 2: Strict Signing Provider Binding**:
+  - *Chosen Approach*: In `useReaderBlockchainActions.ts`, honor `effectiveAuth = authType` strictly. If `authType === 'VAULT'`, execute comments and votes via `SecurityService` without falling back to Keychain unless the user explicitly requests Keychain.
+  - *Why*: Solves the user's reported bug where Keychain was always triggered even when the user wanted to sign with Vault.
+
+---
+
+## 4. Technical Architecture & Data Strategy
+
+```
+┌──────────────────────────────────────────────────────────┐
+│                      useSteemAuth                        │
+│  - authType: 'KEYCHAIN' | 'VAULT'                        │
+│  - username (primary/keychain user)                      │
+│  - selectedVaultUser                                     │
+│  - keychainAccounts: string[] (localStorage sync)        │
+│  - vaultAccounts: string[] (SecurityService)             │
+│  - switchIdentity(username, 'KEYCHAIN' | 'VAULT')        │
+└──────────────┬────────────────────────────┬──────────────┘
+               │                            │
+               ▼                            ▼
+┌───────────────────────────────┐  ┌───────────────────────┐
+│     Reader Mode Controls      │  │   Gallery / Sidebar   │
+│  - ReaderTopHeader selector   │  │   - Existing select   │
+│  - ReaderQuickPanel (mobile)  │  │     synchronized with │
+│  - useReaderBlockchainActions │  │     useSteemAuth      │
+│    (routes to Keychain/Vault) │  └───────────────────────┘
+└───────────────────────────────┘
+```
+
+- **State Model**:
+  - `steem_keychain_accounts`: JSON array of usernames stored in `localStorage`.
+  - `steem_auth_type`: `'KEYCHAIN' | 'VAULT'`.
+  - `activeUser`: dynamic getter resolving to `authType === 'VAULT' ? selectedVaultUser : username`.
+- **Localization (i18n)**:
+  - Add synchronized keys across `uk.ts`, `en.ts`, `es.ts`, `ko.ts`: `selectAccount`, `keychainAccounts`, `vaultAccounts`, `addKeychainAccount`, `signingWithKeychain`, `signingWithVault`.

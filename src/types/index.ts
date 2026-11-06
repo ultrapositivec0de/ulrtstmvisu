@@ -95,6 +95,8 @@ export interface ReaderConfig {
   favoriteTags: string[];
   autoShowInbox: boolean;
   loadImages: boolean;
-  enableVoteLogging: boolean;
+  enableVoteLogging?: boolean;
+  onlyWhitelist?: boolean;
   mutedUsers?: string[];
+  loadFeedWithoutTag?: boolean;
 }

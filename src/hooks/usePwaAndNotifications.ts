@@ -95,7 +95,7 @@ export function usePwaAndNotifications({
           // ignore
         }
         
-        if (readerConfig && readerConfig.autoShowInbox === false) {
+        if (!readerConfig || !readerConfig.autoShowInbox) {
           return;
         }
 

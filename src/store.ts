@@ -1,95 +1,10 @@
-import { create } from 'zustand';
-import { subscribeWithSelector } from 'zustand/middleware';
+// Re-export editor store and helper functions for full backward compatibility
+export * from './stores/useEditorStore';
 
-interface EditorState {
-  lines: string[];
-  cursor: { row: number; col: number } | null;
-  selectionStart: number | null;
-  selectionEnd: number | null;
-  setLines: (lines: string[]) => void;
-  updateLine: (index: number, newText: string) => void;
-  setCursor: (cursor: { row: number; col: number } | null) => void;
-  setSelection: (start: number | null, end: number | null) => void;
-  
-  content: string;
-  setContent: (content: string) => void;
-  stats: { words: number; chars: number };
-  cleanStats: { words: number; chars: number };
-  setStats: (stats: { words: number; chars: number }, cleanStats: { words: number; chars: number }) => void;
-  
-  wpm: number;
-  setWpm: (wpm: number) => void;
-  
-  currentLang: string;
-  setCurrentLang: (lang: string) => void;
-}
-
-const getInitialContent = () => {
-  try {
-    return localStorage.getItem('steem_autosave_temp') || sessionStorage.getItem('steem_autosave_temp') || '';
-  } catch {
-    return '';
-  }
-};
-
-const getInitialLang = () => {
-  try {
-    return localStorage.getItem('steem_language') || 'uk';
-  } catch {
-    return 'uk';
-  }
-};
-
-export const useEditorStore = create<EditorState>()(
-  subscribeWithSelector((set) => ({
-    lines: [],
-    cursor: null,
-    selectionStart: null,
-    selectionEnd: null,
-    content: getInitialContent(),
-    stats: { words: 0, chars: 0 },
-    cleanStats: { words: 0, chars: 0 },
-    setStats: (stats, cleanStats) => set({ stats, cleanStats }),
-    setLines: (lines) => set({ lines, content: lines.join('\n') }),
-    updateLine: (index, newText) => set((state) => {
-      const newLines = [...state.lines];
-      newLines[index] = newText;
-      return { lines: newLines, content: newLines.join('\n') };
-    }),
-    setCursor: (cursor) => set({ cursor }),
-    setSelection: (start, end) => set({ selectionStart: start, selectionEnd: end }),
-    setContent: (content) => set({ content }),
-    wpm: 0,
-    setWpm: (wpm) => set({ wpm }),
-    currentLang: getInitialLang(),
-    setCurrentLang: (currentLang) => set({ currentLang }),
-  }))
-);
-
-export function getRowColFromOffset(text: string, offset: number) {
-  let row = 0;
-  let lastNewline = -1;
-  const len = Math.min(offset, text.length);
-  for (let i = 0; i < len; i++) {
-    if (text[i] === '\n') {
-      row++;
-      lastNewline = i;
-    }
-  }
-  return {
-    row,
-    col: len - (lastNewline + 1)
-  };
-}
-
-export function getOffsetFromRowCol(text: string, cursor: { row: number; col: number }) {
-  const lines = text.split('\n');
-  let offset = 0;
-  for (let i = 0; i < cursor.row; i++) {
-    if (i < lines.length) {
-      offset += lines[i].length + 1; // +1 for '\n'
-    }
-  }
-  return offset + cursor.col;
-}
-
+// Re-export new modular stores
+export { useModalStore, type ModalType, type ModalStoreState } from './stores/useModalStore';
+export { useAppUIStore, type AppView, type AppUIStoreState } from './stores/useAppUIStore';
+export { useReaderStore, type ReaderFeedMode, type ReaderStoreState } from './stores/useReaderStore';
+export { useHistoryStore, type HistorySnapshot, type HistoryStoreState } from './stores/useHistoryStore';
+export { useDeviceStore, type DeviceStoreState } from './store/deviceStore';
+export { useLightboxStore, type LightboxState } from './store/lightboxStore';

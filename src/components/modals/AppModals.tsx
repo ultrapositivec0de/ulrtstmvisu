@@ -4,7 +4,6 @@ import { X, Download } from 'lucide-react';
 import { cn } from '../../lib/utils';
 import { COMMUNITIES, COMMON_TAGS } from '../../data/communities';
 
-import { useEditorStore } from '../../store';
 import { UnlockPinModal } from './UnlockPinModal';
 import { KeysModal } from './KeysModal';
 import { PublishModal } from './PublishModal';
@@ -51,6 +50,10 @@ export interface AppModalsProps {
   setAuthType: (a: any) => void;
   selectedVaultUser: string;
   setSelectedVaultUser: (u: string) => void;
+  keychainAccounts?: string[];
+  addKeychainAccount?: (acc: string) => void;
+  removeKeychainAccount?: (acc: string) => void;
+  switchIdentity?: (user: string, type: 'KEYCHAIN' | 'VAULT') => void;
   pubTitle: string;
   setPubTitle: (t: string) => void;
   pubTags: string;
@@ -225,6 +228,10 @@ export const AppModals: React.FC<AppModalsProps> = (props) => {
     setAuthType,
     selectedVaultUser,
     setSelectedVaultUser,
+    keychainAccounts,
+    addKeychainAccount,
+    removeKeychainAccount,
+    switchIdentity,
     pubTitle,
     setPubTitle,
     pubTags,
@@ -353,9 +360,6 @@ export const AppModals: React.FC<AppModalsProps> = (props) => {
     pinTag,
     t
   } = props;
-  
-  const storeStats = useEditorStore(state => state.stats);
-  const wordsCount = storeStats?.words || 0;
 
   const lastActiveModalRef = React.useRef<string | null>(null);
   React.useEffect(() => {
@@ -373,6 +377,7 @@ export const AppModals: React.FC<AppModalsProps> = (props) => {
 {/* Modals */}
       <AnimatePresence>
         <UnlockPinModal
+          key="modal-unlock-pin"
           isOpen={activeModal === 'unlock-pin'}
           onClose={() => setActiveModal(null)}
           vaultPin={vaultPin}
@@ -383,6 +388,7 @@ export const AppModals: React.FC<AppModalsProps> = (props) => {
         />
 
         <KeysModal
+          key="modal-keys"
           isOpen={activeModal === 'keys'}
           onClose={() => {
             if (lastActiveModalRef.current === 'publish') {
@@ -393,6 +399,14 @@ export const AppModals: React.FC<AppModalsProps> = (props) => {
           }}
           username={username}
           setUsername={setUsername}
+          authType={authType}
+          setAuthType={setAuthType}
+          selectedVaultUser={selectedVaultUser}
+          setSelectedVaultUser={setSelectedVaultUser}
+          keychainAccounts={keychainAccounts}
+          addKeychainAccount={addKeychainAccount}
+          removeKeychainAccount={removeKeychainAccount}
+          switchIdentity={switchIdentity}
           isVaultInitialized={isVaultInitialized}
           isUnlocked={isUnlocked}
           vaultAccounts={vaultAccounts}
@@ -414,6 +428,7 @@ export const AppModals: React.FC<AppModalsProps> = (props) => {
         />
 
         <PublishModal
+          key="modal-publish"
           isOpen={activeModal === 'publish'}
           onClose={() => setActiveModal(null)}
           lang={lang}
@@ -466,6 +481,7 @@ export const AppModals: React.FC<AppModalsProps> = (props) => {
         />
 
         <TemplatesModal
+          key="modal-templates"
           isOpen={activeModal === 'templates'}
           onClose={() => setActiveModal(null)}
           templates={templates}
@@ -484,6 +500,7 @@ export const AppModals: React.FC<AppModalsProps> = (props) => {
         />
 
         <TagPresetsModal
+          key="modal-tag-presets"
           isOpen={activeModal === 'tagPresets'}
           onClose={() => {
             if (lastActiveModalRef.current === 'publish') {
@@ -502,16 +519,17 @@ export const AppModals: React.FC<AppModalsProps> = (props) => {
         />
 
         <SplitPostModal
+          key="modal-split-post"
           isOpen={activeModal === 'splitPost'}
           onClose={() => setActiveModal(null)}
           splitWords={splitWords}
           setSplitWords={setSplitWords}
-          wordsCount={wordsCount}
           handleSplitPost={handleSplitPost}
           t={t}
         />
 
         <DraftsModal
+          key="modal-drafts"
           isOpen={activeModal === 'drafts'}
           onClose={() => setActiveModal(null)}
           setContent={setContent}
@@ -535,6 +553,7 @@ export const AppModals: React.FC<AppModalsProps> = (props) => {
         />
 
         <MentionsModal
+          key="modal-mentions"
           isOpen={activeModal === 'mentions'}
           onClose={() => setActiveModal(null)}
           mentions={mentions}
@@ -549,6 +568,7 @@ export const AppModals: React.FC<AppModalsProps> = (props) => {
         />
 
         <QuickStyleMenu
+          key="modal-quick-style"
           isOpen={isSMenuOpen}
           onClose={() => setIsSMenuOpen(false)}
           themeColor={themeColor}
@@ -573,6 +593,7 @@ export const AppModals: React.FC<AppModalsProps> = (props) => {
         />
 
         <AboutModal
+          key="modal-about"
           isOpen={activeModal === 'about'}
           onClose={() => setActiveModal(null)}
           appAgent={appAgent}
@@ -583,6 +604,7 @@ export const AppModals: React.FC<AppModalsProps> = (props) => {
         />
 
         <TagGroupsModal
+          key="modal-tag-groups"
           isOpen={activeModal === 'tagGroups'}
           onClose={() => {
             if (lastActiveModalRef.current === 'publish') {
@@ -602,6 +624,7 @@ export const AppModals: React.FC<AppModalsProps> = (props) => {
         />
 
         <QueueModal
+          key="modal-queue"
           isOpen={activeModal === 'queue'}
           onClose={() => setActiveModal(null)}
           queue={queue}
@@ -613,6 +636,7 @@ export const AppModals: React.FC<AppModalsProps> = (props) => {
         />
 
         <TableImportModal
+          key="modal-table-import"
           isOpen={activeModal === 'tableImport'}
           onClose={() => setActiveModal(null)}
           tableImportText={tableImportText}
@@ -624,6 +648,7 @@ export const AppModals: React.FC<AppModalsProps> = (props) => {
         />
 
         <SettingsModal
+          key="modal-settings"
           isOpen={activeModal === 'settings'}
           onClose={() => setActiveModal(null)}
           settingsTab={settingsTab}
@@ -695,34 +720,11 @@ export const AppModals: React.FC<AppModalsProps> = (props) => {
         />
       </AnimatePresence>
 
-      <AnimatePresence>
-        {pubLog.msg && !activeModal && (
-            <motion.div 
-              initial={{ opacity: 0, y: -50 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -50 }}
-              className="fixed bottom-20 left-4 right-4 lg:left-auto lg:right-8 lg:top-8 lg:bottom-auto lg:w-80 z-[100]"
-            >
-              <div className={cn(
-                "p-4 rounded-2xl shadow-none border flex items-center gap-3 bg-slate-900",
-                pubLog.type === 'success' ? "border-green-500/30 text-green-400" :
-                pubLog.type === 'error' ? "border-red-500/30 text-red-400" :
-                "border-cyan-500/30 text-cyan-400"
-              )}>
-                {pubLog.type === 'loading' && <div className="w-4 h-4 border-2 border-cyan-500/30 border-t-cyan-500 rounded-full animate-spin shrink-0" />}
-                <p className="text-sm font-medium">{pubLog.msg}</p>
-                <button onClick={() => setPubLog({ msg: '', type: null })} className="ml-auto text-slate-500 hover:text-white">
-                  <X size={20} />
-                </button>
-              </div>
-            </motion.div>
-          )}
-      </AnimatePresence>
-
       {/* Floating PWA Promotion Banner */}
       <AnimatePresence>
         {showPwaBanner && !isPwaInstalled && !isTauriEnv() && !isNeutralinoEnv() && !isEditorFullScreen && !isFullScreen && (
           <motion.div
+            key="pwa-floating-banner"
             initial={{ opacity: 0, y: 50 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: 50 }}

@@ -1,8 +1,10 @@
 import { useState } from 'react';
 import { Buffer } from 'buffer';
-import { getClient, verifyPostOnChain } from '../lib/steem';
+import { getClient, verifyPostOnChain, probeNodes, getActiveNode } from '../lib/steem';
 import { SecurityService } from '../services/securityService';
 import { AuthType } from '../types';
+import { findWorkingPredictedImageUrl } from '../utils/steemImagePrediction';
+import { NativeHttpService } from '../services/nativeHttpService';
 
 interface UseReaderBlockchainActionsProps {
   authType: AuthType;
@@ -170,64 +172,149 @@ export function useReaderBlockchainActions({
 
       const formData = new FormData();
       formData.append("file", safeFile);
-      const res = await fetch(`https://steemitimages.com/${activeUser}/${signature}`, { method: "POST", body: formData });
-      if (!res.ok) throw new Error("Server error " + res.status);
-      const data = await res.json();
-      return data.url || data.link || data.data?.url;
+      const uploadEndpoint = `https://steemitimages.com/${activeUser}/${signature}`;
+      let url = '';
+
+      // 1. Try Native HTTP if in Tauri, Neutralino, or Android
+      if (NativeHttpService.isNativeEnvironment()) {
+        const nativeRes = await NativeHttpService.tryUpload(safeFile, uploadEndpoint, safeFile.name);
+        if (nativeRes.handled && nativeRes.success && nativeRes.url) {
+          url = nativeRes.url;
+        }
+      }
+
+      if (!url) {
+        try {
+          const res = await fetch(uploadEndpoint, { method: "POST", body: formData });
+          if (res.ok) {
+            try {
+              const data = await res.json();
+              url = data.url || data.link || data.data?.url || '';
+            } catch {
+              // CORS blocked JSON response reading
+            }
+          }
+        } catch {
+          // Direct CORS fetch failed; issue no-cors POST so browser transmits file payload to server
+          try {
+            await fetch(uploadEndpoint, { method: "POST", body: formData, mode: "no-cors" });
+          } catch {
+            // Ignore no-cors transport errors
+          }
+        }
+      }
+
+      if (!url) {
+        const predicted = await findWorkingPredictedImageUrl(safeFile, safeFile.name);
+        if (predicted) {
+          url = predicted;
+        }
+      }
+
+      if (url) {
+        return url;
+      }
+      throw new Error("Image upload could not be verified on server.");
     } finally {
       setTimeout(() => setPubLog({ msg: '', type: null }), 3000);
     }
   };
 
   const handleReaderComment = async (parentAuthor: string, parentPermlink: string, body: string, editPermlink?: string) => {
-    const activeUser = authType === 'VAULT' ? selectedVaultUser : username;
+    const hasKeychain = typeof window !== 'undefined' && !!(window as any).steem_keychain;
+    const effectiveAuth = authType;
+    const activeUser = effectiveAuth === 'VAULT' ? (selectedVaultUser || username) : (username || selectedVaultUser);
+
     if (!activeUser) {
       notify(t('noAccount'), 'error');
-      return;
+      throw new Error(t('noAccount'));
     }
 
-    try {
+    if (effectiveAuth === 'VAULT' && SecurityService.isLocked()) {
       await ensureVaultUnlocked();
-      setPubLog({ msg: t('publishing'), type: 'loading' });
-      const permlink = editPermlink || `re-${parentAuthor.replace(/\./g, '')}-${Date.now()}`;
-      const meta = JSON.stringify({ tags: [], app: appAgent, format: 'markdown' });
-      
-      const client = getClient();
-      if (!client) throw new Error("Steem client failed to initialize.");
-      const comment = {
-        author: activeUser,
-        title: '',
-        body,
-        parent_author: parentAuthor,
-        parent_permlink: parentPermlink,
-        permlink,
-        json_metadata: meta
-      };
-
-      if (authType === 'KEYCHAIN') {
-        if (!(window as any).steem_keychain) {
-          throw new Error("Steem Keychain extension not found! Please install it.");
-        }
-        await new Promise((resolve, reject) => {
-          (window as any).steem_keychain.requestPost(activeUser, '', body, parentPermlink, parentAuthor, meta, permlink, '', async (res: any) => {
-            if (res.success) resolve(res);
-            else {
-              const isPublished = await verifyPostOnChain(activeUser, permlink, 2, 1000, body);
-              if (isPublished) resolve(res);
-              else reject(new Error(res.message || "Keychain request failed"));
-            }
-          });
-        });
-      } else {
-        await SecurityService.broadcastPost(client, comment, activeUser);
-      }
-      
-      notify(t('publishedSuccess'), 'success');
-    } catch (err: any) {
-      notify(err.message, 'error');
-    } finally {
-      setPubLog({ msg: '', type: null });
     }
+
+    const maxAttempts = 2;
+    let lastError: any = null;
+
+    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+      try {
+        setPubLog({ msg: t('publishing'), type: 'loading' });
+        const permlink = editPermlink || `re-${parentAuthor.replace(/\./g, '')}-${Date.now()}`;
+        const meta = JSON.stringify({ tags: [], app: appAgent, format: 'markdown' });
+        
+        const client = getClient();
+        if (!client) throw new Error("Steem client failed to initialize.");
+        const comment = {
+          author: activeUser,
+          title: '',
+          body,
+          parent_author: parentAuthor,
+          parent_permlink: parentPermlink,
+          permlink,
+          json_metadata: meta
+        };
+
+        if (effectiveAuth === 'KEYCHAIN') {
+          if (!(window as any).steem_keychain) {
+            throw new Error("Steem Keychain extension not found! Please install it.");
+          }
+          const currentRpc = getActiveNode();
+          await new Promise((resolve, reject) => {
+            (window as any).steem_keychain.requestPost(
+              activeUser,
+              '',
+              body,
+              parentPermlink,
+              parentAuthor,
+              meta,
+              permlink,
+              '',
+              async (res: any) => {
+                if (res.success) resolve(res);
+                else {
+                  const isPublished = await verifyPostOnChain(activeUser, permlink, 3, 1200, body);
+                  if (isPublished) resolve(res);
+                  else reject(new Error(res.message || "Keychain request failed"));
+                }
+              },
+              currentRpc
+            );
+          });
+        } else {
+          await SecurityService.broadcastPost(client, comment, activeUser);
+        }
+        
+        notify(t('publishedSuccess'), 'success');
+        return;
+      } catch (err: any) {
+        lastError = err;
+        const errMsg = (err?.message || String(err)).toLowerCase();
+        const isExpirationOrTimeout = errMsg.includes('expiration') || errMsg.includes('timeout') || errMsg.includes('expired');
+
+        if (attempt < maxAttempts && isExpirationOrTimeout) {
+          console.warn(`[handleReaderComment] Attempt ${attempt} failed with expiration/timeout (${err.message}). Probing nodes and retrying...`);
+          setPubLog({ msg: `${t('publishing')} (Retry ${attempt + 1})...`, type: 'loading' });
+          await probeNodes(true);
+          await new Promise(r => setTimeout(r, 1200));
+          continue;
+        }
+
+        if (isExpirationOrTimeout) {
+          const guidance = t('txExpirationGuidance');
+          const formattedErr = new Error(`${err.message || 'Transaction expiration exception'}. ${guidance}`);
+          notify(formattedErr.message, 'error');
+          throw formattedErr;
+        }
+
+        notify(err.message || String(err), 'error');
+        throw err;
+      } finally {
+        setPubLog({ msg: '', type: null });
+      }
+    }
+
+    if (lastError) throw lastError;
   };
 
   const handleMuteUser = async (targetUser: string, mute: boolean = true) => {
@@ -277,7 +364,10 @@ export function useReaderBlockchainActions({
   };
 
   const handleReaderVote = async (author: string, permlink: string, weight: number) => {
-    const activeUser = authType === 'VAULT' ? selectedVaultUser : username;
+    const hasKeychain = typeof window !== 'undefined' && !!(window as any).steem_keychain;
+    const effectiveAuth = authType;
+    const activeUser = effectiveAuth === 'VAULT' ? (selectedVaultUser || username) : (username || selectedVaultUser);
+
     if (!activeUser) {
       notify(t('noAccount'), 'error');
       return;
@@ -288,12 +378,15 @@ export function useReaderBlockchainActions({
     setLoadingContext(prev => new Set(prev).add(key));
 
     try {
-      await ensureVaultUnlocked();
+      if (effectiveAuth === 'VAULT' && SecurityService.isLocked()) {
+        await ensureVaultUnlocked();
+      }
+
       const client = getClient();
       if (!client) throw new Error("Steem client failed to initialize.");
       const vote = { voter: activeUser, author, permlink, weight };
 
-      if (authType === 'KEYCHAIN') {
+      if (effectiveAuth === 'KEYCHAIN') {
         if (!(window as any).steem_keychain) {
           throw new Error("Steem Keychain extension not found! Please install it.");
         }

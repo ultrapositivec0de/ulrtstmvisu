@@ -39,9 +39,10 @@ import { cn } from '../../lib/utils';
 import { ShieldUserIcon } from '../common/ShieldUserIcon';
 import { getFloatingWidgetStyles } from '../../lib/viewportLayout';
 import { useDeviceStore } from '../../store/deviceStore';
+import type { ToolItem } from './toolsMap';
 
 export interface TamedWidgetProps {
-  toolsMap?: Record<string, { label: string | React.ReactNode; action: (e?: React.MouseEvent) => void }>;
+  toolsMap?: Record<string, ToolItem>;
   widgetPos: 'bottom' | 'floating' | 'hidden';
   setWidgetPos: (pos: 'bottom' | 'floating' | 'hidden') => void;
   isWidgetVisible: boolean;
@@ -116,11 +117,14 @@ const ToolReorderRow: React.FC<ToolReorderRowProps> = ({
   moveTool,
 }) => {
   const dragControls = useDragControls();
+  const tool = toolsMap[toolKey];
+  const toolTitle = tool?.title || (typeof tool?.label === 'string' ? tool.label : toolKey);
 
   return (
     <Reorder.Item 
       key={toolKey || `tool-order-${idx}`} 
       value={toolKey}
+      data-tool={toolKey}
       transition={{ duration: 0.1 }}
       dragListener={false}
       dragControls={dragControls}
@@ -142,10 +146,11 @@ const ToolReorderRow: React.FC<ToolReorderRowProps> = ({
           }}
           className="p-1 cursor-grab active:cursor-grabbing text-slate-500 hover:text-cyan-400 touch-none flex items-center justify-center rounded-lg hover:bg-white/5"
           title="Drag to reorder"
+          aria-label={`Drag ${toolTitle} to reorder`}
         >
           <MoveVertical size={18} />
         </div>
-        <span className="text-[11px] font-bold text-slate-200">{toolsMap[toolKey]?.label}</span>
+        <span className="text-[11px] font-bold text-slate-200" title={toolTitle}>{tool?.label || toolKey}</span>
       </div>
       <div className="flex items-center gap-1.5 opacity-80 sm:opacity-0 group-hover:opacity-100 transition-opacity">
         <button 
@@ -156,6 +161,8 @@ const ToolReorderRow: React.FC<ToolReorderRowProps> = ({
             moveTool(toolKey, 'up');
           }}
           disabled={idx === 0}
+          title={`Move ${toolTitle} up`}
+          aria-label={`Move ${toolTitle} up`}
           className="text-slate-500 hover:text-cyan-400 disabled:opacity-0 transition-all p-1"
         >
           <ChevronUp size={20} />
@@ -168,6 +175,8 @@ const ToolReorderRow: React.FC<ToolReorderRowProps> = ({
             moveTool(toolKey, 'down');
           }}
           disabled={idx === total - 1}
+          title={`Move ${toolTitle} down`}
+          aria-label={`Move ${toolTitle} down`}
           className="text-slate-500 hover:text-cyan-400 disabled:opacity-0 transition-all p-1"
         >
           <ChevronDown size={20} />
@@ -237,41 +246,41 @@ export const TamedWidget: React.FC<TamedWidgetProps> = (props) => {
     t
   } = props;
 
-  const fallbackToolsMap: Record<string, { label: string | React.ReactNode, action: (e?: React.MouseEvent) => void }> = {
-    'B': { label: 'B', action: () => fmt('**') },
-    'I': { label: 'I', action: () => fmt('*') },
-    'S': { label: '~~', action: () => fmt('~~') },
-    'sub': { label: 'sub', action: () => fmt('<sub>', '</sub>') },
-    'sup': { label: 'sup', action: () => fmt('<sup>', '</sup>') },
-    'H1': { label: 'H1', action: () => fmtLine('# ') },
-    'H2': { label: 'H2', action: () => fmtLine('## ') },
-    'H3': { label: 'H3', action: () => fmtLine('### ') },
-    'Link': { label: <LinkIcon size={20} />, action: handleLink },
-    'Quote': { label: <Quote size={20} />, action: () => fmtLine('> ') },
-    'List': { label: '•', action: () => fmtLine('- ') },
-    'Num': { label: '1.', action: () => fmtLine('1. ') },
-    'Task': { label: '☑', action: () => fmtLine('- [ ] ') },
-    'Table': { label: <LayoutGrid size={20} />, action: importTable },
-    'Separator': { label: <Minus size={20} />, action: () => insertAtCursor('| Head |\n| --- |\n', 'end') },
-    'Import': { label: <TableIcon size={20} />, action: importTable },
-    'Code': { label: <Code size={20} />, action: () => fmt('```\n', '\n```') },
-    'Inline': { label: '</>', action: () => fmt('`') },
-    'Indent': { label: 'Tab →', action: () => handleIndent('in') },
-    'Esc': { label: '\\', action: () => fmt('\\', '') },
-    'HR': { label: '—', action: () => insertAtCursor('\n\n---\n\n') },
-    'Color': { label: 'A', action: () => fmt('<div class="phishy">', '</div>') },
-    'Caption': { label: 'Caption', action: () => fmt('<center>\n<sub>', '</sub>\n</center>') },
-    'Left': { label: '⬅', action: () => fmt('<div class="text-left">\n', '\n</div>') },
-    'Center': { label: t('center'), action: () => fmt('<center>\n', '\n</center>') },
-    'Right': { label: '➡', action: () => fmt('<div class="text-right">\n', '\n</div>') },
-    'Justify': { label: t('justify'), action: () => fmt('<div class="text-justify">\n', '\n</div>') },
-    'Templates': { label: <FileText size={20} />, action: () => setActiveModal('templates') },
-    'Mentions': { label: 'Mentions', action: () => insertAtCursor('@') },
-    'Img': { label: <ImageIcon size={20} />, action: () => {} },
-    'Gallery': { label: 'Gallery', action: () => {} }
+  const fallbackToolsMap: Record<string, { id: string; title: string; label: string | React.ReactNode, action: (e?: React.MouseEvent) => void }> = {
+    'B': { id: 'B', title: t('bold'), label: 'B', action: () => fmt('**') },
+    'I': { id: 'I', title: t('italic'), label: 'I', action: () => fmt('*') },
+    'S': { id: 'S', title: t('strike'), label: '~~', action: () => fmt('~~') },
+    'sub': { id: 'sub', title: t('subscript'), label: 'sub', action: () => fmt('<sub>', '</sub>') },
+    'sup': { id: 'sup', title: t('superscript'), label: 'sup', action: () => fmt('<sup>', '</sup>') },
+    'H1': { id: 'H1', title: t('h1'), label: 'H1', action: () => fmtLine('# ') },
+    'H2': { id: 'H2', title: t('h2'), label: 'H2', action: () => fmtLine('## ') },
+    'H3': { id: 'H3', title: t('h3'), label: 'H3', action: () => fmtLine('### ') },
+    'Link': { id: 'Link', title: t('link'), label: <LinkIcon size={20} />, action: handleLink },
+    'Quote': { id: 'Quote', title: t('quote'), label: <Quote size={20} />, action: () => fmtLine('> ') },
+    'List': { id: 'List', title: t('listBullet'), label: '•', action: () => fmtLine('- ') },
+    'Num': { id: 'Num', title: t('listOrdered'), label: '1.', action: () => fmtLine('1. ') },
+    'Task': { id: 'Task', title: t('listTask'), label: '☑', action: () => fmtLine('- [ ] ') },
+    'Table': { id: 'Table', title: t('table'), label: <LayoutGrid size={20} />, action: importTable },
+    'Separator': { id: 'Separator', title: t('tableSelector1ColSep'), label: <Minus size={20} />, action: () => insertAtCursor('| Head |\n| --- |\n', 'end') },
+    'Import': { id: 'Import', title: t('importTable'), label: <TableIcon size={20} />, action: importTable },
+    'Code': { id: 'Code', title: t('codeBlock'), label: <Code size={20} />, action: () => fmt('```\n', '\n```') },
+    'Inline': { id: 'Inline', title: t('inlineCode'), label: '</>', action: () => fmt('`') },
+    'Indent': { id: 'Indent', title: t('indent'), label: 'Tab →', action: () => handleIndent('in') },
+    'Esc': { id: 'Esc', title: t('escapeChar'), label: '\\', action: () => fmt('\\', '') },
+    'HR': { id: 'HR', title: t('hr'), label: '—', action: () => insertAtCursor('\n\n---\n\n') },
+    'Color': { id: 'Color', title: t('redText'), label: 'A', action: () => fmt('<div class="phishy">', '</div>') },
+    'Caption': { id: 'Caption', title: t('captionShort'), label: 'Caption', action: () => fmt('<center>\n<sub>', '</sub>\n</center>') },
+    'Left': { id: 'Left', title: t('leftText'), label: '⬅', action: () => fmt('<div class="text-left">\n', '\n</div>') },
+    'Center': { id: 'Center', title: t('center'), label: t('center'), action: () => fmt('<center>\n', '\n</center>') },
+    'Right': { id: 'Right', title: t('rightText'), label: '➡', action: () => fmt('<div class="text-right">\n', '\n</div>') },
+    'Justify': { id: 'Justify', title: t('justify'), label: t('justify'), action: () => fmt('<div class="text-justify">\n', '\n</div>') },
+    'Templates': { id: 'Templates', title: t('templates'), label: <FileText size={20} />, action: () => setActiveModal('templates') },
+    'Mentions': { id: 'Mentions', title: t('mentions'), label: 'Mentions', action: () => insertAtCursor('@') },
+    'Img': { id: 'Img', title: t('insertLocalImage'), label: <ImageIcon size={20} />, action: () => {} },
+    'Gallery': { id: 'Gallery', title: t('miniGallery'), label: 'Gallery', action: () => {} }
   };
 
-  const TOOLS_MAP = props.toolsMap || fallbackToolsMap;
+  const TOOLS_MAP: Record<string, ToolItem> = (props.toolsMap || fallbackToolsMap) as Record<string, ToolItem>;
   const isMobileLayout = useDeviceStore(s => s.isMobileLayout);
 
   return (
@@ -340,9 +349,10 @@ export const TamedWidget: React.FC<TamedWidgetProps> = (props) => {
                         width: isWidgetMenuOpen && lockedToolsWidth ? `${lockedToolsWidth}px` : undefined
                       }}
                     >
-                      {enabledTools.filter((k: any) => Boolean(k && TOOLS_MAP[k])).map((key: string, idx: number) => {
+                      {Array.from(new Set<string>(enabledTools.filter((k: any) => Boolean(k && TOOLS_MAP[k])))).map((key: string, idx: number) => {
                         const tool = TOOLS_MAP[key];
                         if (!tool) return null;
+                        const toolTitle = tool.title || (typeof tool.label === 'string' ? tool.label : key);
                         const isToolActive = 
                           key === 'B' ? activeFormats.bold :
                           key === 'I' ? activeFormats.italic :
@@ -354,8 +364,12 @@ export const TamedWidget: React.FC<TamedWidgetProps> = (props) => {
                           false;
                         return (
                           <button 
-                            key={key || `tool-${idx}`}
+                            id={`editor-tool-${key}`}
+                            data-tool={key}
+                            key={`editor-tool-${key}-${idx}`}
                             type="button"
+                            title={toolTitle}
+                            aria-label={toolTitle}
                             onMouseDown={(e) => e.preventDefault()}
                             onPointerDown={(e) => e.preventDefault()}
                             onClick={(e) => handleWidgetAction(tool.action, e)} 
@@ -515,9 +529,9 @@ export const TamedWidget: React.FC<TamedWidgetProps> = (props) => {
                                       { id: 'bottom', label: t('widgetPosBottom') },
                                       { id: 'floating', label: t('widgetPosFloating') },
                                       { id: 'hidden', label: t('widgetPosHidden') }
-                                    ].map(pos => (
+                                    ].map((pos, idx) => (
                                       <button
-                                        key={pos.id}
+                                        key={`widget-pos-${pos.id}-${idx}`}
                                         type="button"
                                         onPointerDown={(e) => {
                                           e.preventDefault();
@@ -566,9 +580,9 @@ export const TamedWidget: React.FC<TamedWidgetProps> = (props) => {
                                   className="space-y-2"
                                   style={{ touchAction: 'pan-y' }}
                                 >
-                                  {enabledTools.filter((k: any) => Boolean(k && TOOLS_MAP[k])).map((key: string, idx: number, arr: string[]) => (
+                                  {Array.from(new Set<string>(enabledTools.filter((k: any) => Boolean(k && TOOLS_MAP[k])))).map((key: string, idx: number, arr: string[]) => (
                                     <ToolReorderRow
-                                      key={key || `tool-order-${idx}`}
+                                      key={`reorder-tool-${key}-${idx}`}
                                       toolKey={key}
                                       idx={idx}
                                       total={arr.length}
@@ -579,22 +593,30 @@ export const TamedWidget: React.FC<TamedWidgetProps> = (props) => {
                                 </Reorder.Group>
 
                                 <div className="grid grid-cols-4 gap-1.5 pt-2">
-                                  {Object.keys(TOOLS_MAP).filter(Boolean).map((key, idx) => (
-                                    <button
-                                      key={`toggle-${key || idx}`}
-                                      type="button"
-                                      onPointerDown={(e) => e.preventDefault()}
-                                      onClick={() => toggleTool(key)}
-                                      className={cn(
-                                        "text-[9px] py-1.5 px-2 rounded-lg border text-center transition-all font-medium truncate",
-                                        enabledTools.includes(key) 
-                                          ? "bg-cyan-600/10 border-cyan-500/50 text-cyan-400" 
-                                          : "bg-slate-900 border-slate-800 text-slate-600 hover:border-slate-700"
-                                      )}
-                                    >
-                                      {key}
-                                    </button>
-                                  ))}
+                                  {Object.keys(TOOLS_MAP).filter(Boolean).map((key, idx) => {
+                                    const tool = TOOLS_MAP[key];
+                                    const toolTitle = tool?.title || key;
+                                    return (
+                                      <button
+                                        id={`editor-tool-toggle-${key}`}
+                                        data-tool={key}
+                                        key={`tool-toggle-${key}-${idx}`}
+                                        type="button"
+                                        title={toolTitle}
+                                        aria-label={toolTitle}
+                                        onPointerDown={(e) => e.preventDefault()}
+                                        onClick={() => toggleTool(key)}
+                                        className={cn(
+                                          "text-[9px] py-1.5 px-2 rounded-lg border text-center transition-all font-medium truncate",
+                                          enabledTools.includes(key) 
+                                            ? "bg-cyan-600/10 border-cyan-500/50 text-cyan-400" 
+                                            : "bg-slate-900 border-slate-800 text-slate-600 hover:border-slate-700"
+                                        )}
+                                      >
+                                        {key}
+                                      </button>
+                                    );
+                                  })}
                                 </div>
                               </div>
                             </div>

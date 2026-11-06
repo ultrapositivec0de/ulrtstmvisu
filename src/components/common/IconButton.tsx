@@ -2,6 +2,9 @@ import React from 'react';
 import { cn } from '../../lib/utils';
 
 export interface IconButtonProps {
+  id?: string;
+  'data-tool'?: string;
+  ariaLabel?: string;
   icon: any;
   onClick: (e?: React.MouseEvent | any) => void;
   title?: string;
@@ -12,6 +15,9 @@ export interface IconButtonProps {
 }
 
 export const IconButton: React.FC<IconButtonProps> = ({
+  id,
+  'data-tool': dataTool,
+  ariaLabel,
   icon: Icon,
   onClick,
   title,
@@ -21,11 +27,14 @@ export const IconButton: React.FC<IconButtonProps> = ({
   iconClassName
 }) => (
   <button
+    id={id}
+    data-tool={dataTool}
     type="button"
     onClick={onClick}
     onMouseDown={(e) => e.preventDefault()}
     onPointerDown={(e) => e.preventDefault()}
     title={title}
+    aria-label={ariaLabel || title}
     style={{
       minWidth: 'var(--header-btn-size, 2rem)',
       minHeight: 'var(--header-btn-size, 2rem)',

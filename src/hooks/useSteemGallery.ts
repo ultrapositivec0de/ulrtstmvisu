@@ -4,6 +4,8 @@ import ExifReader from 'exifreader';
 import { SecurityService } from '../services/securityService';
 import { Buffer } from 'buffer';
 import { useImageSearch } from './useImageSearch';
+import { findWorkingPredictedImageUrl } from '../utils/steemImagePrediction';
+import { NativeHttpService } from '../services/nativeHttpService';
 
 const STORAGE_KEY_IMAGES = 'steem_uploaded_images_v2';
 
@@ -51,6 +53,7 @@ export interface SteemGalleryConfig {
   performanceMode: boolean;
   onImageInserted?: () => void;
   setIsMiniGalleryOpen: Dispatch<SetStateAction<boolean>>;
+  authType?: AuthType | 'VAULT';
 }
 
 export function useSteemGallery(config: SteemGalleryConfig) {
@@ -129,7 +132,6 @@ export function useSteemGallery(config: SteemGalleryConfig) {
     const hasKeychain = typeof window !== 'undefined' && !!(window as any).steem_keychain;
     if (!hasKeychain && config.vaultAccounts.length > 0) {
       if (!imageUploadAccount || !config.vaultAccounts.includes(imageUploadAccount)) {
-        // eslint-disable-next-line
         setImageUploadAccount(config.selectedVaultUser || config.vaultAccounts[0]);
       }
     }
@@ -200,7 +202,6 @@ export function useSteemGallery(config: SteemGalleryConfig) {
 
     const savedLinks = localStorage.getItem('steem_editor_source_links');
     if (savedLinks) {
-      // eslint-disable-next-line
       parseImages(savedLinks);
     } else {
       const savedImages = localStorage.getItem(STORAGE_KEY_IMAGES);
@@ -555,7 +556,9 @@ export function useSteemGallery(config: SteemGalleryConfig) {
 
   const uploadExternalImage = useCallback(async (url: string, fileName: string = 'image.jpg') => {
     const hasKeychain = typeof window !== 'undefined' && !!(window as any).steem_keychain;
-    const uploadAuthType = imageUploadAccount ? 'VAULT' : (hasKeychain ? 'KEYCHAIN' : 'VAULT');
+    const uploadAuthType = imageUploadAccount 
+      ? 'VAULT' 
+      : (config.authType === 'VAULT' ? 'VAULT' : (hasKeychain ? 'KEYCHAIN' : 'VAULT'));
     let activeUser = imageUploadAccount;
     
     if (!activeUser) {
@@ -641,27 +644,53 @@ export function useSteemGallery(config: SteemGalleryConfig) {
       const formData = new FormData();
       formData.append("file", file);
       const uploadUrl = `https://steemitimages.com/${cleanUser}/${signature}`;
-      
-      const response = await fetch(uploadUrl, { method: "POST", body: formData });
-      let data: any;
-      try {
-        data = await response.json();
-      } catch {
-        const rawText = await response.text();
-        throw new Error(`Invalid JSON response: ${rawText.substring(0, 100)}`);
+      let finalUrl = '';
+
+      // 1. Try Native HTTP if in Tauri, Neutralino, or Android
+      if (NativeHttpService.isNativeEnvironment()) {
+        const nativeRes = await NativeHttpService.tryUpload(file, uploadUrl, fileName);
+        if (nativeRes.handled && nativeRes.success && nativeRes.url) {
+          finalUrl = nativeRes.url;
+        }
       }
 
-      if (!response.ok || data.success === false || data.error) {
-        const errMsg = data.error?.message || data.error?.name || data.message || (typeof data.error === 'string' ? data.error : `HTTP ${response.status}`);
-        throw new Error(`${config.t('serverError')}: ${errMsg}`);
+      // 2. Direct Web fetch (if not already handled natively)
+      if (!finalUrl) {
+        try {
+          const response = await fetch(uploadUrl, { method: "POST", body: formData });
+          if (response.ok) {
+            try {
+              const data = await response.json();
+              finalUrl = data.url || data.link || data.data?.url || '';
+            } catch {
+              // CORS blocked response JSON reading
+            }
+          }
+        } catch {
+          // Direct fetch failed; issue no-cors POST to deliver payload to server
+          try {
+            await fetch(uploadUrl, { method: "POST", body: formData, mode: "no-cors" });
+          } catch {
+            // ignore transport errors
+          }
+        }
       }
-      
-      const finalUrl = data.url || data.link || data.data?.url;
-      
+
+      // 3. Deterministic DOM Image probing (exempt from CORS read blocking)
+      if (!finalUrl) {
+        config.setPubLog({ msg: config.t('verifyingImage'), type: 'loading' });
+        const predicted = await findWorkingPredictedImageUrl(file, fileName);
+        if (predicted) {
+          finalUrl = predicted;
+        }
+      }
+
       if (finalUrl) {
         const newImg: ImageItem = { url: finalUrl, name: fileName, selected: false };
         setImages(prev => [newImg, ...prev]);
         setSourceInput(prev => finalUrl + "\n" + prev);
+      } else {
+        throw new Error('Image upload could not be verified on server');
       }
     } catch (err: any) {
       console.error(err);
@@ -687,7 +716,9 @@ export function useSteemGallery(config: SteemGalleryConfig) {
     const files = Array.from(rawFiles);
     
     const hasKeychain = typeof window !== 'undefined' && !!(window as any).steem_keychain;
-    const uploadAuthType = imageUploadAccount ? 'VAULT' : (hasKeychain ? 'KEYCHAIN' : 'VAULT');
+    const uploadAuthType = imageUploadAccount 
+      ? 'VAULT' 
+      : (config.authType === 'VAULT' ? 'VAULT' : (hasKeychain ? 'KEYCHAIN' : 'VAULT'));
     let activeUser = imageUploadAccount;
     
     if (!activeUser) {
@@ -748,7 +779,18 @@ export function useSteemGallery(config: SteemGalleryConfig) {
     setIsUploading(true);
     let successCount = 0;
     
-    const uploadVaultWithProgress = (file: File, signature: string, user: string, index: number): Promise<any> => {
+    const uploadVaultWithProgress = async (file: File, signature: string, user: string, index: number): Promise<any> => {
+      const uploadUrl = `https://steemitimages.com/${user}/${signature}`;
+
+      // 1. Try Native HTTP if in Tauri, Neutralino, or Android
+      if (NativeHttpService.isNativeEnvironment()) {
+        const nativeRes = await NativeHttpService.tryUpload(file, uploadUrl, file.name);
+        if (nativeRes.handled && nativeRes.success && nativeRes.url) {
+          return { url: nativeRes.url };
+        }
+      }
+
+      // 2. Direct Web XHR with progress
       return new Promise((resolve, reject) => {
         let isSettled = false;
         const safeReject = (err: Error) => {
@@ -766,7 +808,6 @@ export function useSteemGallery(config: SteemGalleryConfig) {
 
         const formData = new FormData();
         formData.append("file", file);
-        const uploadUrl = `https://steemitimages.com/${user}/${signature}`;
         const xhr = new XMLHttpRequest();
         xhr.open("POST", uploadUrl);
         xhr.upload.onprogress = (e) => {
@@ -791,7 +832,7 @@ export function useSteemGallery(config: SteemGalleryConfig) {
                 return;
               }
               safeResolve(parsed);
-            } catch (err: any) {
+            } catch {
               safeReject(new Error(`Invalid JSON response: ${xhr.responseText ? xhr.responseText.substring(0, 100) : 'empty'}`));
             }
           } else {
@@ -805,7 +846,20 @@ export function useSteemGallery(config: SteemGalleryConfig) {
             safeReject(new Error(`${config.t('serverError')}: ${xhr.status}${errorDetail ? ` (${errorDetail})` : ''}`));
           }
         };
-        xhr.onerror = () => safeReject(new Error("Network connection error"));
+        xhr.onerror = async () => {
+          // If browser blocked XHR response due to missing CORS headers, attempt no-cors + DOM Image probe
+          try {
+            await fetch(uploadUrl, { method: "POST", body: formData, mode: "no-cors" });
+            const predicted = await findWorkingPredictedImageUrl(file, file.name);
+            if (predicted) {
+              safeResolve({ url: predicted });
+              return;
+            }
+          } catch {
+            // ignore
+          }
+          safeReject(new Error("Network connection error"));
+        };
         xhr.onabort = () => safeReject(new Error("Upload aborted"));
         xhr.ontimeout = () => safeReject(new Error("Upload timed out (60s)"));
         xhr.timeout = 60000;
@@ -885,24 +939,50 @@ export function useSteemGallery(config: SteemGalleryConfig) {
             
             const formData = new FormData();
             formData.append("file", file);
-            const resp = await fetch(`https://steemitimages.com/${cleanUser}/${signature}`, { method: "POST", body: formData });
-            if (!resp.ok) {
-              let errText = '';
-              try {
-                errText = await resp.text();
-              } catch {
-                errText = '';
+            const uploadEndpoint = `https://steemitimages.com/${cleanUser}/${signature}`;
+            let url = '';
+
+            // 1. Try Native HTTP if in Tauri, Neutralino, or Android
+            if (NativeHttpService.isNativeEnvironment()) {
+              const nativeRes = await NativeHttpService.tryUpload(file, uploadEndpoint, file.name);
+              if (nativeRes.handled && nativeRes.success && nativeRes.url) {
+                url = nativeRes.url;
               }
-              throw new Error(`${config.t('serverError')}: ${resp.status}${errText ? ` (${errText.substring(0, 100)})` : ''}`);
             }
-            let data: any;
-            try {
-              data = await resp.json();
-            } catch {
-              const rawText = await resp.text();
-              throw new Error(`Invalid JSON response: ${rawText.substring(0, 100)}`);
+
+            if (!url) {
+              try {
+                const resp = await fetch(uploadEndpoint, { method: "POST", body: formData });
+                if (resp.ok) {
+                  try {
+                    const data = await resp.json();
+                    url = data.url || data.link || data.data?.url || '';
+                  } catch {
+                    // Browser CORS blocked response JSON reading
+                  }
+                }
+              } catch {
+                // Direct CORS fetch failed; issue no-cors POST so browser transmits file payload to server
+                try {
+                  await fetch(uploadEndpoint, { method: "POST", body: formData, mode: "no-cors" });
+                } catch {
+                  // Ignore no-cors transport errors
+                }
+              }
             }
-            const url = data.url || data.link || data.data?.url;
+
+            // Probe predicted candidate URLs using non-CORS Image DOM elements
+            if (!url) {
+              config.setPubLog({ 
+                msg: `[${i + 1}/${files.length}] ` + config.t('verifyingImage'), 
+                type: 'loading' 
+              });
+              const predicted = await findWorkingPredictedImageUrl(file, file.name);
+              if (predicted) {
+                url = predicted;
+              }
+            }
+
             if (url) {
               setImages(prev => [
                 ...prev.slice(0, i),
@@ -915,7 +995,7 @@ export function useSteemGallery(config: SteemGalleryConfig) {
                 insertImage(url, file.name, 'plain');
               }
             } else {
-              throw new Error(data.message || data.error || 'No URL returned from image host');
+              throw new Error('Image could not be verified on server');
             }
           }
         } catch (err: any) {

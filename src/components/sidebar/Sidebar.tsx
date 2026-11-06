@@ -20,11 +20,12 @@ import {
   Image as ImageIcon
 } from 'lucide-react';
 import { cn } from '../../lib/utils';
-import { ImageItem } from '../../types';
+import { ImageItem, AuthType } from '../../types';
 import { SecurityService } from '../../services/securityService';
 import { useDeviceStore } from '../../store/deviceStore';
 import ImageItemComp from '../ImageItem';
 import ExternalImageItem from '../ExternalImageItem';
+import { AccountSelector } from '../common/AccountSelector';
 
 export const TextWrapIcon = ({ size = 24, className = "", style }: { size?: number; className?: string; style?: React.CSSProperties }) => (
   <svg 
@@ -80,6 +81,11 @@ export interface SidebarProps {
   selectedVaultUser: string;
   imageUploadAccount: string;
   setImageUploadAccount: (acc: string) => void;
+  authType?: AuthType | 'VAULT';
+  keychainAccounts?: string[];
+  onSelectAccount?: (user: string, type: 'KEYCHAIN' | 'VAULT') => void;
+  onAddKeychainAccount?: (user: string) => void;
+  onOpenVaultManager?: () => void;
   // Gallery state
   galleryMode: 'local' | 'pexels' | 'pixabay' | 'unsplash';
   toggleGalleryMode: (mode: 'local' | 'pexels' | 'pixabay' | 'unsplash') => void;
@@ -150,6 +156,11 @@ export const Sidebar: React.FC<SidebarProps> = (props) => {
     selectedVaultUser,
     imageUploadAccount,
     setImageUploadAccount,
+    authType,
+    keychainAccounts,
+    onSelectAccount,
+    onAddKeychainAccount,
+    onOpenVaultManager,
     galleryMode,
     toggleGalleryMode,
     galleryView,
@@ -207,6 +218,7 @@ export const Sidebar: React.FC<SidebarProps> = (props) => {
     <AnimatePresence>
           {isSidebarOpen && (
             <motion.aside 
+              key="sidebar-motion-aside"
               {...getSidebarMotionConfig()}
               className={cn(
                 "border-r border-slate-800 bg-slate-900 flex flex-col h-full transition-all duration-300 overflow-visible",
@@ -305,6 +317,7 @@ export const Sidebar: React.FC<SidebarProps> = (props) => {
                     <AnimatePresence>
                       {!isGallerySettingsCollapsed && (
                         <motion.div 
+                          key="sidebar-gallery-settings-panel"
                           initial={{ height: 0, opacity: 0 }}
                           animate={{ height: 'auto', opacity: 1 }}
                           exit={{ height: 0, opacity: 0 }}
@@ -348,37 +361,30 @@ export const Sidebar: React.FC<SidebarProps> = (props) => {
                                 </div>
                                 
                                 <div className="grid grid-cols-2 sm:grid-cols-3 gap-1.5">
-                                  {(vaultAccounts.length > 0 || !(typeof window !== 'undefined' && (window as any).steem_keychain)) && (
-                                    <div className="col-span-2 sm:col-span-3 flex items-center gap-2 p-1.5 bg-slate-800/80 rounded-xl border border-slate-700/80 shadow-sm">
-                                      {vaultAccounts.length > 0 ? (
-                                        <select 
-                                          value={imageUploadAccount || ((typeof window !== 'undefined' && (window as any).steem_keychain) ? '' : (selectedVaultUser || vaultAccounts[0]))}
-                                          onChange={(e) => setImageUploadAccount(e.target.value)}
-                                          className="flex-1 bg-slate-900 text-[10px] text-cyan-400 font-bold outline-none cursor-pointer truncate px-2.5 py-1.5 rounded-lg border border-slate-700/80 focus:border-cyan-500/60 focus:ring-1 focus:ring-cyan-500/30 transition-all"
-                                          style={{ colorScheme: 'dark' }}
-                                        >
-                                          {(typeof window !== 'undefined' && (window as any).steem_keychain) && (
-                                            <option key="sidebar-opt-kc" value="" className="bg-slate-900 text-slate-300 py-1">
-                                              🛡️ {username ? `@${username} (Keychain)` : '@keychain (default)'}
-                                            </option>
-                                          )}
-                                          {vaultAccounts.filter(Boolean).map((acc, idx) => (
-                                            <option key={`sidebar-opt-vault-${acc}-${idx}`} value={acc} className="bg-slate-900 text-slate-200 py-1">
-                                              🔑 @{acc} (Vault) {!SecurityService.isLocked() ? '✓' : '🔒'}
-                                            </option>
-                                          ))}
-                                        </select>
-                                      ) : (
-                                        <button 
-                                          onClick={() => setActiveModal('keys')}
-                                          className="flex-1 text-[10px] font-bold text-amber-400 bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/30 rounded-lg py-1.5 px-2.5 flex items-center justify-center gap-1.5 transition-all"
-                                        >
-                                          <Lock size={12} />
-                                          <span>{t('addVaultKeyForUpload')}</span>
-                                        </button>
-                                      )}
-                                    </div>
-                                  )}
+                                  <div className="col-span-2 sm:col-span-3 flex items-center justify-between gap-2 p-1 bg-slate-800/80 rounded-xl border border-slate-700/80 shadow-sm overflow-hidden">
+                                    <AccountSelector
+                                      authType={authType || (imageUploadAccount ? 'VAULT' : 'KEYCHAIN')}
+                                      currentUsername={username}
+                                      selectedVaultUser={selectedVaultUser || imageUploadAccount}
+                                      keychainAccounts={keychainAccounts || []}
+                                      vaultAccounts={vaultAccounts || []}
+                                      onSelectAccount={(user, type) => {
+                                        if (onSelectAccount) {
+                                          onSelectAccount(user, type);
+                                        }
+                                        if (type === 'VAULT') {
+                                          setImageUploadAccount(user);
+                                        } else {
+                                          setImageUploadAccount('');
+                                        }
+                                      }}
+                                      onAddKeychainAccount={onAddKeychainAccount}
+                                      onOpenVaultManager={onOpenVaultManager || (() => setActiveModal('keys'))}
+                                      t={t}
+                                      compact
+                                      className="w-full justify-between bg-transparent border-none p-0.5 shadow-none"
+                                    />
+                                  </div>
                                 </div>
                               </div>
                             ) : (

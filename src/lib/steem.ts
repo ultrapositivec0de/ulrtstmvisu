@@ -190,73 +190,104 @@ export const broadcastWithFallback = async (ops: any[], privateKey: any, timeout
 };
 
 /**
- * Calls a Steem RPC method with fallback to other nodes and retries
+ * Calls a Steem RPC method by querying existing nodes in parallel (competitive race).
+ * The fastest node to return a valid response wins, while other pending node requests
+ * are cleanly aborted to minimize network latency and prevent UI freezes.
  */
-export const callWithFallback = async (method: string, params: any, retriesPerNode = 2) => {
-  let lastError: any = null;
-  for (const node of STEEM_NODES) {
-    for (let i = 0; i <= retriesPerNode; i++) {
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 12000);
-      
-      try {
-        if (i > 0) {
-          console.log(`Retrying ${method} on node ${node} (attempt ${i})...`);
-        }
-        
-        const response = await fetch(node, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            jsonrpc: '2.0',
-            method,
-            params,
-            id: Date.now()
-          }),
-          signal: controller.signal
-        });
-        
-        clearTimeout(timeoutId);
-        
-        if (response.status === 429) {
-          console.warn(`Node ${node} rate limited (429). Waiting...`);
-          await new Promise(resolve => setTimeout(resolve, 2000));
-          continue;
-        }
+export const callWithFallback = async (method: string, params: any, timeoutMs = 25000) => {
+  // Bridge API (Hivemind) calls are supported exclusively on nodes running the bridge plugin (e.g. api.steemit.com)
+  const isBridgeMethod = method.startsWith('bridge.');
+  const targetNodes = isBridgeMethod 
+    ? STEEM_NODES.filter(n => n.includes('steemit.com'))
+    : STEEM_NODES;
 
-        if (!response.ok) {
-          throw new Error(`HTTP error! status: ${response.status}`);
-        }
+  const querySingleNode = async (node: string, signal: AbortSignal) => {
+    const response = await fetch(node, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        jsonrpc: '2.0',
+        method,
+        params,
+        id: Date.now()
+      }),
+      signal
+    });
 
-        const data = await response.json();
-        if (data.error) {
-          // If it's a specific Steem error like "no such account", don't keep retrying other nodes
-          const msg = data.error.message || "";
-          if (msg.includes('No such') || msg.includes('not found') || msg.includes('Unknown method')) {
-             throw new Error(msg || "Steem RPC error");
+    if (response.status === 429) {
+      throw new Error(`Node ${node} rate limited (429)`);
+    }
+
+    if (!response.ok) {
+      throw new Error(`Node ${node} HTTP error: ${response.status}`);
+    }
+
+    const data = await response.json();
+    if (data.error) {
+      const msg = data.error.message || "";
+      // Only data-level errors (like 'No such account' or 'Post not found') are fatal to the operation
+      const isFatal = msg.includes('No such') || msg.includes('not found') || msg.includes('Account name already exists');
+      const err: any = new Error(msg || "Steem RPC error");
+      err.isFatal = isFatal;
+      err.steemError = data.error;
+      throw err;
+    }
+
+    setActiveNode(node);
+    return data.result;
+  };
+
+  // Perform parallel race with increased 25s timeout
+  const executeParallelRace = async (nodes = targetNodes): Promise<any> => {
+    const controllers = nodes.map(() => new AbortController());
+    const overallTimeoutId = setTimeout(() => {
+      controllers.forEach(c => {
+        if (!c.signal.aborted) {
+          c.abort();
+        }
+      });
+    }, timeoutMs);
+
+    try {
+      const nodePromises = nodes.map(async (node, index) => {
+        const controller = controllers[index];
+        const result = await querySingleNode(node, controller.signal);
+        // Abort all competing requests immediately upon first successful result
+        controllers.forEach((c, idx) => {
+          if (idx !== index && !c.signal.aborted) {
+            c.abort();
           }
-          console.warn(`Node ${node} returned error:`, data.error);
-          lastError = data.error;
-          continue; 
-        }
-        return data.result;
-      } catch (err: any) {
-        clearTimeout(timeoutId);
-        lastError = err;
-        
-        if (err.name === 'AbortError') {
-          console.warn(`Node ${node} timed out`);
-        } else if (err.message && (err.message.includes('No such') || err.message.includes('not found') || err.message.includes('Unknown method'))) {
-          throw err;
-        }
-        
-        console.warn(`Node ${node} failed (attempt ${i}):`, err);
-        if (i === retriesPerNode) continue; 
-        await new Promise(resolve => setTimeout(resolve, 1000 * i));
-      }
+        });
+        return result;
+      });
+
+      return await Promise.any(nodePromises);
+    } finally {
+      clearTimeout(overallTimeoutId);
+    }
+  };
+
+  try {
+    return await executeParallelRace();
+  } catch (firstWaveError: any) {
+    const rawErrors = firstWaveError?.errors || [firstWaveError];
+    const fatalErr = rawErrors.find((e: any) => e?.isFatal);
+    if (fatalErr) {
+      throw fatalErr;
+    }
+
+    // Perform one fallback retry wave if temporary network timeout occurred
+    console.warn(`[Steem RPC] Retrying call ${method}...`);
+    await new Promise(resolve => setTimeout(resolve, 1000));
+
+    try {
+      return await executeParallelRace();
+    } catch (secondWaveError: any) {
+      const finalErrors = secondWaveError?.errors || [secondWaveError];
+      const fatal = finalErrors.find((e: any) => e?.isFatal);
+      if (fatal) throw fatal;
+      const lastMsg = finalErrors.map((e: any) => e?.message || String(e)).join('; ');
+      throw new Error(`All Steem nodes failed for ${method}. Errors: ${lastMsg}`, { cause: secondWaveError });
     }
   }
-  
-  const errorMessage = lastError?.message || lastError || "Unknown error";
-  throw new Error(`All Steem nodes failed. Last error: ${errorMessage}`);
 };

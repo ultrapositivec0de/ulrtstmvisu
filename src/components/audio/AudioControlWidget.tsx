@@ -131,14 +131,16 @@ export const AudioControlWidget: React.FC<AudioControlWidgetProps> = ({
       {/* Popover Dropdown Menu */}
       <AnimatePresence>
         {isOpen && (
-          <>
+          <React.Fragment key="audio-widget-dropdown-wrapper">
             {/* Click-away backdrop */}
             <div
+              key="audio-widget-backdrop"
               className="fixed inset-0 z-40 cursor-default"
               onClick={() => setIsOpen(false)}
             />
 
             <motion.div
+              key="audio-widget-popover-content"
               initial={{ opacity: 0, y: 8, scale: 0.96 }}
               animate={{ opacity: 1, y: 0, scale: 1 }}
               exit={{ opacity: 0, y: 8, scale: 0.96 }}
@@ -305,7 +307,7 @@ export const AudioControlWidget: React.FC<AudioControlWidgetProps> = ({
                 </button>
               </div>
             </motion.div>
-          </>
+          </React.Fragment>
         )}
       </AnimatePresence>
     </div>

@@ -753,6 +753,7 @@ export const PublishModal: React.FC<PublishModalProps> = (props) => {
           <AnimatePresence>
             {showAdvancedPublish && (
               <motion.div 
+                key="publish-advanced-section"
                 initial={{ height: 0, opacity: 0 }}
                 animate={{ height: 'auto', opacity: 1 }}
                 exit={{ height: 0, opacity: 0 }}

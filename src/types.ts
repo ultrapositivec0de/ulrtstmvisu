@@ -46,6 +46,7 @@ export interface ReaderConfig {
   autoShowInbox?: boolean;
   loadImages?: boolean;
   enableVoteLogging?: boolean;
+  loadFeedWithoutTag?: boolean;
 }
 
 export interface SteemNotification {

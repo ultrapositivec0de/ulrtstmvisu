@@ -1383,7 +1383,7 @@ function unwrapPhishyFromRange(range: Range, wysiwyg: HTMLElement): boolean {
       } else if (prefix === '- [ ] ') {
         insertHtmlAtCursor('<ul class="task-list"><li><input type="checkbox" style="margin-right: 0.5rem;" /> Task</li></ul>');
       } else {
-        const text = getVisualSelectionHtml();
+        const text = getVisualSelectionHtml() || '';
         insertHtmlAtCursor(`${prefix}${text}`);
       }
       updateContentFromWysiwyg();

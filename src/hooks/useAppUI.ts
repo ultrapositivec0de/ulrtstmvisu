@@ -1,5 +1,7 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useEffect, useCallback } from 'react';
 import { useDeviceStore } from '../store/deviceStore';
+import { useModalStore } from '../stores/useModalStore';
+import { useAppUIStore } from '../stores/useAppUIStore';
 
 export const isTauriEnv = () =>
   typeof window !== 'undefined' && (!!(window as any).__TAURI_INTERNALS__ || !!(window as any).__TAURI__);
@@ -23,18 +25,26 @@ export function useAppUI(options: UseAppUIOptions = {}) {
   } = options;
 
   const isMobileLayout = useDeviceStore((s) => s.isMobileLayout);
-  const [activeModal, setActiveModal] = useState<string | null>(null);
-  const [activeView, setActiveView] = useState<'editor' | 'reader'>('editor');
-  const [isSidebarOpen, setIsSidebarOpen] = useState(() => !useDeviceStore.getState().isMobileLayout);
-  const [isFullScreen, setIsFullScreen] = useState(false);
-  const [isEditorFullScreen, setIsEditorFullScreen] = useState(false);
+  
+  // Zustand stores as single source of truth
+  const activeModal = useModalStore((s) => s.activeModal);
+  const setActiveModal = useModalStore((s) => s.setActiveModal);
+  const activeView = useAppUIStore((s) => s.activeView);
+  const setActiveView = useAppUIStore((s) => s.setActiveView);
+  const isSidebarOpen = useAppUIStore((s) => s.isSidebarOpen);
+  const setIsSidebarOpen = useAppUIStore((s) => s.setIsSidebarOpen);
+  const isFullScreen = useAppUIStore((s) => s.isFullScreen);
+  const setIsFullScreen = useAppUIStore((s) => s.setIsFullScreen);
+  const isEditorFullScreen = useAppUIStore((s) => s.isEditorFullScreen);
+  const setIsEditorFullScreen = useAppUIStore((s) => s.setIsEditorFullScreen);
+  const toggleEditorFullScreen = useAppUIStore((s) => s.toggleEditorFullScreen);
 
   // Sync sidebar open state with desktop layout so it is never lost on PC
   useEffect(() => {
     if (!isMobileLayout) {
       setIsSidebarOpen(true);
     }
-  }, [isMobileLayout]);
+  }, [isMobileLayout, setIsSidebarOpen]);
 
   useEffect(() => {
     if (isTauriEnv()) {
@@ -43,45 +53,39 @@ export function useAppUI(options: UseAppUIOptions = {}) {
   }, []);
 
   const toggleFullScreen = useCallback(() => {
-    setIsFullScreen((prev) => {
-      const next = !prev;
-      if (isTauriEnv()) {
-        import('@tauri-apps/api/window')
-          .then(({ getCurrentWindow }) => {
-            getCurrentWindow().setFullscreen(next).catch(() => {});
-          })
-          .catch(() => {});
-      } else if (isNeutralinoEnv()) {
-        try {
-          const neu = (window as any).Neutralino;
-          if (neu?.window) {
-            if (next) {
-              neu.window.setFullScreen().catch(() => {});
-            } else {
-              neu.window.exitFullScreen().catch(() => {});
-            }
+    const next = !isFullScreen;
+    setIsFullScreen(next);
+    if (isTauriEnv()) {
+      import('@tauri-apps/api/window')
+        .then(({ getCurrentWindow }) => {
+          getCurrentWindow().setFullscreen(next).catch(() => {});
+        })
+        .catch(() => {});
+    } else if (isNeutralinoEnv()) {
+      try {
+        const neu = (window as any).Neutralino;
+        if (neu?.window) {
+          if (next) {
+            neu.window.setFullScreen().catch(() => {});
+          } else {
+            neu.window.exitFullScreen().catch(() => {});
           }
-        } catch (e) {
-          console.warn('[Neutralino Fullscreen error]', e);
+        }
+      } catch (e) {
+        console.warn('[Neutralino Fullscreen error]', e);
+      }
+    } else {
+      if (next) {
+        if (!document.fullscreenElement && document.documentElement.requestFullscreen) {
+          document.documentElement.requestFullscreen().catch(() => {});
         }
       } else {
-        if (next) {
-          if (!document.fullscreenElement && document.documentElement.requestFullscreen) {
-            document.documentElement.requestFullscreen().catch(() => {});
-          }
-        } else {
-          if (document.fullscreenElement && document.exitFullscreen) {
-            document.exitFullscreen().catch(() => {});
-          }
+        if (document.fullscreenElement && document.exitFullscreen) {
+          document.exitFullscreen().catch(() => {});
         }
       }
-      return next;
-    });
-  }, [isTauriEnv, isNeutralinoEnv]);
-
-  const toggleEditorFullScreen = useCallback(() => {
-    setIsEditorFullScreen((prev) => !prev);
-  }, []);
+    }
+  }, [isFullScreen, setIsFullScreen]);
 
   useEffect(() => {
     const handleFullscreenChange = () => {
@@ -108,7 +112,7 @@ export function useAppUI(options: UseAppUIOptions = {}) {
       document.removeEventListener('mozfullscreenchange', handleFullscreenChange);
       document.removeEventListener('MSFullscreenChange', handleFullscreenChange);
     };
-  }, [isTauriEnv, isNeutralinoEnv]);
+  }, [setIsFullScreen]);
 
   useEffect(() => {
     const handleGlobalKeyDown = (e: KeyboardEvent) => {
@@ -196,10 +200,11 @@ export function useAppUI(options: UseAppUIOptions = {}) {
     isWidgetMenuOpen,
     setIsWidgetMenuOpen,
     activeModal,
+    setActiveModal,
     isEditorFullScreen,
+    setIsEditorFullScreen,
     isFullScreen,
-    isTauriEnv,
-    isNeutralinoEnv,
+    setIsFullScreen,
   ]);
 
   return {

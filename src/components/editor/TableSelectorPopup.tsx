@@ -57,10 +57,12 @@ export const TableSelectorPopup: React.FC<TableSelectorPopupProps> = React.memo(
   return (
     <AnimatePresence>
       <div 
+        key="table-selector-popup-container"
         className="fixed inset-0 z-[9998]"
         onClick={() => setShowTableSelector(false)}
       >
         <motion.div
+          key="table-selector-popup-card"
           initial={{ opacity: 0, y: tableSelectorPos.direction === 'down' ? -10 : 10 }}
           animate={{ opacity: 1, y: 0 }}
           exit={{ opacity: 0, scale: 0.95 }}
@@ -104,6 +106,7 @@ export const TableSelectorPopup: React.FC<TableSelectorPopupProps> = React.memo(
             <div className="grid grid-cols-2 gap-2">
               <button 
                 type="button"
+                onMouseDown={(e) => e.preventDefault()}
                 onClick={() => {
                   insertAtCursor(tableImportFormat === 'markdown' ? '| Head |\n| --- |\n' : '<table data-format="html" style="width:100%">\n  <tr>\n    <th>Head</th>\n  </tr>\n</table>\n');
                   setShowTableSelector(false);
@@ -114,6 +117,7 @@ export const TableSelectorPopup: React.FC<TableSelectorPopupProps> = React.memo(
               </button>
               <button 
                 type="button"
+                onMouseDown={(e) => e.preventDefault()}
                 onClick={() => {
                   insertAtCursor(tableImportFormat === 'markdown' ? '| Head | Head |\n| --- | --- |\n' : '<table data-format="html" style="width:100%">\n  <tr>\n    <th>Head</th>\n    <th>Head</th>\n  </tr>\n</table>\n');
                   setShowTableSelector(false);
@@ -124,6 +128,7 @@ export const TableSelectorPopup: React.FC<TableSelectorPopupProps> = React.memo(
               </button>
               <button 
                 type="button"
+                onMouseDown={(e) => e.preventDefault()}
                 onClick={() => {
                   insertAtCursor(tableImportFormat === 'markdown' ? '| Head | Head |\n| --- | --- |\n| Cell | Cell |\n| Cell | Cell |\n' : '<table data-format="html" style="width:100%">\n  <tr>\n    <th>Head</th>\n    <th>Head</th>\n  </tr>\n  <tr>\n    <td>Cell</td>\n    <td>Cell</td>\n  </tr>\n  <tr>\n    <td>Cell</td>\n    <td>Cell</td>\n  </tr>\n</table>\n');
                   setShowTableSelector(false);
@@ -134,6 +139,7 @@ export const TableSelectorPopup: React.FC<TableSelectorPopupProps> = React.memo(
               </button>
               <button 
                 type="button"
+                onMouseDown={(e) => e.preventDefault()}
                 onClick={() => {
                   insertAtCursor(tableImportFormat === 'markdown' ? '| Head | Head | Head |\n| --- | --- | --- |\n| Cell | Cell | Cell |\n| Cell | Cell | Cell |\n| Cell | Cell | Cell |\n' : '<table data-format="html" style="width:100%">\n  <tr>\n    <th>Head</th>\n    <th>Head</th>\n    <th>Head</th>\n  </tr>\n  <tr>\n    <td>Cell</td>\n    <td>Cell</td>\n    <td>Cell</td>\n  </tr>\n  <tr>\n    <td>Cell</td>\n    <td>Cell</td>\n    <td>Cell</td>\n  </tr>\n  <tr>\n    <td>Cell</td>\n    <td>Cell</td>\n    <td>Cell</td>\n  </tr>\n</table>\n');
                   setShowTableSelector(false);
@@ -148,12 +154,12 @@ export const TableSelectorPopup: React.FC<TableSelectorPopupProps> = React.memo(
           <div className="text-[9px] font-bold text-slate-500 uppercase tracking-widest mb-2 text-center">{t('tableSelectorOrDraw')}</div>
           <div className="flex flex-col gap-1 items-center">
             {Array.from({ length: 10 }).map((_, rowIndex) => (
-              <div key={rowIndex} className="flex gap-1">
+              <div key={`matrix-row-${rowIndex}`} className="flex gap-1">
                 {Array.from({ length: 10 }).map((_, colIndex) => {
                   const isHovered = rowIndex <= tableHover.r && colIndex <= tableHover.c;
                   return (
                     <div
-                      key={colIndex}
+                      key={`matrix-cell-${rowIndex}-${colIndex}`}
                       onMouseEnter={() => setTableHover({ r: rowIndex, c: colIndex })}
                       onClick={() => handleInsertMatrix(rowIndex, colIndex)}
                       className={cn(

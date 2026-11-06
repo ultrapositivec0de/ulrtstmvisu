@@ -39,16 +39,38 @@ export function useTableOperations({
     return localStorage.getItem('steem_table_menu_pinned') === 'true';
   });
 
+  const rafIdRef = useRef<number | null>(null);
+
   const updateTableRect = useCallback(() => {
-    if (activeTable) {
-      requestAnimationFrame(() => {
-        if (activeTable) {
-          setTableRect(activeTable.getBoundingClientRect());
-        }
-      });
-    } else {
+    if (!activeTable) {
+      if (rafIdRef.current !== null) {
+        cancelAnimationFrame(rafIdRef.current);
+        rafIdRef.current = null;
+      }
       setTableRect(null);
+      return;
     }
+
+    if (rafIdRef.current !== null) return;
+
+    rafIdRef.current = requestAnimationFrame(() => {
+      rafIdRef.current = null;
+      if (activeTable) {
+        const nextRect = activeTable.getBoundingClientRect();
+        setTableRect(prev => {
+          if (
+            prev &&
+            Math.abs(prev.top - nextRect.top) < 0.5 &&
+            Math.abs(prev.left - nextRect.left) < 0.5 &&
+            Math.abs(prev.width - nextRect.width) < 0.5 &&
+            Math.abs(prev.height - nextRect.height) < 0.5
+          ) {
+            return prev;
+          }
+          return nextRect;
+        });
+      }
+    });
   }, [activeTable]);
 
   useEffect(() => {
@@ -59,6 +81,10 @@ export function useTableOperations({
       scrollContainer.addEventListener('scroll', updateTableRect, { passive: true });
     }
     return () => {
+      if (rafIdRef.current !== null) {
+        cancelAnimationFrame(rafIdRef.current);
+        rafIdRef.current = null;
+      }
       window.removeEventListener('resize', updateTableRect);
       if (scrollContainer) {
         scrollContainer.removeEventListener('scroll', updateTableRect);

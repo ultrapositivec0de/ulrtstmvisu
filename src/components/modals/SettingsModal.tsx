@@ -1114,6 +1114,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = (props) => {
               <AnimatePresence>
                 {showAdvancedSettings && (
                   <motion.div 
+                    key="settings-advanced-panel"
                     initial={{ height: 0, opacity: 0 }}
                     animate={{ height: 'auto', opacity: 1 }}
                     exit={{ height: 0, opacity: 0 }}

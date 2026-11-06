@@ -1,13 +1,14 @@
 import React from 'react';
 import { Layers } from 'lucide-react';
 import { BaseModal } from './BaseModal';
+import { useEditorStore } from '../../store';
 
 interface SplitPostModalProps {
   isOpen: boolean;
   onClose: () => void;
   splitWords: number;
   setSplitWords: (val: number) => void;
-  wordsCount: number;
+  wordsCount?: number;
   handleSplitPost: () => void;
   t: (key: any) => string;
 }
@@ -17,10 +18,12 @@ export const SplitPostModal: React.FC<SplitPostModalProps> = ({
   onClose,
   splitWords,
   setSplitWords,
-  wordsCount,
+  wordsCount: propWordsCount,
   handleSplitPost,
   t
 }) => {
+  const storeWords = useEditorStore(state => isOpen ? (state.stats?.words || 0) : 0);
+  const wordsCount = propWordsCount ?? storeWords;
   const partsCount = Math.ceil(wordsCount / (splitWords || 300));
 
   return (
