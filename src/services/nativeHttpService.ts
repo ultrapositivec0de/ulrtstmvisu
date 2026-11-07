@@ -135,49 +135,54 @@ export class NativeHttpService {
       return { handled: false, success: false };
     }
 
+    let tempPath = '';
     try {
       const arrayBuffer = await file.arrayBuffer();
-      const tempPath = `.tmp_upload_${Date.now()}_${fileName.replace(/[^a-zA-Z0-9.-]/g, '_')}`;
+      tempPath = `.tmp_upload_${Date.now()}_${fileName.replace(/[^a-zA-Z0-9.-]/g, '_')}`;
 
       // Write temporary file via Neutralino filesystem
       await neu.filesystem.writeBinaryFile(tempPath, arrayBuffer);
 
-      // Execute native curl command (curl does not enforce browser CORS and sends multipart file directly)
+      // Execute native curl command with a safety timeout (10s max) so UI never hangs indefinitely
       const escapedUrl = uploadUrl.replace(/"/g, '\\"');
       const escapedPath = tempPath.replace(/"/g, '\\"');
       const cmd = `curl -s -X POST -F "file=@${escapedPath}" "${escapedUrl}"`;
 
-      const result = await neu.os.execCommand(cmd);
+      const execPromise = neu.os.execCommand(cmd);
+      const timeoutPromise = new Promise<null>((resolve) => setTimeout(() => resolve(null), 10000));
+      const result = await Promise.race([execPromise, timeoutPromise]);
 
-      // Clean up temporary file
-      try {
-        await neu.filesystem.remove(tempPath);
-      } catch {
-        // Ignore cleanup error
+      // Clean up temporary file in background
+      if (tempPath) {
+        neu.filesystem.remove(tempPath).catch(() => {});
       }
 
-      if (result?.stdOut) {
+      if (result && (result as any).stdOut) {
         try {
-          const data = JSON.parse(result.stdOut);
+          const data = JSON.parse((result as any).stdOut);
           const url = data?.url || data?.link || data?.data?.url;
           if (url) {
             return { handled: true, success: true, url };
           }
           if (data?.error) {
-            return {
-              handled: true,
-              success: false,
-              error: data.error?.message || data.error?.name || String(data.error),
-            };
+            console.warn('[NativeHttpService] Neutralino curl returned server error:', data.error);
           }
         } catch {
-          // stdout wasn't JSON
+          // stdout wasn't valid JSON
         }
       }
 
+      // If curl timed out, failed, or returned invalid output, fallback to Web prediction
       return { handled: false, success: false };
     } catch (e: any) {
-      console.warn('[NativeHttpService] Neutralino upload failed:', e);
+      console.warn('[NativeHttpService] Neutralino upload failed, falling back to Web prediction:', e);
+      if (tempPath) {
+        try {
+          await neu.filesystem.remove(tempPath);
+        } catch {
+          // Ignore cleanup error
+        }
+      }
       return { handled: false, success: false, error: e?.message || String(e) };
     }
   }
