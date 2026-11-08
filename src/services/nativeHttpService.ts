@@ -231,7 +231,7 @@ export class NativeHttpService {
 
   /**
    * Main entry point: tries native runtimes in order (Tauri -> Neutralino -> Android)
-   * If not in a native runtime or native call fails, returns { handled: false } so web fallback is invoked.
+   * If not in a native runtime or native call fails, returns { handled: false } so web prediction fallback is invoked.
    */
   static async tryUpload(
     file: File | Blob,
@@ -244,8 +244,9 @@ export class NativeHttpService {
     }
 
     if (this.isNeutralino()) {
-      const res = await this.uploadViaNeutralino(file, uploadUrl, fileName);
-      if (res.handled) return res;
+      // Neutralino WebView supports standard in-memory Web Prediction natively without needing disk writes or shell curl.
+      // Returning handled: false allows Neutralino to seamlessly use the fast fetch + DOM Image prediction pipeline.
+      return { handled: false, success: false };
     }
 
     if (this.isAndroidBridge()) {
