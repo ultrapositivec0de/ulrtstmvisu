@@ -111,40 +111,84 @@ export function useSteemGallery(config: SteemGalleryConfig) {
     });
   }, [filteredLocalImages]);
 
-  // Load saved images on mount
-  useEffect(() => {
-    config.initVault();
+  const hasInitializedRef = useRef(false);
+  const initVaultRef = useRef(config.initVault);
+  initVaultRef.current = config.initVault;
+  const didSkipInitialImagesSaveRef = useRef(false);
+  const didSkipInitialLinksSaveRef = useRef(false);
 
+  // Load saved images once on mount (never overwrite selection on config re-renders)
+  useEffect(() => {
+    if (hasInitializedRef.current) return;
+    hasInitializedRef.current = true;
+
+    initVaultRef.current();
+
+    let loadTimer: ReturnType<typeof setTimeout> | null = null;
     if (typeof localStorage !== 'undefined') {
       const savedLinks = localStorage.getItem('steem_editor_source_links');
-      if (savedLinks) {
-        parseImages(savedLinks);
-      } else {
-        const savedImages = localStorage.getItem(STORAGE_KEY_IMAGES);
-        if (savedImages) {
-          try {
-            const parsed = JSON.parse(savedImages);
-            if (Array.isArray(parsed)) {
-              setImages(parsed);
-            }
-          } catch (e) {
-            console.error("Failed to load images", e);
+      const savedImages = localStorage.getItem(STORAGE_KEY_IMAGES);
+
+      let restoredFromSavedImages = false;
+      if (savedImages) {
+        try {
+          const parsed = JSON.parse(savedImages);
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            setImages(parsed);
+            restoredFromSavedImages = true;
           }
+        } catch (e) {
+          console.error("Failed to load images", e);
+        }
+      }
+
+      if (savedLinks) {
+        if (restoredFromSavedImages) {
+          setSourceInput(savedLinks);
+        } else {
+          parseImages(savedLinks);
         }
       }
     }
 
-    setTimeout(() => {
+    loadTimer = setTimeout(() => {
       isImagesLoaded.current = true;
-    }, 1000);
-  }, [parseImages, config]);
+    }, 50);
 
-  // Save images on change (once loaded)
+    return () => {
+      if (loadTimer) clearTimeout(loadTimer);
+    };
+  }, [parseImages]);
+
+  // Save images on change (after initial mount)
   useEffect(() => {
-    if (isImagesLoaded.current && typeof localStorage !== 'undefined') {
-      localStorage.setItem(STORAGE_KEY_IMAGES, JSON.stringify(images));
+    if (!didSkipInitialImagesSaveRef.current) {
+      didSkipInitialImagesSaveRef.current = true;
+      return;
+    }
+    if (typeof localStorage !== 'undefined') {
+      try {
+        localStorage.setItem(STORAGE_KEY_IMAGES, JSON.stringify(images));
+      } catch (e) {
+        console.error("Failed to save images", e);
+      }
     }
   }, [images]);
+
+  // Save source links on change (after initial mount)
+  useEffect(() => {
+    if (!didSkipInitialLinksSaveRef.current) {
+      didSkipInitialLinksSaveRef.current = true;
+      return;
+    }
+    if (typeof localStorage !== 'undefined') {
+      try {
+        localStorage.setItem('steem_editor_source_links', sourceInput);
+      } catch (e) {
+        console.error("Failed to save source links", e);
+      }
+    }
+  }, [sourceInput]);
 
   // 3. Layout and Markup Hook
   const layoutMarkup = useGalleryLayoutMarkup({

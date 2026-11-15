@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { Images, Plus, X, Check } from 'lucide-react';
+import React, { useRef, useState } from 'react';
+import { Images, Plus, X, Check, ChevronLeft, ChevronRight } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { cn } from '../../lib/utils';
 import { getMiniGalleryBottomStyle } from '../../lib/viewportLayout';
@@ -40,6 +40,13 @@ export const MiniGalleryStrip: React.FC<MiniGalleryStripProps> = React.memo(({
   t,
 }) => {
   const [justInsertedUrl, setJustInsertedUrl] = useState<string | null>(null);
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const isDraggingRef = useRef(false);
+  const dragStartXRef = useRef(0);
+  const dragStartScrollLeftRef = useRef(0);
+  const didDragRef = useRef(false);
+
+  const validImages = images.filter(img => Boolean(img && (img.url || img.name)));
 
   return (
     <AnimatePresence>
@@ -102,47 +109,121 @@ export const MiniGalleryStrip: React.FC<MiniGalleryStripProps> = React.memo(({
             </div>
           </div>
 
-          <div 
-            className="flex items-center gap-2 overflow-x-auto py-1 px-0.5 no-scrollbar scroll-smooth overscroll-contain select-none"
-            style={{ scrollbarWidth: 'none', touchAction: 'pan-x' }}
-          >
-            {images.filter(img => Boolean(img && (img.url || img.name))).map((img, idx) => (
+          <div className="flex items-center gap-1 min-w-0">
+            {validImages.length > 4 && (
               <button
-                key={img.url || (img as any).id || `img-${idx}`}
                 type="button"
                 onMouseDown={(e) => e.preventDefault()}
-                onClick={(e) => {
-                  e.preventDefault();
-                  onInsertImage(img.url, img.name);
-                  setJustInsertedUrl(img.url);
-                  setTimeout(() => setJustInsertedUrl(null), 1200);
-                }}
-                className={cn(
-                  "group relative shrink-0 w-14 h-14 rounded-xl overflow-hidden border transition-all active:scale-95 focus:outline-none",
-                  justInsertedUrl === img.url 
-                    ? "border-emerald-400 ring-2 ring-emerald-400/50 scale-105" 
-                    : "border-slate-700 hover:border-cyan-400"
-                )}
-                title={`${img.name} - ${t('tapToInsert')}`}
+                onClick={() => scrollRef.current?.scrollBy({ left: -180, behavior: 'smooth' })}
+                className="p-1 rounded-lg text-[var(--text-muted)] hover:text-cyan-400 hover:bg-slate-800/40 transition-colors shrink-0"
+                title={t('moveLeft')}
+                aria-label={t('moveLeft')}
               >
-                <img 
-                  src={img.url} 
-                  alt={img.name} 
-                  className="w-full h-full object-cover group-hover:opacity-90 transition-opacity"
-                  referrerPolicy="no-referrer"
-                  loading="lazy"
-                />
-                {justInsertedUrl === img.url ? (
-                  <div className="absolute inset-0 bg-emerald-950/80 backdrop-blur-xs flex items-center justify-center text-emerald-400">
-                    <Check size={18} className="stroke-[3]" />
-                  </div>
-                ) : (
-                  <div className="absolute bottom-0 inset-x-0 bg-slate-950/75 py-0.5 text-[8px] text-center text-slate-300 font-mono truncate px-0.5">
-                    {idx + 1}
-                  </div>
-                )}
+                <ChevronLeft size={16} />
               </button>
-            ))}
+            )}
+
+            <div
+              ref={scrollRef}
+              onWheel={(e) => {
+                const el = scrollRef.current;
+                if (!el) return;
+                if (Math.abs(e.deltaY) >= Math.abs(e.deltaX) && e.deltaY !== 0) {
+                  e.preventDefault();
+                  el.scrollLeft += e.deltaY;
+                }
+              }}
+              onMouseDown={(e) => {
+                if (e.button !== 0 || !scrollRef.current) return;
+                e.preventDefault();
+                isDraggingRef.current = true;
+                didDragRef.current = false;
+                dragStartXRef.current = e.clientX;
+                dragStartScrollLeftRef.current = scrollRef.current.scrollLeft;
+              }}
+              onMouseMove={(e) => {
+                if (!isDraggingRef.current || !scrollRef.current) return;
+                const dx = e.clientX - dragStartXRef.current;
+                if (Math.abs(dx) > 4) {
+                  didDragRef.current = true;
+                }
+                if (didDragRef.current) {
+                  scrollRef.current.scrollLeft = dragStartScrollLeftRef.current - dx;
+                }
+              }}
+              onMouseUp={() => {
+                isDraggingRef.current = false;
+                setTimeout(() => {
+                  didDragRef.current = false;
+                }, 0);
+              }}
+              onMouseLeave={() => {
+                isDraggingRef.current = false;
+                setTimeout(() => {
+                  didDragRef.current = false;
+                }, 0);
+              }}
+              className="flex-1 flex items-center gap-2 overflow-x-auto py-1 px-0.5 no-scrollbar overscroll-contain select-none touch-pan-x cursor-grab active:cursor-grabbing"
+              style={{ scrollbarWidth: 'none', touchAction: 'pan-x' }}
+            >
+              {validImages.map((img, idx) => (
+                <button
+                  key={img.url || (img as any).id || `img-${idx}`}
+                  type="button"
+                  onMouseDown={(e) => e.preventDefault()}
+                  onClick={(e) => {
+                    if (didDragRef.current) {
+                      didDragRef.current = false;
+                      e.preventDefault();
+                      return;
+                    }
+                    e.preventDefault();
+                    onInsertImage(img.url, img.name);
+                    setJustInsertedUrl(img.url);
+                    setTimeout(() => setJustInsertedUrl(null), 1200);
+                  }}
+                  style={{ touchAction: 'pan-x' }}
+                  className={cn(
+                    "group relative shrink-0 w-14 h-14 rounded-xl overflow-hidden border transition-all active:scale-95 focus:outline-none touch-pan-x",
+                    justInsertedUrl === img.url 
+                      ? "border-emerald-400 ring-2 ring-emerald-400/50 scale-105" 
+                      : "border-slate-700 hover:border-cyan-400"
+                  )}
+                  title={`${img.name} - ${t('tapToInsert')}`}
+                >
+                  <img 
+                    src={img.url} 
+                    alt={img.name} 
+                    draggable={false}
+                    className="w-full h-full object-cover group-hover:opacity-90 transition-opacity pointer-events-none select-none"
+                    referrerPolicy="no-referrer"
+                    loading="lazy"
+                  />
+                  {justInsertedUrl === img.url ? (
+                    <div className="absolute inset-0 bg-emerald-950/80 backdrop-blur-xs flex items-center justify-center text-emerald-400">
+                      <Check size={18} className="stroke-[3]" />
+                    </div>
+                  ) : (
+                    <div className="absolute bottom-0 inset-x-0 bg-slate-950/75 py-0.5 text-[8px] text-center text-slate-300 font-mono truncate px-0.5">
+                      {idx + 1}
+                    </div>
+                  )}
+                </button>
+              ))}
+            </div>
+
+            {validImages.length > 4 && (
+              <button
+                type="button"
+                onMouseDown={(e) => e.preventDefault()}
+                onClick={() => scrollRef.current?.scrollBy({ left: 180, behavior: 'smooth' })}
+                className="p-1 rounded-lg text-[var(--text-muted)] hover:text-cyan-400 hover:bg-slate-800/40 transition-colors shrink-0"
+                title={t('moveRight')}
+                aria-label={t('moveRight')}
+              >
+                <ChevronRight size={16} />
+              </button>
+            )}
           </div>
         </motion.div>
       )}

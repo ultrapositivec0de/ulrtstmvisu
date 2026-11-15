@@ -977,11 +977,15 @@ export const SettingsModal: React.FC<SettingsModalProps> = (props) => {
                <div className="w-16 h-16 bg-cyan-500/10 rounded-2xl mx-auto flex items-center justify-center text-cyan-400 font-black text-2xl shadow-md shadow-cyan-500/10">S</div>
                <div>
                  <h3 className="text-xl font-black tracking-tight text-[var(--text-main)]">SteemEditor <span className="text-cyan-400">Pro</span></h3>
-                 <p className="text-[10px] text-[var(--text-muted)] uppercase font-black tracking-[0.2em] pt-1">Version 4.8.0 "Quantum"</p>
+                 <p className="text-[10px] text-[var(--text-muted)] uppercase font-black tracking-[0.2em] pt-1">
+                   Version {(APP_CHANGELOG[0]?.version || 'v4.8.11').replace(/^v/, '')} &quot;Quantum&quot;
+                 </p>
                </div>
                <label className="text-[10px] font-black text-[var(--text-muted)] uppercase tracking-[0.2em] px-1 pt-4 block border-t border-[var(--border-color)]">Changelog & Updates</label>
                 <div className="mt-2 p-3 bg-[var(--bg-card)] border border-cyan-500/20 rounded-xl text-left">
-                  <p className="text-xs text-[var(--text-main)] font-medium">New in v4.8.0: Autoscroll Caret Clearance, Phishy Block & Span Exit Fixes & Cross-Platform Version Sync</p>
+                  <p className="text-xs text-[var(--text-main)] font-medium">
+                    New in {APP_CHANGELOG[0]?.version || 'v4.8.11'}: {APP_CHANGELOG[0]?.changes[0] || ''}
+                  </p>
                 </div>
                
                <div className="space-y-2 max-h-60 overflow-y-auto custom-scrollbar bg-[var(--bg-card)] border border-[var(--border-color)] rounded-xl p-3">

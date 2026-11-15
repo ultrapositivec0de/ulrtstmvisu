@@ -1,5 +1,5 @@
 import React from 'react';
-import { AlignLeft, AlignRight, FileText } from 'lucide-react';
+import { AlignLeft, AlignRight, FileText, Check } from 'lucide-react';
 import { cn } from '../lib/utils';
 
 interface ExternalImageItemProps {
@@ -47,12 +47,33 @@ const ExternalImageItem = React.memo(({
     <div 
       onMouseDown={(e) => e.preventDefault()}
       className={cn(
-        "group relative rounded-lg overflow-hidden border transition-all cursor-pointer bg-[var(--bg-card)] flex flex-col shadow-sm flex-none",
-        galleryView === 'grid' ? "w-full min-h-[140px]" : "flex-row items-center p-1.5 gap-2 min-h-[50px]",
-        photo.selected ? "border-cyan-500 ring-1 ring-cyan-500/20" : "border-[var(--border-color)] hover:border-slate-400 dark:hover:border-slate-700"
+        "group relative rounded-lg overflow-hidden border transition-all cursor-pointer bg-[var(--bg-card)] flex shadow-sm flex-none",
+        galleryView === 'grid' ? "flex-col w-full min-h-[140px]" : "flex-row items-center p-1.5 gap-2 min-h-[50px]",
+        photo.selected
+          ? "border-cyan-500 ring-2 ring-cyan-500/40 shadow-md shadow-cyan-500/15"
+          : "border-[var(--border-color)] hover:border-slate-400 dark:hover:border-slate-700"
       )}
       onClick={() => onToggle(idx)}
     >
+      {galleryView === 'list' && (
+        <button
+          type="button"
+          onMouseDown={(e) => e.preventDefault()}
+          onClick={(e) => {
+            e.stopPropagation();
+            onToggle(idx);
+          }}
+          className={cn(
+            "w-4 h-4 rounded border flex items-center justify-center shrink-0 transition-colors",
+            photo.selected
+              ? "bg-cyan-500 border-cyan-400 text-white"
+              : "bg-[var(--bg-main)] border-slate-600 text-transparent group-hover:border-cyan-500/60"
+          )}
+          aria-pressed={!!photo.selected}
+        >
+          <Check size={11} className="stroke-[3]" />
+        </button>
+      )}
       <div className={cn(
         "overflow-hidden relative flex-none bg-[var(--bg-main)]",
         galleryView === 'grid' ? "aspect-square w-full" : "w-10 h-10 rounded"
@@ -64,6 +85,26 @@ const ExternalImageItem = React.memo(({
           referrerPolicy="no-referrer" 
           loading="lazy"
         />
+
+        {galleryView === 'grid' && (
+          <button
+            type="button"
+            onMouseDown={(e) => e.preventDefault()}
+            onClick={(e) => {
+              e.stopPropagation();
+              onToggle(idx);
+            }}
+            className={cn(
+              "absolute top-1.5 left-1.5 z-20 w-5 h-5 rounded-md border flex items-center justify-center transition-all shadow-sm",
+              photo.selected
+                ? "bg-cyan-500 border-cyan-300 text-white opacity-100 scale-100"
+                : "bg-slate-950/75 border-slate-500/80 text-transparent opacity-80 lg:opacity-0 lg:group-hover:opacity-100 hover:border-cyan-400"
+            )}
+            aria-pressed={!!photo.selected}
+          >
+            <Check size={12} className="stroke-[3]" />
+          </button>
+        )}
         
         <div className={cn(
           "absolute inset-x-0 bottom-0 bg-[var(--bg-overlay-surface)] backdrop-blur-dynamic border-t border-[var(--border-subtle)] px-1 py-1.5 flex flex-row items-center justify-center gap-1 transition-all z-10",

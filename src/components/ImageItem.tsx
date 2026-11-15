@@ -1,5 +1,5 @@
 import React from 'react';
-import { AlignLeft, AlignRight, FileText, CloudUpload, Trash2, ChevronLeft, ChevronRight, ChevronUp, ChevronDown } from 'lucide-react';
+import { AlignLeft, AlignRight, FileText, CloudUpload, Trash2, ChevronLeft, ChevronRight, ChevronUp, ChevronDown, Check } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { ImageItem as ImageItemType } from '../types';
 
@@ -63,10 +63,31 @@ const ImageItem = React.memo(({
       className={cn(
         "group relative rounded-lg overflow-hidden border transition-all cursor-pointer bg-[var(--bg-card)] shadow-sm flex-none",
         galleryView === 'grid' ? "flex flex-col w-full min-h-[140px]" : "flex flex-row items-center p-1.5 gap-2 min-h-[50px]",
-        img.selected ? "border-cyan-500 ring-1 ring-cyan-500/20" : "border-[var(--border-color)] hover:border-slate-400 dark:hover:border-slate-700"
+        img.selected
+          ? "border-cyan-500 ring-2 ring-cyan-500/40 shadow-md shadow-cyan-500/15"
+          : "border-[var(--border-color)] hover:border-slate-400 dark:hover:border-slate-700"
       )}
       onClick={() => onToggle(idx)}
     >
+      {galleryView === 'list' && (
+        <button
+          type="button"
+          onMouseDown={(e) => e.preventDefault()}
+          onClick={(e) => {
+            e.stopPropagation();
+            onToggle(idx);
+          }}
+          className={cn(
+            "w-4 h-4 rounded border flex items-center justify-center shrink-0 transition-colors",
+            img.selected
+              ? "bg-cyan-500 border-cyan-400 text-white"
+              : "bg-[var(--bg-main)] border-slate-600 text-transparent group-hover:border-cyan-500/60"
+          )}
+          aria-pressed={!!img.selected}
+        >
+          <Check size={11} className="stroke-[3]" />
+        </button>
+      )}
       <div className={cn(
         "overflow-hidden relative flex-none bg-[var(--bg-main)]",
         galleryView === 'grid' ? "aspect-square w-full" : "w-10 h-10 rounded"
@@ -78,6 +99,26 @@ const ImageItem = React.memo(({
           referrerPolicy="no-referrer" 
           loading="lazy"
         />
+
+        {galleryView === 'grid' && (
+          <button
+            type="button"
+            onMouseDown={(e) => e.preventDefault()}
+            onClick={(e) => {
+              e.stopPropagation();
+              onToggle(idx);
+            }}
+            className={cn(
+              "absolute top-1.5 left-1.5 z-20 w-5 h-5 rounded-md border flex items-center justify-center transition-all shadow-sm",
+              img.selected
+                ? "bg-cyan-500 border-cyan-300 text-white opacity-100 scale-100"
+                : "bg-slate-950/75 border-slate-500/80 text-transparent opacity-80 lg:opacity-0 lg:group-hover:opacity-100 hover:border-cyan-400"
+            )}
+            aria-pressed={!!img.selected}
+          >
+            <Check size={12} className="stroke-[3]" />
+          </button>
+        )}
         
         {galleryView === 'grid' && (
           <div className={cn(
