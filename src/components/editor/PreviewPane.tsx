@@ -3,17 +3,19 @@ import { Eye, EyeOff, MoveVertical, Maximize2, X } from 'lucide-react';
 import { cn } from '../../lib/utils';
 import { useDeviceStore } from '../../store/deviceStore';
 import { useLightboxStore } from '../../store/lightboxStore';
+import { useEditorStore } from '../../store';
+import { useAppUIStore } from '../../stores/useAppUIStore';
 
 export interface PreviewPaneProps {
   previewRef?: React.RefObject<any>;
   previewPaneRef?: React.RefObject<any>;
   activeMobileTab: string;
-  isLivePreviewEnabled: boolean;
-  isFullScreen: boolean;
-  toggleLivePreview: () => void;
-  syncScrollEnabled: boolean;
-  setSyncScrollEnabled: (enabled: boolean) => void;
-  toggleFullScreen: () => void;
+  isLivePreviewEnabled?: boolean;
+  isFullScreen?: boolean;
+  toggleLivePreview?: () => void;
+  syncScrollEnabled?: boolean;
+  setSyncScrollEnabled?: (enabled: boolean) => void;
+  toggleFullScreen?: () => void;
   widgetPos: string;
   lang: string;
   t: (key: any) => string;
@@ -36,6 +38,19 @@ export const PreviewPane: React.FC<PreviewPaneProps> = ({
   editorMode
 }) => {
   const isMobileLayout = useDeviceStore(s => s.isMobileLayout);
+  const storeIsLivePreviewEnabled = useEditorStore(s => s.isLivePreviewEnabled);
+  const storeToggleLivePreview = useEditorStore(s => s.toggleLivePreview);
+  const storeSyncScrollEnabled = useEditorStore(s => s.syncScrollEnabled);
+  const storeSetSyncScrollEnabled = useEditorStore(s => s.setSyncScrollEnabled);
+  const storeIsFullScreen = useAppUIStore(s => s.isFullScreen);
+  const storeToggleFullScreen = useAppUIStore(s => s.toggleFullScreen);
+
+  const livePreview = isLivePreviewEnabled ?? storeIsLivePreviewEnabled;
+  const handleToggleLivePreview = toggleLivePreview ?? storeToggleLivePreview;
+  const syncScroll = syncScrollEnabled ?? storeSyncScrollEnabled;
+  const handleSetSyncScroll = setSyncScrollEnabled ?? storeSetSyncScrollEnabled;
+  const fullScreen = isFullScreen ?? storeIsFullScreen;
+  const handleToggleFullScreen = toggleFullScreen ?? storeToggleFullScreen;
 
   return (
     <div 
@@ -46,28 +61,28 @@ export const PreviewPane: React.FC<PreviewPaneProps> = ({
           ? "hidden" 
           : (isMobileLayout 
               ? (activeMobileTab === 'preview' ? "flex" : "hidden")
-              : (isLivePreviewEnabled ? "flex" : "hidden")),
-        isFullScreen && "bg-slate-950 p-4 lg:p-12 overflow-y-auto fixed inset-0 z-[250]"
+              : (livePreview ? "flex" : "hidden")),
+        fullScreen && "bg-slate-950 p-4 lg:p-12 overflow-y-auto fixed inset-0 z-[250]"
       )}
     >
       <div className="absolute top-4 right-4 z-10 flex gap-2">
         <div className="flex p-1 bg-slate-800 rounded-xl border border-slate-700 gap-1 shrink-0">
           <button
-            onClick={toggleLivePreview}
+            onClick={handleToggleLivePreview}
             className={cn(
               "p-1.5 rounded-lg transition-colors",
-              isLivePreviewEnabled ? "bg-cyan-600 text-white shadow-none" : "bg-red-950 text-red-400 border border-red-500/30"
+              livePreview ? "bg-cyan-600 text-white shadow-none" : "bg-red-950 text-red-400 border border-red-500/30"
             )}
             title={t('toggleLivePreview')}
           >
-            {isLivePreviewEnabled ? <Eye size={20} /> : <EyeOff size={20} />}
+            {livePreview ? <Eye size={20} /> : <EyeOff size={20} />}
           </button>
           <div className="w-px h-4 bg-slate-700 mx-0.5 my-auto" />
           <button
-            onClick={() => setSyncScrollEnabled(!syncScrollEnabled)}
+            onClick={() => handleSetSyncScroll(!syncScroll)}
             className={cn(
               "p-1.5 rounded-lg transition-colors",
-              syncScrollEnabled ? "bg-cyan-600 text-white shadow-none" : "text-slate-500 hover:text-slate-300"
+              syncScroll ? "bg-cyan-600 text-white shadow-none" : "text-slate-500 hover:text-slate-300"
             )}
             title={t('syncScroll')}
           >
@@ -75,14 +90,14 @@ export const PreviewPane: React.FC<PreviewPaneProps> = ({
           </button>
           <div className="w-px h-4 bg-slate-700 mx-0.5 my-auto" />
           <button
-            onClick={toggleFullScreen}
+            onClick={handleToggleFullScreen}
             className={cn(
               "p-1.5 rounded-lg transition-colors",
-              isFullScreen ? "bg-amber-600 text-white shadow-none" : "text-slate-500 hover:text-slate-300"
+              fullScreen ? "bg-amber-600 text-white shadow-none" : "text-slate-500 hover:text-slate-300"
             )}
             title={t('fullscreen')}
           >
-            {isFullScreen ? <X size={20} /> : <Maximize2 size={20} />}
+            {fullScreen ? <X size={20} /> : <Maximize2 size={20} />}
           </button>
         </div>
       </div>

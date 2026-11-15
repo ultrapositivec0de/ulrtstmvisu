@@ -1,0 +1,652 @@
+{
+  "timestamp": "2026-11-14T01:43:27.990Z",
+  "stubs": [
+    {
+      "file": "src/components/Reader.tsx",
+      "line": 502,
+      "propOrContext": "setExpandedReplies",
+      "expr": "() => {}",
+      "category": "empty-handler"
+    },
+    {
+      "file": "src/hooks/useModalsProps.ts",
+      "line": 292,
+      "propOrContext": "setActiveModal",
+      "expr": "rest.setActiveModal ?? appUI?.setActiveModal ?? (() => {})",
+      "category": "fallback-stub"
+    },
+    {
+      "file": "src/hooks/useModalsProps.ts",
+      "line": 341,
+      "propOrContext": "extractMentions",
+      "expr": "rest.extractMentions ?? publishingManager?.extractMentions ?? ((t: string) => [])",
+      "category": "fallback-stub"
+    },
+    {
+      "file": "src/hooks/useModalsProps.ts",
+      "line": 342,
+      "propOrContext": "addToQueue",
+      "expr": "rest.addToQueue ?? publishingManager?.handleAddToQueue ?? publishingQueue.addToQueue ?? (() => {})",
+      "category": "fallback-stub"
+    },
+    {
+      "file": "src/hooks/useModalsProps.ts",
+      "line": 345,
+      "propOrContext": "handlePublish",
+      "expr": "rest.handlePublish ?? publishingManager?.handlePublish ?? (() => {})",
+      "category": "fallback-stub"
+    },
+    {
+      "file": "src/hooks/useModalsProps.ts",
+      "line": 351,
+      "propOrContext": "toggleTag",
+      "expr": "rest.toggleTag ?? appPublishing?.toggleTag ?? (() => {})",
+      "category": "fallback-stub"
+    },
+    {
+      "file": "src/hooks/useModalsProps.ts",
+      "line": 354,
+      "propOrContext": "handleSplitPost",
+      "expr": "rest.handleSplitPost ?? publishingManager?.handleSplitPost ?? (() => {})",
+      "category": "fallback-stub"
+    },
+    {
+      "file": "src/hooks/useModalsProps.ts",
+      "line": 361,
+      "propOrContext": "exportBackup",
+      "expr": "rest.exportBackup ?? appBackup?.handleExportBackup ?? (() => {})",
+      "category": "fallback-stub"
+    },
+    {
+      "file": "src/hooks/useModalsProps.ts",
+      "line": 362,
+      "propOrContext": "importBackup",
+      "expr": "rest.importBackup ?? appBackup?.handleImportBackup ?? (() => {})",
+      "category": "fallback-stub"
+    },
+    {
+      "file": "src/hooks/useModalsProps.ts",
+      "line": 369,
+      "propOrContext": "addMention",
+      "expr": "rest.addMention ?? appPublishing?.addMention ?? (() => {})",
+      "category": "fallback-stub"
+    },
+    {
+      "file": "src/hooks/useModalsProps.ts",
+      "line": 373,
+      "propOrContext": "setThemeColor",
+      "expr": "rest.setThemeColor ?? themeAndStyles?.setThemeColor ?? (() => {})",
+      "category": "fallback-stub"
+    },
+    {
+      "file": "src/hooks/useModalsProps.ts",
+      "line": 376,
+      "propOrContext": "setEditorFont",
+      "expr": "rest.setEditorFont ?? themeAndStyles?.setEditorFont ?? (() => {})",
+      "category": "fallback-stub"
+    },
+    {
+      "file": "src/hooks/useModalsProps.ts",
+      "line": 381,
+      "propOrContext": "setIsDarkMode",
+      "expr": "rest.setIsDarkMode ?? themeAndStyles?.setIsDarkMode ?? (() => {})",
+      "category": "fallback-stub"
+    },
+    {
+      "file": "src/hooks/useModalsProps.ts",
+      "line": 383,
+      "propOrContext": "setVisualStyle",
+      "expr": "rest.setVisualStyle ?? themeAndStyles?.setVisualStyle ?? (() => {})",
+      "category": "fallback-stub"
+    },
+    {
+      "file": "src/hooks/useModalsProps.ts",
+      "line": 385,
+      "propOrContext": "isTauriEnv",
+      "expr": "rest.isTauriEnv ?? appUI?.isTauriEnv ?? (() => false)",
+      "category": "fallback-stub"
+    },
+    {
+      "file": "src/hooks/useModalsProps.ts",
+      "line": 386,
+      "propOrContext": "isNeutralinoEnv",
+      "expr": "rest.isNeutralinoEnv ?? appUI?.isNeutralinoEnv ?? (() => false)",
+      "category": "fallback-stub"
+    },
+    {
+      "file": "src/hooks/useModalsProps.ts",
+      "line": 387,
+      "propOrContext": "handleInstallPwa",
+      "expr": "rest.handleInstallPwa ?? pwa?.handleInstallPwa ?? (() => {})",
+      "category": "fallback-stub"
+    },
+    {
+      "file": "src/hooks/useModalsProps.ts",
+      "line": 405,
+      "propOrContext": "setNeonTextColored",
+      "expr": "rest.setNeonTextColored ?? themeAndStyles?.setNeonTextColored ?? (() => {})",
+      "category": "fallback-stub"
+    },
+    {
+      "file": "src/hooks/useModalsProps.ts",
+      "line": 407,
+      "propOrContext": "setEditorFontSize",
+      "expr": "rest.setEditorFontSize ?? themeAndStyles?.setEditorFontSize ?? (() => {})",
+      "category": "fallback-stub"
+    },
+    {
+      "file": "src/hooks/useModalsProps.ts",
+      "line": 409,
+      "propOrContext": "setToolbarIconSize",
+      "expr": "rest.setToolbarIconSize ?? themeAndStyles?.setToolbarIconSize ?? (() => {})",
+      "category": "fallback-stub"
+    },
+    {
+      "file": "src/hooks/useModalsProps.ts",
+      "line": 422,
+      "propOrContext": "setWysiwygSpacing",
+      "expr": "rest.setWysiwygSpacing ?? themeAndStyles?.setWysiwygSpacing ?? (() => {})",
+      "category": "fallback-stub"
+    },
+    {
+      "file": "src/hooks/useModalsProps.ts",
+      "line": 424,
+      "propOrContext": "setWidgetPos",
+      "expr": "rest.setWidgetPos ?? floatingWidget?.setWidgetPos ?? (() => {})",
+      "category": "fallback-stub"
+    },
+    {
+      "file": "src/hooks/useModalsProps.ts",
+      "line": 426,
+      "propOrContext": "setIsTrafficOptimized",
+      "expr": "rest.setIsTrafficOptimized ?? gallery.setIsTrafficOptimized ?? (() => {})",
+      "category": "fallback-stub"
+    },
+    {
+      "file": "src/hooks/useModalsProps.ts",
+      "line": 432,
+      "propOrContext": "setImageInsertFormat",
+      "expr": "rest.setImageInsertFormat ?? gallery.setImageInsertFormat ?? (() => {})",
+      "category": "fallback-stub"
+    },
+    {
+      "file": "src/hooks/useModalsProps.ts",
+      "line": 434,
+      "propOrContext": "setPexelsSettings",
+      "expr": "rest.setPexelsSettings ?? gallery.setPexelsSettings ?? (() => {})",
+      "category": "fallback-stub"
+    },
+    {
+      "file": "src/hooks/useModalsProps.ts",
+      "line": 436,
+      "propOrContext": "handleClearCache",
+      "expr": "rest.handleClearCache ?? appBackup?.handleClearCache ?? (() => {})",
+      "category": "fallback-stub"
+    },
+    {
+      "file": "src/hooks/useModalsProps.ts",
+      "line": 438,
+      "propOrContext": "setShowPwaBanner",
+      "expr": "rest.setShowPwaBanner ?? pwa?.setShowPwaBanner ?? (() => {})",
+      "category": "fallback-stub"
+    },
+    {
+      "file": "src/hooks/useModalsProps.ts",
+      "line": 442,
+      "propOrContext": "setShowPwaInstructionsModal",
+      "expr": "rest.setShowPwaInstructionsModal ?? pwa?.setShowPwaInstructionsModal ?? (() => {})",
+      "category": "fallback-stub"
+    }
+  ],
+  "propGaps": [
+    {
+      "targetName": "HeaderProps -> headerProps",
+      "interfaceFile": "src/components/header/Header.tsx",
+      "wiringFile": "src/hooks/useAppWorkspaceSuite.ts",
+      "totalInterfaceProps": 56,
+      "missingProps": [
+        {
+          "name": "setActiveModal",
+          "optional": true,
+          "typeStr": "(modal: any) => void",
+          "usedInComponent": true,
+          "hasComponentDefault": true,
+          "defaultExpr": "storeSetActiveModal"
+        },
+        {
+          "name": "setContent",
+          "optional": true,
+          "typeStr": "(content: string) => void",
+          "usedInComponent": true,
+          "hasComponentDefault": true,
+          "defaultExpr": "storeSetContent"
+        }
+      ],
+      "extraProps": []
+    },
+    {
+      "targetName": "ReaderScreenProps -> readerProps",
+      "interfaceFile": "src/components/screens/ReaderScreen.tsx",
+      "wiringFile": "src/hooks/useAppWorkspaceSuite.ts",
+      "totalInterfaceProps": 1,
+      "missingProps": [],
+      "extraProps": [
+        "lang",
+        "t",
+        "editorFontSize",
+        "setEditorFontSize",
+        "onEditPost",
+        "onVote",
+        "onComment",
+        "onDeleteComment",
+        "onUploadImage",
+        "onUserUpdate",
+        "currentUser",
+        "onMuteUser",
+        "mutedUsers",
+        "targetReaderPost",
+        "rawInboxData",
+        "authType",
+        "keychainAccounts",
+        "vaultAccounts",
+        "onSelectAccount",
+        "onAddKeychainAccount",
+        "onOpenVaultManager",
+        "selectedVaultUser"
+      ]
+    },
+    {
+      "targetName": "EditorScreenProps -> editorProps",
+      "interfaceFile": "src/components/screens/EditorScreen.tsx",
+      "wiringFile": "src/hooks/useAppWorkspaceSuite.ts",
+      "totalInterfaceProps": 30,
+      "missingProps": [],
+      "extraProps": []
+    },
+    {
+      "targetName": "AppModalsHostProps -> modalsHostProps",
+      "interfaceFile": "src/components/modals/AppModalsHost.tsx",
+      "wiringFile": "src/hooks/useAppWorkspaceSuite.ts",
+      "totalInterfaceProps": 27,
+      "missingProps": [],
+      "extraProps": []
+    },
+    {
+      "targetName": "SidebarProps -> buildSidebarProps",
+      "interfaceFile": "src/components/sidebar/Sidebar.tsx",
+      "wiringFile": "src/hooks/useSidebarProps.ts",
+      "totalInterfaceProps": 66,
+      "missingProps": [],
+      "extraProps": [
+        "authTypeKeychain"
+      ]
+    },
+    {
+      "targetName": "EditorPaneProps -> buildEditorPaneProps",
+      "interfaceFile": "src/components/editor/EditorPane.tsx",
+      "wiringFile": "src/hooks/useEditorPaneProps.ts",
+      "totalInterfaceProps": 121,
+      "missingProps": [],
+      "extraProps": []
+    },
+    {
+      "targetName": "AppModalsProps -> buildModalsProps",
+      "interfaceFile": "src/components/modals/AppModals.tsx",
+      "wiringFile": "src/hooks/useModalsProps.ts",
+      "totalInterfaceProps": 157,
+      "missingProps": [],
+      "extraProps": []
+    },
+    {
+      "targetName": "WysiwygCanvasProps -> <WysiwygCanvas>",
+      "interfaceFile": "src/components/editor/WysiwygCanvas.tsx",
+      "wiringFile": "src/components/editor/EditorPane.tsx",
+      "totalInterfaceProps": 23,
+      "missingProps": [],
+      "extraProps": []
+    },
+    {
+      "targetName": "TamedWidgetProps -> <TamedWidget>",
+      "interfaceFile": "src/components/editor/TamedWidget.tsx",
+      "wiringFile": "src/components/editor/EditorPane.tsx",
+      "totalInterfaceProps": 57,
+      "missingProps": [],
+      "extraProps": []
+    },
+    {
+      "targetName": "MiniGalleryStripProps -> <MiniGalleryStrip>",
+      "interfaceFile": "src/components/editor/MiniGalleryStrip.tsx",
+      "wiringFile": "src/components/editor/EditorPane.tsx",
+      "totalInterfaceProps": 15,
+      "missingProps": [],
+      "extraProps": []
+    },
+    {
+      "targetName": "EditorTopBarProps -> <EditorTopBar>",
+      "interfaceFile": "src/components/editor/EditorTopBar.tsx",
+      "wiringFile": "src/components/editor/EditorPane.tsx",
+      "totalInterfaceProps": 30,
+      "missingProps": [],
+      "extraProps": []
+    },
+    {
+      "targetName": "PreviewPaneProps -> <PreviewPane>",
+      "interfaceFile": "src/components/editor/PreviewPane.tsx",
+      "wiringFile": "src/components/screens/EditorScreen.tsx",
+      "totalInterfaceProps": 13,
+      "missingProps": [],
+      "extraProps": []
+    },
+    {
+      "targetName": "MobileBottomBarProps -> <MobileBottomBar>",
+      "interfaceFile": "src/components/common/MobileBottomBar.tsx",
+      "wiringFile": "src/components/screens/EditorScreen.tsx",
+      "totalInterfaceProps": 15,
+      "missingProps": [
+        {
+          "name": "isMobileLayout",
+          "optional": true,
+          "typeStr": "boolean",
+          "usedInComponent": true,
+          "hasComponentDefault": true,
+          "defaultExpr": "propIsMobileLayout !== undefined ? propIsMobileLayout : storeIsMobileLayout;"
+        }
+      ],
+      "extraProps": []
+    }
+  ],
+  "destructureMismatches": [],
+  "splitBrain": {
+    "useModalStore.activeModal": {
+      "readers": [
+        "src/hooks/useAppUI.ts:28 -> const activeModal = useModalStore((s) => s.activeModal);"
+      ],
+      "writers": [
+        "src/components/header/Header.tsx:128 -> const storeSetActiveModal = useModalStore(s => s.setActiveModal);",
+        "src/hooks/useAppUI.ts:29 -> const setActiveModal = useModalStore((s) => s.setActiveModal);"
+      ],
+      "localStateDefs": []
+    },
+    "useModalStore.isSMenuOpen": {
+      "readers": [
+        "src/components/modals/AppModals.tsx:205 -> const storeIsSMenuOpen = useModalStore(s => s.isSMenuOpen);",
+        "src/hooks/useWorkspaceEditorState.ts:95 -> const isSMenuOpen = useModalStore((s) => s.isSMenuOpen);"
+      ],
+      "writers": [
+        "src/components/header/Header.tsx:129 -> const storeSetIsSMenuOpen = useModalStore(s => s.setIsSMenuOpen);",
+        "src/components/modals/AppModals.tsx:206 -> const storeSetIsSMenuOpen = useModalStore(s => s.setIsSMenuOpen);",
+        "src/hooks/useWorkspaceEditorState.ts:96 -> const setIsSMenuOpen = useModalStore((s) => s.setIsSMenuOpen);"
+      ],
+      "localStateDefs": []
+    },
+    "useModalStore.showPwaBanner": {
+      "readers": [],
+      "writers": [],
+      "localStateDefs": [
+        "src/hooks/usePwaAndNotifications.ts:188 -> const [showPwaBanner, setShowPwaBanner] = useState(() => {"
+      ]
+    },
+    "useModalStore.showPwaInstructionsModal": {
+      "readers": [],
+      "writers": [],
+      "localStateDefs": [
+        "src/hooks/usePwaAndNotifications.ts:195 -> const [showPwaInstructionsModal, setShowPwaInstructionsModal] = useState(false);"
+      ]
+    },
+    "useModalStore.isAudioPresetsModalOpen": {
+      "readers": [],
+      "writers": [],
+      "localStateDefs": [
+        "src/App.tsx:94 -> const [isAudioPresetsModalOpen, setIsAudioPresetsModalOpen] = useState(false);"
+      ]
+    },
+    "useModalStore.isTableSelectorOpen": {
+      "readers": [
+        "src/hooks/useAppUI.ts:30 -> const storeShowTableSelector = useModalStore((s) => s.isTableSelectorOpen);",
+        "src/hooks/useAppWorkspaceSuite.ts:241 -> const showTableSelector = useModalStore((s) => s.isTableSelectorOpen);"
+      ],
+      "writers": [
+        "src/hooks/useAppUI.ts:31 -> const storeSetShowTableSelector = useModalStore((s) => s.setIsTableSelectorOpen);",
+        "src/hooks/useAppWorkspaceSuite.ts:242 -> const setShowTableSelector = useModalStore((s) => s.setIsTableSelectorOpen);",
+        "src/hooks/useWorkspaceServices.ts:150 -> const setShowTableSelector = useModalStore((s) => s.setIsTableSelectorOpen);"
+      ],
+      "localStateDefs": []
+    },
+    "useAppUIStore.activeView": {
+      "readers": [
+        "src/components/header/Header.tsx:123 -> const storeActiveView = useAppUIStore(s => s.activeView);",
+        "src/hooks/useAppUI.ts:35 -> const activeView = useAppUIStore((s) => s.activeView);"
+      ],
+      "writers": [
+        "src/components/editor/PreviewPane.tsx:46 -> const storeToggleFullScreen = useAppUIStore(s => s.toggleFullScreen);",
+        "src/components/header/Header.tsx:124 -> const storeSetActiveView = useAppUIStore(s => s.setActiveView);",
+        "src/hooks/useAppUI.ts:36 -> const setActiveView = useAppUIStore((s) => s.setActiveView);",
+        "src/hooks/useAppUI.ts:43 -> const toggleEditorFullScreen = useAppUIStore((s) => s.toggleEditorFullScreen);"
+      ],
+      "localStateDefs": []
+    },
+    "useAppUIStore.isSidebarOpen": {
+      "readers": [
+        "src/hooks/useAppUI.ts:37 -> const isSidebarOpen = useAppUIStore((s) => s.isSidebarOpen);"
+      ],
+      "writers": [
+        "src/components/editor/PreviewPane.tsx:46 -> const storeToggleFullScreen = useAppUIStore(s => s.toggleFullScreen);",
+        "src/hooks/useAppUI.ts:38 -> const setIsSidebarOpen = useAppUIStore((s) => s.setIsSidebarOpen);",
+        "src/hooks/useAppUI.ts:43 -> const toggleEditorFullScreen = useAppUIStore((s) => s.toggleEditorFullScreen);"
+      ],
+      "localStateDefs": []
+    },
+    "useAppUIStore.isFullScreen": {
+      "readers": [
+        "src/components/editor/PreviewPane.tsx:45 -> const storeIsFullScreen = useAppUIStore(s => s.isFullScreen);",
+        "src/hooks/useAppUI.ts:39 -> const isFullScreen = useAppUIStore((s) => s.isFullScreen);"
+      ],
+      "writers": [
+        "src/components/editor/PreviewPane.tsx:46 -> const storeToggleFullScreen = useAppUIStore(s => s.toggleFullScreen);",
+        "src/hooks/useAppUI.ts:40 -> const setIsFullScreen = useAppUIStore((s) => s.setIsFullScreen);",
+        "src/hooks/useAppUI.ts:43 -> const toggleEditorFullScreen = useAppUIStore((s) => s.toggleEditorFullScreen);"
+      ],
+      "localStateDefs": []
+    },
+    "useAppUIStore.isEditorFullScreen": {
+      "readers": [
+        "src/hooks/useAppUI.ts:41 -> const isEditorFullScreen = useAppUIStore((s) => s.isEditorFullScreen);"
+      ],
+      "writers": [
+        "src/components/editor/PreviewPane.tsx:46 -> const storeToggleFullScreen = useAppUIStore(s => s.toggleFullScreen);",
+        "src/hooks/useAppUI.ts:42 -> const setIsEditorFullScreen = useAppUIStore((s) => s.setIsEditorFullScreen);",
+        "src/hooks/useAppUI.ts:43 -> const toggleEditorFullScreen = useAppUIStore((s) => s.toggleEditorFullScreen);"
+      ],
+      "localStateDefs": []
+    },
+    "useAppUIStore.settingsTab": {
+      "readers": [
+        "src/hooks/useAppUI.ts:44 -> const settingsTab = useAppUIStore((s) => s.settingsTab);",
+        "src/hooks/useWorkspaceEditorState.ts:92 -> const settingsTab = useAppUIStore((s) => s.settingsTab);"
+      ],
+      "writers": [
+        "src/components/editor/PreviewPane.tsx:46 -> const storeToggleFullScreen = useAppUIStore(s => s.toggleFullScreen);",
+        "src/components/header/Header.tsx:125 -> const storeSetSettingsTab = useAppUIStore(s => s.setSettingsTab);",
+        "src/hooks/useAppUI.ts:43 -> const toggleEditorFullScreen = useAppUIStore((s) => s.toggleEditorFullScreen);",
+        "src/hooks/useAppUI.ts:45 -> const setSettingsTab = useAppUIStore((s) => s.setSettingsTab);",
+        "src/hooks/useWorkspaceEditorState.ts:93 -> const setSettingsTab = useAppUIStore((s) => s.setSettingsTab);"
+      ],
+      "localStateDefs": []
+    },
+    "useEditorStore.isLivePreviewEnabled": {
+      "readers": [
+        "src/components/editor/EditorPane.tsx:306 -> const storeIsLivePreviewEnabled = useEditorStore(s => s.isLivePreviewEnabled);",
+        "src/components/editor/PreviewPane.tsx:41 -> const storeIsLivePreviewEnabled = useEditorStore(s => s.isLivePreviewEnabled);",
+        "src/hooks/useWorkspaceEditorState.ts:86 -> const isLivePreviewEnabled = useEditorStore((s) => s.isLivePreviewEnabled);"
+      ],
+      "writers": [
+        "src/components/editor/EditorPane.tsx:307 -> const storeToggleLivePreview = useEditorStore(s => s.toggleLivePreview);",
+        "src/components/editor/PreviewPane.tsx:42 -> const storeToggleLivePreview = useEditorStore(s => s.toggleLivePreview);",
+        "src/hooks/useWorkspaceEditorState.ts:87 -> const setIsLivePreviewEnabled = useEditorStore((s) => s.setIsLivePreviewEnabled);",
+        "src/hooks/useWorkspaceEditorState.ts:88 -> const toggleLivePreview = useEditorStore((s) => s.toggleLivePreview);"
+      ],
+      "localStateDefs": []
+    },
+    "useEditorStore.syncScrollEnabled": {
+      "readers": [
+        "src/components/editor/PreviewPane.tsx:43 -> const storeSyncScrollEnabled = useEditorStore(s => s.syncScrollEnabled);",
+        "src/hooks/useWorkspaceEditorState.ts:84 -> const syncScrollEnabled = useEditorStore((s) => s.syncScrollEnabled);"
+      ],
+      "writers": [
+        "src/components/editor/EditorPane.tsx:307 -> const storeToggleLivePreview = useEditorStore(s => s.toggleLivePreview);",
+        "src/components/editor/PreviewPane.tsx:42 -> const storeToggleLivePreview = useEditorStore(s => s.toggleLivePreview);",
+        "src/components/editor/PreviewPane.tsx:44 -> const storeSetSyncScrollEnabled = useEditorStore(s => s.setSyncScrollEnabled);",
+        "src/hooks/useWorkspaceEditorState.ts:85 -> const setSyncScrollEnabled = useEditorStore((s) => s.setSyncScrollEnabled);",
+        "src/hooks/useWorkspaceEditorState.ts:88 -> const toggleLivePreview = useEditorStore((s) => s.toggleLivePreview);"
+      ],
+      "localStateDefs": []
+    },
+    "useEditorStore.beautifyEnabled": {
+      "readers": [
+        "src/components/editor/EditorPane.tsx:308 -> const storeBeautifyEnabled = useEditorStore(s => s.beautifyEnabled);",
+        "src/hooks/useWorkspaceEditorState.ts:89 -> const beautifyEnabled = useEditorStore((s) => s.beautifyEnabled);"
+      ],
+      "writers": [
+        "src/components/editor/EditorPane.tsx:307 -> const storeToggleLivePreview = useEditorStore(s => s.toggleLivePreview);",
+        "src/components/editor/EditorPane.tsx:309 -> const storeSetBeautifyEnabled = useEditorStore(s => s.setBeautifyEnabled);",
+        "src/components/editor/PreviewPane.tsx:42 -> const storeToggleLivePreview = useEditorStore(s => s.toggleLivePreview);",
+        "src/hooks/useWorkspaceEditorState.ts:88 -> const toggleLivePreview = useEditorStore((s) => s.toggleLivePreview);",
+        "src/hooks/useWorkspaceEditorState.ts:90 -> const setBeautifyEnabled = useEditorStore((s) => s.setBeautifyEnabled);"
+      ],
+      "localStateDefs": []
+    },
+    "useEditorStore.activeFormats": {
+      "readers": [
+        "src/components/editor/EditorPane.tsx:310 -> const storeActiveFormats = useEditorStore(s => s.activeFormats);",
+        "src/components/header/Header.tsx:126 -> const storeActiveFormats = useEditorStore(s => s.activeFormats);",
+        "src/hooks/useEditorFormat.ts:40 -> const activeFormats = useEditorStore((s) => s.activeFormats);"
+      ],
+      "writers": [
+        "src/components/editor/EditorPane.tsx:307 -> const storeToggleLivePreview = useEditorStore(s => s.toggleLivePreview);",
+        "src/components/editor/PreviewPane.tsx:42 -> const storeToggleLivePreview = useEditorStore(s => s.toggleLivePreview);",
+        "src/hooks/useEditorCore.ts:64 -> const storeSetActiveFormats = useEditorStore((s) => s.setActiveFormats);",
+        "src/hooks/useEditorFormat.ts:41 -> const setActiveFormats = useEditorStore((s) => s.setActiveFormats);",
+        "src/hooks/useWorkspaceEditorState.ts:88 -> const toggleLivePreview = useEditorStore((s) => s.toggleLivePreview);"
+      ],
+      "localStateDefs": []
+    },
+    "useEditorStore.content": {
+      "readers": [
+        "src/App.tsx:112 -> const contentForPublish = useEditorStore(state => activeModal === 'publish' ? state.content : '');",
+        "src/components/CodeEditor.tsx:17 -> const content = useEditorStore((state) => state.content);",
+        "src/components/common/MobileBottomBar.tsx:82 -> const firstLine = useEditorStore.getState().content.split('\\n')[0].replace(/[#*`]/g, '').trim().substring(0, 100);",
+        "src/components/editor/EditorPane.tsx:412 -> currentEditorContent={useEditorStore.getState().content}",
+        "src/components/editor/EditorPane.tsx:417 -> const currentContent = useEditorStore.getState().content || '';",
+        "src/components/editor/WysiwygCanvas.tsx:264 -> data-is-empty={useEditorStore.getState().content.trim() === '' ? 'true' : undefined}",
+        "src/components/editor/toolsMap.tsx:109 -> const selectedText = useEditorStore.getState().content.substring(start, end);",
+        "src/components/editor/toolsMap.tsx:112 -> const newContent = useEditorStore.getState().content.substring(0, start) + newText + useEditorStore.getState().content.substring(end);",
+        "src/components/header/Header.tsx:646 -> const currentContent = useEditorStore.getState().content;",
+        "src/components/header/Header.tsx:649 -> useEditorStore.setState({ content: newContent });",
+        "src/components/header/Header.tsx:718 -> if (useEditorStore.getState().content.trim() !== '') {",
+        "src/components/modals/TemplatesModal.tsx:77 -> content: useEditorStore.getState().content,",
+        "src/hooks/useEditorCore.ts:141 -> const content = useEditorStore.getState().content;",
+        "src/hooks/useEditorFormat.ts:159 -> const content = useEditorStore.getState().content;",
+        "src/hooks/useEditorFormat.ts:969 -> const newContent = useEditorStore.getState().content.substring(0, range.s) + textToInsert + useEditorStore.getState().content.substring(range.e);",
+        "src/hooks/useEditorFormat.ts:980 -> const newContent = useEditorStore.getState().content.substring(0, range.s) + newText + useEditorStore.getState().content.substring(range.e);",
+        "src/hooks/useEditorFormat.ts:1357 -> const content = useEditorStore.getState().content;",
+        "src/hooks/useEditorFormat.ts:1481 -> const content = useEditorStore.getState().content;",
+        "src/hooks/useEditorFormat.ts:1555 -> const content = useEditorStore.getState().content;",
+        "src/hooks/useEditorModeManager.ts:148 -> const textVal = useEditorStore.getState().content;",
+        "src/hooks/useEditorModeManager.ts:351 -> if (syncResult.md !== useEditorStore.getState().content) {",
+        "src/hooks/useEditorModeManager.ts:356 -> if (md !== useEditorStore.getState().content) {",
+        "src/hooks/useEditorModeManager.ts:362 -> if (editorRef.current && editorRef.current.value !== useEditorStore.getState().content) {",
+        "src/hooks/useEditorModeManager.ts:377 -> let val = useEditorStore.getState().content;",
+        "src/hooks/useEditorModeManager.ts:432 -> if (syncResult.md !== useEditorStore.getState().content) {",
+        "src/hooks/useEditorModeManager.ts:437 -> if (md !== useEditorStore.getState().content) {",
+        "src/hooks/useEditorShortcutsAndAutosave.ts:157 -> useEditorStore.setState({ content: val });",
+        "src/hooks/useEditorShortcutsAndAutosave.ts:163 -> useEditorStore.setState({ content: md });",
+        "src/hooks/useEditorShortcutsAndAutosave.ts:213 -> const mdContent = useEditorStore.getState().content;",
+        "src/hooks/useEditorWorker.ts:68 -> calculate(useEditorStore.getState().content); // initial",
+        "src/hooks/useSteemPublishingSuite.ts:88 -> const content = useEditorStore.getState().content;",
+        "src/hooks/useWorkspaceDOMRefs.ts:24 -> const lastSyncContentRef = useRef<string>(useEditorStore.getState().content);",
+        "src/hooks/useWorkspaceServices.ts:316 -> if (saved && saved !== useEditorStore.getState().content) {",
+        "src/hooks/useWysiwygSync.ts:377 -> const lastSyncContentRef = useRef<string>(useEditorStore.getState().content);",
+        "src/hooks/useWysiwygSync.ts:605 -> const storeContent = useEditorStore.getState().content;",
+        "src/hooks/useWysiwygSync.ts:617 -> const currentContent = useEditorStore.getState().content;",
+        "src/hooks/useWysiwygSync.ts:649 -> const storeContent = useEditorStore.getState().content;",
+        "src/hooks/useWysiwygSync.ts:670 -> return useEditorStore.getState().content;",
+        "src/hooks/useWysiwygSync.ts:695 -> let textContent = useEditorStore.getState().content;",
+        "src/hooks/useWysiwygSync.ts:820 -> lastSyncContentRef.current = useEditorStore.getState().content;",
+        "src/hooks/useWysiwygSync.ts:891 -> const rowColPos = getRowColFromOffset(useEditorStore.getState().content, pos.start);"
+      ],
+      "writers": [
+        "src/App.tsx:85 -> const setContent = useEditorStore(state => state.setContent);",
+        "src/components/editor/EditorPane.tsx:307 -> const storeToggleLivePreview = useEditorStore(s => s.toggleLivePreview);",
+        "src/components/editor/EditorPane.tsx:441 -> useEditorStore.getState().setContent(newContent);",
+        "src/components/editor/PreviewPane.tsx:42 -> const storeToggleLivePreview = useEditorStore(s => s.toggleLivePreview);",
+        "src/components/header/Header.tsx:127 -> const storeSetContent = useEditorStore(s => s.setContent);",
+        "src/hooks/useEditorEvents.ts:60 -> const setContent = useEditorStore((state) => state.setContent);",
+        "src/hooks/useEditorFormat.ts:183 -> useEditorStore.getState().setContent(newContent);",
+        "src/hooks/useEditorFormat.ts:265 -> useEditorStore.getState().setContent(newText);",
+        "src/hooks/useEditorFormat.ts:289 -> useEditorStore.getState().setContent(newText);",
+        "src/hooks/useEditorFormat.ts:306 -> useEditorStore.getState().setContent(newText);",
+        "src/hooks/useEditorFormat.ts:330 -> useEditorStore.getState().setContent(newText);",
+        "src/hooks/useEditorFormat.ts:365 -> useEditorStore.getState().setContent(newText);",
+        "src/hooks/useEditorFormat.ts:383 -> useEditorStore.getState().setContent(newText);",
+        "src/hooks/useEditorFormat.ts:416 -> useEditorStore.getState().setContent(newText);",
+        "src/hooks/useEditorFormat.ts:462 -> useEditorStore.getState().setContent(newText);",
+        "src/hooks/useEditorFormat.ts:482 -> useEditorStore.getState().setContent(newText);",
+        "src/hooks/useEditorFormat.ts:501 -> useEditorStore.getState().setContent(newText);",
+        "src/hooks/useEditorFormat.ts:530 -> useEditorStore.getState().setContent(newText);",
+        "src/hooks/useEditorFormat.ts:546 -> useEditorStore.getState().setContent(newText);",
+        "src/hooks/useEditorFormat.ts:970 -> useEditorStore.getState().setContent(newContent);",
+        "src/hooks/useEditorFormat.ts:981 -> useEditorStore.getState().setContent(newContent);",
+        "src/hooks/useEditorFormat.ts:1425 -> useEditorStore.getState().setContent(newContent);",
+        "src/hooks/useEditorFormat.ts:1438 -> useEditorStore.getState().setContent(newContent);",
+        "src/hooks/useEditorFormat.ts:1450 -> useEditorStore.getState().setContent(newContent);",
+        "src/hooks/useEditorFormat.ts:1470 -> useEditorStore.getState().setContent(newContent);",
+        "src/hooks/useEditorFormat.ts:1525 -> useEditorStore.getState().setContent(newContent);",
+        "src/hooks/useEditorFormat.ts:1542 -> useEditorStore.getState().setContent(newContent);",
+        "src/hooks/useEditorFormat.ts:1581 -> useEditorStore.getState().setContent(newContent);",
+        "src/hooks/useEditorPaneProps.ts:292 -> setContent: useEditorStore.getState().setContent,",
+        "src/hooks/useWorkspaceEditorState.ts:88 -> const toggleLivePreview = useEditorStore((s) => s.toggleLivePreview);",
+        "src/hooks/useWorkspaceServices.ts:125 -> const setContent = useEditorStore(state => state.setContent);",
+        "src/hooks/useWysiwygSync.ts:375 -> const setContent = useEditorStore((state) => state.setContent);"
+      ],
+      "localStateDefs": []
+    },
+    "useEditorStore.currentLang": {
+      "readers": [
+        "src/components/audio/AudioControlWidget.tsx:37 -> const currentLang = useEditorStore(s => s.currentLang);",
+        "src/components/common/ImageLightboxModal.tsx:10 -> const currentLang = useEditorStore((s) => s.currentLang) as any;",
+        "src/components/common/NotificationToast.tsx:28 -> const currentLang = useEditorStore(s => s.currentLang);",
+        "src/components/docReader/DocReaderSettingsMenu.tsx:21 -> const currentLang = useEditorStore(s => s.currentLang);",
+        "src/components/docReader/DocReaderSourceDrawer.tsx:31 -> const currentLang = useEditorStore(s => s.currentLang);",
+        "src/components/docReader/DocReaderTOC.tsx:25 -> const currentLang = useEditorStore(s => s.currentLang);",
+        "src/components/docReader/DocReaderToolbar.tsx:37 -> const currentLang = useEditorStore(s => s.currentLang);",
+        "src/components/docReader/useDocReader.ts:36 -> const currentLang = useEditorStore(s => s.currentLang);",
+        "src/components/docReader/useDocReader.ts:66 -> title: currentEditorTitle || getTranslation(useEditorStore.getState().currentLang, 'readerUntitledDoc'),",
+        "src/components/modals/AudioPresetsModal.tsx:62 -> const currentLang = useEditorStore(s => s.currentLang);",
+        "src/components/modals/BaseModal.tsx:58 -> const currentLang = useEditorStore(s => s.currentLang);",
+        "src/components/reader/PostRenderer.tsx:54 -> const currentLang = useEditorStore(s => s.currentLang);",
+        "src/services/audio/presets.ts:94 -> const activeLang = (lang || useEditorStore.getState().currentLang || 'uk') as any;",
+        "src/services/audio/presets.ts:102 -> const activeLang = (lang || useEditorStore.getState().currentLang || 'uk') as any;",
+        "src/services/audio/presets.ts:112 -> const currentLang = (useEditorStore.getState().currentLang || 'uk') as any;"
+      ],
+      "writers": [
+        "src/App.tsx:61 -> useEditorStore.getState().setCurrentLang(lang);",
+        "src/components/editor/EditorPane.tsx:307 -> const storeToggleLivePreview = useEditorStore(s => s.toggleLivePreview);",
+        "src/components/editor/PreviewPane.tsx:42 -> const storeToggleLivePreview = useEditorStore(s => s.toggleLivePreview);",
+        "src/hooks/useWorkspaceEditorState.ts:88 -> const toggleLivePreview = useEditorStore((s) => s.toggleLivePreview);"
+      ],
+      "localStateDefs": []
+    }
+  },
+  "parityDiffs": [
+    {
+      "component": "Header",
+      "backupCount": 56,
+      "currentCount": 54,
+      "lostFromBackup": [
+        "setActiveModal",
+        "setContent"
+      ],
+      "addedInCurrent": []
+    }
+  ]
+}

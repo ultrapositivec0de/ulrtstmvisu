@@ -1,0 +1,1535 @@
+{
+  "generatedAt": "2026-11-14T01:43:36.065Z",
+  "localStorage": {
+    "readWithoutWrite": [
+      {
+        "key": "steem_save_pexels_unencrypted",
+        "reads": [
+          "src/components/modals/KeysModal.tsx:149"
+        ]
+      },
+      {
+        "key": "steem_editor_source_links",
+        "reads": [
+          "src/hooks/useSteemGallery.ts:119"
+        ]
+      }
+    ],
+    "lostFromBak": [],
+    "allReads": {
+      "steem_lang": [
+        "src/App.tsx:53",
+        "src/components/LineComponent.tsx:14",
+        "src/components/Reader.tsx:98",
+        "src/components/reader/CommentItem.tsx:53",
+        "src/components/reader/ReplyBox.tsx:30"
+      ],
+      "steem_language": [
+        "src/App.tsx:53",
+        "src/components/common/ErrorBoundary.tsx:29",
+        "src/stores/useEditorStore.ts:81"
+      ],
+      "steem_vote_logs": [
+        "src/components/Reader.tsx:203",
+        "src/components/reader/ReaderCurationView.tsx:489"
+      ],
+      "steem_save_pexels_unencrypted": [
+        "src/components/modals/KeysModal.tsx:149"
+      ],
+      "steem_reader_config_v1": [
+        "src/components/reader/CommentItem.tsx:76",
+        "src/hooks/useAppNotifications.ts:16",
+        "src/hooks/useAppNotifications.ts:29",
+        "src/hooks/usePwaAndNotifications.ts:92"
+      ],
+      "steem_text_wrap_enabled": [
+        "src/hooks/gallery/useGalleryLayoutMarkup.ts:39"
+      ],
+      "steem_image_insert_format": [
+        "src/hooks/gallery/useGalleryLayoutMarkup.ts:44"
+      ],
+      "steem_exif_enabled": [
+        "src/hooks/gallery/useImageUploadPipeline.ts:71"
+      ],
+      "steem_traffic_optimized": [
+        "src/hooks/gallery/useStockPhotos.ts:28"
+      ],
+      "steem_pexels_settings": [
+        "src/hooks/gallery/useStockPhotos.ts:35"
+      ],
+      "steem_cached_curation_posts": [
+        "src/hooks/reader/useReaderCuration.ts:39"
+      ],
+      "steem_reader_curation_cols": [
+        "src/hooks/reader/useReaderCuration.ts:53"
+      ],
+      "steem_cached_posts": [
+        "src/hooks/reader/useReaderFeedData.ts:20",
+        "src/hooks/reader/useReaderFeedData.ts:35"
+      ],
+      "steem_hidden_replies": [
+        "src/hooks/reader/useReaderInbox.ts:31",
+        "src/hooks/reader/useReaderInbox.ts:237",
+        "src/hooks/usePwaAndNotifications.ts:44"
+      ],
+      "steem_quick_tags_v1": [
+        "src/hooks/useAppNotifications.ts:98"
+      ],
+      "steem_editor_mode": [
+        "src/hooks/useEditorModeManager.ts:44"
+      ],
+      "steem_editor_cursor": [
+        "src/hooks/useEditorModeManager.ts:162",
+        "src/hooks/useEditorModeManager.ts:258"
+      ],
+      "steem_editor_scroll": [
+        "src/hooks/useEditorModeManager.ts:186",
+        "src/hooks/useEditorModeManager.ts:305"
+      ],
+      "steem_widget_pos": [
+        "src/hooks/useFloatingWidgetState.ts:20"
+      ],
+      "widget_opacity": [
+        "src/hooks/useFloatingWidgetState.ts:30"
+      ],
+      "widget_no_border": [
+        "src/hooks/useFloatingWidgetState.ts:36"
+      ],
+      "steem_gallery_cache_results": [
+        "src/hooks/useImageSearch.ts:24"
+      ],
+      "steem_reward_type": [
+        "src/hooks/usePostSettings.ts:9"
+      ],
+      "steem_remove_title_line": [
+        "src/hooks/usePostSettings.ts:14"
+      ],
+      "steem_app_agent": [
+        "src/hooks/usePostSettings.ts:19"
+      ],
+      "steem_tag_groups": [
+        "src/hooks/usePostSettings.ts:40"
+      ],
+      "steem_notif_enabled": [
+        "src/hooks/usePwaAndNotifications.ts:17"
+      ],
+      "steem_muted_users": [
+        "src/hooks/usePwaAndNotifications.ts:25"
+      ],
+      "steem_last_notif_time": [
+        "src/hooks/usePwaAndNotifications.ts:38"
+      ],
+      "steem_pwa_banner_dismissed": [
+        "src/hooks/usePwaAndNotifications.ts:190"
+      ],
+      "steem_auth_type": [
+        "src/hooks/useSteemAuth.ts:8"
+      ],
+      "steem_keychain_accounts": [
+        "src/hooks/useSteemAuth.ts:33",
+        "src/hooks/useSteemAuth.ts:76"
+      ],
+      "steem_username": [
+        "src/hooks/useSteemAuth.ts:43",
+        "src/hooks/useSteemAuth.ts:95",
+        "src/hooks/useSteemAuth.ts:119"
+      ],
+      "steem_pixabay_key": [
+        "src/hooks/useSteemAuth.ts:154"
+      ],
+      "steem_unsplash_access_key": [
+        "src/hooks/useSteemAuth.ts:160"
+      ],
+      "steem_pexels_key_raw": [
+        "src/hooks/useSteemAuth.ts:180"
+      ],
+      "steem_prefer_vault": [
+        "src/hooks/useSteemAuth.ts:200"
+      ],
+      "steem_gallery_collapsed": [
+        "src/hooks/useSteemGallery.ts:41"
+      ],
+      "steem_editor_source_links": [
+        "src/hooks/useSteemGallery.ts:119"
+      ],
+      "steem_table_menu_pinned": [
+        "src/hooks/useTableOperations.ts:48"
+      ],
+      "steem_dark_mode": [
+        "src/hooks/useThemeAndStyles.ts:104"
+      ],
+      "steem_visual_style": [
+        "src/hooks/useThemeAndStyles.ts:105"
+      ],
+      "steem_neon_text_colored": [
+        "src/hooks/useThemeAndStyles.ts:106"
+      ],
+      "steem_theme_color": [
+        "src/hooks/useThemeAndStyles.ts:108"
+      ],
+      "steem_editor_font": [
+        "src/hooks/useThemeAndStyles.ts:109"
+      ],
+      "steem_editor_font_size": [
+        "src/hooks/useThemeAndStyles.ts:111"
+      ],
+      "steem_ui_scale_preset": [
+        "src/hooks/useThemeAndStyles.ts:117",
+        "src/hooks/useThemeAndStyles.ts:128",
+        "src/hooks/useThemeAndStyles.ts:140",
+        "src/hooks/useThemeAndStyles.ts:147"
+      ],
+      "steem_ui_header_icon_size": [
+        "src/hooks/useThemeAndStyles.ts:126"
+      ],
+      "steem_ui_header_height_auto": [
+        "src/hooks/useThemeAndStyles.ts:133"
+      ],
+      "steem_ui_header_height": [
+        "src/hooks/useThemeAndStyles.ts:138"
+      ],
+      "steem_ui_gallery_icon_size": [
+        "src/hooks/useThemeAndStyles.ts:145"
+      ],
+      "steem_toolbar_icon_size": [
+        "src/hooks/useThemeAndStyles.ts:152"
+      ],
+      "steem_wysiwyg_spacing": [
+        "src/hooks/useThemeAndStyles.ts:169"
+      ],
+      "steem_performance_mode": [
+        "src/hooks/useWorkspaceEditorState.ts:59"
+      ],
+      "steem_ondemand_sync": [
+        "src/hooks/useWorkspaceEditorState.ts:65"
+      ],
+      "steem_layout_preference": [
+        "src/store/deviceStore.ts:66"
+      ],
+      "steem_app_active_view": [
+        "src/stores/useAppUIStore.ts:25"
+      ],
+      "steem_autosave_temp": [
+        "src/stores/useEditorStore.ts:73"
+      ],
+      "steem_live_preview_enabled": [
+        "src/stores/useEditorStore.ts:89"
+      ],
+      "steem_sync_scroll": [
+        "src/stores/useEditorStore.ts:94"
+      ],
+      "steem_beautify": [
+        "src/stores/useEditorStore.ts:99"
+      ]
+    },
+    "allWrites": {
+      "steem_language": [
+        "src/App.tsx:62"
+      ],
+      "steem_lang": [
+        "src/App.tsx:63",
+        "src/components/header/Header.tsx:588"
+      ],
+      "steem_editor_cursor": [
+        "src/components/CodeEditor.tsx:301",
+        "src/components/CodeEditor.tsx:333",
+        "src/hooks/useEditorModeManager.ts:61",
+        "src/hooks/useEditorModeManager.ts:392",
+        "src/hooks/useEditorShortcutsAndAutosave.ts:132",
+        "src/hooks/useWysiwygSync.ts:1006",
+        "src/hooks/useWysiwygSync.ts:1016"
+      ],
+      "steem_visual_html_is_stale": [
+        "src/components/CodeEditor.tsx:302",
+        "src/components/modals/DraftsModal.tsx:139"
+      ],
+      "steem_vote_logs": [
+        "src/components/Reader.tsx:227"
+      ],
+      "steem_editor_scroll": [
+        "src/components/editor/EditorPane.tsx:279",
+        "src/hooks/useEditorEvents.ts:157"
+      ],
+      "steem_ondemand_sync": [
+        "src/components/editor/EditorTopBar.tsx:203",
+        "src/hooks/useWorkspaceEditorState.ts:69",
+        "src/hooks/useWorkspaceEditorState.ts:81"
+      ],
+      "steem_beautify": [
+        "src/components/editor/EditorTopBar.tsx:256",
+        "src/components/editor/EditorTopBar.tsx:412",
+        "src/components/modals/QuickStyleMenu.tsx:158",
+        "src/stores/useEditorStore.ts:159"
+      ],
+      "steem_wysiwyg_spacing": [
+        "src/components/editor/EditorTopBar.tsx:452",
+        "src/components/editor/EditorTopBar.tsx:475",
+        "src/components/modals/SettingsModal.tsx:538",
+        "src/components/modals/SettingsModal.tsx:562",
+        "src/hooks/useThemeAndStyles.ts:232"
+      ],
+      "steem_editor_font_size": [
+        "src/components/editor/EditorTopBar.tsx:510",
+        "src/components/editor/EditorTopBar.tsx:533",
+        "src/components/modals/SettingsModal.tsx:431",
+        "src/components/modals/SettingsModal.tsx:455",
+        "src/hooks/useThemeAndStyles.ts:204"
+      ],
+      "steem_toolbar_icon_size": [
+        "src/components/editor/EditorTopBar.tsx:564",
+        "src/components/modals/SettingsModal.tsx:484",
+        "src/components/modals/SettingsModal.tsx:508",
+        "src/hooks/useThemeAndStyles.ts:228"
+      ],
+      "steem_table_menu_pinned": [
+        "src/components/editor/TableFloatingActionMenu.tsx:81"
+      ],
+      "widget_opacity": [
+        "src/components/editor/TamedWidget.tsx:496"
+      ],
+      "widget_no_border": [
+        "src/components/editor/TamedWidget.tsx:511"
+      ],
+      "steem_widget_pos": [
+        "src/components/editor/TamedWidget.tsx:553",
+        "src/components/modals/SettingsModal.tsx:372"
+      ],
+      "steem_enabled_tools": [
+        "src/components/editor/TamedWidget.tsx:578"
+      ],
+      "steem_dark_mode": [
+        "src/components/header/Header.tsx:542",
+        "src/components/modals/QuickStyleMenu.tsx:177",
+        "src/hooks/useThemeAndStyles.ts:184"
+      ],
+      "steem_app_agent": [
+        "src/components/modals/AboutModal.tsx:127",
+        "src/components/modals/AboutModal.tsx:142",
+        "src/components/modals/SettingsModal.tsx:1129",
+        "src/components/modals/SettingsModal.tsx:1143",
+        "src/hooks/usePostSettings.ts:22",
+        "src/hooks/usePostSettings.ts:57"
+      ],
+      "steem_pwa_banner_dismissed": [
+        "src/components/modals/AppModals.tsx:752",
+        "src/components/modals/AppModals.tsx:771"
+      ],
+      "steem_autosave_temp_visual_html": [
+        "src/components/modals/DraftsModal.tsx:138"
+      ],
+      "steem_performance_mode": [
+        "src/components/modals/KeysModal.tsx:578",
+        "src/components/sidebar/Sidebar.tsx:436",
+        "src/hooks/useWorkspaceEditorState.ts:77"
+      ],
+      "steem_pexels_key_raw": [
+        "src/components/modals/KeysModal.tsx:614",
+        "src/components/modals/SettingsModal.tsx:928"
+      ],
+      "steem_pixabay_key": [
+        "src/components/modals/KeysModal.tsx:647"
+      ],
+      "steem_unsplash_access_key": [
+        "src/components/modals/KeysModal.tsx:678"
+      ],
+      "steem_pexels_unencrypted": [
+        "src/components/modals/KeysModal.tsx:700"
+      ],
+      "steem_quick_tags_v1": [
+        "src/components/modals/PublishModal.tsx:258",
+        "src/components/modals/PublishModal.tsx:265",
+        "src/hooks/useAppNotifications.ts:118"
+      ],
+      "steem_remove_title_line": [
+        "src/components/modals/PublishModal.tsx:475",
+        "src/hooks/usePostSettings.ts:53"
+      ],
+      "steem_reward_type": [
+        "src/components/modals/PublishModal.tsx:730",
+        "src/hooks/usePostSettings.ts:49"
+      ],
+      "steem_theme_color": [
+        "src/components/modals/QuickStyleMenu.tsx:99",
+        "src/components/modals/SettingsModal.tsx:340",
+        "src/hooks/useThemeAndStyles.ts:196"
+      ],
+      "steem_editor_font": [
+        "src/components/modals/QuickStyleMenu.tsx:126",
+        "src/components/modals/SettingsModal.tsx:310",
+        "src/hooks/useThemeAndStyles.ts:200"
+      ],
+      "steem_visual_style": [
+        "src/components/modals/QuickStyleMenu.tsx:179",
+        "src/components/modals/QuickStyleMenu.tsx:190",
+        "src/components/modals/SettingsModal.tsx:240",
+        "src/components/modals/SettingsModal.tsx:254",
+        "src/hooks/useThemeAndStyles.ts:188"
+      ],
+      "steem_sync_scroll": [
+        "src/components/modals/SettingsModal.tsx:395",
+        "src/stores/useEditorStore.ts:149"
+      ],
+      "steem_traffic_optimized": [
+        "src/components/sidebar/Sidebar.tsx:448",
+        "src/hooks/gallery/useStockPhotos.ts:45"
+      ],
+      "steem_exif_enabled": [
+        "src/components/sidebar/Sidebar.tsx:460",
+        "src/hooks/gallery/useImageUploadPipeline.ts:76"
+      ],
+      "steem_text_wrap_enabled": [
+        "src/hooks/gallery/useGalleryLayoutMarkup.ts:49"
+      ],
+      "steem_image_insert_format": [
+        "src/hooks/gallery/useGalleryLayoutMarkup.ts:55"
+      ],
+      "steem_pexels_settings": [
+        "src/hooks/gallery/useStockPhotos.ts:51"
+      ],
+      "steem_reader_curation_cols": [
+        "src/hooks/reader/useReaderCuration.ts:67"
+      ],
+      "steem_cached_curation_posts": [
+        "src/hooks/reader/useReaderCuration.ts:72"
+      ],
+      "steem_cached_posts": [
+        "src/hooks/reader/useReaderFeedData.ts:44"
+      ],
+      "steem_reader_config_v1": [
+        "src/hooks/useAppNotifications.ts:32"
+      ],
+      "steem_editor_mode": [
+        "src/hooks/useEditorModeManager.ts:331"
+      ],
+      "steem_gallery_cache_results": [
+        "src/hooks/useImageSearch.ts:41"
+      ],
+      "steem_tag_groups": [
+        "src/hooks/usePostSettings.ts:62"
+      ],
+      "steem_hidden_replies": [
+        "src/hooks/usePwaAndNotifications.ts:47"
+      ],
+      "steem_notif_enabled": [
+        "src/hooks/usePwaAndNotifications.ts:56"
+      ],
+      "steem_muted_users": [
+        "src/hooks/usePwaAndNotifications.ts:72",
+        "src/hooks/useReaderBlockchainActions.ts:357"
+      ],
+      "steem_last_notif_time": [
+        "src/hooks/usePwaAndNotifications.ts:156"
+      ],
+      "steem_username": [
+        "src/hooks/useReaderBlockchainActions.ts:148",
+        "src/hooks/useSteemAuth.ts:85",
+        "src/hooks/useSteemAuth.ts:106",
+        "src/hooks/useSteemAuth.ts:137",
+        "src/hooks/useWorkspaceEditorState.ts:110"
+      ],
+      "steem_auth_type": [
+        "src/hooks/useSteemAuth.ts:24",
+        "src/hooks/useSteemAuth.ts:136",
+        "src/hooks/useSteemAuth.ts:145"
+      ],
+      "steem_keychain_accounts": [
+        "src/hooks/useSteemAuth.ts:56",
+        "src/hooks/useSteemAuth.ts:67"
+      ],
+      "steem_prefer_vault": [
+        "src/hooks/useSteemAuth.ts:144"
+      ],
+      "steem_gallery_collapsed": [
+        "src/hooks/useSteemGallery.ts:47"
+      ],
+      "steem_ui_scale_preset": [
+        "src/hooks/useThemeAndStyles.ts:158",
+        "src/hooks/useThemeAndStyles.ts:208"
+      ],
+      "steem_neon_text_colored": [
+        "src/hooks/useThemeAndStyles.ts:192"
+      ],
+      "steem_ui_header_icon_size": [
+        "src/hooks/useThemeAndStyles.ts:212"
+      ],
+      "steem_ui_header_height": [
+        "src/hooks/useThemeAndStyles.ts:216"
+      ],
+      "steem_ui_header_height_auto": [
+        "src/hooks/useThemeAndStyles.ts:220"
+      ],
+      "steem_ui_gallery_icon_size": [
+        "src/hooks/useThemeAndStyles.ts:224"
+      ],
+      "steem_autosave_temp": [
+        "src/hooks/useWysiwygSync.ts:622",
+        "src/hooks/useWysiwygSync.ts:662"
+      ],
+      "steem_layout_preference": [
+        "src/store/deviceStore.ts:134"
+      ],
+      "steem_app_active_view": [
+        "src/stores/useAppUIStore.ts:42"
+      ],
+      "steem_live_preview_enabled": [
+        "src/stores/useEditorStore.ts:131",
+        "src/stores/useEditorStore.ts:139"
+      ]
+    }
+  },
+  "zustandStores": [
+    {
+      "file": "src/store/deviceStore.ts",
+      "hookName": "useDeviceStore",
+      "totalFields": [
+        "isTauri",
+        "isNeutralino",
+        "isNativeApp",
+        "isNativeMobile",
+        "isNativeDesktop",
+        "isAndroid",
+        "isIOS",
+        "isWindows",
+        "isMac",
+        "isLinux",
+        "isTouchDevice",
+        "hasCoarsePointer",
+        "hasFinePointer",
+        "hasHoverCapability",
+        "isClientHintMobile",
+        "isMobileBrowser",
+        "isWaterfox",
+        "isFirefox",
+        "platform",
+        "viewportWidth",
+        "viewportHeight",
+        "windowInnerWidth",
+        "windowInnerHeight",
+        "offsetTop",
+        "pageTop",
+        "screenOrientation",
+        "formFactor",
+        "isKeyboardOpen",
+        "keyboardOffset",
+        "browserBottomInset",
+        "layoutPreference",
+        "isMobileLayout",
+        "isSplitEditorSupported",
+        "showMobileBottomBar",
+        "isHeaderCompact",
+        "setLayoutPreference",
+        "updateMetrics"
+      ],
+      "unusedSetters": [
+        "setLayoutPreference"
+      ],
+      "storeReferencesCount": 33,
+      "storeFieldHits": {
+        "isKeyboardOpen": [
+          "src/components/reader/ReaderMobileBottomBar.tsx:38: const isKeyboardOpen = useDeviceStore((s) => s.isKeyboardOpen);",
+          "src/hooks/useVisualViewport.ts:61: const currentKeyboardOpen = useDeviceStore.getState().isKeyboardOpen;"
+        ],
+        "isMobileLayout": [
+          "src/components/Reader.tsx:131: const isMobileLayout = useDeviceStore((s) => s.isMobileLayout);",
+          "src/components/common/MobileBottomBar.tsx:44: const storeIsMobileLayout = useDeviceStore(s => s.isMobileLayout);",
+          "src/components/editor/EditorPane.tsx:269: const isMobileLayout = useDeviceStore(s => s.isMobileLayout);",
+          "src/components/editor/PreviewPane.tsx:40: const isMobileLayout = useDeviceStore(s => s.isMobileLayout);",
+          "src/components/editor/StatusBar.tsx:29: const isMobileLayout = useDeviceStore(s => s.isMobileLayout);",
+          "src/components/editor/StatusBar.tsx:71: const isMobileLayout = useDeviceStore(s => s.isMobileLayout);",
+          "src/components/editor/TamedWidget.tsx:284: const isMobileLayout = useDeviceStore(s => s.isMobileLayout);",
+          "src/components/header/Header.tsx:208: const isMobileLayout = useDeviceStore(s => s.isMobileLayout);",
+          "src/components/reader/ReaderMobileBottomBar.tsx:37: const isMobileLayout = useDeviceStore((s) => s.isMobileLayout);",
+          "src/components/sidebar/Sidebar.tsx:148: const isMobileLayout = useDeviceStore(s => s.isMobileLayout);",
+          "src/hooks/useAppUI.ts:25: const isMobileLayout = useDeviceStore((s) => s.isMobileLayout);"
+        ],
+        "showMobileBottomBar": [
+          "src/components/Reader.tsx:130: const showMobileBottomBar = useDeviceStore((s) => s.showMobileBottomBar);",
+          "src/components/common/MobileBottomBar.tsx:43: const showMobileBottomBar = useDeviceStore(s => s.showMobileBottomBar);",
+          "src/components/header/Header.tsx:210: const showMobileBottomBar = useDeviceStore(s => s.showMobileBottomBar);",
+          "src/components/reader/ReaderMobileBottomBar.tsx:36: const showMobileBottomBar = useDeviceStore((s) => s.showMobileBottomBar);"
+        ],
+        "isHeaderCompact": [
+          "src/components/header/Header.tsx:209: const isHeaderCompact = useDeviceStore(s => s.isHeaderCompact);"
+        ]
+      }
+    },
+    {
+      "file": "src/store/lightboxStore.ts",
+      "hookName": "useLightboxStore",
+      "totalFields": [
+        "isOpen",
+        "imageSrc",
+        "imageAlt",
+        "openLightbox",
+        "closeLightbox"
+      ],
+      "unusedSetters": [],
+      "storeReferencesCount": 11,
+      "storeFieldHits": {
+        "isOpen": [
+          "src/components/common/ImageLightboxModal.tsx:9: const { isOpen, imageSrc, imageAlt, closeLightbox } = useLightboxStore();"
+        ],
+        "imageSrc": [
+          "src/components/common/ImageLightboxModal.tsx:9: const { isOpen, imageSrc, imageAlt, closeLightbox } = useLightboxStore();"
+        ],
+        "imageAlt": [
+          "src/components/common/ImageLightboxModal.tsx:9: const { isOpen, imageSrc, imageAlt, closeLightbox } = useLightboxStore();"
+        ],
+        "openLightbox": [
+          "src/components/editor/PreviewPane.tsx:114: useLightboxStore.getState().openLightbox(img.src, img.alt || '');",
+          "src/components/editor/WysiwygCanvas.tsx:255: useLightboxStore.getState().openLightbox(img.src, img.alt || '');",
+          "src/components/reader/CommentItem.tsx:208: useLightboxStore.getState().openLightbox(img.src, img.alt || '');",
+          "src/components/reader/PostRenderer.tsx:108: useLightboxStore.getState().openLightbox(img.src, img.alt || '');"
+        ],
+        "closeLightbox": [
+          "src/components/common/ImageLightboxModal.tsx:9: const { isOpen, imageSrc, imageAlt, closeLightbox } = useLightboxStore();"
+        ]
+      }
+    },
+    {
+      "file": "src/store/readerStore.ts",
+      "hookName": "useReaderStore",
+      "totalFields": [
+        "config",
+        "updateConfig",
+        "setConfig",
+        "viewMode",
+        "setViewMode",
+        "isReaderHeaderOpen",
+        "setIsReaderHeaderOpen",
+        "showQuickPanel",
+        "setShowQuickPanel",
+        "voteWeight",
+        "setVoteWeight",
+        "revealedImages",
+        "setRevealedImages",
+        "revealImage",
+        "respondedReplies",
+        "setRespondedReplies",
+        "recordRespondedReply",
+        "showMutedManager",
+        "setShowMutedManager",
+        "loadingMutedManager",
+        "setLoadingMutedManager",
+        "fetchedMutedUsers",
+        "setFetchedMutedUsers",
+        "applyOptimisticVoteToPosts",
+        "applyOptimisticVoteToComments"
+      ],
+      "unusedSetters": [],
+      "storeReferencesCount": 26,
+      "storeFieldHits": {
+        "config": [
+          "src/components/Reader.tsx:104: const config = useReaderStore((s) => s.config);"
+        ],
+        "setConfig": [
+          "src/components/Reader.tsx:105: const setConfig = useReaderStore((s) => s.setConfig);"
+        ],
+        "viewMode": [
+          "src/components/Reader.tsx:108: const viewMode = useReaderStore((s) => s.viewMode);"
+        ],
+        "setViewMode": [
+          "src/components/Reader.tsx:109: const setViewMode = useReaderStore((s) => s.setViewMode);"
+        ],
+        "isReaderHeaderOpen": [
+          "src/components/Reader.tsx:110: const isReaderHeaderOpen = useReaderStore((s) => s.isReaderHeaderOpen);"
+        ],
+        "setIsReaderHeaderOpen": [
+          "src/components/Reader.tsx:111: const setIsReaderHeaderOpen = useReaderStore((s) => s.setIsReaderHeaderOpen);"
+        ],
+        "showQuickPanel": [
+          "src/components/Reader.tsx:112: const showQuickPanel = useReaderStore((s) => s.showQuickPanel);"
+        ],
+        "setShowQuickPanel": [
+          "src/components/Reader.tsx:113: const setShowQuickPanel = useReaderStore((s) => s.setShowQuickPanel);"
+        ],
+        "voteWeight": [
+          "src/components/Reader.tsx:114: const voteWeight = useReaderStore((s) => s.voteWeight);"
+        ],
+        "setVoteWeight": [
+          "src/components/Reader.tsx:115: const setVoteWeight = useReaderStore((s) => s.setVoteWeight);"
+        ],
+        "revealedImages": [
+          "src/components/Reader.tsx:116: const revealedImages = useReaderStore((s) => s.revealedImages);"
+        ],
+        "setRevealedImages": [
+          "src/components/Reader.tsx:117: const setRevealedImages = useReaderStore((s) => s.setRevealedImages);"
+        ],
+        "respondedReplies": [
+          "src/components/Reader.tsx:106: const respondedReplies = useReaderStore((s) => s.respondedReplies);"
+        ],
+        "setRespondedReplies": [
+          "src/components/Reader.tsx:107: const setRespondedReplies = useReaderStore((s) => s.setRespondedReplies);"
+        ],
+        "showMutedManager": [
+          "src/components/Reader.tsx:120: const showMutedManager = useReaderStore((s) => s.showMutedManager);"
+        ],
+        "setShowMutedManager": [
+          "src/components/Reader.tsx:121: const setShowMutedManager = useReaderStore((s) => s.setShowMutedManager);"
+        ],
+        "loadingMutedManager": [
+          "src/components/Reader.tsx:122: const loadingMutedManager = useReaderStore((s) => s.loadingMutedManager);"
+        ],
+        "setLoadingMutedManager": [
+          "src/components/Reader.tsx:123: const setLoadingMutedManager = useReaderStore((s) => s.setLoadingMutedManager);"
+        ],
+        "fetchedMutedUsers": [
+          "src/components/Reader.tsx:124: const fetchedMutedUsers = useReaderStore((s) => s.fetchedMutedUsers);"
+        ],
+        "setFetchedMutedUsers": [
+          "src/components/Reader.tsx:125: const setFetchedMutedUsers = useReaderStore((s) => s.setFetchedMutedUsers);"
+        ],
+        "applyOptimisticVoteToPosts": [
+          "src/components/Reader.tsx:127: const applyOptimisticVoteToPosts = useReaderStore((s) => s.applyOptimisticVoteToPosts);"
+        ],
+        "applyOptimisticVoteToComments": [
+          "src/components/Reader.tsx:128: const applyOptimisticVoteToComments = useReaderStore((s) => s.applyOptimisticVoteToComments);"
+        ]
+      }
+    },
+    {
+      "file": "src/stores/useAppUIStore.ts",
+      "hookName": "useAppUIStore",
+      "totalFields": [
+        "activeView",
+        "isSidebarOpen",
+        "isFullScreen",
+        "isEditorFullScreen",
+        "settingsTab",
+        "setActiveView",
+        "setIsSidebarOpen",
+        "setIsFullScreen",
+        "toggleFullScreen",
+        "setIsEditorFullScreen",
+        "toggleEditorFullScreen",
+        "setSettingsTab"
+      ],
+      "unusedSetters": [],
+      "storeReferencesCount": 24,
+      "storeFieldHits": {
+        "activeView": [
+          "src/components/header/Header.tsx:123: const storeActiveView = useAppUIStore(s => s.activeView);",
+          "src/hooks/useAppUI.ts:35: const activeView = useAppUIStore((s) => s.activeView);"
+        ],
+        "isSidebarOpen": [
+          "src/hooks/useAppUI.ts:37: const isSidebarOpen = useAppUIStore((s) => s.isSidebarOpen);"
+        ],
+        "isFullScreen": [
+          "src/components/editor/PreviewPane.tsx:45: const storeIsFullScreen = useAppUIStore(s => s.isFullScreen);",
+          "src/hooks/useAppUI.ts:39: const isFullScreen = useAppUIStore((s) => s.isFullScreen);"
+        ],
+        "isEditorFullScreen": [
+          "src/hooks/useAppUI.ts:41: const isEditorFullScreen = useAppUIStore((s) => s.isEditorFullScreen);"
+        ],
+        "settingsTab": [
+          "src/hooks/useAppUI.ts:44: const settingsTab = useAppUIStore((s) => s.settingsTab);",
+          "src/hooks/useWorkspaceEditorState.ts:92: const settingsTab = useAppUIStore((s) => s.settingsTab);"
+        ],
+        "setActiveView": [
+          "src/components/header/Header.tsx:124: const storeSetActiveView = useAppUIStore(s => s.setActiveView);",
+          "src/hooks/useAppUI.ts:36: const setActiveView = useAppUIStore((s) => s.setActiveView);"
+        ],
+        "setIsSidebarOpen": [
+          "src/hooks/useAppUI.ts:38: const setIsSidebarOpen = useAppUIStore((s) => s.setIsSidebarOpen);"
+        ],
+        "setIsFullScreen": [
+          "src/hooks/useAppUI.ts:40: const setIsFullScreen = useAppUIStore((s) => s.setIsFullScreen);"
+        ],
+        "toggleFullScreen": [
+          "src/components/editor/PreviewPane.tsx:46: const storeToggleFullScreen = useAppUIStore(s => s.toggleFullScreen);"
+        ],
+        "setIsEditorFullScreen": [
+          "src/hooks/useAppUI.ts:42: const setIsEditorFullScreen = useAppUIStore((s) => s.setIsEditorFullScreen);"
+        ],
+        "toggleEditorFullScreen": [
+          "src/hooks/useAppUI.ts:43: const toggleEditorFullScreen = useAppUIStore((s) => s.toggleEditorFullScreen);"
+        ],
+        "setSettingsTab": [
+          "src/components/header/Header.tsx:125: const storeSetSettingsTab = useAppUIStore(s => s.setSettingsTab);",
+          "src/hooks/useAppUI.ts:45: const setSettingsTab = useAppUIStore((s) => s.setSettingsTab);",
+          "src/hooks/useWorkspaceEditorState.ts:93: const setSettingsTab = useAppUIStore((s) => s.setSettingsTab);"
+        ]
+      }
+    },
+    {
+      "file": "src/stores/useEditorStore.ts",
+      "hookName": "useEditorStore",
+      "totalFields": [
+        "lines",
+        "cursor",
+        "selectionStart",
+        "selectionEnd",
+        "setLines",
+        "updateLine",
+        "setCursor",
+        "setSelection",
+        "content",
+        "setContent",
+        "stats",
+        "cleanStats",
+        "setStats",
+        "wpm",
+        "setWpm",
+        "currentLang",
+        "setCurrentLang",
+        "isLivePreviewEnabled",
+        "setIsLivePreviewEnabled",
+        "toggleLivePreview",
+        "syncScrollEnabled",
+        "setSyncScrollEnabled",
+        "beautifyEnabled",
+        "setBeautifyEnabled",
+        "activeFormats",
+        "setActiveFormats"
+      ],
+      "unusedSetters": [
+        "setLines",
+        "setWpm"
+      ],
+      "storeReferencesCount": 187,
+      "storeFieldHits": {
+        "lines": [
+          "src/components/LineComponent.tsx:12: const line = useEditorStore(state => state.lines[index]);",
+          "src/lib/cursorSync.ts:46: const { lines, setCursor } = useEditorStore.getState();",
+          "src/lib/cursorSync.ts:56: const { cursor, lines } = useEditorStore.getState();"
+        ],
+        "cursor": [
+          "src/lib/cursorSync.ts:56: const { cursor, lines } = useEditorStore.getState();"
+        ],
+        "selectionStart": [
+          "src/components/CodeEditor.tsx:18: const selectionStart = useEditorStore((state) => state.selectionStart);",
+          "src/hooks/useEditorFormat.ts:1390: const storeStart = useEditorStore.getState().selectionStart;"
+        ],
+        "selectionEnd": [
+          "src/components/CodeEditor.tsx:19: const selectionEnd = useEditorStore((state) => state.selectionEnd);",
+          "src/hooks/useEditorFormat.ts:1391: const storeEnd = useEditorStore.getState().selectionEnd;"
+        ],
+        "updateLine": [
+          "src/components/LineComponent.tsx:13: const updateLine = useEditorStore(state => state.updateLine);"
+        ],
+        "setCursor": [
+          "src/hooks/useEditorModeManager.ts:69: useEditorStore.getState().setCursor(rowColPos);",
+          "src/hooks/useEditorModeManager.ts:182: useEditorStore.getState().setCursor(rowColPos);",
+          "src/hooks/useWysiwygSync.ts:892: useEditorStore.getState().setCursor(rowColPos);",
+          "src/hooks/useWysiwygSync.ts:1009: useEditorStore.getState().setCursor(rowColPos);",
+          "src/hooks/useWysiwygSync.ts:1019: useEditorStore.getState().setCursor(rowColPos);",
+          "src/lib/cursorSync.ts:46: const { lines, setCursor } = useEditorStore.getState();"
+        ],
+        "setSelection": [
+          "src/hooks/useEditorModeManager.ts:70: useEditorStore.getState().setSelection(start, end);",
+          "src/hooks/useEditorModeManager.ts:183: useEditorStore.getState().setSelection(safeStart, safeEnd);",
+          "src/hooks/useEditorModeManager.ts:296: useEditorStore.getState().setSelection(pos.start, pos.end);",
+          "src/hooks/useWysiwygSync.ts:890: useEditorStore.getState().setSelection(pos.start, pos.end);",
+          "src/hooks/useWysiwygSync.ts:1010: useEditorStore.getState().setSelection(startIdx, endIdx);",
+          "src/hooks/useWysiwygSync.ts:1020: useEditorStore.getState().setSelection(startIdx, startIdx);"
+        ],
+        "content": [
+          "src/App.tsx:112: const contentForPublish = useEditorStore(state => activeModal === 'publish' ? state.content : '');",
+          "src/components/CodeEditor.tsx:17: const content = useEditorStore((state) => state.content);",
+          "src/components/common/MobileBottomBar.tsx:82: const firstLine = useEditorStore.getState().content.split('\\n')[0].replace(/[#*`]/g, '').trim().substring(0, 100);",
+          "src/components/editor/EditorPane.tsx:412: currentEditorContent={useEditorStore.getState().content}",
+          "src/components/editor/EditorPane.tsx:417: const currentContent = useEditorStore.getState().content || '';",
+          "src/components/editor/WysiwygCanvas.tsx:264: data-is-empty={useEditorStore.getState().content.trim() === '' ? 'true' : undefined}",
+          "src/components/editor/toolsMap.tsx:109: const selectedText = useEditorStore.getState().content.substring(start, end);",
+          "src/components/editor/toolsMap.tsx:112: const newContent = useEditorStore.getState().content.substring(0, start) + newText + useEditorStore.getState().content.substring(end);",
+          "src/components/header/Header.tsx:646: const currentContent = useEditorStore.getState().content;",
+          "src/components/header/Header.tsx:649: useEditorStore.setState({ content: newContent });",
+          "src/components/header/Header.tsx:718: if (useEditorStore.getState().content.trim() !== '') {",
+          "src/components/modals/TemplatesModal.tsx:77: content: useEditorStore.getState().content,",
+          "src/hooks/useEditorCore.ts:141: const content = useEditorStore.getState().content;",
+          "src/hooks/useEditorFormat.ts:159: const content = useEditorStore.getState().content;",
+          "src/hooks/useEditorFormat.ts:969: const newContent = useEditorStore.getState().content.substring(0, range.s) + textToInsert + useEditorStore.getState().content.substring(range.e);",
+          "src/hooks/useEditorFormat.ts:980: const newContent = useEditorStore.getState().content.substring(0, range.s) + newText + useEditorStore.getState().content.substring(range.e);",
+          "src/hooks/useEditorFormat.ts:1357: const content = useEditorStore.getState().content;",
+          "src/hooks/useEditorFormat.ts:1481: const content = useEditorStore.getState().content;",
+          "src/hooks/useEditorFormat.ts:1555: const content = useEditorStore.getState().content;",
+          "src/hooks/useEditorModeManager.ts:148: const textVal = useEditorStore.getState().content;",
+          "src/hooks/useEditorModeManager.ts:351: if (syncResult.md !== useEditorStore.getState().content) {",
+          "src/hooks/useEditorModeManager.ts:356: if (md !== useEditorStore.getState().content) {",
+          "src/hooks/useEditorModeManager.ts:362: if (editorRef.current && editorRef.current.value !== useEditorStore.getState().content) {",
+          "src/hooks/useEditorModeManager.ts:377: let val = useEditorStore.getState().content;",
+          "src/hooks/useEditorModeManager.ts:432: if (syncResult.md !== useEditorStore.getState().content) {",
+          "src/hooks/useEditorModeManager.ts:437: if (md !== useEditorStore.getState().content) {",
+          "src/hooks/useEditorShortcutsAndAutosave.ts:157: useEditorStore.setState({ content: val });",
+          "src/hooks/useEditorShortcutsAndAutosave.ts:163: useEditorStore.setState({ content: md });",
+          "src/hooks/useEditorShortcutsAndAutosave.ts:213: const mdContent = useEditorStore.getState().content;",
+          "src/hooks/useEditorWorker.ts:68: calculate(useEditorStore.getState().content); // initial",
+          "src/hooks/useSteemPublishingSuite.ts:88: const content = useEditorStore.getState().content;",
+          "src/hooks/useWorkspaceDOMRefs.ts:24: const lastSyncContentRef = useRef<string>(useEditorStore.getState().content);",
+          "src/hooks/useWorkspaceServices.ts:316: if (saved && saved !== useEditorStore.getState().content) {",
+          "src/hooks/useWysiwygSync.ts:377: const lastSyncContentRef = useRef<string>(useEditorStore.getState().content);",
+          "src/hooks/useWysiwygSync.ts:605: const storeContent = useEditorStore.getState().content;",
+          "src/hooks/useWysiwygSync.ts:617: const currentContent = useEditorStore.getState().content;",
+          "src/hooks/useWysiwygSync.ts:649: const storeContent = useEditorStore.getState().content;",
+          "src/hooks/useWysiwygSync.ts:670: return useEditorStore.getState().content;",
+          "src/hooks/useWysiwygSync.ts:695: let textContent = useEditorStore.getState().content;",
+          "src/hooks/useWysiwygSync.ts:820: lastSyncContentRef.current = useEditorStore.getState().content;",
+          "src/hooks/useWysiwygSync.ts:891: const rowColPos = getRowColFromOffset(useEditorStore.getState().content, pos.start);"
+        ],
+        "setContent": [
+          "src/App.tsx:85: const setContent = useEditorStore(state => state.setContent);",
+          "src/components/editor/EditorPane.tsx:441: useEditorStore.getState().setContent(newContent);",
+          "src/components/header/Header.tsx:127: const storeSetContent = useEditorStore(s => s.setContent);",
+          "src/hooks/useEditorEvents.ts:60: const setContent = useEditorStore((state) => state.setContent);",
+          "src/hooks/useEditorFormat.ts:183: useEditorStore.getState().setContent(newContent);",
+          "src/hooks/useEditorFormat.ts:265: useEditorStore.getState().setContent(newText);",
+          "src/hooks/useEditorFormat.ts:289: useEditorStore.getState().setContent(newText);",
+          "src/hooks/useEditorFormat.ts:306: useEditorStore.getState().setContent(newText);",
+          "src/hooks/useEditorFormat.ts:330: useEditorStore.getState().setContent(newText);",
+          "src/hooks/useEditorFormat.ts:365: useEditorStore.getState().setContent(newText);",
+          "src/hooks/useEditorFormat.ts:383: useEditorStore.getState().setContent(newText);",
+          "src/hooks/useEditorFormat.ts:416: useEditorStore.getState().setContent(newText);",
+          "src/hooks/useEditorFormat.ts:462: useEditorStore.getState().setContent(newText);",
+          "src/hooks/useEditorFormat.ts:482: useEditorStore.getState().setContent(newText);",
+          "src/hooks/useEditorFormat.ts:501: useEditorStore.getState().setContent(newText);",
+          "src/hooks/useEditorFormat.ts:530: useEditorStore.getState().setContent(newText);",
+          "src/hooks/useEditorFormat.ts:546: useEditorStore.getState().setContent(newText);",
+          "src/hooks/useEditorFormat.ts:970: useEditorStore.getState().setContent(newContent);",
+          "src/hooks/useEditorFormat.ts:981: useEditorStore.getState().setContent(newContent);",
+          "src/hooks/useEditorFormat.ts:1425: useEditorStore.getState().setContent(newContent);",
+          "src/hooks/useEditorFormat.ts:1438: useEditorStore.getState().setContent(newContent);",
+          "src/hooks/useEditorFormat.ts:1450: useEditorStore.getState().setContent(newContent);",
+          "src/hooks/useEditorFormat.ts:1470: useEditorStore.getState().setContent(newContent);",
+          "src/hooks/useEditorFormat.ts:1525: useEditorStore.getState().setContent(newContent);",
+          "src/hooks/useEditorFormat.ts:1542: useEditorStore.getState().setContent(newContent);",
+          "src/hooks/useEditorFormat.ts:1581: useEditorStore.getState().setContent(newContent);",
+          "src/hooks/useEditorPaneProps.ts:292: setContent: useEditorStore.getState().setContent,",
+          "src/hooks/useWorkspaceServices.ts:125: const setContent = useEditorStore(state => state.setContent);",
+          "src/hooks/useWysiwygSync.ts:375: const setContent = useEditorStore((state) => state.setContent);"
+        ],
+        "stats": [
+          "src/components/editor/StatusBar.tsx:16: const stats = useEditorStore(state => state.stats);",
+          "src/components/editor/StatusBar.tsx:26: const stats = useEditorStore(state => state.stats);",
+          "src/components/editor/StatusBar.tsx:68: const stats = useEditorStore(state => state.stats);",
+          "src/components/modals/SplitPostModal.tsx:25: const storeWords = useEditorStore(state => isOpen ? (state.stats?.words || 0) : 0);"
+        ],
+        "cleanStats": [
+          "src/components/editor/StatusBar.tsx:27: const cleanStats = useEditorStore(state => state.cleanStats);",
+          "src/components/editor/StatusBar.tsx:69: const cleanStats = useEditorStore(state => state.cleanStats);"
+        ],
+        "setStats": [
+          "src/hooks/useWorkspaceServices.ts:212: useEditorStore.getState().setStats(rawStats, cleanStatsResult);"
+        ],
+        "wpm": [
+          "src/components/editor/StatusBar.tsx:28: const wpm = useEditorStore(state => state.wpm);",
+          "src/components/editor/StatusBar.tsx:70: const wpm = useEditorStore(state => state.wpm);"
+        ],
+        "currentLang": [
+          "src/components/audio/AudioControlWidget.tsx:37: const currentLang = useEditorStore(s => s.currentLang);",
+          "src/components/common/ImageLightboxModal.tsx:10: const currentLang = useEditorStore((s) => s.currentLang) as any;",
+          "src/components/common/NotificationToast.tsx:28: const currentLang = useEditorStore(s => s.currentLang);",
+          "src/components/docReader/DocReaderSettingsMenu.tsx:21: const currentLang = useEditorStore(s => s.currentLang);",
+          "src/components/docReader/DocReaderSourceDrawer.tsx:31: const currentLang = useEditorStore(s => s.currentLang);",
+          "src/components/docReader/DocReaderTOC.tsx:25: const currentLang = useEditorStore(s => s.currentLang);",
+          "src/components/docReader/DocReaderToolbar.tsx:37: const currentLang = useEditorStore(s => s.currentLang);",
+          "src/components/docReader/useDocReader.ts:36: const currentLang = useEditorStore(s => s.currentLang);",
+          "src/components/docReader/useDocReader.ts:66: title: currentEditorTitle || getTranslation(useEditorStore.getState().currentLang, 'readerUntitledDoc'),",
+          "src/components/modals/AudioPresetsModal.tsx:62: const currentLang = useEditorStore(s => s.currentLang);",
+          "src/components/modals/BaseModal.tsx:58: const currentLang = useEditorStore(s => s.currentLang);",
+          "src/components/reader/PostRenderer.tsx:54: const currentLang = useEditorStore(s => s.currentLang);",
+          "src/services/audio/presets.ts:94: const activeLang = (lang || useEditorStore.getState().currentLang || 'uk') as any;",
+          "src/services/audio/presets.ts:102: const activeLang = (lang || useEditorStore.getState().currentLang || 'uk') as any;",
+          "src/services/audio/presets.ts:112: const currentLang = (useEditorStore.getState().currentLang || 'uk') as any;"
+        ],
+        "setCurrentLang": [
+          "src/App.tsx:61: useEditorStore.getState().setCurrentLang(lang);"
+        ],
+        "isLivePreviewEnabled": [
+          "src/components/editor/EditorPane.tsx:306: const storeIsLivePreviewEnabled = useEditorStore(s => s.isLivePreviewEnabled);",
+          "src/components/editor/PreviewPane.tsx:41: const storeIsLivePreviewEnabled = useEditorStore(s => s.isLivePreviewEnabled);",
+          "src/hooks/useWorkspaceEditorState.ts:86: const isLivePreviewEnabled = useEditorStore((s) => s.isLivePreviewEnabled);"
+        ],
+        "setIsLivePreviewEnabled": [
+          "src/hooks/useWorkspaceEditorState.ts:87: const setIsLivePreviewEnabled = useEditorStore((s) => s.setIsLivePreviewEnabled);"
+        ],
+        "toggleLivePreview": [
+          "src/components/editor/EditorPane.tsx:307: const storeToggleLivePreview = useEditorStore(s => s.toggleLivePreview);",
+          "src/components/editor/PreviewPane.tsx:42: const storeToggleLivePreview = useEditorStore(s => s.toggleLivePreview);",
+          "src/hooks/useWorkspaceEditorState.ts:88: const toggleLivePreview = useEditorStore((s) => s.toggleLivePreview);"
+        ],
+        "syncScrollEnabled": [
+          "src/components/editor/PreviewPane.tsx:43: const storeSyncScrollEnabled = useEditorStore(s => s.syncScrollEnabled);",
+          "src/hooks/useWorkspaceEditorState.ts:84: const syncScrollEnabled = useEditorStore((s) => s.syncScrollEnabled);"
+        ],
+        "setSyncScrollEnabled": [
+          "src/components/editor/PreviewPane.tsx:44: const storeSetSyncScrollEnabled = useEditorStore(s => s.setSyncScrollEnabled);",
+          "src/hooks/useWorkspaceEditorState.ts:85: const setSyncScrollEnabled = useEditorStore((s) => s.setSyncScrollEnabled);"
+        ],
+        "beautifyEnabled": [
+          "src/components/editor/EditorPane.tsx:308: const storeBeautifyEnabled = useEditorStore(s => s.beautifyEnabled);",
+          "src/hooks/useWorkspaceEditorState.ts:89: const beautifyEnabled = useEditorStore((s) => s.beautifyEnabled);"
+        ],
+        "setBeautifyEnabled": [
+          "src/components/editor/EditorPane.tsx:309: const storeSetBeautifyEnabled = useEditorStore(s => s.setBeautifyEnabled);",
+          "src/hooks/useWorkspaceEditorState.ts:90: const setBeautifyEnabled = useEditorStore((s) => s.setBeautifyEnabled);"
+        ],
+        "activeFormats": [
+          "src/components/editor/EditorPane.tsx:310: const storeActiveFormats = useEditorStore(s => s.activeFormats);",
+          "src/components/header/Header.tsx:126: const storeActiveFormats = useEditorStore(s => s.activeFormats);",
+          "src/hooks/useEditorFormat.ts:40: const activeFormats = useEditorStore((s) => s.activeFormats);"
+        ],
+        "setActiveFormats": [
+          "src/hooks/useEditorCore.ts:64: const storeSetActiveFormats = useEditorStore((s) => s.setActiveFormats);",
+          "src/hooks/useEditorFormat.ts:41: const setActiveFormats = useEditorStore((s) => s.setActiveFormats);"
+        ]
+      }
+    },
+    {
+      "file": "src/stores/useHistoryStore.ts",
+      "hookName": "useHistoryStore",
+      "totalFields": [
+        "past",
+        "future",
+        "maxHistory",
+        "canUndo",
+        "canRedo",
+        "pushSnapshot",
+        "undo",
+        "redo",
+        "clearHistory"
+      ],
+      "unusedSetters": [],
+      "storeReferencesCount": 2,
+      "storeFieldHits": {}
+    },
+    {
+      "file": "src/stores/useModalStore.ts",
+      "hookName": "useModalStore",
+      "totalFields": [
+        "activeModal",
+        "previousModal",
+        "modalParams",
+        "isSMenuOpen",
+        "isTableSelectorOpen",
+        "setActiveModal",
+        "openModal",
+        "closeModal",
+        "closeAllModals",
+        "setIsSMenuOpen",
+        "setIsTableSelectorOpen"
+      ],
+      "unusedSetters": [],
+      "storeReferencesCount": 21,
+      "storeFieldHits": {
+        "activeModal": [
+          "src/hooks/useAppUI.ts:28: const activeModal = useModalStore((s) => s.activeModal);"
+        ],
+        "isSMenuOpen": [
+          "src/components/modals/AppModals.tsx:205: const storeIsSMenuOpen = useModalStore(s => s.isSMenuOpen);",
+          "src/hooks/useWorkspaceEditorState.ts:95: const isSMenuOpen = useModalStore((s) => s.isSMenuOpen);"
+        ],
+        "isTableSelectorOpen": [
+          "src/hooks/useAppUI.ts:30: const storeShowTableSelector = useModalStore((s) => s.isTableSelectorOpen);",
+          "src/hooks/useAppWorkspaceSuite.ts:241: const showTableSelector = useModalStore((s) => s.isTableSelectorOpen);"
+        ],
+        "setActiveModal": [
+          "src/components/header/Header.tsx:128: const storeSetActiveModal = useModalStore(s => s.setActiveModal);",
+          "src/hooks/useAppUI.ts:29: const setActiveModal = useModalStore((s) => s.setActiveModal);"
+        ],
+        "setIsSMenuOpen": [
+          "src/components/header/Header.tsx:129: const storeSetIsSMenuOpen = useModalStore(s => s.setIsSMenuOpen);",
+          "src/components/modals/AppModals.tsx:206: const storeSetIsSMenuOpen = useModalStore(s => s.setIsSMenuOpen);",
+          "src/hooks/useWorkspaceEditorState.ts:96: const setIsSMenuOpen = useModalStore((s) => s.setIsSMenuOpen);"
+        ],
+        "setIsTableSelectorOpen": [
+          "src/hooks/useAppUI.ts:31: const storeSetShowTableSelector = useModalStore((s) => s.setIsTableSelectorOpen);",
+          "src/hooks/useAppWorkspaceSuite.ts:242: const setShowTableSelector = useModalStore((s) => s.setIsTableSelectorOpen);",
+          "src/hooks/useWorkspaceServices.ts:150: const setShowTableSelector = useModalStore((s) => s.setIsTableSelectorOpen);"
+        ]
+      }
+    },
+    {
+      "file": "src/stores/useReaderStore.ts",
+      "hookName": "useReaderStore",
+      "totalFields": [
+        "selectedPost",
+        "activeTag",
+        "feedMode",
+        "searchQuery",
+        "searchTag",
+        "isDetailView",
+        "viewMode",
+        "showInbox",
+        "showQuickPanel",
+        "isReaderHeaderOpen",
+        "revealedImages",
+        "setSelectedPost",
+        "setActiveTag",
+        "setFeedMode",
+        "setSearchQuery",
+        "setSearchTag",
+        "setIsDetailView",
+        "setViewMode",
+        "setShowInbox",
+        "setShowQuickPanel",
+        "setIsReaderHeaderOpen",
+        "toggleRevealImage",
+        "resetReaderState"
+      ],
+      "unusedSetters": [
+        "setSelectedPost",
+        "setActiveTag",
+        "setFeedMode",
+        "setSearchQuery",
+        "setSearchTag",
+        "setIsDetailView",
+        "setShowInbox",
+        "toggleRevealImage"
+      ],
+      "storeReferencesCount": 26,
+      "storeFieldHits": {
+        "viewMode": [
+          "src/components/Reader.tsx:108: const viewMode = useReaderStore((s) => s.viewMode);"
+        ],
+        "showQuickPanel": [
+          "src/components/Reader.tsx:112: const showQuickPanel = useReaderStore((s) => s.showQuickPanel);"
+        ],
+        "isReaderHeaderOpen": [
+          "src/components/Reader.tsx:110: const isReaderHeaderOpen = useReaderStore((s) => s.isReaderHeaderOpen);"
+        ],
+        "revealedImages": [
+          "src/components/Reader.tsx:116: const revealedImages = useReaderStore((s) => s.revealedImages);"
+        ],
+        "setViewMode": [
+          "src/components/Reader.tsx:109: const setViewMode = useReaderStore((s) => s.setViewMode);"
+        ],
+        "setShowQuickPanel": [
+          "src/components/Reader.tsx:113: const setShowQuickPanel = useReaderStore((s) => s.setShowQuickPanel);"
+        ],
+        "setIsReaderHeaderOpen": [
+          "src/components/Reader.tsx:111: const setIsReaderHeaderOpen = useReaderStore((s) => s.setIsReaderHeaderOpen);"
+        ]
+      }
+    }
+  ],
+  "modalsAndHeaderProps": {
+    "domainReturnsCount": {
+      "auth": 28,
+      "postSettings": 18,
+      "draftsManager": 13,
+      "publishingQueue": 0,
+      "publishingManager": 0,
+      "tableOps": 27,
+      "appBackup": 4,
+      "gallery": 53,
+      "pwa": 23,
+      "themeAndStyles": 33,
+      "appUI": 18,
+      "floatingWidget": 21,
+      "appPublishing": 4,
+      "editorCore": 41,
+      "editorState": 34
+    },
+    "pubSuiteReturns": [
+      "postSettings",
+      "publishingQueue",
+      "publishingManager",
+      "rewardType",
+      "setRewardType",
+      "removeTitleLine",
+      "setRemoveTitleLine",
+      "appAgent",
+      "setAppAgent",
+      "beneficiaries",
+      "setBeneficiaries",
+      "benName",
+      "setBenName",
+      "benWeight",
+      "setBenWeight",
+      "showAdvancedSettings",
+      "setShowAdvancedSettings",
+      "showAdvancedPublish",
+      "setShowAdvancedPublish",
+      "tagGroups",
+      "setTagGroups",
+      "queue",
+      "setQueue",
+      "scheduledTime",
+      "setScheduledTime",
+      "performBroadcast",
+      "publishFromQueue",
+      "addToQueue",
+      "extractMentions",
+      "sanitizeFilename",
+      "handleSplitPost",
+      "handlePublish",
+      "handleAddToQueue"
+    ],
+    "unresolvedModalFallbacks": [
+      {
+        "prop": "extractMentions",
+        "expr": "rest.extractMentions ?? publishingManager?.extractMentions ?? ((t: string) => [])",
+        "line": 341
+      },
+      {
+        "prop": "addToQueue",
+        "expr": "rest.addToQueue ?? publishingManager?.handleAddToQueue ?? publishingQueue.addToQueue ?? (() => {})",
+        "line": 342
+      },
+      {
+        "prop": "handlePublish",
+        "expr": "rest.handlePublish ?? publishingManager?.handlePublish ?? (() => {})",
+        "line": 345
+      },
+      {
+        "prop": "handleSplitPost",
+        "expr": "rest.handleSplitPost ?? publishingManager?.handleSplitPost ?? (() => {})",
+        "line": 354
+      }
+    ],
+    "omittedHeaderProps": [
+      {
+        "name": "setActiveModal",
+        "optional": true,
+        "type": "(modal: any) => void"
+      },
+      {
+        "name": "setContent",
+        "optional": true,
+        "type": "(content: string) => void"
+      }
+    ],
+    "headerPropsKeys": [
+      "setIsSMenuOpen",
+      "visualStyle",
+      "activeView",
+      "setActiveView",
+      "editorMode",
+      "toolsMap",
+      "activeFormats",
+      "fmt",
+      "fmtLine",
+      "handleIndent",
+      "handleLink",
+      "importTable",
+      "saveDraft",
+      "downloadFile",
+      "insertAtCursor",
+      "templates",
+      "mentions",
+      "queue",
+      "setPubTitle",
+      "setPubTags",
+      "setCurrentDraftId",
+      "notifEnabled",
+      "setNotifEnabled",
+      "visibleNotifications",
+      "showNotificationList",
+      "setShowNotificationList",
+      "markAllAsRead",
+      "setTargetReaderPost",
+      "lang",
+      "setLang",
+      "showLangMenu",
+      "setShowLangMenu",
+      "isDarkMode",
+      "setIsDarkMode",
+      "performanceMode",
+      "showMobileToolsOpen",
+      "setShowMobileToolsOpen",
+      "showMobileTools1",
+      "setShowMobileTools1",
+      "showMobileTools2",
+      "setShowMobileTools2",
+      "isPwaInstalled",
+      "handleInstallPwa",
+      "getMotionConfig",
+      "editorRef",
+      "wysiwygRef",
+      "isSyncingRef",
+      "getMarked",
+      "confirmDialog",
+      "updateWysiwygEmptyStatus",
+      "setSettingsTab",
+      "isTauriEnv",
+      "isNeutralinoEnv",
+      "t"
+    ],
+    "passedToUseEditorPaneProps": [
+      "modeManager",
+      "wysiwygSync",
+      "editorFormat",
+      "editorEvents",
+      "tableOps",
+      "floatingWidget",
+      "gallery",
+      "editorPaneRef",
+      "editorRef",
+      "wysiwygRef",
+      "isSyncingRef",
+      "wysiwygLocalBackupTimeoutRef",
+      "wysiwygSyncTimeoutRef",
+      "lastSyncContentRef",
+      "fileInputRef",
+      "scrollRef",
+      "isEditorFullScreen",
+      "isFullScreen",
+      "vvHeight",
+      "viewportHeight",
+      "offsetTop",
+      "activeMobileTab",
+      "visualStyle",
+      "isDarkMode",
+      "typingSound",
+      "onOpenAudioPresetsModal",
+      "isLivePreviewEnabled",
+      "onDemandSyncEnabled",
+      "beautifyEnabled",
+      "neonTextColored",
+      "isSpacingMenuOpen",
+      "wysiwygSpacing",
+      "editorFontSize",
+      "toolbarIconSize",
+      "keyboardOffset",
+      "performanceMode",
+      "isKeyboardOpen",
+      "isSidebarOpen",
+      "isWidgetMenuOpen",
+      "setIsWidgetMenuOpen",
+      "lang",
+      "pubTitle",
+      "setPubTitle",
+      "pubTags",
+      "setPubTags",
+      "drafts",
+      "saveDraft",
+      "toggleEditorFullScreen",
+      "setOnDemandSyncEnabled",
+      "notify",
+      "toggleLivePreview",
+      "setBeautifyEnabled",
+      "setNeonTextColored",
+      "setIsSpacingMenuOpen",
+      "setWysiwygSpacing",
+      "setEditorFontSize",
+      "setToolbarIconSize",
+      "isMiniGalleryOpen",
+      "setIsMiniGalleryOpen",
+      "setJustInsertedUrl",
+      "justInsertedUrl",
+      "showMobileTools1",
+      "showMobileTools2",
+      "showMobileToolsOpen",
+      "setShowMobileTools1",
+      "setShowMobileTools2",
+      "setShowMobileToolsOpen",
+      "activeModal",
+      "setActiveModal",
+      "setSettingsTab",
+      "setIsEditorFocused",
+      "confirmDialog",
+      "TOOLS_MAP",
+      "t"
+    ]
+  },
+  "settingsAndChildModals": {
+    "clearImagesHits": [],
+    "clearTemplatesHits": [],
+    "readerInterfaceProps": [
+      "lang",
+      "t",
+      "editorFontSize",
+      "setEditorFontSize",
+      "onEditPost",
+      "onComment",
+      "onVote",
+      "currentUser",
+      "onUserUpdate",
+      "onUploadImage",
+      "onDeleteComment",
+      "onMuteUser",
+      "mutedUsers",
+      "targetReaderPost",
+      "rawInboxData",
+      "authType",
+      "keychainAccounts",
+      "vaultAccounts",
+      "onSelectAccount",
+      "onAddKeychainAccount",
+      "onOpenVaultManager",
+      "selectedVaultUser"
+    ],
+    "readerScreenSnippet": "import React from 'react';\nimport { cn } from '../../lib/utils';\nimport Reader, { type ReaderProps } from '../Reader';\n\nexport interface ReaderScreenProps extends ReaderProps {\n  isVisible: boolean;\n}\n\nexport const ReaderScreen: React.FC<ReaderScreenProps> = ({ isVisible, ...readerProps }) => {\n  return (\n    <div className={cn(\"flex-1 overflow-hidden bg-slate-900 flex flex-col\", !isVisible && \"hidden\")}>\n      <Reader {...readerProps} />\n    </div>\n  );\n};\n"
+  },
+  "backupEffectsAndListeners": {
+    "bakAddListeners": [
+      "517: document.addEventListener('mousedown', handleClickOutside);",
+      "960: document.addEventListener('selectionchange', handleSelectionChange);",
+      "1024: window.addEventListener('beforeunload', flushSave);",
+      "1025: window.addEventListener('pagehide', flushSave);",
+      "1026: document.addEventListener('visibilitychange', handleVisibilityChange);"
+    ],
+    "srcAddListenersCount": 44,
+    "srcAddListeners": [
+      "src/components/CodeEditor.tsx:139: window.addEventListener('beforeunload', handleBeforeUnload);",
+      "src/components/common/ImageLightboxModal.tsx:54: window.addEventListener('keydown', handleKeyDown);",
+      "src/components/docReader/DocReaderContainer.tsx:72: window.addEventListener('keydown', handleKeyDown);",
+      "src/components/docReader/DocReaderSourceDrawer.tsx:47: document.addEventListener('mousedown', handleOutsideClick);",
+      "src/components/docReader/DocReaderSourceDrawer.tsx:48: document.addEventListener('touchstart', handleOutsideClick);",
+      "src/components/docReader/DocReaderTOC.tsx:47: document.addEventListener('mousedown', handleOutsideClick);",
+      "src/components/docReader/DocReaderTOC.tsx:48: document.addEventListener('touchstart', handleOutsideClick);",
+      "src/components/header/Header.tsx:229: document.addEventListener('pointerdown', handleClickOutside);",
+      "src/components/modals/BaseModal.tsx:69: window.addEventListener('keydown', handleKeyDown);",
+      "src/components/modals/BaseModal.tsx:97: window.addEventListener('scroll', resetWindowScroll, { passive: true });",
+      "src/components/modals/BaseModal.tsx:98: window.addEventListener('focusin', resetWindowScroll, { passive: true });",
+      "src/hooks/reader/useReaderInbox.ts:245: window.addEventListener(\"steem_mark_all_read\", handleMarkAllRead);",
+      "src/hooks/useAppUI.ts:109: document.addEventListener('fullscreenchange', handleFullscreenChange);",
+      "src/hooks/useAppUI.ts:110: document.addEventListener('webkitfullscreenchange', handleFullscreenChange);",
+      "src/hooks/useAppUI.ts:111: document.addEventListener('mozfullscreenchange', handleFullscreenChange);",
+      "src/hooks/useAppUI.ts:112: document.addEventListener('MSFullscreenChange', handleFullscreenChange);",
+      "src/hooks/useAppUI.ts:200: window.addEventListener('keydown', handleGlobalKeyDown);",
+      "src/hooks/useEditorFormat.ts:132: img.addEventListener('load', () => {",
+      "src/hooks/useEditorShortcutsAndAutosave.ts:115: document.addEventListener('selectionchange', handleSelectionChange);",
+      "src/hooks/useEditorShortcutsAndAutosave.ts:178: window.addEventListener('beforeunload', flushSave);",
+      "src/hooks/useEditorShortcutsAndAutosave.ts:179: window.addEventListener('pagehide', flushSave);",
+      "src/hooks/useEditorShortcutsAndAutosave.ts:180: document.addEventListener('visibilitychange', handleVisibilityChange);",
+      "src/hooks/usePwaAndNotifications.ts:235: window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);",
+      "src/hooks/usePwaAndNotifications.ts:236: window.addEventListener('appinstalled', handleAppInstalled);",
+      "src/hooks/useTableOperations.ts:87: window.addEventListener('resize', updateTableRect, { passive: true });",
+      "src/hooks/useTableOperations.ts:90: scrollContainer.addEventListener('scroll', updateTableRect, { passive: true });",
+      "src/hooks/useVisualViewport.ts:99: vv.addEventListener('resize', handleMetricsUpdate);",
+      "src/hooks/useVisualViewport.ts:100: vv.addEventListener('scroll', handleMetricsUpdate);",
+      "src/hooks/useVisualViewport.ts:103: window.addEventListener('scroll', onWindowScroll, { passive: true });",
+      "src/hooks/useVisualViewport.ts:104: window.addEventListener('resize', handleMetricsUpdate);",
+      "src/hooks/useVisualViewport.ts:105: window.addEventListener('orientationchange', handleMetricsUpdate);",
+      "src/hooks/useVisualViewport.ts:106: window.addEventListener('focusin', handleMetricsUpdate);",
+      "src/hooks/useVisualViewport.ts:107: window.addEventListener('focusout', () => {",
+      "src/hooks/useWindowInteractions.ts:43: document.addEventListener('mousedown', handleClickOutside);",
+      "src/hooks/useWysiwygSync.ts:535: img.addEventListener('load', () => scrollCaretIntoView('nearest'), { once: true });",
+      "src/hooks/useWysiwygSync.ts:902: img.addEventListener('load', () => scrollCaretIntoView('center'), { once: true });",
+      "src/services/audio/useTypingSound.ts:157: window.addEventListener('touchstart', handleGestureWake, { passive: true });",
+      "src/services/audio/useTypingSound.ts:158: window.addEventListener('touchend', handleGestureWake, { passive: true });",
+      "src/services/audio/useTypingSound.ts:159: window.addEventListener('pointerdown', handleGestureWake, { passive: true });",
+      "src/services/audio/useTypingSound.ts:160: window.addEventListener('click', handleGestureWake, { passive: true });",
+      "src/services/audio/useTypingSound.ts:161: window.addEventListener('keydown', handleGestureWake, { passive: true });",
+      "src/services/audio/useTypingSound.ts:270: window.addEventListener('keydown', handleKeyDown, { passive: true, capture: true });",
+      "src/services/audio/useTypingSound.ts:271: window.addEventListener('beforeinput', handleBeforeInput as EventListener, { passive: true, capture: true });",
+      "src/services/audio/useTypingSound.ts:272: window.addEventListener('pointerdown', handlePointerDown, { passive: true, capture: true });"
+    ],
+    "missingInAppFromBak": [
+      "marked <- marked",
+      "Idiomorph <- idiomorph",
+      "cn <- ./lib/utils",
+      "probeNodes <- ./lib/steem",
+      "SteemPost <- ./types",
+      "useDeviceStore <- ./store/deviceStore",
+      "htmlToMarkdown <- ./lib/editorSync",
+      "convertBareImageUrlsToMarkdown <- ./lib/editorSync",
+      "isImageAndProxyUrl <- ./lib/editorSync",
+      "getMiniGalleryBottomStyle <- ./lib/viewportLayout",
+      "DOM_PURIFY_CONFIG <- ./utils/markdownParser",
+      "APP_CHANGELOG <- ./data/changelog",
+      "getChangelogText <- ./data/changelog",
+      "useEditorWorker <- ./hooks/useEditorWorker",
+      "useSteemQueue <- ./hooks/useSteemQueue",
+      "processContentForSteem <- ./hooks/useSteemQueue",
+      "useSteemGallery <- ./hooks/useSteemGallery",
+      "useEditorFormat <- ./hooks/useEditorFormat",
+      "useWysiwygSync <- ./hooks/useWysiwygSync",
+      "useEditorEvents <- ./hooks/useEditorEvents",
+      "usePublishingManager <- ./hooks/usePublishingManager",
+      "usePostSettings <- ./hooks/usePostSettings",
+      "useReaderBlockchainActions <- ./hooks/useReaderBlockchainActions",
+      "useTableOperations <- ./hooks/useTableOperations",
+      "useAppBackup <- ./hooks/useAppBackup",
+      "useEditorModeManager <- ./hooks/useEditorModeManager",
+      "Header <- ./components/header/Header",
+      "GlobalEditorStyles <- ./components/common/GlobalEditorStyles",
+      "type SidebarProps <- ./components/sidebar/Sidebar",
+      "type EditorPaneProps <- ./components/editor/EditorPane",
+      "createToolsMap <- ./components/editor/toolsMap",
+      "EditorScreen <- ./components/screens",
+      "ReaderScreen <- ./components/screens",
+      "AppModalsHost <- ./components/modals",
+      "type AppModalsProps <- ./components/modals"
+    ]
+  },
+  "editorAndWidgets": {
+    "tamedGetMarkedOrSetContent": [
+      "TamedWidget.tsx:71: getMarked: () => any;",
+      "TamedWidget.tsx:72: setContent: (content: string) => void;",
+      "TamedWidget.tsx:216: getMarked,",
+      "TamedWidget.tsx:217: setContent,",
+      "TamedWidget.tsx:249: const fallbackToolsMap: Record<string, { id: string; title: string; label: string | React.ReactNode, action: (e?: React.MouseEvent) => void }> = {",
+      "TamedWidget.tsx:283: const TOOLS_MAP: Record<string, ToolItem> = (props.toolsMap || fallbackToolsMap) as Record<string, ToolItem>;"
+    ],
+    "miniGalleryPropsAndIsOpen": [
+      "MiniGalleryStrip.tsx:5: import { getMiniGalleryBottomStyle } from '../../lib/viewportLayout';",
+      "MiniGalleryStrip.tsx:8: isOpen: boolean;",
+      "MiniGalleryStrip.tsx:9: onClose: () => void;",
+      "MiniGalleryStrip.tsx:26: isOpen,",
+      "MiniGalleryStrip.tsx:27: onClose,",
+      "MiniGalleryStrip.tsx:46: {isOpen && images.length > 0 && !activeModal && editorMode !== 'reading' && (",
+      "MiniGalleryStrip.tsx:54: bottom: getMiniGalleryBottomStyle({",
+      "MiniGalleryStrip.tsx:96: onClick={onClose}"
+    ],
+    "editorPaneStubSensitiveProps": [
+      "EditorPane.tsx:46: isMiniGalleryOpen: boolean;",
+      "EditorPane.tsx:94: setIsMiniGalleryOpen: (val: boolean) => void;",
+      "EditorPane.tsx:117: isImageAndProxyUrl: (url: string) => boolean;",
+      "EditorPane.tsx:120: htmlToMarkdown: (html: string) => string;",
+      "EditorPane.tsx:121: convertBareImageUrlsToMarkdown: (text: string) => string;",
+      "EditorPane.tsx:122: getMarked: () => any;",
+      "EditorPane.tsx:123: setContent: (content: string) => void;",
+      "EditorPane.tsx:177: isMiniGalleryOpen,",
+      "EditorPane.tsx:223: setIsMiniGalleryOpen,",
+      "EditorPane.tsx:244: isImageAndProxyUrl,",
+      "EditorPane.tsx:247: htmlToMarkdown,",
+      "EditorPane.tsx:248: convertBareImageUrlsToMarkdown,",
+      "EditorPane.tsx:249: getMarked,",
+      "EditorPane.tsx:250: setContent,",
+      "EditorPane.tsx:441: useEditorStore.getState().setContent(newContent);",
+      "EditorPane.tsx:466: isImageAndProxyUrl={isImageAndProxyUrl}",
+      "EditorPane.tsx:469: htmlToMarkdown={htmlToMarkdown}",
+      "EditorPane.tsx:470: convertBareImageUrlsToMarkdown={convertBareImageUrlsToMarkdown}",
+      "EditorPane.tsx:471: getMarked={getMarked}",
+      "EditorPane.tsx:502: isMiniGalleryOpen={isMiniGalleryOpen}",
+      "EditorPane.tsx:508: isOpen={isMiniGalleryOpen}",
+      "EditorPane.tsx:509: onClose={() => setIsMiniGalleryOpen(false)}",
+      "EditorPane.tsx:554: getMarked={getMarked}",
+      "EditorPane.tsx:555: setContent={setContent}"
+    ],
+    "toolsMapActions": [
+      "toolsMap.tsx:22: action: (e?: React.MouseEvent) => void;",
+      "toolsMap.tsx:32: setShowTableSelector: React.Dispatch<React.SetStateAction<boolean>>;",
+      "toolsMap.tsx:36: setActiveModal: (modal: any) => void;",
+      "toolsMap.tsx:40: setIsMiniGalleryOpen: React.Dispatch<React.SetStateAction<boolean>>;",
+      "toolsMap.tsx:51: setShowTableSelector,",
+      "toolsMap.tsx:55: setActiveModal,",
+      "toolsMap.tsx:59: setIsMiniGalleryOpen,",
+      "toolsMap.tsx:63: 'B': { id: 'B', title: t('bold'), label: 'B', action: () => fmt('**') },",
+      "toolsMap.tsx:64: 'I': { id: 'I', title: t('italic'), label: 'I', action: () => fmt('*') },",
+      "toolsMap.tsx:65: 'S': { id: 'S', title: t('strike'), label: '~~', action: () => fmt('~~') },",
+      "toolsMap.tsx:66: 'sub': { id: 'sub', title: t('subscript'), label: 'sub', action: () => fmt('<sub>', '</sub>') },",
+      "toolsMap.tsx:67: 'sup': { id: 'sup', title: t('superscript'), label: 'sup', action: () => fmt('<sup>', '</sup>') },",
+      "toolsMap.tsx:68: 'H1': { id: 'H1', title: t('h1'), label: 'H1', action: () => fmtLine('# ') },",
+      "toolsMap.tsx:69: 'H2': { id: 'H2', title: t('h2'), label: 'H2', action: () => fmtLine('## ') },",
+      "toolsMap.tsx:70: 'H3': { id: 'H3', title: t('h3'), label: 'H3', action: () => fmtLine('### ') },",
+      "toolsMap.tsx:71: 'Link': { id: 'Link', title: t('link'), label: <LinkIcon size={20} />, action: handleLink },",
+      "toolsMap.tsx:72: 'Quote': { id: 'Quote', title: t('quote'), label: <Quote size={20} />, action: () => fmtLine('> ') },",
+      "toolsMap.tsx:73: 'List': { id: 'List', title: t('listBullet'), label: '•', action: () => fmtLine('- ') },",
+      "toolsMap.tsx:74: 'Num': { id: 'Num', title: t('listOrdered'), label: '1.', action: () => fmtLine('1. ') },",
+      "toolsMap.tsx:75: 'Task': { id: 'Task', title: t('listTask'), label: '☑', action: () => fmtLine('- [ ] ') },",
+      "toolsMap.tsx:80: action: (e?: React.MouseEvent) => {",
+      "toolsMap.tsx:91: setShowTableSelector(prev => !prev);",
+      "toolsMap.tsx:97: 'Separator': { id: 'Separator', title: t('tableSelector1ColSep'), label: <SplitSquareHorizontal size={20} />, action: () => insertAtCursor('| Head |\\n| --- |\\n', 'end') },",
+      "toolsMap.tsx:98: 'Import': { id: 'Import', title: t('importTable'), label: <TableIcon size={20} />, action: () => importTable() },",
+      "toolsMap.tsx:99: 'Code': { id: 'Code', title: t('codeBlock'), label: <Code size={20} />, action: () => fmt('```\\n', '\\n```') },",
+      "toolsMap.tsx:100: 'Inline': { id: 'Inline', title: t('inlineCode'), label: <Terminal size={20} />, action: () => fmt('`') },",
+      "toolsMap.tsx:105: action: () => {",
+      "toolsMap.tsx:116: 'Esc': { id: 'Esc', title: t('escapeChar'), label: '\\\\', action: () => fmt('\\\\', '') },",
+      "toolsMap.tsx:117: 'HR': { id: 'HR', title: t('hr'), label: '—', action: () => insertAtCursor('\\n\\n---\\n\\n') },",
+      "toolsMap.tsx:118: 'Color': { id: 'Color', title: t('redText'), label: <span className=\"text-red-500 font-bold text-lg\">A</span>, action: () => fmt('<div class=\"phishy\">', '</div>') },",
+      "toolsMap.tsx:123: action: async () => {",
+      "toolsMap.tsx:130: 'Left': { id: 'Left', title: t('leftText'), label: '⬅', action: () => fmt('<div class=\"text-left\">\\n', '\\n</div>') },",
+      "toolsMap.tsx:131: 'Center': { id: 'Center', title: t('center'), label: t('toolAlignCenterShort'), action: () => fmt('<center>\\n', '\\n</center>') },",
+      "toolsMap.tsx:132: 'Right': { id: 'Right', title: t('rightText'), label: '➡', action: () => fmt('<div class=\"text-right\">\\n', '\\n</div>') },",
+      "toolsMap.tsx:133: 'Justify': { id: 'Justify', title: t('justify'), label: t('toolAlignJustifyShort'), action: () => fmt('<div class=\"text-justify\">\\n', '\\n</div>') },",
+      "toolsMap.tsx:134: 'Templates': { id: 'Templates', title: t('templates'), label: <FileText size={20} />, action: () => setActiveModal('templates') },",
+      "toolsMap.tsx:139: action: async () => {",
+      "toolsMap.tsx:154: action: () => {",
+      "toolsMap.tsx:162: action: () => {",
+      "toolsMap.tsx:163: setIsMiniGalleryOpen(prev => !prev);"
+    ]
+  }
+}

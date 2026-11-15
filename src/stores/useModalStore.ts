@@ -22,13 +22,9 @@ export interface ModalStoreState {
   activeModal: ModalType | null;
   previousModal: ModalType | null;
   modalParams: Record<string, any>;
-  
+
   // Direct boolean helpers for non-exclusive floating modals/overlays
   isSMenuOpen: boolean;
-  showPwaBanner: boolean;
-  showPwaInstructionsModal: boolean;
-  isAudioPresetsModalOpen: boolean;
-  isAccountPromptModalOpen: boolean;
   isTableSelectorOpen: boolean;
 
   // Actions
@@ -36,12 +32,8 @@ export interface ModalStoreState {
   openModal: (modal: ModalType, params?: Record<string, any>) => void;
   closeModal: (modal?: ModalType) => void;
   closeAllModals: () => void;
-  setIsSMenuOpen: (open: boolean) => void;
-  setShowPwaBanner: (show: boolean) => void;
-  setShowPwaInstructionsModal: (show: boolean) => void;
-  setIsAudioPresetsModalOpen: (open: boolean) => void;
-  setIsAccountPromptModalOpen: (open: boolean) => void;
-  setIsTableSelectorOpen: (open: boolean) => void;
+  setIsSMenuOpen: (open: boolean | ((prev: boolean) => boolean)) => void;
+  setIsTableSelectorOpen: (open: boolean | ((prev: boolean) => boolean)) => void;
 }
 
 export const useModalStore = create<ModalStoreState>((set, get) => ({
@@ -50,10 +42,6 @@ export const useModalStore = create<ModalStoreState>((set, get) => ({
   modalParams: {},
 
   isSMenuOpen: false,
-  showPwaBanner: false,
-  showPwaInstructionsModal: false,
-  isAudioPresetsModalOpen: false,
-  isAccountPromptModalOpen: false,
   isTableSelectorOpen: false,
 
   setActiveModal: (modal, params = {}) => {
@@ -75,7 +63,7 @@ export const useModalStore = create<ModalStoreState>((set, get) => ({
   },
 
   closeModal: (modal) => {
-    const { activeModal, previousModal } = get();
+    const { activeModal } = get();
     if (!modal || activeModal === modal) {
       set({
         activeModal: null,
@@ -91,17 +79,17 @@ export const useModalStore = create<ModalStoreState>((set, get) => ({
       previousModal: null,
       modalParams: {},
       isSMenuOpen: false,
-      showPwaInstructionsModal: false,
-      isAudioPresetsModalOpen: false,
-      isAccountPromptModalOpen: false,
       isTableSelectorOpen: false,
     });
   },
 
-  setIsSMenuOpen: (open) => set({ isSMenuOpen: open }),
-  setShowPwaBanner: (show) => set({ showPwaBanner: show }),
-  setShowPwaInstructionsModal: (show) => set({ showPwaInstructionsModal: show }),
-  setIsAudioPresetsModalOpen: (open) => set({ isAudioPresetsModalOpen: open }),
-  setIsAccountPromptModalOpen: (open) => set({ isAccountPromptModalOpen: open }),
-  setIsTableSelectorOpen: (open) => set({ isTableSelectorOpen: open }),
+  setIsSMenuOpen: (action) =>
+    set((state) => ({
+      isSMenuOpen: typeof action === 'function' ? action(state.isSMenuOpen) : action,
+    })),
+
+  setIsTableSelectorOpen: (action) =>
+    set((state) => ({
+      isTableSelectorOpen: typeof action === 'function' ? action(state.isTableSelectorOpen) : action,
+    })),
 }));

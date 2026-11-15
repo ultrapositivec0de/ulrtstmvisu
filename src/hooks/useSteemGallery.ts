@@ -1,36 +1,12 @@
 import { useState, useCallback, useMemo, useEffect, useRef, Dispatch, SetStateAction } from 'react';
 import { ImageItem, AuthType } from '../types';
-import ExifReader from 'exifreader';
-import { SecurityService } from '../services/securityService';
-import { Buffer } from 'buffer';
-import { useImageSearch } from './useImageSearch';
-import { findWorkingPredictedImageUrl } from '../utils/steemImagePrediction';
-import { NativeHttpService } from '../services/nativeHttpService';
+import { useStockPhotos } from './gallery/useStockPhotos';
+import { useGalleryLayoutMarkup } from './gallery/useGalleryLayoutMarkup';
+import { useImageUploadPipeline, sanitizeFilename } from './gallery/useImageUploadPipeline';
+
+export { sanitizeFilename };
 
 const STORAGE_KEY_IMAGES = 'steem_uploaded_images_v2';
-
-export const sanitizeFilename = (name: string): string => {
-  const ukrToLatin: Record<string, string> = {
-    'а': 'a', 'б': 'b', 'в': 'v', 'г': 'h', 'ґ': 'g', 'д': 'd', 'е': 'e', 'є': 'ye', 'ж': 'zh', 'з': 'z',
-    'и': 'y', 'і': 'i', 'ї': 'yi', 'й': 'y', 'к': 'k', 'л': 'l', 'м': 'm', 'н': 'n', 'о': 'o', 'п': 'p',
-    'р': 'r', 'с': 's', 'т': 't', 'у': 'u', 'ф': 'f', 'х': 'kh', 'ц': 'ts', 'ч': 'ch', 'ш': 'sh', 'щ': 'shch',
-    'ь': '', 'ю': 'yu', 'я': 'ya', 'А': 'A', 'Б': 'B', 'В': 'V', 'Г': 'H', 'Ґ': 'G', 'Д': 'D', 'Е': 'E',
-    'Є': 'Ye', 'Ж': 'Zh', 'З': 'Z', 'И': 'Y', 'І': 'I', 'Ї': 'Yi', 'Й': 'Y', 'К': 'K', 'Л': 'L', 'М': 'M',
-    'Н': 'N', 'О': 'O', 'П': 'P', 'Р': 'R', 'С': 'S', 'Т': 'T', 'У': 'U', 'Ф': 'F', 'Х': 'Kh', 'Ц': 'Ts',
-    'Ч': 'Ch', 'Ш': 'Sh', 'Щ': 'Shch', 'Ь': '', 'Ю': 'Yu', 'Я': 'Ya'
-  };
-  
-  const parts = name.split('.');
-  const ext = parts.length > 1 ? parts.pop() : '';
-  const base = parts.join('.');
-  const result = base.split('').map(char => ukrToLatin[char] || char).join('');
-  
-  return result
-    .toLowerCase()
-    .replace(/\s+/g, '_')
-    .replace(/[^a-z0-9_.-]/g, '')
-    .substring(0, 40) + (ext ? '.' + ext : '');
-};
 
 export interface SteemGalleryConfig {
   t: (key: any) => string;
@@ -60,105 +36,44 @@ export function useSteemGallery(config: SteemGalleryConfig) {
   const [images, setImages] = useState<ImageItem[]>([]);
   const isImagesLoaded = useRef(false);
   const [sourceInput, setSourceInput] = useState('');
-  const [isGalleryCollapsed, setIsGalleryCollapsed] = useState(() => localStorage.getItem('steem_gallery_collapsed') === 'true');
+  const [isGalleryCollapsed, setIsGalleryCollapsed] = useState(() => {
+    if (typeof localStorage === 'undefined') return false;
+    return localStorage.getItem('steem_gallery_collapsed') === 'true';
+  });
   const [galleryView, setGalleryView] = useState<'grid' | 'list'>('grid');
 
-  const {
-    galleryMode,
-    setGalleryMode,
-    gallerySearch,
-    setGallerySearch,
-    isSearchingPexels,
-    setIsSearchingPexels,
-    pexelsResults,
-    setPexelsResults,
-    pexelsPage,
-    setPexelsPage,
-    handleExternalSearch,
-  } = useImageSearch(config);
-  const [isTrafficOptimized, setIsTrafficOptimized] = useState(() => {
-    return localStorage.getItem('steem_traffic_optimized') === 'true';
-  });
-
-  const [isGallerySettingsCollapsed, setIsGallerySettingsCollapsed] = useState(false);
-  const [gridLayout, setGridLayout] = useState<'col' | 'col-table' | 'row' | 'grid-2' | 'col-img-text' | 'col-text-img'>('col');
-  const [gridWithCaptions, setGridWithCaptions] = useState(false);
-  const [singleCaptionAlign, setSingleCaptionAlign] = useState<'center' | 'left' | 'right'>('center');
-  const [isTextWrapEnabled, setIsTextWrapEnabled] = useState(() => {
-    return localStorage.getItem('steem_text_wrap_enabled') !== 'false';
-  });
-  const [isExifEnabled, setIsExifEnabled] = useState(() => localStorage.getItem('steem_exif_enabled') === 'true');
-  const [imageInsertFormat, setImageInsertFormat] = useState<'html' | 'markdown'>(() => {
-    return (localStorage.getItem('steem_image_insert_format') as 'html' | 'markdown') || 'markdown';
-  });
-  const [isUploading, setIsUploading] = useState(false);
-  const [imageUploadAccount, setImageUploadAccount] = useState('');
-
-  const [pexelsSettings, setPexelsSettings] = useState(() => {
-    const saved = localStorage.getItem('steem_pexels_settings');
-    return saved ? JSON.parse(saved) : { withAttribution: true, linkEmbedded: true };
-  });
-
-  // Load and sync localStorage settings
   useEffect(() => {
-    localStorage.setItem('steem_gallery_collapsed', String(isGalleryCollapsed));
+    if (typeof localStorage !== 'undefined') {
+      localStorage.setItem('steem_gallery_collapsed', String(isGalleryCollapsed));
+    }
   }, [isGalleryCollapsed]);
 
-  useEffect(() => {
-    localStorage.setItem('steem_traffic_optimized', String(isTrafficOptimized));
-  }, [isTrafficOptimized]);
+  // 1. Stock Photos Hook
+  const stockPhotos = useStockPhotos(config);
 
-  useEffect(() => {
-    localStorage.setItem('steem_text_wrap_enabled', String(isTextWrapEnabled));
-  }, [isTextWrapEnabled]);
-
-  useEffect(() => {
-    localStorage.setItem('steem_exif_enabled', String(isExifEnabled));
-  }, [isExifEnabled]);
-
-  useEffect(() => {
-    localStorage.setItem('steem_image_insert_format', imageInsertFormat);
-  }, [imageInsertFormat]);
-
-  useEffect(() => {
-    localStorage.setItem('steem_pexels_settings', JSON.stringify(pexelsSettings));
-  }, [pexelsSettings]);
-
-  useEffect(() => {
-    localStorage.setItem('steem_gallery_cache_results', JSON.stringify(pexelsResults));
-  }, [pexelsResults]);
-
-  useEffect(() => {
-    const hasKeychain = typeof window !== 'undefined' && !!(window as any).steem_keychain;
-    if (!hasKeychain && config.vaultAccounts.length > 0) {
-      if (!imageUploadAccount || !config.vaultAccounts.includes(imageUploadAccount)) {
-        setImageUploadAccount(config.selectedVaultUser || config.vaultAccounts[0]);
-      }
-    }
-  }, [config.vaultAccounts, config.selectedVaultUser, imageUploadAccount]);
-
+  // 2. Filtered local images and image management
   const filteredLocalImages = useMemo(() => {
-    if (!gallerySearch.trim()) return images;
-    return images.filter(img => 
-      img.name.toLowerCase().includes(gallerySearch.toLowerCase()) || 
-      img.url.toLowerCase().includes(gallerySearch.toLowerCase())
+    if (!stockPhotos.gallerySearch.trim()) return images;
+    return images.filter(img =>
+      img.name.toLowerCase().includes(stockPhotos.gallerySearch.toLowerCase()) ||
+      img.url.toLowerCase().includes(stockPhotos.gallerySearch.toLowerCase())
     );
-  }, [images, gallerySearch]);
+  }, [images, stockPhotos.gallerySearch]);
 
   const parseImages = useCallback((input: string) => {
     setSourceInput(input);
     const urlPattern = /(https?:\/\/[^[\]\s<>"'()]+?\.(?:jpg|jpeg|png|webp|gif|svg))/gi;
     const matches = input.match(urlPattern) || [];
     const uniqueUrls = Array.from(new Set(matches));
-    
+
     setImages(prev => {
       const existingUrls = new Set(prev.map(img => img.url));
       const newImages = uniqueUrls.map(url => ({
         url,
         name: url.split('/').pop()?.split('?')[0] || 'image',
-        selected: false
+        selected: false,
       })).filter(img => !existingUrls.has(img.url));
-      
+
       const keptImages = prev.filter(img => uniqueUrls.includes(img.url));
       return [...keptImages, ...newImages];
     });
@@ -200,19 +115,21 @@ export function useSteemGallery(config: SteemGalleryConfig) {
   useEffect(() => {
     config.initVault();
 
-    const savedLinks = localStorage.getItem('steem_editor_source_links');
-    if (savedLinks) {
-      parseImages(savedLinks);
-    } else {
-      const savedImages = localStorage.getItem(STORAGE_KEY_IMAGES);
-      if (savedImages) {
-        try {
-          const parsed = JSON.parse(savedImages);
-          if (Array.isArray(parsed)) {
-            setImages(parsed);
+    if (typeof localStorage !== 'undefined') {
+      const savedLinks = localStorage.getItem('steem_editor_source_links');
+      if (savedLinks) {
+        parseImages(savedLinks);
+      } else {
+        const savedImages = localStorage.getItem(STORAGE_KEY_IMAGES);
+        if (savedImages) {
+          try {
+            const parsed = JSON.parse(savedImages);
+            if (Array.isArray(parsed)) {
+              setImages(parsed);
+            }
+          } catch (e) {
+            console.error("Failed to load images", e);
           }
-        } catch (e) {
-          console.error("Failed to load images", e);
         }
       }
     }
@@ -220,813 +137,46 @@ export function useSteemGallery(config: SteemGalleryConfig) {
     setTimeout(() => {
       isImagesLoaded.current = true;
     }, 1000);
-  }, [parseImages]);
+  }, [parseImages, config]);
 
   // Save images on change (once loaded)
   useEffect(() => {
-    if (isImagesLoaded.current) {
+    if (isImagesLoaded.current && typeof localStorage !== 'undefined') {
       localStorage.setItem(STORAGE_KEY_IMAGES, JSON.stringify(images));
     }
   }, [images]);
 
-  const toggleGalleryMode = useCallback((mode: 'local' | 'pexels' | 'unsplash' | 'pixabay') => {
-    setGalleryMode(mode);
-    setGallerySearch('');
-  }, []);
+  // 3. Layout and Markup Hook
+  const layoutMarkup = useGalleryLayoutMarkup({
+    images,
+    setImages,
+    pexelsResults: stockPhotos.pexelsResults,
+    setPexelsResults: stockPhotos.setPexelsResults,
+    galleryMode: stockPhotos.galleryMode,
+    pexelsSettings: stockPhotos.pexelsSettings,
+    insertAtCursor: config.insertAtCursor,
+    onImageInserted: config.onImageInserted,
+    t: config.t,
+  });
 
-  const getExifTableFromBlob = useCallback(async (file: File | Blob): Promise<string> => {
-    if (!isExifEnabled) return '';
-    try {
-      const arrayBuffer = await file.arrayBuffer();
-      const tags = ExifReader.load(arrayBuffer);
-      if (!tags) return '';
-
-      const make = tags['Make']?.description || '';
-      const model = tags['Model']?.description || '';
-      const fNumber = tags['FNumber']?.description ? `f/${tags['FNumber'].description}` : '';
-      const iso = tags['ISOSpeedRatings']?.description ? `ISO ${tags['ISOSpeedRatings'].description}` : '';
-      const shutter = tags['ExposureTime']?.description || '';
-      const focal = tags['FocalLength']?.description || '';
-
-      if (!make && !model && !iso) return '';
-
-      let table = '\n| Param | Camera Info |\n| --- | --- |\n';
-      if (make || model) table += `| 📸 | ${make} ${model} |\n`;
-      if (fNumber) table += `| 🔘 | ${fNumber} |\n`;
-      if (shutter) table += `| ⏲️ | ${shutter} |\n`;
-      if (iso) table += `| 🎞️ | ${iso} |\n`;
-      if (focal) table += `| 🔍 | ${focal} |\n`;
-      
-      return table + '\n';
-    } catch (e) {
-      console.error('Exif error:', e);
-      return '';
-    }
-  }, [isExifEnabled]);
-
-  const shortenName = useCallback((name: string, max: number = 30) => {
-    if (name.length <= max) return name;
-    return name.substring(0, max) + '...';
-  }, []);
-
-  const insertExternalImage = useCallback((photo: any, position: 'left' | 'right' | 'center' | 'plain') => {
-    const url = photo.url.split('?')[0];
-    const name = shortenName(photo.alt || 'Photo');
-    const photographer = photo.author;
-    const photographerUrl = photo.authorUrl;
-
-    let attribution = '';
-    if (pexelsSettings.withAttribution) {
-      const source = (photo.source || 'pexels').toLowerCase();
-      const sourceName = source === 'unsplash' ? 'Unsplash' : source === 'pixabay' ? 'Pixabay' : 'Pexels';
-      attribution = `<div align="${singleCaptionAlign}"><sup>By <a href="${photographerUrl}">${photographer}</a> on <a href="https://${source}.com">${sourceName}</a></sup></div>`;
-    }
-
-    if (imageInsertFormat === 'markdown') {
-      const externalLinkUrl = photo.pageURL || photo.url.split('?')[0];
-      let md = `![${name}](${url})`;
-      if (pexelsSettings.linkEmbedded) {
-        md = `[${md}](${externalLinkUrl})`;
-      }
-      
-      let finalMd: string;
-      if (position === 'plain') {
-        finalMd = md + (attribution ? '\n\n' + attribution : '');
-      } else if (position === 'center') {
-        finalMd = `<center>\n\n${md}\n\n${attribution ? attribution + '\n\n' : ''}</center>`;
-      } else {
-        finalMd = `<div class="pull-${position}">\n\n${md}\n\n${attribution ? attribution + '\n\n' : ''}</div>`;
-      }
-
-      if (!isTextWrapEnabled && (position === 'left' || position === 'right')) finalMd += '\n<div class="clearfix"></div>\n';
-      config.insertAtCursor(finalMd);
-      if (config.onImageInserted) config.onImageInserted();
-      return;
-    }
-
-    const imgHtml = `<img src="${url}" alt="${name}">`;
-    let html = '';
-    if (position === 'plain') html = imgHtml + (attribution ? '<br/>' + attribution : '');
-    else if (position === 'left' || position === 'right') html = `<div class="pull-${position}">${imgHtml}<br/>${attribution}</div>`;
-    else if (position === 'center') html = `<center>${imgHtml}<br/>${attribution}</center>`;
-
-    if (!isTextWrapEnabled && (position === 'left' || position === 'right')) html += '\n<div class="clearfix"></div>\n';
-    config.insertAtCursor(html);
-    if (config.onImageInserted) config.onImageInserted();
-  }, [shortenName, pexelsSettings, singleCaptionAlign, imageInsertFormat, isTextWrapEnabled, config]);
-
-  const insertImage = useCallback((url: string, name: string, position: 'left' | 'right' | 'center' | 'plain') => {
-    const sName = shortenName(name);
-    const localImg = images.find(i => i.url === url);
-    const exifTable = localImg?.exif || '';
-    
-    let attribution = '';
-    if (gridWithCaptions) {
-      attribution = `<div align="${singleCaptionAlign}"><sup> ✍️ </sup></div>`;
-    }
-
-    if (imageInsertFormat === 'markdown') {
-      const md = `![${sName}](${url})`;
-      let finalMd: string;
-      if (position === 'plain') {
-        finalMd = md + (attribution ? '\n\n' + attribution : '');
-      } else if (position === 'center') {
-        finalMd = `<center>\n\n${md}\n\n${attribution ? attribution + '\n\n' : ''}</center>`;
-      } else {
-        finalMd = `<div class="pull-${position}">\n\n${md}\n\n${attribution ? attribution + '\n\n' : ''}</div>`;
-      }
-
-      if (!isTextWrapEnabled && (position === 'left' || position === 'right')) {
-        finalMd += '\n<div class="clearfix"></div>\n';
-      }
-
-      config.insertAtCursor(finalMd + exifTable, 'end');
-      if (config.onImageInserted) config.onImageInserted();
-      return;
-    }
-
-    const imgHtml = `<img src="${url}" alt="${sName}">`;
-    let html = '';
-
-    if (position === 'plain') {
-      html = imgHtml + (attribution ? '<br/>' + attribution : '');
-    } else if (position === 'left' || position === 'right') {
-      html = `<div class="pull-${position}">${imgHtml}<br/>${attribution}</div>`;
-    } else if (position === 'center') {
-      html = `<center>${imgHtml}<br/>${attribution}</center>`;
-    }
-
-    if (!isTextWrapEnabled && (position === 'left' || position === 'right')) {
-      html += '\n<div class="clearfix"></div>\n';
-    }
-
-    config.insertAtCursor(html + exifTable, 'end');
-    if (config.onImageInserted) config.onImageInserted();
-  }, [shortenName, images, gridWithCaptions, singleCaptionAlign, imageInsertFormat, isTextWrapEnabled, config]);
-
-  const insertGrid = useCallback(() => {
-    const selected = galleryMode === 'local' 
-      ? images.filter(img => img.selected)
-      : pexelsResults.filter(p => p.selected);
-
-    if (selected.length === 0) return;
-    
-    let result = '';
-
-    const getCaption = (item: any, index: number, isLocal: boolean, htmlMode: boolean = false) => {
-      if (isLocal) return ` ✍️ `;
-      
-      const photo = item as any;
-      const author = photo.photographer || item.author || 'Author';
-      const source = (photo.source || 'pexels').toLowerCase();
-      const authorUrl = photo.photographer_url || item.authorUrl || '#';
-      
-      const sourceName = source === 'unsplash' ? 'Unsplash' : source === 'pixabay' ? 'Pixabay' : 'Pexels';
-      
-      if (pexelsSettings.withAttribution) {
-        if (htmlMode) {
-           return `By <a href="${authorUrl}">${author}</a> on <a href="https://${source}.com">${sourceName}</a>`;
-        }
-        return `By [${author}](${authorUrl}) on [${sourceName}](https://${source}.com)`;
-      }
-      return ` ✍️ `;
-    };
-
-    const getMarkdownImg = (item: any, isLocal: boolean) => {
-      if (isLocal) return `![${(item as ImageItem).name}](${item.url})`;
-      const photo = item as any;
-      let url = photo.src?.large2x || photo.src?.large || item.url;
-      if (url?.includes('?')) url = url.split('?')[0];
-      return `![Photo by ${photo.photographer || item.author || 'Author'}](${url})`;
-    };
-
-    const getHtmlImg = (item: any, isLocal: boolean) => {
-      if (isLocal) return `<img src="${item.url}" style="width:100%">`;
-      const photo = item as any;
-      let url = photo.src?.large2x || photo.src?.large || item.url;
-      if (url?.includes('?')) url = url.split('?')[0];
-      return `<img src="${url}" style="width:100%">`;
-    };
-
-    const generateCell = (item: any, idx: number, isLocal: boolean, isHtml: boolean) => {
-      const photo = item as any;
-      const externalLinkUrl = item.url || item.pageURL || photo?.photographer_url || item.url;
-      const imgMarkup = isHtml ? getHtmlImg(item, isLocal) : getMarkdownImg(item, isLocal);
-      const linkedImg = (pexelsSettings.linkEmbedded && !isLocal) ? `<a href="${externalLinkUrl}">${imgMarkup}</a>` : imgMarkup;
-      const caption = getCaption(item, idx, isLocal, isHtml);
-      
-      if (isHtml) {
-        return `  <td style="padding:4px; vertical-align:top; width:50%">\n    ${linkedImg}\n    ${gridWithCaptions ? `<br/><div align="${singleCaptionAlign}"><sup>${caption}</sup></div>` : ''}\n  </td>`;
-      }
-      return `${linkedImg}${gridWithCaptions ? `\n\n<div align="${singleCaptionAlign}"><sup>${caption}</sup></div>` : ''}`;
-    };
-
-    const isLocal = galleryMode === 'local';
-
-    if (imageInsertFormat === 'markdown') {
-      if (gridLayout === 'col') {
-        selected.forEach((item, idx) => {
-          const mdImg = getMarkdownImg(item, isLocal);
-          const linkedImg = (pexelsSettings.linkEmbedded && !isLocal) ? `[${mdImg}](${item.url})` : mdImg;
-          result += `${linkedImg}\n`;
-          if (gridWithCaptions) {
-            result += `<div align="${singleCaptionAlign}"><sup>${getCaption(item, idx, isLocal, false)}</sup></div>\n`;
-          }
-          result += `\n`;
-        });
-      } else if (gridLayout === 'col-table') {
-        result += `| ${config.t('galleryGrid')} |\n| --- |\n`;
-        selected.forEach((item, idx) => {
-          const mdImg = getMarkdownImg(item, isLocal);
-          const linkedImg = (pexelsSettings.linkEmbedded && !isLocal) ? `[${mdImg}](${item.url})` : mdImg;
-          let cell = linkedImg;
-          if (gridWithCaptions) {
-            cell += `<br/><sup>${getCaption(item, idx, isLocal, true)}</sup>`;
-          }
-          result += `| <center>${cell}</center> |\n`;
-        });
-        result += `\n`;
-      } else if (gridLayout === 'grid-2') {
-        result += `<table style="width:100%">\n`;
-        for (let i = 0; i < selected.length; i += 2) {
-          result += ` <tr>\n`;
-          result += generateCell(selected[i], i, isLocal, true) + `\n`;
-          if (selected[i + 1]) {
-            result += generateCell(selected[i + 1], i + 1, isLocal, true) + `\n`;
-          } else {
-            result += `  <td style="width:50%"></td>\n`;
-          }
-          result += ` </tr>\n`;
-        }
-        result += `</table>\n\n`;
-      } else if (gridLayout === 'row') {
-        result += `|`;
-        selected.forEach(() => result += `   |`);
-        result += `\n|`;
-        selected.forEach(() => result += ` --- |`);
-        result += `\n|`;
-        selected.forEach((item, idx) => {
-          const mdImg = getMarkdownImg(item, isLocal);
-          const linkedImg = (pexelsSettings.linkEmbedded && !isLocal) ? `[${mdImg}](${item.url})` : mdImg;
-          let cell = linkedImg;
-          if (gridWithCaptions) {
-            cell += `<br/><sup>${getCaption(item, idx, isLocal, true)}</sup>`;
-          }
-          result += ` <center>${cell}</center> |`;
-        });
-        result += `\n\n`;
-      } else if (gridLayout === 'col-img-text') {
-        selected.forEach((item, idx) => {
-          const mdImg = getMarkdownImg(item, isLocal);
-          const linkedImg = (pexelsSettings.linkEmbedded && !isLocal) ? `[${mdImg}](${item.url})` : mdImg;
-          const caption = gridWithCaptions ? `<br/><sup>${getCaption(item, idx, isLocal, true)}</sup>` : '';
-          result += `<table style="width:100%">\n <tr>\n  <td style="width:50%; vertical-align:top; padding:6px">\n    ${linkedImg}${caption}\n  </td>\n  <td style="width:50%; vertical-align:top; padding:6px">\n    ${config.t('textPlaceholder')}\n  </td>\n </tr>\n</table>\n\n`;
-        });
-      } else if (gridLayout === 'col-text-img') {
-        selected.forEach((item, idx) => {
-          const mdImg = getMarkdownImg(item, isLocal);
-          const linkedImg = (pexelsSettings.linkEmbedded && !isLocal) ? `[${mdImg}](${item.url})` : mdImg;
-          const caption = gridWithCaptions ? `<br/><sup>${getCaption(item, idx, isLocal, true)}</sup>` : '';
-          result += `<table style="width:100%">\n <tr>\n  <td style="width:50%; vertical-align:top; padding:6px">\n    ${config.t('textPlaceholder')}\n  </td>\n  <td style="width:50%; vertical-align:top; padding:6px">\n    ${linkedImg}${caption}\n  </td>\n </tr>\n</table>\n\n`;
-        });
-      }
-    } else {
-      if (gridLayout === 'col') {
-        selected.forEach((item, idx) => {
-          const imgHtml = getHtmlImg(item, isLocal);
-          const linkedImg = (pexelsSettings.linkEmbedded && !isLocal) ? `<a href="${item.url}">${imgHtml}</a>` : imgHtml;
-          result += `<center>\n  ${linkedImg}\n`;
-          if (gridWithCaptions) {
-            result += `  <br/>\n  <div align="${singleCaptionAlign}"><sup>${getCaption(item, idx, isLocal, true)}</sup></div>\n`;
-          }
-          result += `</center>\n<br/>\n\n`;
-        });
-      } else if (gridLayout === 'col-table' || gridLayout === 'row' || gridLayout === 'grid-2') {
-        result += `<table style="width:100%">\n`;
-        if (gridLayout === 'col-table') {
-          selected.forEach((item, idx) => {
-            const imgHtml = getHtmlImg(item, isLocal);
-            const linkedImg = (pexelsSettings.linkEmbedded && !isLocal) ? `<a href="${item.url}">${imgHtml}</a>` : imgHtml;
-            result += ` <tr>\n  <td style="padding:4px; text-align:center">\n    ${linkedImg}\n    ${gridWithCaptions ? `<br/><sup>${getCaption(item, idx, isLocal, true)}</sup>` : ''}\n  </td>\n </tr>\n`;
-          });
-        } else if (gridLayout === 'row') {
-          result += ` <tr>\n`;
-          selected.forEach((item, idx) => {
-            const imgHtml = getHtmlImg(item, isLocal);
-            const linkedImg = (pexelsSettings.linkEmbedded && !isLocal) ? `<a href="${item.url}">${imgHtml}</a>` : imgHtml;
-            result += `  <td style="padding:4px; text-align:center; vertical-align:top">\n    ${linkedImg}\n    ${gridWithCaptions ? `<br/><sup>${getCaption(item, idx, isLocal, true)}</sup>` : ''}\n  </td>\n`;
-          });
-          result += ` </tr>\n`;
-        } else if (gridLayout === 'grid-2') {
-          for (let i = 0; i < selected.length; i += 2) {
-            result += ` <tr>\n`;
-            result += generateCell(selected[i], i, isLocal, true) + `\n`;
-            if (selected[i + 1]) {
-              result += generateCell(selected[i + 1], i + 1, isLocal, true) + `\n`;
-            } else {
-              result += `  <td style="width:50%"></td>\n`;
-            }
-            result += ` </tr>\n`;
-          }
-        }
-        result += `</table>\n\n`;
-      } else if (gridLayout === 'col-img-text') {
-        selected.forEach((item, idx) => {
-          const imgHtml = getHtmlImg(item, isLocal);
-          const linkedImg = (pexelsSettings.linkEmbedded && !isLocal) ? `<a href="${item.url}">${imgHtml}</a>` : imgHtml;
-          const caption = gridWithCaptions ? `<br/><sup>${getCaption(item, idx, isLocal, true)}</sup>` : '';
-          result += `<table style="width:100%">\n <tr>\n  <td style="width:50%; vertical-align:top; padding:6px">\n    ${linkedImg}${caption}\n  </td>\n  <td style="width:50%; vertical-align:top; padding:6px">\n    ${config.t('textPlaceholder')}\n  </td>\n </tr>\n</table>\n\n`;
-        });
-      } else if (gridLayout === 'col-text-img') {
-        selected.forEach((item, idx) => {
-          const imgHtml = getHtmlImg(item, isLocal);
-          const linkedImg = (pexelsSettings.linkEmbedded && !isLocal) ? `<a href="${item.url}">${imgHtml}</a>` : imgHtml;
-          const caption = gridWithCaptions ? `<br/><sup>${getCaption(item, idx, isLocal, true)}</sup>` : '';
-          result += `<table style="width:100%">\n <tr>\n  <td style="width:50%; vertical-align:top; padding:6px">\n    ${config.t('textPlaceholder')}\n  </td>\n  <td style="width:50%; vertical-align:top; padding:6px">\n    ${linkedImg}${caption}\n  </td>\n </tr>\n</table>\n\n`;
-        });
-      }
-    }
-
-    config.insertAtCursor(result, 'end');
-    if (config.onImageInserted) config.onImageInserted();
-
-    setImages(prev => prev.map(img => ({ ...img, selected: false })));
-    setPexelsResults(prev => prev.map(p => ({ ...p, selected: false })));
-  }, [galleryMode, images, pexelsResults, pexelsSettings, gridWithCaptions, singleCaptionAlign, imageInsertFormat, gridLayout, config]);
-
-  const uploadExternalImage = useCallback(async (url: string, fileName: string = 'image.jpg') => {
-    const hasKeychain = typeof window !== 'undefined' && !!(window as any).steem_keychain;
-    const uploadAuthType = imageUploadAccount 
-      ? 'VAULT' 
-      : (config.authType === 'VAULT' ? 'VAULT' : (hasKeychain ? 'KEYCHAIN' : 'VAULT'));
-    let activeUser = imageUploadAccount;
-    
-    if (!activeUser) {
-      if (uploadAuthType === 'VAULT') {
-        activeUser = config.selectedVaultUser || (config.vaultAccounts.length > 0 ? config.vaultAccounts[0] : '');
-      } else {
-        activeUser = config.username;
-      }
-    }
-    
-    if (!activeUser) {
-      if (uploadAuthType === 'VAULT') {
-        config.notify(config.t('needVaultAccount'), 'error');
-        config.setActiveModal('keys');
-        return;
-      } else {
-        const inputUser = await config.promptDialog(config.t('username'));
-        if (!inputUser) return;
-        activeUser = inputUser.replace('@', '').trim();
-        config.setUsername(activeUser);
-      }
-    }
-
-    if (uploadAuthType === 'VAULT' && SecurityService.isLocked()) {
-      let unlocked = false;
-      let pinErrorMsg = '';
-      while (!unlocked) {
-        const pass = await config.promptDialog(
-          pinErrorMsg ? `${config.t('pinError')} (${pinErrorMsg}). ${config.t('enterPin')}` : config.t('enterPin'),
-          '',
-          undefined,
-          'password'
-        );
-        if (!pass) return;
-        try {
-          config.setPubLog({ msg: config.t('verifyingPinMsg'), type: 'loading' });
-          await SecurityService.unlock(pass);
-          await config.initVault();
-          unlocked = true;
-          config.setPubLog({ msg: '', type: null });
-        } catch (e: any) {
-          pinErrorMsg = e.message || 'Incorrect PIN';
-          config.notify(`❌ ${pinErrorMsg}`, 'error');
-        }
-      }
-    } else if (uploadAuthType === 'KEYCHAIN') {
-      if (!(window as any).steem_keychain) {
-        config.notify(config.t('noKeychain'), 'error');
-        return;
-      }
-    }
-
-    setIsUploading(true);
-    config.setPubLog({ msg: config.t('preparingUpload').replace('{name}', fileName), type: 'loading' });
-    
-    try {
-      let blob: Blob;
-      try {
-        const res = await fetch(url);
-        if (!res.ok) throw new Error();
-        blob = await res.blob();
-      } catch {
-        config.setPubLog({ msg: config.t('proxyAttempt'), type: 'loading' });
-        const proxyUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`;
-        const res = await fetch(proxyUrl);
-        if (!res.ok) throw new Error(config.t('proxyError'));
-        blob = await res.blob();
-      }
-
-      const file = new File([blob], fileName, { type: blob.type });
-      const cleanUser = (activeUser || '').replace(/^@+/, '').trim();
-      let signature = '';
-      if (uploadAuthType === 'VAULT') {
-        const arrayBuffer = await blob.arrayBuffer();
-        const fileBuffer = Buffer.from(arrayBuffer);
-        const prefix = Buffer.from("ImageSigningChallenge", 'utf8');
-        const dataToSign = Buffer.concat([prefix, fileBuffer]);
-        signature = await SecurityService.signBuffer(dataToSign, cleanUser);
-      } else {
-        signature = await SecurityService.signImageChallengeWithKeychain(file, cleanUser);
-      }
-
-      const formData = new FormData();
-      formData.append("file", file);
-      const uploadUrl = `https://steemitimages.com/${cleanUser}/${signature}`;
-      let finalUrl = '';
-
-      // 1. Try Native HTTP if in Tauri, Neutralino, or Android
-      if (NativeHttpService.isNativeEnvironment()) {
-        const nativeRes = await NativeHttpService.tryUpload(file, uploadUrl, fileName);
-        if (nativeRes.handled && nativeRes.success && nativeRes.url) {
-          finalUrl = nativeRes.url;
-        }
-      }
-
-      // 2. Direct Web fetch (if not already handled natively)
-      if (!finalUrl) {
-        try {
-          const response = await fetch(uploadUrl, { method: "POST", body: formData });
-          if (response.ok) {
-            try {
-              const data = await response.json();
-              finalUrl = data.url || data.link || data.data?.url || '';
-            } catch {
-              // CORS blocked response JSON reading
-            }
-          }
-        } catch {
-          // Direct fetch failed; issue no-cors POST to deliver payload to server
-          try {
-            await fetch(uploadUrl, { method: "POST", body: formData, mode: "no-cors" });
-          } catch {
-            // ignore transport errors
-          }
-        }
-      }
-
-      // 3. Deterministic DOM Image probing (exempt from CORS read blocking)
-      if (!finalUrl) {
-        config.setPubLog({ msg: config.t('verifyingImage'), type: 'loading' });
-        const predicted = await findWorkingPredictedImageUrl(file, fileName);
-        if (predicted) {
-          finalUrl = predicted;
-        }
-      }
-
-      if (finalUrl) {
-        const newImg: ImageItem = { url: finalUrl, name: fileName, selected: false };
-        setImages(prev => [newImg, ...prev]);
-        setSourceInput(prev => finalUrl + "\n" + prev);
-      } else {
-        throw new Error('Image upload could not be verified on server');
-      }
-    } catch (err: any) {
-      console.error(err);
-      config.setPubLog({ msg: `❌ ${config.t('error')}: ${err.message}`, type: 'error' });
-    } finally {
-      setIsUploading(false);
-      setTimeout(() => config.setPubLog({ msg: '', type: null }), 3000);
-    }
-  }, [imageUploadAccount, config]);
-
-  const handleFileUpload = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const inputEl = e.target;
-    if (isUploading) {
-      if (inputEl) inputEl.value = '';
-      return;
-    }
-    
-    const rawFiles = inputEl?.files;
-    if (!rawFiles || rawFiles.length === 0) {
-      if (inputEl) inputEl.value = '';
-      return;
-    }
-    const files = Array.from(rawFiles);
-    
-    const hasKeychain = typeof window !== 'undefined' && !!(window as any).steem_keychain;
-    const uploadAuthType = imageUploadAccount 
-      ? 'VAULT' 
-      : (config.authType === 'VAULT' ? 'VAULT' : (hasKeychain ? 'KEYCHAIN' : 'VAULT'));
-    let activeUser = imageUploadAccount;
-    
-    if (!activeUser) {
-      if (uploadAuthType === 'VAULT') {
-        activeUser = config.selectedVaultUser || (config.vaultAccounts.length > 0 ? config.vaultAccounts[0] : '');
-      } else {
-        activeUser = config.username;
-      }
-    }
-    
-    if (!activeUser) {
-      if (inputEl) inputEl.value = '';
-      if (uploadAuthType === 'VAULT') {
-        config.notify(config.t('needVaultAccount'), 'error');
-        config.setActiveModal('keys');
-        return;
-      } else {
-        const inputUser = await config.promptDialog(config.t('username'));
-        if (!inputUser) return;
-        activeUser = inputUser.replace('@', '').trim();
-        config.setUsername(activeUser);
-      }
-    }
-
-    if (uploadAuthType === 'VAULT' && SecurityService.isLocked()) {
-      let unlocked = false;
-      let pinErrorMsg = '';
-      while (!unlocked) {
-        const pass = await config.promptDialog(
-          pinErrorMsg ? `${config.t('pinError')} (${pinErrorMsg}). ${config.t('enterPin')}` : config.t('enterPin'),
-          '',
-          undefined,
-          'password'
-        );
-        if (!pass) {
-          if (inputEl) inputEl.value = '';
-          return;
-        }
-        try {
-          config.setPubLog({ msg: config.t('verifyingPinMsg'), type: 'loading' });
-          await SecurityService.unlock(pass);
-          await config.initVault();
-          unlocked = true;
-          config.setPubLog({ msg: '', type: null });
-        } catch (e: any) {
-          pinErrorMsg = e.message || 'Incorrect PIN';
-          config.notify(`❌ ${pinErrorMsg}`, 'error');
-        }
-      }
-    } else if (uploadAuthType === 'KEYCHAIN') {
-      if (!(window as any).steem_keychain) {
-        if (inputEl) inputEl.value = '';
-        config.notify(config.t('noKeychain'), 'error');
-        return;
-      }
-    }
-
-    setIsUploading(true);
-    let successCount = 0;
-    
-    const uploadVaultWithProgress = async (file: File, signature: string, user: string, index: number): Promise<any> => {
-      const uploadUrl = `https://steemitimages.com/${user}/${signature}`;
-
-      // 1. Try Native HTTP if in Tauri, Neutralino, or Android
-      if (NativeHttpService.isNativeEnvironment()) {
-        const nativeRes = await NativeHttpService.tryUpload(file, uploadUrl, file.name);
-        if (nativeRes.handled && nativeRes.success && nativeRes.url) {
-          return { url: nativeRes.url };
-        }
-      }
-
-      // 2. Direct Web XHR with progress
-      return new Promise((resolve, reject) => {
-        let isSettled = false;
-        const safeReject = (err: Error) => {
-          if (!isSettled) {
-            isSettled = true;
-            reject(err);
-          }
-        };
-        const safeResolve = (val: any) => {
-          if (!isSettled) {
-            isSettled = true;
-            resolve(val);
-          }
-        };
-
-        const formData = new FormData();
-        formData.append("file", file);
-        const xhr = new XMLHttpRequest();
-        xhr.open("POST", uploadUrl);
-        xhr.upload.onprogress = (e) => {
-          if (e.lengthComputable) {
-            const percent = Math.round((e.loaded / e.total) * 100);
-            config.setPubLog({ 
-               msg: config.t('uploadProgress')
-                .replace('{current}', (index + 1).toString())
-                .replace('{total}', files.length.toString())
-                .replace('{name}', `${file.name} (${percent}%)`), 
-              type: 'loading' 
-            });
-          }
-        };
-        xhr.onload = () => {
-          if (xhr.status >= 200 && xhr.status < 300) {
-            try {
-              const parsed = JSON.parse(xhr.responseText);
-              if (parsed.success === false || parsed.error) {
-                const errMsg = parsed.error?.message || parsed.error?.name || parsed.message || (typeof parsed.error === 'string' ? parsed.error : 'Image host rejected signature');
-                safeReject(new Error(`${config.t('serverError')}: ${errMsg}`));
-                return;
-              }
-              safeResolve(parsed);
-            } catch {
-              safeReject(new Error(`Invalid JSON response: ${xhr.responseText ? xhr.responseText.substring(0, 100) : 'empty'}`));
-            }
-          } else {
-            let errorDetail: string;
-            try {
-              const errParsed = JSON.parse(xhr.responseText);
-              errorDetail = errParsed.error?.message || errParsed.error?.name || errParsed.message || (typeof errParsed.error === 'string' ? errParsed.error : '');
-            } catch {
-              errorDetail = xhr.responseText ? xhr.responseText.substring(0, 100) : '';
-            }
-            safeReject(new Error(`${config.t('serverError')}: ${xhr.status}${errorDetail ? ` (${errorDetail})` : ''}`));
-          }
-        };
-        xhr.onerror = async () => {
-          // If browser blocked XHR response due to missing CORS headers, attempt no-cors + DOM Image probe
-          try {
-            await fetch(uploadUrl, { method: "POST", body: formData, mode: "no-cors" });
-            const predicted = await findWorkingPredictedImageUrl(file, file.name);
-            if (predicted) {
-              safeResolve({ url: predicted });
-              return;
-            }
-          } catch {
-            // ignore
-          }
-          safeReject(new Error("Network connection error"));
-        };
-        xhr.onabort = () => safeReject(new Error("Upload aborted"));
-        xhr.ontimeout = () => safeReject(new Error("Upload timed out (60s)"));
-        xhr.timeout = 60000;
-        xhr.send(formData);
-      });
-    };
-
-    try {
-      const cleanUser = (activeUser || '').replace(/^@+/, '').trim();
-      for (let i = 0; i < files.length; i++) {
-        const originalFile = files[i];
-        const sanitizedName = sanitizeFilename(originalFile.name);
-        const file = new File([originalFile], sanitizedName, { type: originalFile.type });
-        
-        if (i > 0) await new Promise(resolve => setTimeout(resolve, 400));
-
-        try {
-          const exifTable = await getExifTableFromBlob(originalFile);
-
-          let signature = '';
-          if (uploadAuthType === 'VAULT') {
-            const arrayBuffer = await file.arrayBuffer();
-            const fileBuffer = Buffer.from(arrayBuffer);
-            const prefix = Buffer.from("ImageSigningChallenge", 'utf8');
-            const dataToSign = Buffer.concat([prefix, fileBuffer]);
-            
-            let attempt = 0;
-            let uploaded = false;
-            let lastErr: any = null;
-            while (attempt < 3 && !uploaded) {
-              attempt++;
-              try {
-                config.setPubLog({ 
-                  msg: `[${i + 1}/${files.length}] ` + config.t('signingImage').replace('{name}', file.name) + (attempt > 1 ? config.t('signingImageAttempt').replace('{attempt}', attempt.toString()) : ''), 
-                  type: 'loading' 
-                });
-                signature = await SecurityService.signBuffer(dataToSign, cleanUser);
-                const data = await uploadVaultWithProgress(file, signature, cleanUser, i);
-                const url = data.url || data.link || data.data?.url;
-                if (url) {
-                  setImages(prev => [
-                    ...prev.slice(0, i),
-                    { url, name: file.name, selected: false, exif: exifTable },
-                    ...prev.slice(i)
-                  ]);
-                  setSourceInput(prev => url + "\n" + prev);
-                  successCount++;
-                  uploaded = true;
-                  if (i === 0) {
-                    insertImage(url, file.name, 'plain');
-                  }
-                } else {
-                  const errMsg = data.error?.message || data.error?.name || data.message || (typeof data.error === 'string' ? data.error : 'No URL returned from image host');
-                  throw new Error(errMsg);
-                }
-              } catch (err: any) {
-                lastErr = err;
-                console.warn(`Upload attempt ${attempt} failed for ${file.name}:`, err);
-                if (attempt >= 3) throw lastErr;
-                config.setPubLog({
-                  msg: config.t('uploadRetryAttempt')
-                    .replace('{attempt}', attempt.toString())
-                    .replace('{error}', err.message || config.t('error'))
-                    .replace('{seconds}', (attempt * 1.5).toString()),
-                  type: 'loading'
-                });
-                await new Promise(r => setTimeout(r, 1500 * attempt));
-              }
-            }
-          } else {
-            config.setPubLog({ 
-              msg: `[${i + 1}/${files.length}] ` + config.t('uploadProgress').replace('{current}', (i + 1).toString()).replace('{total}', files.length.toString()).replace('{name}', file.name), 
-              type: 'loading' 
-            });
-
-            signature = await SecurityService.signImageChallengeWithKeychain(file, cleanUser);
-            
-            const formData = new FormData();
-            formData.append("file", file);
-            const uploadEndpoint = `https://steemitimages.com/${cleanUser}/${signature}`;
-            let url = '';
-
-            // 1. Try Native HTTP if in Tauri, Neutralino, or Android
-            if (NativeHttpService.isNativeEnvironment()) {
-              const nativeRes = await NativeHttpService.tryUpload(file, uploadEndpoint, file.name);
-              if (nativeRes.handled && nativeRes.success && nativeRes.url) {
-                url = nativeRes.url;
-              }
-            }
-
-            if (!url) {
-              try {
-                const resp = await fetch(uploadEndpoint, { method: "POST", body: formData });
-                if (resp.ok) {
-                  try {
-                    const data = await resp.json();
-                    url = data.url || data.link || data.data?.url || '';
-                  } catch {
-                    // Browser CORS blocked response JSON reading
-                  }
-                }
-              } catch {
-                // Direct CORS fetch failed; issue no-cors POST so browser transmits file payload to server
-                try {
-                  await fetch(uploadEndpoint, { method: "POST", body: formData, mode: "no-cors" });
-                } catch {
-                  // Ignore no-cors transport errors
-                }
-              }
-            }
-
-            // Probe predicted candidate URLs using non-CORS Image DOM elements
-            if (!url) {
-              config.setPubLog({ 
-                msg: `[${i + 1}/${files.length}] ` + config.t('verifyingImage'), 
-                type: 'loading' 
-              });
-              const predicted = await findWorkingPredictedImageUrl(file, file.name);
-              if (predicted) {
-                url = predicted;
-              }
-            }
-
-            if (url) {
-              setImages(prev => [
-                ...prev.slice(0, i),
-                { url, name: file.name, selected: false, exif: exifTable },
-                ...prev.slice(i)
-              ]);
-              setSourceInput(prev => url + "\n" + prev);
-              successCount++;
-              if (i === 0) {
-                insertImage(url, file.name, 'plain');
-              }
-            } else {
-              throw new Error('Image could not be verified on server');
-            }
-          }
-        } catch (err: any) {
-          console.error(`Error uploading file ${file.name}:`, err);
-          config.setPubLog({ 
-            msg: config.t('fileErrorWithIndex')
-              .replace('{index}', (i + 1).toString())
-              .replace('{name}', file.name)
-              .replace('{error}', err.message), 
-            type: 'error' 
-          });
-          await new Promise(resolve => setTimeout(resolve, 2500));
-        }
-      }
-    } finally {
-      if (inputEl) inputEl.value = '';
-      setIsUploading(false);
-      if (successCount > 0) {
-        config.setPubLog({ 
-          msg: config.t('uploadComplete').replace('{count}', successCount.toString()).replace('{total}', files.length.toString()), 
-          type: 'success' 
-        });
-        setTimeout(() => config.setPubLog({ msg: '', type: null }), 3000);
-        if (files.length > 1) {
-          config.setIsMiniGalleryOpen(true);
-        }
-      } else {
-        setTimeout(() => config.setPubLog({ msg: '', type: null }), 3000);
-      }
-    }
-  }, [imageUploadAccount, config, isUploading, getExifTableFromBlob, insertImage]);
+  // 4. Image Upload Pipeline Hook
+  const uploadPipeline = useImageUploadPipeline({
+    t: config.t,
+    notify: config.notify,
+    promptDialog: config.promptDialog,
+    setActiveModal: config.setActiveModal,
+    initVault: config.initVault,
+    setPubLog: config.setPubLog,
+    username: config.username,
+    setUsername: config.setUsername,
+    selectedVaultUser: config.selectedVaultUser,
+    vaultAccounts: config.vaultAccounts,
+    setIsMiniGalleryOpen: config.setIsMiniGalleryOpen,
+    authType: config.authType,
+    setImages,
+    setSourceInput,
+    insertImage: layoutMarkup.insertImage,
+  });
 
   return {
     images,
@@ -1035,50 +185,58 @@ export function useSteemGallery(config: SteemGalleryConfig) {
     setSourceInput,
     isGalleryCollapsed,
     setIsGalleryCollapsed,
-    galleryMode,
-    setGalleryMode,
     galleryView,
     setGalleryView,
-    gallerySearch,
-    setGallerySearch,
-    isSearchingPexels,
-    setIsSearchingPexels,
-    pexelsResults,
-    setPexelsResults,
-    pexelsPage,
-    setPexelsPage,
-    isTrafficOptimized,
-    setIsTrafficOptimized,
-    isGallerySettingsCollapsed,
-    setIsGallerySettingsCollapsed,
-    gridLayout,
-    setGridLayout,
-    gridWithCaptions,
-    setGridWithCaptions,
-    singleCaptionAlign,
-    setSingleCaptionAlign,
-    isTextWrapEnabled,
-    setIsTextWrapEnabled,
-    isExifEnabled,
-    setIsExifEnabled,
-    imageInsertFormat,
-    setImageInsertFormat,
-    isUploading,
-    setIsUploading,
-    imageUploadAccount,
-    setImageUploadAccount,
-    pexelsSettings,
-    setPexelsSettings,
     filteredLocalImages,
     parseImages,
     toggleImageSelection,
     moveImageLocal,
-    toggleGalleryMode,
-    handleExternalSearch,
-    insertExternalImage,
-    insertImage,
-    insertGrid,
-    uploadExternalImage,
-    handleFileUpload
+
+    // From stockPhotos
+    galleryMode: stockPhotos.galleryMode,
+    setGalleryMode: stockPhotos.setGalleryMode,
+    gallerySearch: stockPhotos.gallerySearch,
+    setGallerySearch: stockPhotos.setGallerySearch,
+    isSearchingPexels: stockPhotos.isSearchingPexels,
+    setIsSearchingPexels: stockPhotos.setIsSearchingPexels,
+    pexelsResults: stockPhotos.pexelsResults,
+    setPexelsResults: stockPhotos.setPexelsResults,
+    pexelsPage: stockPhotos.pexelsPage,
+    setPexelsPage: stockPhotos.setPexelsPage,
+    isTrafficOptimized: stockPhotos.isTrafficOptimized,
+    setIsTrafficOptimized: stockPhotos.setIsTrafficOptimized,
+    pexelsSettings: stockPhotos.pexelsSettings,
+    setPexelsSettings: stockPhotos.setPexelsSettings,
+    toggleGalleryMode: stockPhotos.toggleGalleryMode,
+    handleExternalSearch: stockPhotos.handleExternalSearch,
+
+    // From layoutMarkup
+    isGallerySettingsCollapsed: layoutMarkup.isGallerySettingsCollapsed,
+    setIsGallerySettingsCollapsed: layoutMarkup.setIsGallerySettingsCollapsed,
+    gridLayout: layoutMarkup.gridLayout,
+    setGridLayout: layoutMarkup.setGridLayout,
+    gridWithCaptions: layoutMarkup.gridWithCaptions,
+    setGridWithCaptions: layoutMarkup.setGridWithCaptions,
+    singleCaptionAlign: layoutMarkup.singleCaptionAlign,
+    setSingleCaptionAlign: layoutMarkup.setSingleCaptionAlign,
+    isTextWrapEnabled: layoutMarkup.isTextWrapEnabled,
+    setIsTextWrapEnabled: layoutMarkup.setIsTextWrapEnabled,
+    imageInsertFormat: layoutMarkup.imageInsertFormat,
+    setImageInsertFormat: layoutMarkup.setImageInsertFormat,
+    shortenName: layoutMarkup.shortenName,
+    insertExternalImage: layoutMarkup.insertExternalImage,
+    insertImage: layoutMarkup.insertImage,
+    insertGrid: layoutMarkup.insertGrid,
+
+    // From uploadPipeline
+    isUploading: uploadPipeline.isUploading,
+    setIsUploading: uploadPipeline.setIsUploading,
+    imageUploadAccount: uploadPipeline.imageUploadAccount,
+    setImageUploadAccount: uploadPipeline.setImageUploadAccount,
+    isExifEnabled: uploadPipeline.isExifEnabled,
+    setIsExifEnabled: uploadPipeline.setIsExifEnabled,
+    getExifTableFromBlob: uploadPipeline.getExifTableFromBlob,
+    uploadExternalImage: uploadPipeline.uploadExternalImage,
+    handleFileUpload: uploadPipeline.handleFileUpload,
   };
 }

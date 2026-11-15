@@ -89,9 +89,7 @@ export interface SettingsModalProps {
   pexelsSettings: any;
   setPexelsSettings: React.Dispatch<React.SetStateAction<any>>;
   images: ImageItem[];
-  clearAllImages?: () => void;
   templates: Template[];
-  clearAllTemplates?: () => void;
   handleClearCache: () => void;
   // Vault
   isUnlocked: boolean;

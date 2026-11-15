@@ -51,12 +51,14 @@ import { IconButton } from '../common/IconButton';
 import { ShieldUserIcon } from '../common/ShieldUserIcon';
 import { AVAILABLE_LANGUAGES } from '../../locales';
 import { useEditorStore } from '../../store';
+import { useAppUIStore } from '../../stores/useAppUIStore';
+import { useModalStore } from '../../stores/useModalStore';
 
 export interface HeaderProps {
-  setIsSMenuOpen: (open: boolean) => void;
+  setIsSMenuOpen?: (open: boolean) => void;
   visualStyle: 'standard' | 'neon';
-  activeView: string;
-  setActiveView: (view: any) => void;
+  activeView?: string;
+  setActiveView?: (view: any) => void;
   editorMode: string;
   toolsMap?: Record<string, { label: string | React.ReactNode; action: (e?: React.MouseEvent) => void }>;
   // Format actions & states
@@ -68,11 +70,9 @@ export interface HeaderProps {
   saveDraft: () => void;
   downloadFile: () => void;
   insertAtCursor: (text: string, selectionMode?: 'end' | 'select') => void;
-  saveFirst?: () => void;
-  activeFormats: any;
+  activeFormats?: any;
   // Collections & Drafts
   templates: any[];
-  drafts?: any[];
   mentions: any[];
   queue: any[];
   setPubTitle: (t: string) => void;
@@ -102,8 +102,8 @@ export interface HeaderProps {
   showMobileTools2: boolean;
   setShowMobileTools2: (open: boolean) => void;
   // App & Editor Refs / Helpers
-  setActiveModal: (modal: any) => void;
-  setSettingsTab: (tab: any) => void;
+  setActiveModal?: (modal: any) => void;
+  setSettingsTab?: (tab: any) => void;
   isPwaInstalled: boolean;
   handleInstallPwa: () => void;
   getMotionConfig: () => any;
@@ -111,7 +111,7 @@ export interface HeaderProps {
   wysiwygRef: React.RefObject<any>;
   isSyncingRef: React.MutableRefObject<boolean>;
   getMarked: () => any;
-  setContent: (content: string) => void;
+  setContent?: (content: string) => void;
   confirmDialog: (options: any) => Promise<boolean>;
   updateWysiwygEmptyStatus: (ref: any) => void;
   isTauriEnv: () => boolean;
@@ -120,11 +120,19 @@ export interface HeaderProps {
 }
 
 export const Header: React.FC<HeaderProps> = (props) => {
+  const storeActiveView = useAppUIStore(s => s.activeView);
+  const storeSetActiveView = useAppUIStore(s => s.setActiveView);
+  const storeSetSettingsTab = useAppUIStore(s => s.setSettingsTab);
+  const storeActiveFormats = useEditorStore(s => s.activeFormats);
+  const storeSetContent = useEditorStore(s => s.setContent);
+  const storeSetActiveModal = useModalStore(s => s.setActiveModal);
+  const storeSetIsSMenuOpen = useModalStore(s => s.setIsSMenuOpen);
+
   const {
-    setIsSMenuOpen,
+    setIsSMenuOpen = storeSetIsSMenuOpen,
     visualStyle,
-    activeView,
-    setActiveView,
+    activeView = storeActiveView,
+    setActiveView = storeSetActiveView,
     editorMode,
     fmt,
     fmtLine,
@@ -134,7 +142,7 @@ export const Header: React.FC<HeaderProps> = (props) => {
     saveDraft,
     downloadFile,
     insertAtCursor,
-    activeFormats,
+    activeFormats = storeActiveFormats,
     setPubTitle,
     setPubTags,
     setCurrentDraftId,
@@ -158,8 +166,8 @@ export const Header: React.FC<HeaderProps> = (props) => {
     setShowMobileTools1,
     showMobileTools2,
     setShowMobileTools2,
-    setActiveModal,
-    setSettingsTab,
+    setActiveModal = storeSetActiveModal,
+    setSettingsTab = storeSetSettingsTab,
     isPwaInstalled,
     handleInstallPwa,
     getMotionConfig,
@@ -167,7 +175,7 @@ export const Header: React.FC<HeaderProps> = (props) => {
     wysiwygRef,
     isSyncingRef,
     getMarked,
-    setContent,
+    setContent = storeSetContent,
     confirmDialog,
     updateWysiwygEmptyStatus,
     isTauriEnv,
@@ -239,7 +247,10 @@ export const Header: React.FC<HeaderProps> = (props) => {
           <div className="flex items-center gap-1 sm:gap-2">
             <button 
               id="header-logo-button"
-              onClick={() => setIsSMenuOpen(true)}
+              onClick={() => {
+                setIsSMenuOpen?.(true);
+                storeSetIsSMenuOpen(true);
+              }}
               className="w-8 h-8 sm:w-9 sm:h-9 bg-gradient-to-br from-cyan-500 to-blue-600 rounded-lg sm:rounded-xl flex items-center justify-center text-white font-black shrink-0 shadow-lg shadow-cyan-500/20 hover:scale-105 active:scale-95 transition-all text-base sm:text-xl"
             >
               <span className={cn("logo-s", visualStyle === 'neon' && "neon-icon-glow")}>S</span>

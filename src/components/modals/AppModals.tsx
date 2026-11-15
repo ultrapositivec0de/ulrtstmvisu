@@ -19,6 +19,7 @@ import { QueueModal } from './QueueModal';
 import { TableImportModal } from './TableImportModal';
 import { SettingsModal } from './SettingsModal';
 import { PwaInstructionsModal } from './PwaInstructionsModal';
+import { useModalStore } from '../../stores/useModalStore';
 
 export interface AppModalsProps {
   activeModal: string | null;
@@ -201,6 +202,9 @@ export interface AppModalsProps {
 }
 
 export const AppModals: React.FC<AppModalsProps> = (props) => {
+  const storeIsSMenuOpen = useModalStore(s => s.isSMenuOpen);
+  const storeSetIsSMenuOpen = useModalStore(s => s.setIsSMenuOpen);
+
   const {
     activeModal,
     setActiveModal,
@@ -569,8 +573,11 @@ export const AppModals: React.FC<AppModalsProps> = (props) => {
 
         <QuickStyleMenu
           key="modal-quick-style"
-          isOpen={isSMenuOpen}
-          onClose={() => setIsSMenuOpen(false)}
+          isOpen={isSMenuOpen || storeIsSMenuOpen}
+          onClose={() => {
+            setIsSMenuOpen(false);
+            storeSetIsSMenuOpen(false);
+          }}
           themeColor={themeColor}
           setThemeColor={setThemeColor}
           themes={activeAssortment}

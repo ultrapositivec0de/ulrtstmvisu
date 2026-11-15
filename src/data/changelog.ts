@@ -6,35 +6,47 @@ export interface ChangelogEntry {
 
 export const APP_CHANGELOG: ChangelogEntry[] = [
   {
+    version: "v4.8.11",
+    date: "2026-11-14",
+    changes: [
+      "Модульна декомпозиція App.tsx (~1740 → ~330 рядків): винесено AppWorkspaceHost, композитні хуки та ізольовані екрани робочого простору.",
+      "Уніфікація стану в Zustand (useEditorStore, useAppUIStore, useModalStore, useReaderStore): усунено розщеплення станів (activeFormats, settingsTab, перемикачі редактора) та виправлено ключі localStorage.",
+      "Відновлення інтеграцій після рефакторингу: меню логотипа (QuickStyleMenu), вставка тексту/HTML і зображень у візуальному режимі, кнопка таблиць (TableSelectorPopup) та стан міні-галереї.",
+      "Оптимізація введення та виділення в Markdown (CodeEditor.tsx): усунуто зайві ре-рендери та reflow, розділено таймери тексту й курсора, стабілізовано ref-колбек для безперебійного набору й виділення протягуванням."
+    ]
+  },
+  {
     version: "v4.8.10",
     date: "2026-11-06",
     changes: [
-      "Crystal Bell (FM Synthesis) Acoustic Refinement: Integrated master studio dynamics compressor and limiter to prevent high-frequency intermodulation distortion; implemented acoustic register differentiation across octaves (C4–E4 singing bowl resonance, G4–C5 singing bell, D5–C6 crystal chime with airy 2.76x harmonic sparkle) and dynamic FM modulation envelope.",
-      "Organic Water Drops (Liquid Cavitation Model): Replaced mechanical tone sweep with physical dual-formant cavity resonance (1.48x secondary harmonic), non-linear pitch rise with soft bubble detachment tail, and warm 2800 Hz low-pass filtering for soft, organic droplet acoustics.",
-      "Authentic Geiger Counter Radiation Clicks: Replaced tonal oscillation with ultra-short (2.5–3.5 ms) electrostatic ionization discharge micro-spikes and bandpass filtering (4800–6500 Hz) for genuine dry Geiger-Müller counter clicks.",
-      "Master Audio Pipeline Anti-Clipping: Added studio-grade DynamicsCompressorNode to master bus for pristine polyphonic voice summation during rapid typing.",
-      "Cross-Platform Release Synchronization: Synchronized version across package.json, Tauri, Cargo.toml, Service Worker cache, metadata, and application settings."
+      "Автономна система Undo/Redo на базі useHistoryStore (Zustand) із відновленням позиції курсора/виділення та сенсорними кнопками у TamedWidget.",
+      "Стандартизація UI і модальних вікон (BaseModal, глобальні CSS-токени поверхонь та шарів), виправлення позиціонування поповерів (AudioControlWidget, меню інтервалів) і мобільної клавіатури.",
+      "Повна мультимовна локалізація на 4 мови (uk, en, es, ko) через єдині словники src/locales/ для редактора, модалок, рідера, Doc Reader та аудіо-пресетів.",
+      "Удосконалення режиму читання документів (DocReader): зміст (TOC), панель джерел, меню налаштувань та кешування рендеру."
     ]
   },
   {
     version: "v4.8.9",
     date: "2026-10-28",
     changes: [
-      "Cross-platform release synchronization and system improvements."
+      "Модульна декомпозиція Steem Reader: виділено ReaderFeedView, ReaderCurationView, ReaderSettingsView, PostRenderer, CommentItem та централізовано дії голосування/коментарів у useReaderStore.",
+      "Оптимізація пайплайну зображень SteemitImages із детермінованим мультихеш-прогнозом (steemImagePrediction) та стабілізацією галереї."
     ]
   },
   {
     version: "v4.8.8",
     date: "2026-10-24",
     changes: [
-      "Reader feed UX optimization, post editing preservation on broadcast, mobile bottom bar with 5-action layout and quick controls sheet, safe-area statusbar inbox overlay, and whitelist/blacklist input improvements."
+      "Оптимізація стрічки Reader та збереження стану редагування поста під час публікації (broadcast).",
+      "Мобільна нижня панель ReaderMobileBottomBar (5 дій і панель швидких налаштувань), коректний оверлей інбоксу в safe-area та покращення фільтрів whitelist/blacklist."
     ]
   },
   {
     version: "v4.8.7",
     date: "2026-10-12",
     changes: [
-      "Cross-platform release synchronization and system improvements."
+      "Покращення мобільної взаємодії, відступів панелей і адаптивного масштабування інтерфейсу.",
+      "Посилення санітизації та парсингу таблиць/цитат і вирівнювання форматування списків між Markdown та візуальним режимом."
     ]
   },
   {

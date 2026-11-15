@@ -11,15 +11,13 @@ export const isNeutralinoEnv = () =>
 
 export interface UseAppUIOptions {
   showTableSelector?: boolean;
-  setShowTableSelector?: (show: boolean) => void;
+  setShowTableSelector?: (show: boolean | ((prev: boolean) => boolean)) => void;
   isWidgetMenuOpen?: boolean;
   setIsWidgetMenuOpen?: (open: boolean) => void;
 }
 
 export function useAppUI(options: UseAppUIOptions = {}) {
   const {
-    showTableSelector = false,
-    setShowTableSelector,
     isWidgetMenuOpen = false,
     setIsWidgetMenuOpen,
   } = options;
@@ -29,6 +27,11 @@ export function useAppUI(options: UseAppUIOptions = {}) {
   // Zustand stores as single source of truth
   const activeModal = useModalStore((s) => s.activeModal);
   const setActiveModal = useModalStore((s) => s.setActiveModal);
+  const storeShowTableSelector = useModalStore((s) => s.isTableSelectorOpen);
+  const storeSetShowTableSelector = useModalStore((s) => s.setIsTableSelectorOpen);
+  const showTableSelector = options.showTableSelector ?? storeShowTableSelector;
+  const setShowTableSelector = options.setShowTableSelector ?? storeSetShowTableSelector;
+
   const activeView = useAppUIStore((s) => s.activeView);
   const setActiveView = useAppUIStore((s) => s.setActiveView);
   const isSidebarOpen = useAppUIStore((s) => s.isSidebarOpen);
@@ -38,6 +41,8 @@ export function useAppUI(options: UseAppUIOptions = {}) {
   const isEditorFullScreen = useAppUIStore((s) => s.isEditorFullScreen);
   const setIsEditorFullScreen = useAppUIStore((s) => s.setIsEditorFullScreen);
   const toggleEditorFullScreen = useAppUIStore((s) => s.toggleEditorFullScreen);
+  const settingsTab = useAppUIStore((s) => s.settingsTab);
+  const setSettingsTab = useAppUIStore((s) => s.setSettingsTab);
 
   // Sync sidebar open state with desktop layout so it is never lost on PC
   useEffect(() => {
@@ -210,6 +215,8 @@ export function useAppUI(options: UseAppUIOptions = {}) {
   return {
     activeModal,
     setActiveModal,
+    showTableSelector,
+    setShowTableSelector,
     activeView,
     setActiveView,
     isSidebarOpen,
@@ -220,6 +227,8 @@ export function useAppUI(options: UseAppUIOptions = {}) {
     setIsEditorFullScreen,
     toggleFullScreen,
     toggleEditorFullScreen,
+    settingsTab,
+    setSettingsTab,
     isTauriEnv,
     isNeutralinoEnv,
   };

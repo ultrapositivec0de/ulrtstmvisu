@@ -11,7 +11,7 @@ import { Language } from '../../types';
 export interface EditorScreenProps {
   isVisible: boolean;
   sidebarProps: SidebarProps;
-  editorPaneProps: EditorPaneProps;
+  editorPaneProps?: EditorPaneProps;
 
   // Layout & UI
   isEditorFullScreen: boolean;
@@ -23,11 +23,11 @@ export interface EditorScreenProps {
   previewPaneRef: React.RefObject<HTMLDivElement | null>;
   activeMobileTab: 'editor' | 'preview';
   setActiveMobileTab: (tab: 'editor' | 'preview') => void;
-  isLivePreviewEnabled: boolean;
-  toggleLivePreview: () => void;
-  syncScrollEnabled: boolean;
-  setSyncScrollEnabled: (enabled: boolean | ((prev: boolean) => boolean)) => void;
-  toggleFullScreen: () => void;
+  isLivePreviewEnabled?: boolean;
+  toggleLivePreview?: () => void;
+  syncScrollEnabled?: boolean;
+  setSyncScrollEnabled?: (enabled: boolean | ((prev: boolean) => boolean)) => void;
+  toggleFullScreen?: () => void;
   widgetPos: string;
   lang: Language;
   pubTitle: string;
@@ -90,7 +90,7 @@ export const EditorScreen: React.FC<EditorScreenProps> = ({
         >
           <div className="flex-1 flex overflow-hidden">
             {/* Markdown / Visual / Reader Editor Pane */}
-            <EditorPane {...editorPaneProps} />
+            <EditorPane {...(editorPaneProps || ({} as EditorPaneProps))} />
 
             {/* Preview Pane */}
             <PreviewPane

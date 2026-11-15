@@ -1,4 +1,4 @@
-import React, { forwardRef, useEffect, useRef } from 'react';
+import React, { forwardRef, useCallback, useEffect, useRef } from 'react';
 import { useEditorStore, getRowColFromOffset } from '../store';
 import { calculateVisibleEditorHeight, getExactCaretYInTextarea } from '../lib/viewportLayout';
 
@@ -14,82 +14,113 @@ interface CodeEditorProps extends React.TextareaHTMLAttributes<HTMLTextAreaEleme
 }
 
 export const CodeEditor = forwardRef<HTMLTextAreaElement, CodeEditorProps>((props, ref) => {
-  const content = useEditorStore((state) => state.content);
-  const selectionStart = useEditorStore((state) => state.selectionStart);
-  const selectionEnd = useEditorStore((state) => state.selectionEnd);
+  const initialState = useEditorStore.getState();
+  const initialContentRef = useRef(initialState.content);
 
-  const syncTimeoutRef = useRef<any>(null);
-  const localSaveTimeoutRef = useRef<any>(null);
+  const syncContentTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const syncCursorTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const localSaveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const caretRafRef = useRef<number | null>(null);
+  const caretThrottleTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const lastCaretCheckTimeRef = useRef<number>(0);
 
-  const latestContentRef = useRef(content);
-  const latestSelectionStartRef = useRef(selectionStart);
-  const latestSelectionEndRef = useRef(selectionEnd);
-
-  useEffect(() => {
-    if (localRef.current && localRef.current.value !== content) {
-      const prevStart = localRef.current.selectionStart;
-      const prevEnd = localRef.current.selectionEnd;
-      localRef.current.value = content;
-      if (document.activeElement === localRef.current && prevStart !== null && prevEnd !== null) {
-        const safeStart = Math.min(prevStart, content.length);
-        const safeEnd = Math.min(prevEnd, content.length);
-        localRef.current.setSelectionRange(safeStart, safeEnd);
-      }
-    }
-    latestContentRef.current = content;
-  }, [content]);
-
-  useEffect(() => {
-    latestSelectionStartRef.current = selectionStart;
-  }, [selectionStart]);
-
-  useEffect(() => {
-    latestSelectionEndRef.current = selectionEnd;
-  }, [selectionEnd]);
+  const latestContentRef = useRef(initialState.content);
+  const latestSelectionStartRef = useRef(initialState.selectionStart);
+  const latestSelectionEndRef = useRef(initialState.selectionEnd);
 
   // Use a local ref if an external one is not provided, or merge them.
   // To keep it simple, we'll assume the parent always passes a ref.
   const localRef = React.useRef<HTMLTextAreaElement | null>(null);
-  
-  const handleRef = (el: HTMLTextAreaElement | null) => {
-    localRef.current = el;
-    if (el) {
-      const storeState = useEditorStore.getState();
-      const sStart = storeState.selectionStart;
-      const sEnd = storeState.selectionEnd;
-      if (typeof sStart === 'number' && typeof sEnd === 'number') {
-        try {
-          el.setSelectionRange(sStart, sEnd);
-        } catch {
-          // ignore
+  const hydratedElementRef = useRef<HTMLTextAreaElement | null>(null);
+
+  useEffect(() => {
+    const unsubscribe = useEditorStore.subscribe((state, prevState) => {
+      if (state.content !== prevState.content) {
+        if (localRef.current && localRef.current.value !== state.content) {
+          const prevStart = localRef.current.selectionStart;
+          const prevEnd = localRef.current.selectionEnd;
+          localRef.current.value = state.content;
+          if (document.activeElement === localRef.current && prevStart !== null && prevEnd !== null) {
+            const safeStart = Math.min(prevStart, state.content.length);
+            const safeEnd = Math.min(prevEnd, state.content.length);
+            localRef.current.setSelectionRange(safeStart, safeEnd);
+          }
+        }
+        latestContentRef.current = state.content;
+      }
+
+      if (state.selectionStart !== prevState.selectionStart || state.selectionEnd !== prevState.selectionEnd) {
+        latestSelectionStartRef.current = state.selectionStart;
+        latestSelectionEndRef.current = state.selectionEnd;
+
+        if (
+          localRef.current &&
+          document.activeElement !== localRef.current &&
+          state.selectionStart !== null &&
+          state.selectionEnd !== null &&
+          state.selectionStart !== undefined &&
+          state.selectionEnd !== undefined
+        ) {
+          if (
+            localRef.current.selectionStart !== state.selectionStart ||
+            localRef.current.selectionEnd !== state.selectionEnd
+          ) {
+            localRef.current.setSelectionRange(state.selectionStart, state.selectionEnd);
+          }
         }
       }
+    });
+    return unsubscribe;
+  }, []);
+
+  const handleRef = useCallback((el: HTMLTextAreaElement | null) => {
+    localRef.current = el;
+    if (el) {
+      if (hydratedElementRef.current !== el) {
+        hydratedElementRef.current = el;
+        const storeState = useEditorStore.getState();
+        if (el.value !== storeState.content) {
+          el.value = storeState.content;
+        }
+        latestContentRef.current = el.value;
+        const sStart = storeState.selectionStart;
+        const sEnd = storeState.selectionEnd;
+        if (typeof sStart === 'number' && typeof sEnd === 'number') {
+          try {
+            const maxLen = el.value.length;
+            el.setSelectionRange(Math.min(Math.max(0, sStart), maxLen), Math.min(Math.max(0, sEnd), maxLen));
+          } catch {
+            // ignore
+          }
+        }
+      }
+    } else {
+      hydratedElementRef.current = null;
     }
+
     if (typeof ref === 'function') {
       ref(el);
     } else if (ref) {
       ref.current = el;
     }
-  };
-
-  React.useEffect(() => {
-    if (!localRef.current) return;
-    if (selectionStart !== null && selectionEnd !== null && selectionStart !== undefined && selectionEnd !== undefined) {
-      if (localRef.current.selectionStart !== selectionStart || localRef.current.selectionEnd !== selectionEnd) {
-        localRef.current.setSelectionRange(selectionStart, selectionEnd);
-      }
-    }
-  }, [selectionStart, selectionEnd]);
+  }, [ref]);
 
   // Flush any pending/debounced changes to the store immediately
   const flushChanges = (target: HTMLTextAreaElement) => {
-    if (syncTimeoutRef.current) {
-      clearTimeout(syncTimeoutRef.current);
-      syncTimeoutRef.current = null;
+    if (syncContentTimeoutRef.current) {
+      clearTimeout(syncContentTimeoutRef.current);
+      syncContentTimeoutRef.current = null;
+    }
+    if (syncCursorTimeoutRef.current) {
+      clearTimeout(syncCursorTimeoutRef.current);
+      syncCursorTimeoutRef.current = null;
     }
     const val = target.value;
     const start = target.selectionStart;
     const end = target.selectionEnd;
+    latestContentRef.current = val;
+    latestSelectionStartRef.current = start;
+    latestSelectionEndRef.current = end;
     const pos = getRowColFromOffset(val, start);
     
     const currentStore = useEditorStore.getState();
@@ -106,11 +137,20 @@ export const CodeEditor = forwardRef<HTMLTextAreaElement, CodeEditorProps>((prop
   // Sync on unmount to make sure we don't lose any last keystrokes
   useEffect(() => {
     return () => {
-      if (syncTimeoutRef.current) {
-        clearTimeout(syncTimeoutRef.current);
+      if (syncContentTimeoutRef.current) {
+        clearTimeout(syncContentTimeoutRef.current);
+      }
+      if (syncCursorTimeoutRef.current) {
+        clearTimeout(syncCursorTimeoutRef.current);
       }
       if (localSaveTimeoutRef.current) {
         clearTimeout(localSaveTimeoutRef.current);
+      }
+      if (caretRafRef.current !== null) {
+        cancelAnimationFrame(caretRafRef.current);
+      }
+      if (caretThrottleTimerRef.current) {
+        clearTimeout(caretThrottleTimerRef.current);
       }
       const val = latestContentRef.current;
       const start = latestSelectionStartRef.current;
@@ -153,6 +193,10 @@ export const CodeEditor = forwardRef<HTMLTextAreaElement, CodeEditorProps>((prop
       toolbarIconSize: props.toolbarIconSize || 18,
     });
 
+    if (target.scrollHeight <= visibleHeight - 20 && target.scrollTop === 0) {
+      return;
+    }
+
     const caretY = getExactCaretYInTextarea(target, target.selectionStart);
     const caretRelativeY = caretY - target.scrollTop;
 
@@ -163,12 +207,56 @@ export const CodeEditor = forwardRef<HTMLTextAreaElement, CodeEditorProps>((prop
     }
   };
 
-  const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
-    requestAnimationFrame(() => {
-      if (localRef.current) {
-        ensureCaretVisibleInView(localRef.current);
+  const scheduleCaretVisibilityCheck = (target: HTMLTextAreaElement, immediate = false) => {
+    if (!target) return;
+    const runCheck = () => {
+      if (caretRafRef.current !== null) {
+        cancelAnimationFrame(caretRafRef.current);
       }
-    });
+      caretRafRef.current = requestAnimationFrame(() => {
+        caretRafRef.current = null;
+        if (localRef.current) {
+          lastCaretCheckTimeRef.current = Date.now();
+          ensureCaretVisibleInView(localRef.current);
+        }
+      });
+    };
+
+    if (immediate) {
+      if (caretThrottleTimerRef.current) {
+        clearTimeout(caretThrottleTimerRef.current);
+        caretThrottleTimerRef.current = null;
+      }
+      runCheck();
+      return;
+    }
+
+    const elapsed = Date.now() - lastCaretCheckTimeRef.current;
+    if (elapsed >= 180 && !caretThrottleTimerRef.current) {
+      runCheck();
+    } else {
+      if (caretThrottleTimerRef.current) clearTimeout(caretThrottleTimerRef.current);
+      caretThrottleTimerRef.current = setTimeout(() => {
+        caretThrottleTimerRef.current = null;
+        runCheck();
+      }, 180);
+    }
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (
+      e.key === 'Enter' ||
+      e.key === 'Backspace' ||
+      e.key === 'Delete' ||
+      e.key === 'ArrowUp' ||
+      e.key === 'ArrowDown' ||
+      e.key === 'PageUp' ||
+      e.key === 'PageDown' ||
+      e.key === 'Home' ||
+      e.key === 'End'
+    ) {
+      scheduleCaretVisibilityCheck(e.currentTarget, true);
+    }
 
     if (props.onKeyDown) {
       props.onKeyDown(e);
@@ -269,24 +357,37 @@ export const CodeEditor = forwardRef<HTMLTextAreaElement, CodeEditorProps>((prop
   };
 
   const handleChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
-    const val = e.target.value;
-    const start = e.target.selectionStart;
-    const end = e.target.selectionEnd;
-    const pos = getRowColFromOffset(val, start);
+    const target = e.target;
+    const val = target.value;
+    const start = target.selectionStart;
+    const end = target.selectionEnd;
 
     latestContentRef.current = val;
     latestSelectionStartRef.current = start;
     latestSelectionEndRef.current = end;
     
-    // Debounce Zustand update
+    // Debounce Zustand update (including row/col calculation)
     const syncDelay = 100;
-    if (syncTimeoutRef.current) clearTimeout(syncTimeoutRef.current);
-    syncTimeoutRef.current = setTimeout(() => {
+    if (syncContentTimeoutRef.current) clearTimeout(syncContentTimeoutRef.current);
+    syncContentTimeoutRef.current = setTimeout(() => {
+      syncContentTimeoutRef.current = null;
+      if (syncCursorTimeoutRef.current) {
+        clearTimeout(syncCursorTimeoutRef.current);
+        syncCursorTimeoutRef.current = null;
+      }
+      const liveTarget = localRef.current ?? target;
+      const liveVal = liveTarget.value;
+      const liveStart = liveTarget.selectionStart;
+      const liveEnd = liveTarget.selectionEnd;
+      latestContentRef.current = liveVal;
+      latestSelectionStartRef.current = liveStart;
+      latestSelectionEndRef.current = liveEnd;
+      const pos = getRowColFromOffset(liveVal, liveStart);
       useEditorStore.setState({
-        content: val,
+        content: liveVal,
         cursor: pos,
-        selectionStart: start,
-        selectionEnd: end
+        selectionStart: liveStart,
+        selectionEnd: liveEnd
       });
     }, syncDelay);
 
@@ -296,9 +397,13 @@ export const CodeEditor = forwardRef<HTMLTextAreaElement, CodeEditorProps>((prop
     const backupDelay = props.onDemandSyncEnabled === false ? 350 : 1500;
     if (localSaveTimeoutRef.current) clearTimeout(localSaveTimeoutRef.current);
     localSaveTimeoutRef.current = setTimeout(() => {
+      localSaveTimeoutRef.current = null;
       try {
-        localStorage.setItem(STORAGE_KEY_AUTOSAVE, val);
-        localStorage.setItem('steem_editor_cursor', JSON.stringify({ start, end }));
+        localStorage.setItem(STORAGE_KEY_AUTOSAVE, latestContentRef.current);
+        localStorage.setItem(
+          'steem_editor_cursor',
+          JSON.stringify({ start: latestSelectionStartRef.current, end: latestSelectionEndRef.current })
+        );
         localStorage.setItem('steem_visual_html_is_stale', 'true');
       } catch (err) {
         console.warn('Failed to save content and cursor to localStorage', err);
@@ -309,39 +414,48 @@ export const CodeEditor = forwardRef<HTMLTextAreaElement, CodeEditorProps>((prop
       props.onChange(e);
     }
 
-    requestAnimationFrame(() => {
-      ensureCaretVisibleInView(e.target);
-    });
+    scheduleCaretVisibilityCheck(target, false);
   };
 
   const updateCursorAndSelection = (target: HTMLTextAreaElement) => {
     const start = target.selectionStart;
     const end = target.selectionEnd;
+
+    if (latestSelectionStartRef.current === start && latestSelectionEndRef.current === end) {
+      return; // No change in selection or cursor, avoid useless work
+    }
     
     latestSelectionStartRef.current = start;
     latestSelectionEndRef.current = end;
 
-    const currentStore = useEditorStore.getState();
-    if (currentStore.selectionStart === start && currentStore.selectionEnd === end) {
-      return; // No change in selection or cursor, avoid useless re-render
-    }
-
-    const pos = getRowColFromOffset(target.value, start);
-    
-    // Save cursor position immediately on selection change (clicks/arrows/focus)
-    try {
-      localStorage.setItem('steem_editor_cursor', JSON.stringify({ start, end }));
-    } catch (err) {
-      console.warn('Failed to save cursor to localStorage', err);
-    }
-
-    if (syncTimeoutRef.current) clearTimeout(syncTimeoutRef.current);
-    syncTimeoutRef.current = setTimeout(() => {
-      useEditorStore.setState({
-        cursor: pos,
-        selectionStart: start,
-        selectionEnd: end
-      });
+    if (syncCursorTimeoutRef.current) clearTimeout(syncCursorTimeoutRef.current);
+    syncCursorTimeoutRef.current = setTimeout(() => {
+      syncCursorTimeoutRef.current = null;
+      const liveTarget = localRef.current ?? target;
+      const liveVal = liveTarget.value;
+      const liveStart = liveTarget.selectionStart;
+      const liveEnd = liveTarget.selectionEnd;
+      latestSelectionStartRef.current = liveStart;
+      latestSelectionEndRef.current = liveEnd;
+      const pos = getRowColFromOffset(liveVal, liveStart);
+      try {
+        localStorage.setItem('steem_editor_cursor', JSON.stringify({ start: liveStart, end: liveEnd }));
+      } catch (err) {
+        console.warn('Failed to save cursor to localStorage', err);
+      }
+      const currentStore = useEditorStore.getState();
+      if (
+        currentStore.cursor?.row !== pos.row ||
+        currentStore.cursor?.col !== pos.col ||
+        currentStore.selectionStart !== liveStart ||
+        currentStore.selectionEnd !== liveEnd
+      ) {
+        useEditorStore.setState({
+          cursor: pos,
+          selectionStart: liveStart,
+          selectionEnd: liveEnd
+        });
+      }
     }, 100);
   };
 
@@ -357,9 +471,18 @@ export const CodeEditor = forwardRef<HTMLTextAreaElement, CodeEditorProps>((prop
     if (props.onKeyUp) {
       props.onKeyUp(e);
     }
-    requestAnimationFrame(() => {
-      ensureCaretVisibleInView(e.currentTarget);
-    });
+    if (
+      e.key === 'ArrowUp' ||
+      e.key === 'ArrowDown' ||
+      e.key === 'PageUp' ||
+      e.key === 'PageDown' ||
+      e.key === 'Home' ||
+      e.key === 'End'
+    ) {
+      scheduleCaretVisibilityCheck(e.currentTarget, true);
+    } else {
+      scheduleCaretVisibilityCheck(e.currentTarget, false);
+    }
   };
 
   const handleClick = (e: React.MouseEvent<HTMLTextAreaElement>) => {
@@ -393,7 +516,7 @@ export const CodeEditor = forwardRef<HTMLTextAreaElement, CodeEditorProps>((prop
   return (
     <textarea
       ref={handleRef}
-      defaultValue={content}
+      defaultValue={initialContentRef.current}
       onChange={handleChange}
       onKeyDown={handleKeyDown}
       onSelect={handleSelect}

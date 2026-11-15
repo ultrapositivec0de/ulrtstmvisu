@@ -1,30 +1,39 @@
 import { useState, useRef, useCallback, useEffect } from 'react';
+import { formatImportedTable } from '../utils/tableOperations';
 
 interface UseTableOperationsProps {
   wysiwygRef: React.RefObject<HTMLDivElement | null>;
   updateContentFromWysiwyg: () => void;
   setIsWidgetVisible: (visible: boolean) => void;
   setActiveModal: (modal: any) => void;
-  tableImportText: string;
-  setTableImportText: (text: string) => void;
-  tableImportFormat: 'markdown' | 'html';
+  tableImportText?: string;
+  setTableImportText?: (text: string) => void;
+  tableImportFormat?: 'markdown' | 'html';
+  setTableImportFormat?: (format: 'markdown' | 'html') => void;
   insertAtCursor: (text: string, ...args: any[]) => void;
   notify: (msg: string, type?: 'success' | 'error' | 'loading') => void;
   t: (key: any) => string;
 }
 
-export function useTableOperations({
-  wysiwygRef,
-  updateContentFromWysiwyg,
-  setIsWidgetVisible,
-  setActiveModal,
-  tableImportText,
-  setTableImportText,
-  tableImportFormat,
-  insertAtCursor,
-  notify,
-  t,
-}: UseTableOperationsProps) {
+export function useTableOperations(props: UseTableOperationsProps) {
+  const {
+    wysiwygRef,
+    updateContentFromWysiwyg,
+    setIsWidgetVisible,
+    setActiveModal,
+    insertAtCursor,
+    notify,
+    t,
+  } = props;
+
+  const [internalTableImportText, setInternalTableImportText] = useState('');
+  const [internalTableImportFormat, setInternalTableImportFormat] = useState<'markdown' | 'html'>('markdown');
+  const [tableSelectorPos, setTableSelectorPos] = useState<{ x: number; y: number; direction: 'up' | 'down' } | null>(null);
+
+  const tableImportText = props.tableImportText !== undefined ? props.tableImportText : internalTableImportText;
+  const setTableImportText = props.setTableImportText || setInternalTableImportText;
+  const tableImportFormat = props.tableImportFormat !== undefined ? props.tableImportFormat : internalTableImportFormat;
+  const setTableImportFormat = props.setTableImportFormat || setInternalTableImportFormat;
   const [activeTable, setActiveTable] = useState<HTMLTableElement | null>(null);
   const [activeTableRow, setActiveTableRow] = useState<HTMLTableRowElement | null>(null);
   const [activeTableCell, setActiveTableCell] = useState<HTMLTableCellElement | null>(null);
@@ -146,105 +155,17 @@ export function useTableOperations({
 
   const processTableImport = useCallback(() => {
     const data = tableImportText;
-    if (!data) {
+    if (!data || !data.trim()) {
       setActiveModal(null);
       return;
     }
 
-    const lines = data.split(/\r\n|\r|\n/).filter(l => l.trim() !== '');
-    if (lines.length === 0) {
+    const resultTable = formatImportedTable(data, tableImportFormat);
+    if (!resultTable) {
       setActiveModal(null);
       return;
     }
 
-    // Detect delimiter
-    const delimiters = ['\t', ';', ',', '|'];
-    let bestDelimiter = '\t';
-    let maxConsistency = -1;
-
-    delimiters.forEach(d => {
-      const colCounts = lines.map(l => l.split(d).length);
-      const avg = colCounts.reduce((a, b) => a + b, 0) / colCounts.length;
-      if (avg > 1.1) {
-        const mostFrequent = colCounts.reduce((acc, curr) => {
-          acc[curr] = (acc[curr] || 0) + 1;
-          return acc;
-        }, {} as Record<number, number>);
-        
-        const frequency = Math.max(...Object.values(mostFrequent));
-        if (frequency > maxConsistency) {
-          maxConsistency = frequency;
-          bestDelimiter = d;
-        }
-      }
-    });
-
-    const rows = lines.map(line => {
-      let parts: string[];
-      if (bestDelimiter === '|') {
-        const trimmedLine = line.trim();
-        parts = trimmedLine.split('|').map(p => p.trim());
-        if (parts[0] === '') parts.shift();
-        if (parts[parts.length - 1] === '') parts.pop();
-      } else if (bestDelimiter === ',') {
-        const partsArray = [];
-        let current = '';
-        let inQuotes = false;
-        for (let i = 0; i < line.length; i++) {
-          const char = line[i];
-          if (char === '"') inQuotes = !inQuotes;
-          else if (char === ',' && !inQuotes) {
-            partsArray.push(current.trim());
-            current = '';
-          } else {
-            current += char;
-          }
-        }
-        partsArray.push(current.trim());
-        parts = partsArray;
-      } else {
-        parts = line.split(bestDelimiter).map(p => p.trim());
-      }
-      return parts;
-    });
-
-    const maxCols = Math.max(...rows.map(r => r.length));
-    
-    const normalizedRows = rows.map(r => {
-      const newRow = [...r];
-      while (newRow.length < maxCols) {
-        newRow.push('');
-      }
-      if (newRow.length > maxCols) {
-        return newRow.slice(0, maxCols);
-      }
-      return newRow;
-    });
-
-    let resultTable = '';
-    if (tableImportFormat === 'markdown') {
-      normalizedRows.forEach((cols, i) => {
-        const cleanCols = cols.map(c => {
-          return c.replace(/\|/g, '\\|').replace(/\r\n|\r|\n/g, '<br/>').trim();
-        });
-        resultTable += '| ' + cleanCols.join(' | ') + ' |\n';
-        if (i === 0) {
-          resultTable += '| ' + cleanCols.map(() => '---').join(' | ') + ' |\n';
-        }
-      });
-    } else {
-      resultTable = '<table data-format="html" style="width:100%">\n';
-      normalizedRows.forEach((cols, i) => {
-        resultTable += '  <tr>\n';
-        cols.forEach(col => {
-          const tag = i === 0 ? 'th' : 'td';
-          resultTable += `    <${tag}>${col}</${tag}>\n`;
-        });
-        resultTable += '  </tr>\n';
-      });
-      resultTable += '</table>';
-    }
-    
     insertAtCursor(resultTable, 'end');
     setTableImportText('');
     setActiveModal(null);
@@ -273,5 +194,11 @@ export function useTableOperations({
     deleteActiveTable,
     importTable,
     processTableImport,
+    tableImportText,
+    setTableImportText,
+    tableImportFormat,
+    setTableImportFormat,
+    tableSelectorPos,
+    setTableSelectorPos,
   };
 }

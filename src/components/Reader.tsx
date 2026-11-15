@@ -1,6 +1,5 @@
 /* eslint-disable react-hooks/purity */
 import React, {
-  useState,
   useEffect,
   useCallback,
   useRef,
@@ -64,28 +63,7 @@ export interface ReaderProps {
   selectedVaultUser?: string;
 }
 
-const STORAGE_KEY_READER_CONFIG = "steem_reader_config_v1";
-const STORAGE_KEY_RESPONDED = "steem_responded_v1";
-
-const DEFAULT_READER_CONFIG: ReaderConfig = {
-  whiteList: [],
-  blackList: [],
-  fontSize: 16,
-  fontWeight: 400,
-  limitPerUser: 5,
-  daysLimit: 7,
-  tags: [],
-  contentWidth: 800,
-  excludeMuted: true,
-  autoLoadComments: false,
-  strictTagMode: false,
-  favoriteTags: ["ukraine", "steem", "hive-145157"],
-  autoShowInbox: false,
-  loadImages: true,
-  enableVoteLogging: true,
-  onlyWhitelist: false,
-  loadFeedWithoutTag: false,
-};
+import { useReaderStore } from "../store/readerStore";
 
 export default function Reader({
   lang: propLang,
@@ -122,61 +100,32 @@ export default function Reader({
     return getTranslation(currentLang, k);
   }, [propT, propLang]);
 
-  // Config State
-  const [config, setConfig] = useState<ReaderConfig>(() => {
-    const saved = typeof localStorage !== "undefined" ? localStorage.getItem(STORAGE_KEY_READER_CONFIG) : null;
-    if (saved) {
-      try {
-        const parsed = JSON.parse(saved);
-        let cleanedTags = parsed.tags;
-        if (Array.isArray(cleanedTags) && cleanedTags.join(" ") === "ukraine steemexclusive hive-105151") {
-          cleanedTags = [];
-        }
-        let cleanedFavs = parsed.favoriteTags;
-        if (!cleanedFavs || cleanedFavs.length === 0 || cleanedFavs.includes("hive-171319")) {
-          cleanedFavs = DEFAULT_READER_CONFIG.favoriteTags;
-        }
-        return {
-          ...DEFAULT_READER_CONFIG,
-          ...parsed,
-          autoShowInbox: parsed.autoShowInbox !== undefined ? Boolean(parsed.autoShowInbox) : false,
-          tags: cleanedTags || [],
-          favoriteTags: cleanedFavs,
-        };
-      } catch {
-        return DEFAULT_READER_CONFIG;
-      }
-    }
-    return DEFAULT_READER_CONFIG;
-  });
-
-  useEffect(() => {
-    localStorage.setItem(STORAGE_KEY_READER_CONFIG, JSON.stringify(config));
-  }, [config]);
-
-  const [respondedReplies, setRespondedReplies] = useState<Record<string, string>>(() => {
-    const saved = typeof localStorage !== "undefined" ? localStorage.getItem(STORAGE_KEY_RESPONDED) : null;
-    try {
-      return saved ? JSON.parse(saved) : {};
-    } catch {
-      return {};
-    }
-  });
-
-  useEffect(() => {
-    localStorage.setItem(STORAGE_KEY_RESPONDED, JSON.stringify(respondedReplies));
-  }, [respondedReplies]);
-
-  const [viewMode, setViewMode] = useState<"feed" | "curation" | "settings">("feed");
-  const [isReaderHeaderOpen, setIsReaderHeaderOpen] = useState(true);
-  const [showQuickPanel, setShowQuickPanel] = useState(false);
-  const [voteWeight, setVoteWeight] = useState(10000);
-  const [revealedImages, setRevealedImages] = useState<Set<string>>(new Set());
+  // Reader Store State
+  const config = useReaderStore((s) => s.config);
+  const setConfig = useReaderStore((s) => s.setConfig);
+  const respondedReplies = useReaderStore((s) => s.respondedReplies);
+  const setRespondedReplies = useReaderStore((s) => s.setRespondedReplies);
+  const viewMode = useReaderStore((s) => s.viewMode);
+  const setViewMode = useReaderStore((s) => s.setViewMode);
+  const isReaderHeaderOpen = useReaderStore((s) => s.isReaderHeaderOpen);
+  const setIsReaderHeaderOpen = useReaderStore((s) => s.setIsReaderHeaderOpen);
+  const showQuickPanel = useReaderStore((s) => s.showQuickPanel);
+  const setShowQuickPanel = useReaderStore((s) => s.setShowQuickPanel);
+  const voteWeight = useReaderStore((s) => s.voteWeight);
+  const setVoteWeight = useReaderStore((s) => s.setVoteWeight);
+  const revealedImages = useReaderStore((s) => s.revealedImages);
+  const setRevealedImages = useReaderStore((s) => s.setRevealedImages);
 
   // Muted Manager States
-  const [showMutedManager, setShowMutedManager] = useState(false);
-  const [loadingMutedManager, setLoadingMutedManager] = useState(false);
-  const [fetchedMutedUsers, setFetchedMutedUsers] = useState<string[]>([]);
+  const showMutedManager = useReaderStore((s) => s.showMutedManager);
+  const setShowMutedManager = useReaderStore((s) => s.setShowMutedManager);
+  const loadingMutedManager = useReaderStore((s) => s.loadingMutedManager);
+  const setLoadingMutedManager = useReaderStore((s) => s.setLoadingMutedManager);
+  const fetchedMutedUsers = useReaderStore((s) => s.fetchedMutedUsers);
+  const setFetchedMutedUsers = useReaderStore((s) => s.setFetchedMutedUsers);
+
+  const applyOptimisticVoteToPosts = useReaderStore((s) => s.applyOptimisticVoteToPosts);
+  const applyOptimisticVoteToComments = useReaderStore((s) => s.applyOptimisticVoteToComments);
 
   const showMobileBottomBar = useDeviceStore((s) => s.showMobileBottomBar);
   const isMobileLayout = useDeviceStore((s) => s.isMobileLayout);
@@ -241,69 +190,10 @@ export default function Reader({
 
   // Local Vote & Comment Optimistic Handlers
   const handleLocalVote = async (author: string, permlink: string, weight: number) => {
-    setPosts((prev) =>
-      prev.map((p) => {
-        if (p.author === author && p.permlink === permlink) {
-          const hasVoted = p.active_votes.some((v) => v.voter === currentUser);
-          if (!hasVoted) {
-            return {
-              ...p,
-              active_votes: [...p.active_votes, { voter: currentUser || "", weight }],
-            };
-          }
-        }
-        return p;
-      }),
-    );
-
-    inboxHook.setInbox((prev) =>
-      prev.map((p) => {
-        if (p.author === author && p.permlink === permlink) {
-          const hasVoted = p.active_votes.some((v) => v.voter === currentUser);
-          if (!hasVoted) {
-            return {
-              ...p,
-              active_votes: [...p.active_votes, { voter: currentUser || "", weight }],
-            };
-          }
-        }
-        return p;
-      }),
-    );
-
-    setPostComments((prev) => {
-      const next = { ...prev };
-      Object.keys(next).forEach((key) => {
-        next[key] = next[key].map((c) => {
-          if (c.author === author && c.permlink === permlink) {
-            const hasVoted = c.active_votes.some((v) => v.voter === currentUser);
-            if (!hasVoted) {
-              return {
-                ...c,
-                active_votes: [...c.active_votes, { voter: currentUser || "", weight }],
-              };
-            }
-          }
-          return c;
-        });
-      });
-      return next;
-    });
-
-    curationHook.setCurationPosts((prev) =>
-      prev.map((p) => {
-        if (p.author === author && p.permlink === permlink) {
-          const hasVoted = p.active_votes?.some((v) => v.voter === currentUser);
-          if (!hasVoted) {
-            return {
-              ...p,
-              active_votes: [...(p.active_votes || []), { voter: currentUser || "", weight }],
-            };
-          }
-        }
-        return p;
-      }),
-    );
+    setPosts((prev) => applyOptimisticVoteToPosts(prev, author, permlink, weight, currentUser));
+    inboxHook.setInbox((prev) => applyOptimisticVoteToPosts(prev, author, permlink, weight, currentUser));
+    setPostComments((prev) => applyOptimisticVoteToComments(prev, author, permlink, weight, currentUser));
+    curationHook.setCurationPosts((prev) => applyOptimisticVoteToPosts(prev, author, permlink, weight, currentUser));
 
     try {
       await onVote(author, permlink, weight);

@@ -200,7 +200,7 @@ export const EditorTopBar: React.FC<EditorTopBarProps> = ({
           onClick={() => {
             const next = !onDemandSyncEnabled;
             setOnDemandSyncEnabled(next);
-            localStorage.setItem('steem_on_demand_sync', String(next));
+            localStorage.setItem('steem_ondemand_sync', String(next));
             notify(
               next 
                  ? t('syncOnDemandNotifyOn')

@@ -1,6 +1,6 @@
 import { useState, useRef, useCallback, useEffect } from 'react';
 import { useEditorStore, getRowColFromOffset, getOffsetFromRowCol } from '../store';
-import { isInsideTagInLine } from '../utils/formatUtils';
+import { getAllFormatRangesInLine } from '../utils/formatUtils';
 import { calculateCaretScrollTop } from '../lib/viewportLayout';
 
 interface UseEditorModeManagerProps {
@@ -48,90 +48,146 @@ export function useEditorModeManager({
   const cursorPositionRef = useRef<{ start: number; end: number } | null>(null);
   const isTransitioningModeRef = useRef<boolean>(false);
   const hasRestoredInitialCursorRef = useRef(false);
+  const saveCursorTimerRef = useRef<any>(null);
 
-  const saveCursorPosition = useCallback(() => {
+  const flushCursorAnalysis = useCallback(() => {
     if (isTransitioningModeRef.current || isSyncingRef.current) return;
-    if (editorRef.current) {
-      const start = editorRef.current.selectionStart;
-      const end = editorRef.current.selectionEnd;
-      if (start === null || end === null || start === undefined || end === undefined) return;
-      const pos = { start, end };
-      cursorPositionRef.current = pos;
-      try {
-        localStorage.setItem('steem_editor_cursor', JSON.stringify(pos));
-      } catch (err) {
-        console.warn('Failed to save cursor position:', err);
-      }
+    const ta = editorRef.current;
+    if (!ta) return;
 
-      // Sync content and Zustand store (in-memory only, disk persistence is debounced)
-      const text = editorRef.current.value;
-      const rowColPos = getRowColFromOffset(text, start);
-      useEditorStore.getState().setCursor(rowColPos);
-      useEditorStore.getState().setSelection(start, end);
+    const start = ta.selectionStart;
+    const end = ta.selectionEnd;
+    if (start === null || end === null || start === undefined || end === undefined) return;
+    const pos = { start, end };
+    cursorPositionRef.current = pos;
 
-      if (editorMode === 'markdown') {
-        const caretPos = start;
-        const selEnd = end;
+    try {
+      localStorage.setItem('steem_editor_cursor', JSON.stringify(pos));
+    } catch (err) {
+      console.warn('Failed to save cursor position:', err);
+    }
 
-        const lineStart = text.lastIndexOf('\n', caretPos - 1) + 1;
-        const lineEnd = text.indexOf('\n', caretPos);
-        const actualLineEnd = lineEnd === -1 ? text.length : lineEnd;
+    const text = ta.value;
+    const rowColPos = getRowColFromOffset(text, start);
+    const currentStore = useEditorStore.getState();
+    if (
+      !currentStore.cursor ||
+      currentStore.cursor.row !== rowColPos.row ||
+      currentStore.cursor.col !== rowColPos.col
+    ) {
+      currentStore.setCursor(rowColPos);
+    }
+    if (currentStore.selectionStart !== start || currentStore.selectionEnd !== end) {
+      currentStore.setSelection(start, end);
+    }
 
-        const currentLine = text.substring(lineStart, actualLineEnd);
-        const caretInLine = caretPos - lineStart;
-        const selEndInLine = Math.min(actualLineEnd, selEnd) - lineStart;
+    if (editorMode === 'markdown') {
+      const caretPos = start;
+      const selEnd = end;
 
-        const before = text.slice(0, caretPos);
-        const after = text.slice(selEnd);
-        const lastOpenPhishy = Math.max(
-          before.lastIndexOf('<div class="phishy">'),
-          before.lastIndexOf("<div class='phishy'>"),
-          before.lastIndexOf('<span class="phishy">'),
-          before.lastIndexOf("<span class='phishy'>")
-        );
-        const lastClosePhishy = Math.max(
-          before.lastIndexOf('</div>'),
-          before.lastIndexOf('</span>')
-        );
-        const nextClosePhishy = Math.min(
-          after.indexOf('</div>') === -1 ? Infinity : after.indexOf('</div>'),
-          after.indexOf('</span>') === -1 ? Infinity : after.indexOf('</span>')
-        );
-        const nextOpenPhishy = Math.min(
-          after.indexOf('<div class="phishy">') === -1 ? Infinity : after.indexOf('<div class="phishy">'),
-          after.indexOf("<div class='phishy'>") === -1 ? Infinity : after.indexOf("<div class='phishy'>"),
-          after.indexOf('<span class="phishy">') === -1 ? Infinity : after.indexOf('<span class="phishy">'),
-          after.indexOf("<span class='phishy'>") === -1 ? Infinity : after.indexOf("<span class='phishy'>")
-        );
-        const isEnclosedInPhishy = lastOpenPhishy !== -1 && (lastClosePhishy === -1 || lastClosePhishy < lastOpenPhishy) && nextClosePhishy !== Infinity && (nextOpenPhishy === Infinity || nextOpenPhishy > nextClosePhishy);
+      const lineStart = text.lastIndexOf('\n', caretPos - 1) + 1;
+      const lineEnd = text.indexOf('\n', caretPos);
+      const actualLineEnd = lineEnd === -1 ? text.length : lineEnd;
 
-        const newFormats = {
-          bold: isInsideTagInLine(currentLine, caretInLine, '**', selEndInLine),
-          italic: isInsideTagInLine(currentLine, caretInLine, '*', selEndInLine),
-          code: isInsideTagInLine(currentLine, caretInLine, '`', selEndInLine),
-          strikethrough: isInsideTagInLine(currentLine, caretInLine, '~~', selEndInLine),
-          sub: isInsideTagInLine(currentLine, caretInLine, '<sub>', selEndInLine),
-          sup: isInsideTagInLine(currentLine, caretInLine, '<sup>', selEndInLine),
-          phishy: isEnclosedInPhishy || isInsideTagInLine(currentLine, caretInLine, '<div class="phishy">', selEndInLine) || isInsideTagInLine(currentLine, caretInLine, '<span class="phishy">', selEndInLine)
-        };
+      const currentLine = text.substring(lineStart, actualLineEnd);
+      const caretInLine = caretPos - lineStart;
+      const selEndInLine = Math.min(actualLineEnd, selEnd) - lineStart;
 
-        setActiveFormats((prev: any) => {
-          if (
-            prev.bold === newFormats.bold &&
-            prev.italic === newFormats.italic &&
-            prev.code === newFormats.code &&
-            prev.strikethrough === newFormats.strikethrough &&
-            prev.sub === newFormats.sub &&
-            prev.sup === newFormats.sup &&
-            prev.phishy === newFormats.phishy
-          ) {
-            return prev;
-          }
-          return newFormats;
-        });
-      }
+      const lastIdxBefore = (str: string) => {
+        if (caretPos < str.length) return -1;
+        return text.lastIndexOf(str, caretPos - str.length);
+      };
+      const firstIdxAfter = (str: string) => {
+        const idx = text.indexOf(str, selEnd);
+        return idx === -1 ? Infinity : idx;
+      };
+
+      const lastOpenPhishy = Math.max(
+        lastIdxBefore('<div class="phishy">'),
+        lastIdxBefore("<div class='phishy'>"),
+        lastIdxBefore('<span class="phishy">'),
+        lastIdxBefore("<span class='phishy'>")
+      );
+      const lastClosePhishy = Math.max(
+        lastIdxBefore('</div>'),
+        lastIdxBefore('</span>')
+      );
+      const nextClosePhishy = Math.min(
+        firstIdxAfter('</div>'),
+        firstIdxAfter('</span>')
+      );
+      const nextOpenPhishy = Math.min(
+        firstIdxAfter('<div class="phishy">'),
+        firstIdxAfter("<div class='phishy'>"),
+        firstIdxAfter('<span class="phishy">'),
+        firstIdxAfter("<span class='phishy'>")
+      );
+      const isEnclosedInPhishy =
+        lastOpenPhishy !== -1 &&
+        (lastClosePhishy === -1 || lastClosePhishy < lastOpenPhishy) &&
+        nextClosePhishy !== Infinity &&
+        (nextOpenPhishy === Infinity || nextOpenPhishy > nextClosePhishy);
+
+      const lineRanges = getAllFormatRangesInLine(currentLine);
+      const hasFormat = (key: 'bold' | 'italic' | 'code' | 'strikethrough' | 'sub' | 'sup' | 'phishy') => {
+        if (caretInLine === selEndInLine) {
+          return lineRanges.some((r) => r.formatKey === key && caretInLine >= r.contentStart && caretInLine <= r.contentEnd);
+        }
+        return lineRanges.some((r) => r.formatKey === key && caretInLine >= r.contentStart && selEndInLine <= r.contentEnd);
+      };
+
+      const newFormats = {
+        bold: hasFormat('bold'),
+        italic: hasFormat('italic'),
+        code: hasFormat('code'),
+        strikethrough: hasFormat('strikethrough'),
+        sub: hasFormat('sub'),
+        sup: hasFormat('sup'),
+        phishy: isEnclosedInPhishy || hasFormat('phishy'),
+      };
+
+      setActiveFormats((prev: any) => {
+        if (
+          prev.bold === newFormats.bold &&
+          prev.italic === newFormats.italic &&
+          prev.code === newFormats.code &&
+          prev.strikethrough === newFormats.strikethrough &&
+          prev.sub === newFormats.sub &&
+          prev.sup === newFormats.sup &&
+          prev.phishy === newFormats.phishy
+        ) {
+          return prev;
+        }
+        return newFormats;
+      });
     }
   }, [editorMode, editorRef, isSyncingRef, setActiveFormats]);
+
+  const saveCursorPosition = useCallback((immediateOrEvent?: boolean | unknown) => {
+    if (isTransitioningModeRef.current || isSyncingRef.current) return;
+    if (!editorRef.current) return;
+
+    const start = editorRef.current.selectionStart;
+    const end = editorRef.current.selectionEnd;
+    if (start === null || end === null || start === undefined || end === undefined) return;
+
+    cursorPositionRef.current = { start, end };
+
+    if (saveCursorTimerRef.current) {
+      clearTimeout(saveCursorTimerRef.current);
+      saveCursorTimerRef.current = null;
+    }
+
+    if (immediateOrEvent === true) {
+      flushCursorAnalysis();
+      return;
+    }
+
+    saveCursorTimerRef.current = setTimeout(() => {
+      saveCursorTimerRef.current = null;
+      flushCursorAnalysis();
+    }, 100);
+  }, [editorRef, isSyncingRef, flushCursorAnalysis]);
 
   const numIconSize = typeof toolbarIconSize === 'number' ? toolbarIconSize : (toolbarIconSize === 'large' ? 24 : toolbarIconSize === 'small' ? 16 : 20);
 
@@ -472,7 +528,13 @@ export function useEditorModeManager({
 
   // Save cursor position when unmounting or switching view
   useEffect(() => {
-    return () => saveCursorPosition();
+    return () => {
+      if (saveCursorTimerRef.current) {
+        clearTimeout(saveCursorTimerRef.current);
+        saveCursorTimerRef.current = null;
+      }
+      saveCursorPosition(true);
+    };
   }, [saveCursorPosition]);
 
   const restoreVisualSelectionLatestRef = useRef(restoreVisualSelection);

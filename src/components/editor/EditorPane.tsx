@@ -31,9 +31,9 @@ export interface EditorPaneProps {
   isDarkMode: boolean;
   t: (key: any) => string;
   editorMode: 'visual' | 'markdown' | 'reading';
-  isLivePreviewEnabled: boolean;
+  isLivePreviewEnabled?: boolean;
   onDemandSyncEnabled: boolean;
-  beautifyEnabled: boolean;
+  beautifyEnabled?: boolean;
   neonTextColored: boolean;
   isSpacingMenuOpen: boolean;
   wysiwygSpacing: number;
@@ -51,7 +51,7 @@ export interface EditorPaneProps {
   widgetPos: any;
   isWidgetVisible: boolean;
   isWidgetMenuOpen: boolean;
-  activeFormats: any;
+  activeFormats?: any;
   showMobileTools1: boolean;
   showMobileTools2: boolean;
   showMobileToolsOpen: boolean;
@@ -82,8 +82,8 @@ export interface EditorPaneProps {
   toggleEditorFullScreen: () => void;
   setOnDemandSyncEnabled: (val: boolean) => void;
   notify: (msg: string, type?: any) => void;
-  toggleLivePreview: () => void;
-  setBeautifyEnabled: (val: boolean) => void;
+  toggleLivePreview?: () => void;
+  setBeautifyEnabled?: (val: boolean) => void;
   setNeonTextColored: (val: boolean) => void;
   setIsSpacingMenuOpen: (val: boolean) => void;
   setWysiwygSpacing: (val: number) => void;
@@ -107,7 +107,7 @@ export interface EditorPaneProps {
   setWidgetNoBorder: (val: boolean) => void;
 
   // editor functions
-  saveCursorPosition: () => void;
+  saveCursorPosition: (immediate?: boolean) => void;
   setIsEditorFocused: (val: boolean) => void;
   handleEditorKeyDown: (e: React.KeyboardEvent<HTMLTextAreaElement>) => void;
   handleEditorScroll: (e: React.UIEvent<HTMLTextAreaElement>) => void;
@@ -126,7 +126,6 @@ export interface EditorPaneProps {
   deleteActiveTableRow: () => void;
   deleteActiveTableCol: () => void;
   deleteActiveTable: () => void;
-  getMiniGalleryBottomStyle: (params: any) => string | undefined;
   insertImage: (url: string, name: string, format: any) => void;
   insertAtCursor: (text: string) => void;
   confirmDialog: any;
@@ -254,7 +253,6 @@ export const EditorPane: React.FC<EditorPaneProps> = ({
   deleteActiveTableRow,
   deleteActiveTableCol,
   deleteActiveTable,
-  getMiniGalleryBottomStyle,
   insertImage,
   insertAtCursor,
   confirmDialog,
@@ -305,6 +303,18 @@ export const EditorPane: React.FC<EditorPaneProps> = ({
       : "pb-44 mb-[5rem] lg:pb-16 lg:mb-2";
   };
 
+  const storeIsLivePreviewEnabled = useEditorStore(s => s.isLivePreviewEnabled);
+  const storeToggleLivePreview = useEditorStore(s => s.toggleLivePreview);
+  const storeBeautifyEnabled = useEditorStore(s => s.beautifyEnabled);
+  const storeSetBeautifyEnabled = useEditorStore(s => s.setBeautifyEnabled);
+  const storeActiveFormats = useEditorStore(s => s.activeFormats);
+
+  const effectiveIsLivePreview = isLivePreviewEnabled ?? storeIsLivePreviewEnabled;
+  const effectiveToggleLivePreview = toggleLivePreview ?? storeToggleLivePreview;
+  const effectiveBeautify = beautifyEnabled ?? storeBeautifyEnabled;
+  const effectiveSetBeautify = setBeautifyEnabled ?? storeSetBeautifyEnabled;
+  const effectiveActiveFormats = activeFormats ?? storeActiveFormats;
+
   return (
     <div 
       ref={editorPaneRef}
@@ -335,10 +345,10 @@ export const EditorPane: React.FC<EditorPaneProps> = ({
         toggleEditorFullScreen={toggleEditorFullScreen}
         onDemandSyncEnabled={onDemandSyncEnabled}
         setOnDemandSyncEnabled={setOnDemandSyncEnabled}
-        isLivePreviewEnabled={isLivePreviewEnabled}
-        toggleLivePreview={toggleLivePreview}
-        beautifyEnabled={beautifyEnabled}
-        setBeautifyEnabled={setBeautifyEnabled}
+        isLivePreviewEnabled={effectiveIsLivePreview}
+        toggleLivePreview={effectiveToggleLivePreview}
+        beautifyEnabled={effectiveBeautify}
+        setBeautifyEnabled={effectiveSetBeautify}
         neonTextColored={neonTextColored}
         setNeonTextColored={setNeonTextColored}
         typingSound={typingSound}
@@ -371,17 +381,23 @@ export const EditorPane: React.FC<EditorPaneProps> = ({
           onChange={() => {
             saveCursorPosition();
           }}
-          onSelect={saveCursorPosition}
-          onKeyUp={saveCursorPosition}
-          onClick={saveCursorPosition}
+          onSelect={() => {
+            saveCursorPosition();
+          }}
+          onKeyUp={() => {
+            saveCursorPosition();
+          }}
+          onClick={() => {
+            saveCursorPosition();
+          }}
           onScroll={handleEditorScroll}
           onFocus={() => {
             setIsEditorFocused(true);
-            saveCursorPosition();
+            saveCursorPosition(true);
             if (widgetPos !== 'hidden') setIsWidgetVisible(true);
           }}
           onBlur={() => {
-            saveCursorPosition();
+            saveCursorPosition(true);
             setTimeout(() => setIsEditorFocused(false), 200);
           }}
           onKeyDown={handleEditorKeyDown}
@@ -392,7 +408,7 @@ export const EditorPane: React.FC<EditorPaneProps> = ({
           className={cn(
             "flex-1 w-full bg-transparent text-base outline-none resize-none custom-scrollbar editor-font overscroll-contain",
             (visualStyle === 'neon' && neonTextColored) ? "text-cyan-400 font-normal" : "text-slate-300",
-            beautifyEnabled ? "px-4 lg:px-8 pt-4 lg:pt-6 max-w-[clamp(40rem,60vw,80rem)] mx-auto selection:bg-[rgb(var(--accent-color)/0.3)]" : "px-3 pt-3 lg:px-6 lg:pt-6",
+            effectiveBeautify ? "px-4 lg:px-8 pt-4 lg:pt-6 max-w-[clamp(40rem,60vw,80rem)] mx-auto selection:bg-[rgb(var(--accent-color)/0.3)]" : "px-3 pt-3 lg:px-6 lg:pt-6",
             getEditorBottomSpacingClass()
           )}
           placeholder={t('placeholder')}
@@ -445,7 +461,7 @@ export const EditorPane: React.FC<EditorPaneProps> = ({
           visualStyle={visualStyle}
           editorFontSize={editorFontSize}
           wysiwygSpacing={wysiwygSpacing}
-          beautifyEnabled={beautifyEnabled}
+          beautifyEnabled={effectiveBeautify}
         />
       ) : (
         <WysiwygCanvas
@@ -469,7 +485,7 @@ export const EditorPane: React.FC<EditorPaneProps> = ({
           handleWysiwygScroll={handleWysiwygScroll}
           visualStyle={visualStyle}
           neonTextColored={neonTextColored}
-          beautifyEnabled={beautifyEnabled}
+          beautifyEnabled={effectiveBeautify}
           bottomSpacingClass={getEditorBottomSpacingClass()}
           t={t}
         />
@@ -523,7 +539,7 @@ export const EditorPane: React.FC<EditorPaneProps> = ({
           isWidgetMenuOpen={isWidgetMenuOpen}
           setIsWidgetMenuOpen={setIsWidgetMenuOpen}
           editorMode={editorMode}
-          activeFormats={activeFormats}
+          activeFormats={effectiveActiveFormats}
           fmt={fmt}
           fmtLine={fmtLine}
           handleIndent={handleIndent}

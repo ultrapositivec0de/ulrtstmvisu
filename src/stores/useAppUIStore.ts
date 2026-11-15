@@ -1,23 +1,23 @@
 import { create } from 'zustand';
 
 export type AppView = 'editor' | 'reader';
+export type SettingsTab = 'general' | 'gallery' | 'vault' | 'keys' | 'about' | 'pwa';
 
 export interface AppUIStoreState {
   activeView: AppView;
   isSidebarOpen: boolean;
   isFullScreen: boolean;
   isEditorFullScreen: boolean;
-  settingsTab: string;
+  settingsTab: SettingsTab;
 
   // Actions
   setActiveView: (view: AppView) => void;
   setIsSidebarOpen: (open: boolean | ((prev: boolean) => boolean)) => void;
-  toggleSidebar: () => void;
   setIsFullScreen: (full: boolean | ((prev: boolean) => boolean)) => void;
   toggleFullScreen: () => void;
   setIsEditorFullScreen: (full: boolean | ((prev: boolean) => boolean)) => void;
   toggleEditorFullScreen: () => void;
-  setSettingsTab: (tab: string) => void;
+  setSettingsTab: (tab: SettingsTab | ((prev: SettingsTab) => SettingsTab)) => void;
 }
 
 const getInitialActiveView = (): AppView => {
@@ -49,9 +49,6 @@ export const useAppUIStore = create<AppUIStoreState>((set) => ({
       isSidebarOpen: typeof action === 'function' ? action(state.isSidebarOpen) : action,
     })),
 
-  toggleSidebar: () =>
-    set((state) => ({ isSidebarOpen: !state.isSidebarOpen })),
-
   setIsFullScreen: (action) =>
     set((state) => ({
       isFullScreen: typeof action === 'function' ? action(state.isFullScreen) : action,
@@ -68,5 +65,8 @@ export const useAppUIStore = create<AppUIStoreState>((set) => ({
   toggleEditorFullScreen: () =>
     set((state) => ({ isEditorFullScreen: !state.isEditorFullScreen })),
 
-  setSettingsTab: (settingsTab) => set({ settingsTab }),
+  setSettingsTab: (action) =>
+    set((state) => ({
+      settingsTab: typeof action === 'function' ? action(state.settingsTab) : action,
+    })),
 }));

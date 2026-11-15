@@ -61,6 +61,8 @@ export function calculateCaretScrollTop(
 }
 
 let mirrorDiv: HTMLDivElement | null = null;
+let lastMirrorKey = '';
+let lastCachedLineHeight = 24;
 
 /**
  * Calculates exact vertical position (in pixels) of the caret inside a textarea,
@@ -83,21 +85,29 @@ export function getExactCaretYInTextarea(ta: HTMLTextAreaElement, pos?: number):
     mirrorDiv.style.wordWrap = 'break-word';
     mirrorDiv.style.overflowWrap = 'break-word';
     document.body.appendChild(mirrorDiv);
+    lastMirrorKey = '';
   }
 
   const style = window.getComputedStyle(ta);
-  mirrorDiv.style.font = style.font;
-  mirrorDiv.style.fontFamily = style.fontFamily;
-  mirrorDiv.style.fontSize = style.fontSize;
-  mirrorDiv.style.fontWeight = style.fontWeight;
-  mirrorDiv.style.lineHeight = style.lineHeight;
-  mirrorDiv.style.letterSpacing = style.letterSpacing;
-  mirrorDiv.style.paddingTop = style.paddingTop;
-  mirrorDiv.style.paddingLeft = style.paddingLeft;
-  mirrorDiv.style.paddingRight = style.paddingRight;
-  mirrorDiv.style.border = style.border;
-  mirrorDiv.style.boxSizing = style.boxSizing;
-  mirrorDiv.style.width = `${ta.clientWidth}px`;
+  const widthStr = `${ta.clientWidth}px`;
+  const mirrorKey = `${widthStr}|${style.font}|${style.fontSize}|${style.lineHeight}|${style.letterSpacing}|${style.paddingTop}|${style.paddingLeft}|${style.paddingRight}|${style.border}|${style.boxSizing}`;
+
+  if (mirrorKey !== lastMirrorKey) {
+    mirrorDiv.style.font = style.font;
+    mirrorDiv.style.fontFamily = style.fontFamily;
+    mirrorDiv.style.fontSize = style.fontSize;
+    mirrorDiv.style.fontWeight = style.fontWeight;
+    mirrorDiv.style.lineHeight = style.lineHeight;
+    mirrorDiv.style.letterSpacing = style.letterSpacing;
+    mirrorDiv.style.paddingTop = style.paddingTop;
+    mirrorDiv.style.paddingLeft = style.paddingLeft;
+    mirrorDiv.style.paddingRight = style.paddingRight;
+    mirrorDiv.style.border = style.border;
+    mirrorDiv.style.boxSizing = style.boxSizing;
+    mirrorDiv.style.width = widthStr;
+    lastCachedLineHeight = parseFloat(style.lineHeight) || 24;
+    lastMirrorKey = mirrorKey;
+  }
 
   mirrorDiv.textContent = ta.value.substring(0, caretPos);
 
@@ -105,7 +115,7 @@ export function getExactCaretYInTextarea(ta: HTMLTextAreaElement, pos?: number):
   span.textContent = '\u200B';
   mirrorDiv.appendChild(span);
 
-  const caretY = span.offsetTop + (parseFloat(style.lineHeight) || 24);
+  const caretY = span.offsetTop + lastCachedLineHeight;
   return caretY;
 }
 

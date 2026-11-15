@@ -1,6 +1,0 @@
-{
-  "summary": "Implementation plan for a unified global and Reader account selector that supports switching between Keychain and Vault accounts with multi-user Keychain management.",
-  "updatedAt": "2026-11-05T22:02:04.438089237Z",
-  "requestFeedback": true,
-  "userFacing": true
-}

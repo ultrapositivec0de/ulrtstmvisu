@@ -276,8 +276,8 @@ export const TamedWidget: React.FC<TamedWidgetProps> = (props) => {
     'Justify': { id: 'Justify', title: t('justify'), label: t('justify'), action: () => fmt('<div class="text-justify">\n', '\n</div>') },
     'Templates': { id: 'Templates', title: t('templates'), label: <FileText size={20} />, action: () => setActiveModal('templates') },
     'Mentions': { id: 'Mentions', title: t('mentions'), label: 'Mentions', action: () => insertAtCursor('@') },
-    'Img': { id: 'Img', title: t('insertLocalImage'), label: <ImageIcon size={20} />, action: () => {} },
-    'Gallery': { id: 'Gallery', title: t('miniGallery'), label: 'Gallery', action: () => {} }
+    'Img': { id: 'Img', title: t('insertLocalImage'), label: <ImageIcon size={20} />, action: () => (document.querySelector('input[type="file"][accept="image/*"]') as HTMLInputElement | null)?.click() },
+    'Gallery': { id: 'Gallery', title: t('miniGallery'), label: 'Gallery', action: () => { setSettingsTab('gallery'); setActiveModal('settings'); } }
   };
 
   const TOOLS_MAP: Record<string, ToolItem> = (props.toolsMap || fallbackToolsMap) as Record<string, ToolItem>;

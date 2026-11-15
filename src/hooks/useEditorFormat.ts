@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react';
+import { useCallback } from 'react';
 import { useEditorStore } from '../store';
 import { getMarked } from '../utils/markdownParser';
 import { getAllFormatRangesInLine, FormatRange, isOffsetInTechnicalZone } from '../utils/formatUtils';
@@ -37,15 +37,8 @@ export function useEditorFormat(config: EditorFormatConfig) {
     scrollCaretIntoView
   } = config;
 
-  const [activeFormats, setActiveFormats] = useState({
-    bold: false,
-    italic: false,
-    code: false,
-    strikethrough: false,
-    sub: false,
-    sup: false,
-    phishy: false
-  });
+  const activeFormats = useEditorStore((s) => s.activeFormats);
+  const setActiveFormats = useEditorStore((s) => s.setActiveFormats);
 
 const insertHtmlAtCursor = useCallback((html: string) => {
     if (!wysiwygRef.current) return;
