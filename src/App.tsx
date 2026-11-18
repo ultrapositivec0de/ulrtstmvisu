@@ -194,6 +194,7 @@ function App() {
 
   // 17. Unified Workspace Services Suite
   const {
+    publishingSuite,
     postSettings,
     publishingQueue,
     publishingManager,
@@ -243,6 +244,7 @@ function App() {
     isDarkMode,
   } = useAppWorkspaceSuite({
     auth,
+    publishingSuite,
     postSettings,
     draftsManager,
     publishingQueue,

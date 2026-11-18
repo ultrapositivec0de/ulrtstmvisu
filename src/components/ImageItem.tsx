@@ -1,7 +1,8 @@
-import React from 'react';
-import { AlignLeft, AlignRight, FileText, CloudUpload, Trash2, ChevronLeft, ChevronRight, ChevronUp, ChevronDown, Check } from 'lucide-react';
+import React, { useState } from 'react';
+import { AlignLeft, AlignRight, FileText, CloudUpload, Trash2, ChevronLeft, ChevronRight, ChevronUp, ChevronDown, Check, Copy } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { ImageItem as ImageItemType } from '../types';
+import { getCanonicalImageUrl, copyTextWithFallback } from '../utils/postFormatting';
 
 interface ImageItemProps {
   img: ImageItemType;
@@ -32,9 +33,21 @@ const ImageItem = React.memo(({
   t,
   isCollapsed
 }: ImageItemProps) => {
+  const [copiedUrl, setCopiedUrl] = useState(false);
+
+  const canonicalUrl = getCanonicalImageUrl(img.url);
   const displayUrl = isTrafficOptimized && img.url.startsWith('http')
     ? `https://steemitimages.com/${galleryView === 'grid' ? '640x0' : '128x128'}/${img.url}`
     : img.url;
+
+  const handleCopyUrl = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    const ok = await copyTextWithFallback(canonicalUrl);
+    if (ok) {
+      setCopiedUrl(true);
+      setTimeout(() => setCopiedUrl(false), 1800);
+    }
+  };
 
   if (isCollapsed) {
     return (
@@ -148,6 +161,18 @@ const ImageItem = React.memo(({
                 <CloudUpload className="shrink-0" style={{ width: 'calc(var(--gallery-icon-size, 16px) * 0.8)', height: 'calc(var(--gallery-icon-size, 16px) * 0.8)' }} />
               </button>
             )}
+            <button
+              onMouseDown={(e) => e.preventDefault()}
+              onClick={handleCopyUrl}
+              className="p-1.5 bg-slate-800/80 dark:bg-slate-800 rounded flex-1 hover:bg-cyan-600 hover:text-white outline-none text-slate-100 dark:text-white transition-colors flex justify-center items-center shadow-xs"
+              title={copiedUrl ? t('lightboxUrlCopied') : t('lightboxCopyUrl')}
+            >
+              {copiedUrl ? (
+                <Check className="shrink-0 text-green-400" style={{ width: 'calc(var(--gallery-icon-size, 16px) * 0.8)', height: 'calc(var(--gallery-icon-size, 16px) * 0.8)' }} />
+              ) : (
+                <Copy className="shrink-0" style={{ width: 'calc(var(--gallery-icon-size, 16px) * 0.8)', height: 'calc(var(--gallery-icon-size, 16px) * 0.8)' }} />
+              )}
+            </button>
             <button onMouseDown={(e) => e.preventDefault()} onClick={(e) => { e.stopPropagation(); onDelete(idx); }} className="p-1.5 bg-slate-800/80 dark:bg-slate-800 rounded flex-1 hover:bg-red-600 hover:text-white outline-none text-slate-100 dark:text-white transition-colors flex justify-center items-center shadow-xs" title={t('delete')}>
               <Trash2 className="shrink-0" style={{ width: 'calc(var(--gallery-icon-size, 16px) * 0.8)', height: 'calc(var(--gallery-icon-size, 16px) * 0.8)' }} />
             </button>
@@ -171,6 +196,13 @@ const ImageItem = React.memo(({
               </button>
               <button onMouseDown={(e) => e.preventDefault()} title={t('rightText')} onClick={(e) => { e.stopPropagation(); onInsert(img.url, img.name, 'right'); }} className="text-[var(--text-muted)] hover:text-cyan-500">
                 <AlignRight className="shrink-0" style={{ width: 'calc(var(--gallery-icon-size, 16px) * 0.75)', height: 'calc(var(--gallery-icon-size, 16px) * 0.75)' }} />
+              </button>
+              <button onMouseDown={(e) => e.preventDefault()} title={copiedUrl ? t('lightboxUrlCopied') : t('lightboxCopyUrl')} onClick={handleCopyUrl} className="text-[var(--text-muted)] hover:text-cyan-500">
+                {copiedUrl ? (
+                  <Check className="shrink-0 text-green-400" style={{ width: 'calc(var(--gallery-icon-size, 16px) * 0.75)', height: 'calc(var(--gallery-icon-size, 16px) * 0.75)' }} />
+                ) : (
+                  <Copy className="shrink-0" style={{ width: 'calc(var(--gallery-icon-size, 16px) * 0.75)', height: 'calc(var(--gallery-icon-size, 16px) * 0.75)' }} />
+                )}
               </button>
               <button onMouseDown={(e) => e.preventDefault()} title={t('delete')} onClick={(e) => { e.stopPropagation(); onDelete(idx); }} className="text-[var(--text-muted)] hover:text-red-500">
                 <Trash2 className="shrink-0" style={{ width: 'calc(var(--gallery-icon-size, 16px) * 0.75)', height: 'calc(var(--gallery-icon-size, 16px) * 0.75)' }} />

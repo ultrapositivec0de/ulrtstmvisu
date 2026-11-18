@@ -28,7 +28,8 @@ import { motion, AnimatePresence } from 'motion/react';
 import { cn } from '../../lib/utils';
 import { ReaderConfig, SteemPost } from '../../types';
 import { POPULAR_COMMUNITIES, POPULAR_TAGS } from '../../data/communities';
-import { getWordCounts } from '../../utils/postFormatting';
+import { getWordCounts, getCanonicalImageUrl } from '../../utils/postFormatting';
+import { useLightboxStore } from '../../store/lightboxStore';
 import { PostRenderer } from './PostRenderer';
 
 export interface ReaderCurationViewProps {
@@ -402,13 +403,13 @@ export const ReaderCurationView: React.FC<ReaderCurationViewProps> = React.memo(
                                     <input
                                       type="number"
                                       min="1"
-                                      max="30"
+                                      max="365"
                                       value={curationDays}
                                       onChange={(e) =>
                                         setCurationDays(
                                           Math.max(
                                             1,
-                                            Math.min(30, Number(e.target.value)),
+                                            Math.min(365, Number(e.target.value) || 1),
                                           ),
                                         )
                                       }
@@ -418,6 +419,11 @@ export const ReaderCurationView: React.FC<ReaderCurationViewProps> = React.memo(
                                       {t("days")}
                                     </span>
                                   </div>
+                                  {curationDays > 7 && (
+                                    <p className="text-[10px] text-amber-400/90 leading-snug">
+                                      {t("curationOlderHint")}
+                                    </p>
+                                  )}
                                 </div>
                               </div>
                             </div>
@@ -798,20 +804,33 @@ export const ReaderCurationView: React.FC<ReaderCurationViewProps> = React.memo(
                             </div>
                           </div>
   
-                          <div className="space-y-2 relative pointer-events-auto">
+                          <div className="space-y-2 relative pointer-events-auto min-w-0 max-w-full">
                             <div
                               onClick={(e) => {
+                                const target = e.target as HTMLElement;
+                                if (target && target.tagName === 'IMG') {
+                                  e.stopPropagation();
+                                  const imgEl = target as HTMLImageElement;
+                                  if (imgEl.src) {
+                                    useLightboxStore.getState().openLightbox(getCanonicalImageUrl(imgEl.src), imgEl.alt || '');
+                                  }
+                                  return;
+                                }
+                                if (target && target.closest('summary, details, a, button')) {
+                                  e.stopPropagation();
+                                  return;
+                                }
                                 if (!isSelected) toggleSelection(e);
                               }}
                               className={cn(
-                                "text-sm text-slate-300 bg-slate-950/50 p-4 rounded-xl transition-all relative custom-scrollbar",
+                                "text-sm text-slate-300 bg-slate-950/50 p-4 rounded-xl transition-all relative custom-scrollbar min-w-0 max-w-full overflow-x-hidden",
                                 isExpanded
                                   ? "max-h-[500px] overflow-y-auto"
                                   : "max-h-[120px] overflow-hidden",
                               )}
                             >
                               <div
-                                className="markdown-body opacity-90 text-[13px] leading-relaxed"
+                                className="markdown-body opacity-90 text-[13px] leading-relaxed min-w-0 max-w-full [&_img]:cursor-zoom-in"
                                 dangerouslySetInnerHTML={{
                                   __html: renderContent(post.body, post.permlink),
                                 }}

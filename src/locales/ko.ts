@@ -1169,6 +1169,25 @@ export const translations = {
   "removeKeychainAccountConfirm": "Keychain 목록에서 @{acc} 계정을 삭제하시겠습니까?",
   "signingMethod": "서명 방식",
   "addVaultAccount": "Vault에 계정 추가",
+  "inboxCheckAgain": "다시 확인",
+  "inboxAllHiddenDesc": "불러온 모든 답글이 현재 로컬에서 숨겨져 있습니다.",
+  "inboxShowHiddenBtn": "숨겨진 항목 보기 ({count})",
+  "inboxHideHiddenBtn": "숨겨진 항목 감추기",
+  "loadAllFavoriteTags": "즐겨찾기 코어",
+  "loadAllFavoriteTagsTitle": "모든 즐겨찾기 태그의 게시물을 순차적으로 불러오기",
+  "pinPost": "읽기 캐시에 고정",
+  "unpinPost": "캐시 고정 해제",
+  "pinnedPostsTitle": "읽기용 고정 게시물",
+  "readerLoadMorePosts": "게시물 더 불러오기",
+  "curationOlderHint": "참고: 7일이 지난 게시물은 보상 기간이 종료되었지만 계속 열람하고 댓글을 남길 수 있습니다.",
+  "editModeBannerTitle": "게시물 편집 모드",
+  "editModePermlinkLocked": "기존 게시물을 업데이트하기 위해 블록체인 퍼마링크(permlink)가 잠겨 있습니다.",
+  "editModeAllowTitleChange": "표시 제목 변경 허용 (기술적 permlink는 변경되지 않음)",
+  "exitEditModeBtn": "초기화",
+  "editModeExitedNotify": "편집 모드가 해제되었습니다 — 다음 발행 시 새 게시물이 생성됩니다.",
+  "draftEditModeSavedNotify": "게시물 편집 메타데이터와 함께 임시보관함에 저장되었습니다.",
+  "draftEditModeLoadedNotify": "기존 게시물 편집 모드로 초안을 불러왔습니다.",
+  "draftEditBadge": "편집"
 } as const;
 
 export default { meta, translations };

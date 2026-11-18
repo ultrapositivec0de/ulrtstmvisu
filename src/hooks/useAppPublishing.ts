@@ -1,16 +1,23 @@
 import { useCallback } from 'react';
 import { SteemPost } from '../types';
+import { type SaveDraftMeta } from './useDrafts';
 
 export interface UseAppPublishingProps {
   syncWysiwygToContentIfVisual: () => string;
-  saveDraftHook: (currentMarkdown: string, status: 'working' | 'ready', notify: any, t: any) => void;
+  saveDraftHook: (currentMarkdown: string, status: 'working' | 'ready', notify: any, t: any, meta?: SaveDraftMeta) => void;
   confirmDialog: (title: string, msg: string) => Promise<boolean>;
   notify: (msg: string, type?: any) => void;
   t: (key: any) => string;
+  pubTitle?: string;
   setPubTitle: (title: string) => void;
   setContent: (content: string) => void;
+  pubTags?: string;
   setPubTags: React.Dispatch<React.SetStateAction<string>> | ((tags: any) => void);
+  editingPermlink?: string | null;
   setEditingPermlink: (permlink: string | null) => void;
+  setCurrentDraftId?: (id: string | null) => void;
+  setIsPubTitleManuallyEdited?: (val: boolean) => void;
+  setAllowTitleChangeInEdit?: (val: boolean) => void;
   setActiveView: (view: 'editor' | 'reader') => void;
   lastSyncContentRef: React.MutableRefObject<string>;
   syncCursorMarkdownToVisual: () => Promise<void>;
@@ -27,10 +34,16 @@ export function useAppPublishing({
   confirmDialog,
   notify,
   t,
+  pubTitle,
   setPubTitle,
   setContent,
+  pubTags,
   setPubTags,
+  editingPermlink,
   setEditingPermlink,
+  setCurrentDraftId,
+  setIsPubTitleManuallyEdited,
+  setAllowTitleChangeInEdit,
   setActiveView,
   lastSyncContentRef,
   syncCursorMarkdownToVisual,
@@ -53,8 +66,12 @@ export function useAppPublishing({
 
   const saveDraft = useCallback((status: 'working' | 'ready' = 'working') => {
     const currentMarkdown = syncWysiwygToContentIfVisual();
-    saveDraftHook(currentMarkdown, status, notify, t);
-  }, [syncWysiwygToContentIfVisual, saveDraftHook, notify, t]);
+    saveDraftHook(currentMarkdown, status, notify, t, {
+      editingPermlink: editingPermlink || null,
+      tags: pubTags,
+      pubTitle,
+    });
+  }, [syncWysiwygToContentIfVisual, saveDraftHook, notify, t, editingPermlink, pubTags, pubTitle]);
 
   const handleEditPost = useCallback(async (post: SteemPost) => {
     const currentMarkdown = syncWysiwygToContentIfVisual();
@@ -68,6 +85,9 @@ export function useAppPublishing({
       }
     }
 
+    setCurrentDraftId?.(null);
+    setIsPubTitleManuallyEdited?.(false);
+    setAllowTitleChangeInEdit?.(false);
     setPubTitle(post.title);
     setContent(post.body);
     setPubTags(JSON.parse(post.json_metadata || '{}').tags?.join(' ') || post.category);
@@ -78,7 +98,23 @@ export function useAppPublishing({
       syncCursorMarkdownToVisual();
     }, 50);
     notify(t('editor'), 'success');
-  }, [syncWysiwygToContentIfVisual, confirmDialog, t, saveDraft, setPubTitle, setContent, setPubTags, setEditingPermlink, setActiveView, lastSyncContentRef, syncCursorMarkdownToVisual, notify]);
+  }, [
+    syncWysiwygToContentIfVisual,
+    confirmDialog,
+    t,
+    saveDraft,
+    setCurrentDraftId,
+    setIsPubTitleManuallyEdited,
+    setAllowTitleChangeInEdit,
+    setPubTitle,
+    setContent,
+    setPubTags,
+    setEditingPermlink,
+    setActiveView,
+    lastSyncContentRef,
+    syncCursorMarkdownToVisual,
+    notify,
+  ]);
 
   const addMention = useCallback(() => {
     const name = newMention.trim().replace('@', '');

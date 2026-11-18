@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { usePostSettings } from './usePostSettings';
 import { useSteemQueue, processContentForSteem } from './useSteemQueue';
 import { usePublishingManager } from './usePublishingManager';
@@ -25,10 +25,14 @@ export interface UseSteemPublishingSuiteProps {
   vaultPin: string;
   initVault: (pin?: string) => any;
   promptDialog: (opts: any) => Promise<string | null>;
-  saveDraftHook: (content: string, status: 'working' | 'ready', notify: any, t: any) => void;
+  saveDraftHook: (content: string, status: 'working' | 'ready', notify: any, t: any, meta?: any) => void;
   setActiveModal: (val: string | null) => void;
   activeModal: string | null;
   setPubLog: (log: any) => void;
+}
+
+function extractFirstLineTitle(rawContent: string): string {
+  return (rawContent.split('\n')[0] || '').replace(/[#*`]/g, '').trim().substring(0, 70);
 }
 
 export function useSteemPublishingSuite({
@@ -55,6 +59,9 @@ export function useSteemPublishingSuite({
   activeModal,
   setPubLog,
 }: UseSteemPublishingSuiteProps) {
+  const [isPubTitleManuallyEdited, setIsPubTitleManuallyEdited] = useState(false);
+  const [allowTitleChangeInEdit, setAllowTitleChangeInEdit] = useState(false);
+
   // 1. Post & Publishing Settings
   const postSettings = usePostSettings();
   const {
@@ -78,19 +85,37 @@ export function useSteemPublishingSuite({
     setTagGroups,
   } = postSettings;
 
-  // 2. Auto-Title & Auth Sync on Publish Modal Open
+  // Reset title-edit unlock whenever editing session switches/exits
+  useEffect(() => {
+    setAllowTitleChangeInEdit(false);
+  }, [editingPermlink]);
+
+  // 2. Event-driven Auto-Title & Auth Sync (no timers/polling; zero keystroke overhead)
   useEffect(() => {
     if (activeModal === 'publish') {
       if (typeof window !== 'undefined' && !(window as any).steem_keychain) {
         setAuthType('VAULT');
       }
-      if (!pubTitle) {
-        const content = useEditorStore.getState().content;
-        const firstLine = content.split('\n')[0].replace(/[#*`]/g, '').trim();
-        if (firstLine) setPubTitle(firstLine.substring(0, 70));
+      if (!editingPermlink && !isPubTitleManuallyEdited) {
+        const latestContent = syncWysiwygToContentIfVisual() || useEditorStore.getState().content;
+        const firstLine = extractFirstLineTitle(latestContent);
+        setPubTitle(firstLine);
       }
     }
-  }, [activeModal, pubTitle, setAuthType, setPubTitle]);
+  }, [activeModal, editingPermlink, isPubTitleManuallyEdited, setAuthType, setPubTitle, syncWysiwygToContentIfVisual]);
+
+  useEffect(() => {
+    const unsubscribe = useEditorStore.subscribe((state, prevState) => {
+      if (state.content === prevState.content) return;
+      if (editingPermlink || isPubTitleManuallyEdited) return;
+      const prevFirst = extractFirstLineTitle(prevState.content);
+      const nextFirst = extractFirstLineTitle(state.content);
+      if (nextFirst !== prevFirst) {
+        setPubTitle(nextFirst);
+      }
+    });
+    return unsubscribe;
+  }, [editingPermlink, isPubTitleManuallyEdited, setPubTitle]);
 
   // 3. Publishing Queue
   const publishingQueue = useSteemQueue({
@@ -108,6 +133,12 @@ export function useSteemPublishingSuite({
     authType,
     username,
     selectedVaultUser,
+    editingPermlink,
+    setEditingPermlink,
+    onExitEditMode: () => {
+      setIsPubTitleManuallyEdited(false);
+      setAllowTitleChangeInEdit(false);
+    },
   });
 
   const {
@@ -134,6 +165,8 @@ export function useSteemPublishingSuite({
     isEditingPost: editingPermlink !== null,
     editingPermlink,
     setEditingPermlink,
+    setIsPubTitleManuallyEdited,
+    setAllowTitleChangeInEdit,
     authType,
     selectedVaultUser,
     username,
@@ -163,6 +196,12 @@ export function useSteemPublishingSuite({
     postSettings,
     publishingQueue,
     publishingManager,
+
+    // Title & edit mode controls
+    isPubTitleManuallyEdited,
+    setIsPubTitleManuallyEdited,
+    allowTitleChangeInEdit,
+    setAllowTitleChangeInEdit,
 
     // Settings helpers
     rewardType,

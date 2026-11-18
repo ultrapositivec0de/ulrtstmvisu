@@ -2,6 +2,8 @@ import React from 'react';
 import { Lock } from 'lucide-react';
 import { BaseModal } from './BaseModal';
 import { SecurityService } from '../../services/securityService';
+import { useDeviceStore } from '../../store/deviceStore';
+import { cn } from '../../lib/utils';
 
 interface UnlockPinModalProps {
   isOpen: boolean;
@@ -22,6 +24,10 @@ export const UnlockPinModal: React.FC<UnlockPinModalProps> = ({
   notify,
   t
 }) => {
+  const isKeyboardOpen = useDeviceStore(s => s.isKeyboardOpen);
+  const viewportHeight = useDeviceStore(s => s.viewportHeight);
+  const isCompactKeyboard = isKeyboardOpen && viewportHeight > 0 && viewportHeight < 520;
+
   const handleUnlock = async () => {
     if (!vaultPin) return;
     try {
@@ -48,28 +54,36 @@ export const UnlockPinModal: React.FC<UnlockPinModalProps> = ({
       modalKey="modal-unlock-pin"
       className="max-w-[340px]"
       footer={
-        <div className="flex gap-2 p-4 border-t border-[var(--border-color)] bg-[var(--bg-main)]/60">
+        <div className={cn(
+          'flex gap-2 border-t border-[var(--border-color)] bg-[var(--bg-main)]/60',
+          isCompactKeyboard ? 'p-3' : 'p-4'
+        )}>
           <button 
             type="button"
             onClick={onClose}
-            className="btn-secondary flex-1 py-2 px-3 text-xs uppercase"
+            className="btn-secondary flex-1 py-2.5 px-3 text-xs uppercase min-h-[40px]"
           >
             {t('cancel')}
           </button>
           <button 
             type="button"
             onClick={handleUnlock}
-            className="btn-primary flex-[2] py-2 px-3 text-xs uppercase"
+            className="btn-primary flex-[2] py-2.5 px-3 text-xs uppercase min-h-[40px]"
           >
             {t('unlock')}
           </button>
         </div>
       }
     >
-      <div className="p-5 text-center space-y-4">
-        <div className="w-12 h-12 bg-cyan-500/10 rounded-full flex items-center justify-center mx-auto border border-cyan-500/20 text-cyan-400">
-          <Lock size={22} />
-        </div>
+      <div className={cn(
+        'text-center',
+        isCompactKeyboard ? 'p-3.5 space-y-2.5' : 'p-5 space-y-4'
+      )}>
+        {!isCompactKeyboard && (
+          <div className="w-12 h-12 bg-cyan-500/10 rounded-full flex items-center justify-center mx-auto border border-cyan-500/20 text-cyan-400">
+            <Lock size={22} />
+          </div>
+        )}
 
         <div>
           <p className="text-xs text-[var(--text-muted)]">{t('enterPinPlaceholder')}</p>
@@ -78,6 +92,8 @@ export const UnlockPinModal: React.FC<UnlockPinModalProps> = ({
         <input 
           autoFocus
           type="password"
+          enterKeyHint="done"
+          autoComplete="current-password"
           value={vaultPin}
           onChange={e => setVaultPin(e.target.value)}
           onKeyDown={async (e) => {

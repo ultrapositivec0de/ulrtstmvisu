@@ -4,6 +4,9 @@ export interface Draft {
   body: string;
   date: string;
   status: 'working' | 'ready';
+  tags?: string;
+  editingPermlink?: string | null;
+  editingOriginalTitle?: string;
 }
 
 export interface Template {
@@ -41,6 +44,7 @@ export interface QueueItem {
   scheduledTime: string;
   status: 'pending' | 'success' | 'failed' | 'processing';
   error?: string;
+  editingPermlink?: string | null;
 }
 
 export interface SteemPost {

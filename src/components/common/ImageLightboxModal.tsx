@@ -4,6 +4,7 @@ import { X, ZoomIn, ZoomOut, RotateCcw, Copy, Check, Download } from 'lucide-rea
 import { useLightboxStore } from '../../store/lightboxStore';
 import { useEditorStore } from '../../store';
 import { getTranslation, TranslationKey } from '../../locales';
+import { getCanonicalImageUrl, copyTextWithFallback } from '../../utils/postFormatting';
 
 export const ImageLightboxModal: React.FC = () => {
   const { isOpen, imageSrc, imageAlt, closeLightbox } = useLightboxStore();
@@ -72,14 +73,23 @@ export const ImageLightboxModal: React.FC = () => {
     setPosition({ x: 0, y: 0 });
   };
 
-  const handleCopyLink = async () => {
-    if (!imageSrc) return;
+  const canonicalSrc = imageSrc ? getCanonicalImageUrl(imageSrc) : '';
+  const decodedFilename = React.useMemo(() => {
+    if (!canonicalSrc) return '';
+    const raw = canonicalSrc.split('/').pop()?.split('?')[0] || '';
     try {
-      await navigator.clipboard.writeText(imageSrc);
+      return decodeURIComponent(raw);
+    } catch {
+      return raw;
+    }
+  }, [canonicalSrc]);
+
+  const handleCopyLink = async () => {
+    if (!canonicalSrc) return;
+    const ok = await copyTextWithFallback(canonicalSrc);
+    if (ok) {
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
-    } catch (err) {
-      console.warn('Clipboard write failed:', err);
     }
   };
 
@@ -193,9 +203,12 @@ export const ImageLightboxModal: React.FC = () => {
           style={{ paddingTop: 'max(0.75rem, env(safe-area-inset-top, 0px))' }}
         >
           {/* Left info */}
-          <div className="flex items-center gap-2 max-w-[50%] min-w-0">
-            <span className="text-xs font-semibold text-slate-300 truncate tracking-tight">
-              {imageAlt || (imageSrc.split('/').pop()?.split('?')[0] || 'Image')}
+          <div className="flex items-center gap-2 max-w-[55%] min-w-0">
+            <span
+              className="text-xs font-semibold text-slate-300 truncate tracking-tight select-text"
+              title={decodedFilename || imageAlt || canonicalSrc}
+            >
+              {imageAlt || decodedFilename || 'Image'}
             </span>
             <span className="text-[10px] font-mono text-cyan-400 bg-cyan-950/50 px-1.5 py-0.5 rounded border border-cyan-500/20 shrink-0">
               {Math.round(scale * 100)}%
@@ -237,8 +250,8 @@ export const ImageLightboxModal: React.FC = () => {
               {copied ? <Check size={18} className="text-green-400" /> : <Copy size={18} />}
             </button>
             <a
-              href={imageSrc}
-              download
+              href={canonicalSrc || imageSrc}
+              download={decodedFilename || undefined}
               target="_blank"
               rel="noreferrer noopener"
               title="Download image"
@@ -290,15 +303,35 @@ export const ImageLightboxModal: React.FC = () => {
           />
         </div>
 
-        {/* Bottom Caption / Hint */}
-        {imageAlt && (
-          <div 
-            className="w-full text-center py-2 px-4 bg-slate-950/70 border-t border-white/10 shrink-0 text-xs text-slate-300 tracking-wide font-medium"
-            style={{ paddingBottom: 'max(0.5rem, env(safe-area-inset-bottom, 0px))' }}
-          >
-            {imageAlt}
+        {/* Bottom Full Selectable URL & Caption Bar */}
+        <div
+          onClick={(e) => e.stopPropagation()}
+          className="w-full py-2 px-3 sm:px-6 bg-slate-950/85 border-t border-white/10 shrink-0 flex flex-col sm:flex-row items-center justify-between gap-2 text-xs text-slate-300"
+          style={{ paddingBottom: 'max(0.5rem, env(safe-area-inset-bottom, 0px))' }}
+        >
+          {imageAlt && (
+            <div className="text-slate-200 font-medium truncate max-w-full sm:max-w-[30%] select-text">
+              {imageAlt}
+            </div>
+          )}
+          <div className="flex items-center gap-2 w-full sm:flex-1 min-w-0 justify-center sm:justify-end">
+            <code
+              className="text-[11px] font-mono text-cyan-300/90 bg-slate-900/90 border border-white/10 rounded-lg px-2.5 py-1 break-all select-text max-h-14 overflow-y-auto flex-1 min-w-0"
+              title={canonicalSrc}
+            >
+              {canonicalSrc}
+            </code>
+            <button
+              type="button"
+              onClick={handleCopyLink}
+              className="px-2.5 py-1.5 rounded-lg bg-cyan-600/25 hover:bg-cyan-600/40 text-cyan-200 border border-cyan-500/30 text-[11px] font-semibold flex items-center gap-1.5 shrink-0 cursor-pointer transition-colors"
+              title={copied ? t('lightboxUrlCopied') : t('lightboxCopyUrl')}
+            >
+              {copied ? <Check size={13} className="text-green-400" /> : <Copy size={13} />}
+              <span>{copied ? t('lightboxUrlCopied') : t('lightboxCopyUrl')}</span>
+            </button>
           </div>
-        )}
+        </div>
       </motion.div>
     </AnimatePresence>
   );

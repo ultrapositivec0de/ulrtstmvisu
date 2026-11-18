@@ -254,6 +254,12 @@ export interface CompositeModalsPropsInput {
   quickTags: string[];
   setQuickTags: (tags: string[]) => void;
   pinTag: (tag: string) => void;
+  editingPermlink?: string | null;
+  setEditingPermlink?: (p: string | null) => void;
+  isPubTitleManuallyEdited?: boolean;
+  setIsPubTitleManuallyEdited?: (v: boolean) => void;
+  allowTitleChangeInEdit?: boolean;
+  setAllowTitleChangeInEdit?: (v: boolean) => void;
   t: (key: any) => string;
 }
 
@@ -444,6 +450,12 @@ export function buildModalsProps(props: BuildModalsPropsInput | CompositeModalsP
       quickTags: rest.quickTags,
       setQuickTags: rest.setQuickTags,
       pinTag: rest.pinTag,
+      editingPermlink: rest.editingPermlink ?? null,
+      setEditingPermlink: rest.setEditingPermlink,
+      isPubTitleManuallyEdited: rest.isPubTitleManuallyEdited ?? false,
+      setIsPubTitleManuallyEdited: rest.setIsPubTitleManuallyEdited,
+      allowTitleChangeInEdit: rest.allowTitleChangeInEdit ?? false,
+      setAllowTitleChangeInEdit: rest.setAllowTitleChangeInEdit,
       t: rest.t,
     };
   }

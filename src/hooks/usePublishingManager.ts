@@ -17,6 +17,8 @@ export interface UsePublishingManagerOptions {
   isEditingPost?: boolean;
   editingPermlink?: string | null;
   setEditingPermlink?: (permlink: string | null) => void;
+  setIsPubTitleManuallyEdited?: (val: boolean) => void;
+  setAllowTitleChangeInEdit?: (val: boolean) => void;
   authType: AuthType;
   selectedVaultUser: string;
   username: string;
@@ -56,6 +58,8 @@ export function usePublishingManager(options: UsePublishingManagerOptions) {
     isEditingPost,
     editingPermlink,
     setEditingPermlink,
+    setIsPubTitleManuallyEdited,
+    setAllowTitleChangeInEdit,
     authType,
     selectedVaultUser,
     username,
@@ -106,7 +110,7 @@ export function usePublishingManager(options: UsePublishingManagerOptions) {
       .toLowerCase()
       .replace(/\s+/g, '_')
       .replace(/[^a-z0-9_.-]/g, '')
-      .substring(0, 40) + (ext ? '.' + ext : '');
+      .substring(0, 120) + (ext ? '.' + ext : '');
   };
 
   const handleSplitPost = useCallback(() => {
@@ -226,6 +230,11 @@ export function usePublishingManager(options: UsePublishingManagerOptions) {
       if (setEditingPermlink) {
         setEditingPermlink(null);
       }
+      setIsPubTitleManuallyEdited?.(false);
+      setAllowTitleChangeInEdit?.(false);
+      if (isEditingPost) {
+        notify(t('editModeExitedNotify'), 'success');
+      }
       setTimeout(() => {
         setActiveModal(null);
         setPubLog({ msg: '', type: null });
@@ -240,6 +249,9 @@ export function usePublishingManager(options: UsePublishingManagerOptions) {
     isEditingPost,
     editingPermlink,
     setEditingPermlink,
+    setIsPubTitleManuallyEdited,
+    setAllowTitleChangeInEdit,
+    notify,
     processContentForSteem,
     authType,
     selectedVaultUser,

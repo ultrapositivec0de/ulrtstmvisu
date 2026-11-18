@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { SteemPost, ReaderConfig } from "../../types";
 import { callWithFallback } from "../../lib/steem";
 
@@ -7,6 +7,62 @@ interface UseReaderFeedDataProps {
   setConfig: React.Dispatch<React.SetStateAction<ReaderConfig>>;
   mutedUsers: string[];
   setShowQuickPanel?: (show: boolean) => void;
+}
+
+interface TagCursorState {
+  startAuthor: string;
+  startPermlink: string;
+  exhausted: boolean;
+}
+
+function parseTagsInput(raw: string): string[] {
+  return Array.from(
+    new Set(
+      raw
+        .split(/[\s,]+/)
+        .map((s) => s.trim().replace(/^[#@]+/, "").toLowerCase())
+        .filter(Boolean),
+    ),
+  );
+}
+
+function buildFilteredFeed(
+  rawList: SteemPost[],
+  currentConfig: ReaderConfig,
+  mutedUsers: string[],
+): SteemPost[] {
+  const now = Date.now();
+  const limitTime = now - currentConfig.daysLimit * 24 * 60 * 60 * 1000;
+
+  const uniqueMap = new Map<string, SteemPost>();
+  for (const post of rawList) {
+    const key = `${post.author}/${post.permlink}`;
+    if (!uniqueMap.has(key)) {
+      uniqueMap.set(key, post);
+    }
+  }
+
+  let filtered = Array.from(uniqueMap.values()).filter((post) => {
+    const createdMs = new Date(post.created + "Z").getTime();
+    if (createdMs < limitTime) return false;
+    if (currentConfig.blackList.includes(post.author)) return false;
+    if (currentConfig.excludeMuted && mutedUsers.includes(post.author)) return false;
+    if (currentConfig.onlyWhitelist && !currentConfig.whiteList.includes(post.author)) return false;
+    return true;
+  });
+
+  // Sort merged multi-tag posts newest first
+  filtered.sort(
+    (a, b) => new Date(b.created + "Z").getTime() - new Date(a.created + "Z").getTime(),
+  );
+
+  const userCounts: Record<string, number> = {};
+  filtered = filtered.filter((post) => {
+    userCounts[post.author] = (userCounts[post.author] || 0) + 1;
+    return userCounts[post.author] <= currentConfig.limitPerUser;
+  });
+
+  return filtered;
 }
 
 export function useReaderFeedData({
@@ -24,6 +80,8 @@ export function useReaderFeedData({
     }
   });
   const [loading, setLoading] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [hasMoreFeed, setHasMoreFeed] = useState(false);
   const [expandedPosts, setExpandedPosts] = useState<Set<string>>(new Set());
   const [postComments, setPostComments] = useState<Record<string, SteemPost[]>>({});
   const [loadingComments, setLoadingComments] = useState<Set<string>>(new Set());
@@ -38,6 +96,11 @@ export function useReaderFeedData({
       return false;
     }
   });
+
+  const tagCursorsRef = useRef<Record<string, TagCursorState>>({});
+  const activeTagsRef = useRef<string[]>([]);
+  const rawPoolRef = useRef<SteemPost[]>([]);
+  const fetchRequestIdRef = useRef(0);
 
   useEffect(() => {
     if (posts && posts.length > 0) {
@@ -76,96 +139,222 @@ export function useReaderFeedData({
     }
   };
 
-  const fetchPosts = useCallback(async (customTag?: string) => {
-    const rawTag = customTag !== undefined ? customTag : searchTag;
-    const isExplicitEmpty = rawTag.trim() === "";
-    const currentSearchTags = rawTag.split(" ").filter(Boolean);
-    const activeTags = isExplicitEmpty ? [] : (currentSearchTags.length > 0 ? currentSearchTags : config.tags);
-    const selectedTag = activeTags.length > 0 ? activeTags[0].replace(/^[#@]+/, '') : "";
+  const fetchTagBatches = useCallback(
+    async (
+      tag: string,
+      targetValidAdd: number,
+      maxBatches: number,
+      requestId: number,
+      currentConfig: ReaderConfig,
+      currentMuted: string[],
+    ) => {
+      if (!tagCursorsRef.current[tag]) {
+        tagCursorsRef.current[tag] = {
+          startAuthor: "",
+          startPermlink: "",
+          exhausted: false,
+        };
+      }
+      const cursor = tagCursorsRef.current[tag];
+      const limitTime = Date.now() - currentConfig.daysLimit * 24 * 60 * 60 * 1000;
+      let validAdded = 0;
 
-    if (isExplicitEmpty && config.tags.length > 0) {
-      setConfig((c) => ({ ...c, tags: [] }));
-    } else if (currentSearchTags.length > 0 && currentSearchTags.join(" ") !== config.tags.join(" ")) {
-      setConfig((c) => ({ ...c, tags: currentSearchTags }));
-    }
+      for (let b = 0; b < maxBatches; b++) {
+        if (fetchRequestIdRef.current !== requestId) return;
+        if (cursor.exhausted) break;
 
-    if (setShowQuickPanel) setShowQuickPanel(false);
+        const query: Record<string, any> = {
+          tag,
+          limit: 100,
+        };
+        if (cursor.startAuthor && cursor.startPermlink) {
+          query.start_author = cursor.startAuthor;
+          query.start_permlink = cursor.startPermlink;
+        }
 
-    // If tag is not entered and user has not enabled loading feed without tag:
-    if (!selectedTag && !config.loadFeedWithoutTag) {
-      setPosts([]);
-      setLoading(false);
+        const batch: SteemPost[] = await callWithFallback(
+          "condenser_api.get_discussions_by_created",
+          [query],
+        );
+
+        if (fetchRequestIdRef.current !== requestId) return;
+        if (!batch || batch.length === 0) {
+          cursor.exhausted = true;
+          break;
+        }
+
+        const isContinuation = Boolean(cursor.startAuthor);
+        if (isContinuation && batch.length <= 1) {
+          cursor.exhausted = true;
+          break;
+        }
+
+        const items = isContinuation ? batch.slice(1) : batch;
+        const lastPost = batch[batch.length - 1];
+        cursor.startAuthor = lastPost.author;
+        cursor.startPermlink = lastPost.permlink;
+
+        const lastCreatedMs = new Date(lastPost.created + "Z").getTime();
+        if (lastCreatedMs < limitTime) {
+          cursor.exhausted = true;
+        }
+
+        rawPoolRef.current.push(...items);
+
+        for (const post of items) {
+          const createdMs = new Date(post.created + "Z").getTime();
+          if (
+            createdMs >= limitTime &&
+            !currentConfig.blackList.includes(post.author) &&
+            !(currentConfig.excludeMuted && currentMuted.includes(post.author)) &&
+            !(currentConfig.onlyWhitelist && !currentConfig.whiteList.includes(post.author))
+          ) {
+            validAdded++;
+          }
+        }
+
+        if (validAdded >= targetValidAdd || batch.length < 100) {
+          if (batch.length < 100) {
+            cursor.exhausted = true;
+          }
+          break;
+        }
+      }
+    },
+    [],
+  );
+
+  const fetchPosts = useCallback(
+    async (customTag?: string) => {
+      const requestId = ++fetchRequestIdRef.current;
+      const rawTag = customTag !== undefined ? customTag : searchTag;
+      const isExplicitEmpty = rawTag.trim() === "";
+      const currentSearchTags = parseTagsInput(rawTag);
+      const fallbackConfigTags = parseTagsInput((config.tags || []).join(" "));
+      const activeTags = isExplicitEmpty
+        ? []
+        : currentSearchTags.length > 0
+          ? currentSearchTags
+          : fallbackConfigTags;
+
+      if (isExplicitEmpty && config.tags.length > 0) {
+        setConfig((c) => ({ ...c, tags: [] }));
+      } else if (
+        currentSearchTags.length > 0 &&
+        currentSearchTags.join(" ") !== config.tags.join(" ")
+      ) {
+        setConfig((c) => ({ ...c, tags: currentSearchTags }));
+      }
+
+      if (setShowQuickPanel) setShowQuickPanel(false);
+
+      if (activeTags.length === 0 && !config.loadFeedWithoutTag) {
+        activeTagsRef.current = [];
+        rawPoolRef.current = [];
+        tagCursorsRef.current = {};
+        setHasMoreFeed(false);
+        setPosts([]);
+        setLoading(false);
+        setHasInitiatedFeed(true);
+        return;
+      }
+
+      const tagsToFetch = activeTags.length > 0 ? activeTags : [""];
+      activeTagsRef.current = tagsToFetch;
+      tagCursorsRef.current = {};
+      rawPoolRef.current = [];
+      setHasMoreFeed(false);
       setHasInitiatedFeed(true);
-      return;
-    }
+      setLoading(true);
 
-    setHasInitiatedFeed(true);
-    setLoading(true);
+      try {
+        const isMulti = tagsToFetch.length > 1;
+        const maxBatchesPerTag = isMulti ? 3 : 8;
+        const targetPerTag = isMulti ? 15 : 25;
+
+        for (const tag of tagsToFetch) {
+          if (fetchRequestIdRef.current !== requestId) return;
+          try {
+            await fetchTagBatches(
+              tag,
+              targetPerTag,
+              maxBatchesPerTag,
+              requestId,
+              config,
+              mutedUsers,
+            );
+            if (fetchRequestIdRef.current !== requestId) return;
+            const snapshot = buildFilteredFeed(rawPoolRef.current, config, mutedUsers);
+            setPosts(snapshot);
+          } catch (tagErr) {
+            console.error(`Failed to fetch posts for tag "${tag}":`, tagErr);
+          }
+        }
+
+        if (fetchRequestIdRef.current === requestId) {
+          const anyMore = tagsToFetch.some((tag) => !tagCursorsRef.current[tag]?.exhausted);
+          setHasMoreFeed(anyMore);
+        }
+      } catch (err) {
+        console.error("Failed to fetch posts:", err);
+      } finally {
+        if (fetchRequestIdRef.current === requestId) {
+          setLoading(false);
+        }
+      }
+    },
+    [config, searchTag, mutedUsers, setConfig, setShowQuickPanel, fetchTagBatches],
+  );
+
+  const loadMorePosts = useCallback(async () => {
+    const activeTags = activeTagsRef.current;
+    if (loading || loadingMore || !hasMoreFeed || activeTags.length === 0) return;
+
+    const requestId = fetchRequestIdRef.current;
+    setLoadingMore(true);
 
     try {
-      const query = {
-        tag: selectedTag,
-        limit: 100,
-      };
+      const isMulti = activeTags.length > 1;
+      const maxBatches = isMulti ? 2 : 4;
+      const targetValid = isMulti ? 10 : 20;
 
-      const result: SteemPost[] = await callWithFallback(
-        "condenser_api.get_discussions_by_created",
-        [query],
-      );
-
-      const now = new Date();
-      const limitDate = new Date(
-        now.getTime() - config.daysLimit * 24 * 60 * 60 * 1000,
-      );
-
-      let filtered = result.filter((post) => {
-        const created = new Date(post.created + "Z");
-        return created >= limitDate;
-      });
-
-      filtered = filtered.filter(
-        (post) => !config.blackList.includes(post.author),
-      );
-
-      if (config.excludeMuted) {
-        filtered = filtered.filter(
-          (post) => !mutedUsers.includes(post.author),
-        );
+      for (const tag of activeTags) {
+        if (fetchRequestIdRef.current !== requestId) return;
+        if (tagCursorsRef.current[tag]?.exhausted) continue;
+        try {
+          await fetchTagBatches(
+            tag,
+            targetValid,
+            maxBatches,
+            requestId,
+            config,
+            mutedUsers,
+          );
+          if (fetchRequestIdRef.current !== requestId) return;
+          setPosts(buildFilteredFeed(rawPoolRef.current, config, mutedUsers));
+        } catch (tagErr) {
+          console.error(`Failed to load more posts for tag "${tag}":`, tagErr);
+        }
       }
 
-      if (config.onlyWhitelist) {
-        filtered = filtered.filter((post) =>
-          config.whiteList.includes(post.author),
-        );
+      if (fetchRequestIdRef.current === requestId) {
+        const anyMore = activeTags.some((tag) => !tagCursorsRef.current[tag]?.exhausted);
+        setHasMoreFeed(anyMore);
       }
-
-      const userCounts: Record<string, number> = {};
-      filtered = filtered.filter((post) => {
-        userCounts[post.author] = (userCounts[post.author] || 0) + 1;
-        return userCounts[post.author] <= config.limitPerUser;
-      });
-
-      if (config.excludeMuted) {
-        filtered = filtered.filter(
-          (p) => !mutedUsers.includes(p.author),
-        );
-      }
-
-      const uniquePosts = filtered.filter(
-        (p, index, self) =>
-          index ===
-          self.findIndex(
-            (t) => t.author === p.author && t.permlink === p.permlink,
-          ),
-      );
-
-      setPosts(uniquePosts);
-    } catch (err) {
-      console.error("Failed to fetch posts:", err);
     } finally {
-      setLoading(false);
+      if (fetchRequestIdRef.current === requestId) {
+        setLoadingMore(false);
+      }
     }
-  }, [config, searchTag, mutedUsers, setConfig, setShowQuickPanel]);
+  }, [loading, loadingMore, hasMoreFeed, config, mutedUsers, fetchTagBatches]);
+
+  const fetchFavoriteCorePosts = useCallback(() => {
+    const favs = parseTagsInput((config.favoriteTags || []).join(" "));
+    if (favs.length === 0) return;
+    const combined = favs.join(" ");
+    setSearchTag(combined);
+    fetchPosts(combined);
+  }, [config.favoriteTags, fetchPosts]);
 
   const handleSearch = () => {
     fetchPosts();
@@ -191,6 +380,8 @@ export function useReaderFeedData({
     setPosts,
     loading,
     setLoading,
+    loadingMore,
+    hasMoreFeed,
     expandedPosts,
     setExpandedPosts,
     postComments,
@@ -204,6 +395,8 @@ export function useReaderFeedData({
     commentBody,
     setCommentBody,
     fetchPosts,
+    loadMorePosts,
+    fetchFavoriteCorePosts,
     fetchComments,
     togglePost,
     handleSearch,

@@ -35,6 +35,12 @@ export interface DraftsModalProps {
   drafts: Draft[];
   deleteDraft: (id: string) => void;
   toggleDraftStatus: (id: string) => void;
+
+  // Edit metadata
+  editingPermlink?: string | null;
+  setEditingPermlink?: (p: string | null) => void;
+  setIsPubTitleManuallyEdited?: (v: boolean) => void;
+  setAllowTitleChangeInEdit?: (v: boolean) => void;
 }
 
 export const DraftsModal: React.FC<DraftsModalProps> = (props) => {
@@ -43,6 +49,7 @@ export const DraftsModal: React.FC<DraftsModalProps> = (props) => {
     onClose,
     setContent,
     setPubTitle,
+    setPubTags,
     setCurrentDraftId,
     editorMode,
     wysiwygRef,
@@ -56,7 +63,11 @@ export const DraftsModal: React.FC<DraftsModalProps> = (props) => {
     t,
     drafts,
     deleteDraft,
-    toggleDraftStatus
+    toggleDraftStatus,
+    editingPermlink,
+    setEditingPermlink,
+    setIsPubTitleManuallyEdited,
+    setAllowTitleChangeInEdit
   } = props;
 
   const [draftFilter, setDraftFilter] = useState<'all' | 'working' | 'ready'>('all');
@@ -123,9 +134,14 @@ export const DraftsModal: React.FC<DraftsModalProps> = (props) => {
               className="group p-3.5 sm:p-4 bg-[var(--bg-main)]/50 hover:bg-[var(--bg-card)] border border-[var(--border-color)] hover:border-cyan-500/40 rounded-xl transition-all cursor-pointer flex justify-between items-center gap-3"
               onClick={async () => {
                 if (await confirmDialog(t('loadDraftConfirm'))) {
+                  const hadEditMode = Boolean(editingPermlink);
                   setContent(draft.body);
                   setPubTitle(draft.title);
+                  if (draft.tags !== undefined) setPubTags(draft.tags);
                   setCurrentDraftId(draft.id);
+                  setEditingPermlink?.(draft.editingPermlink || null);
+                  setIsPubTitleManuallyEdited?.(false);
+                  setAllowTitleChangeInEdit?.(false);
                   localStorage.removeItem('steem_autosave_temp_visual_html');
                   
                   if (editorMode === 'visual' && wysiwygRef.current) {
@@ -141,6 +157,12 @@ export const DraftsModal: React.FC<DraftsModalProps> = (props) => {
                     }
                     isSyncingRef.current = false;
                   }
+
+                  if (draft.editingPermlink) {
+                    notify(t('draftEditModeLoadedNotify'), 'info');
+                  } else if (hadEditMode) {
+                    notify(t('editModeExitedNotify'), 'info');
+                  }
                   
                   onClose();
                 }
@@ -149,6 +171,11 @@ export const DraftsModal: React.FC<DraftsModalProps> = (props) => {
               <div className="min-w-0 flex-1">
                 <div className="flex items-center gap-2">
                   <h4 className="font-bold text-xs sm:text-sm text-[var(--text-main)] truncate">{draft.title || t('untitled')}</h4>
+                  {draft.editingPermlink && (
+                    <span className="text-[9px] bg-amber-500/15 text-amber-300 px-1.5 py-0.5 rounded border border-amber-500/30 uppercase font-bold tracking-tight shrink-0">
+                      {t('draftEditBadge')}
+                    </span>
+                  )}
                   {draft.status === 'ready' && (
                     <span className="text-[9px] bg-green-500/15 text-green-400 px-1.5 py-0.5 rounded border border-green-500/30 uppercase font-bold tracking-tight shrink-0">
                       {t('ready')}
@@ -162,8 +189,19 @@ export const DraftsModal: React.FC<DraftsModalProps> = (props) => {
                 <button 
                   onClick={(e) => {
                     e.stopPropagation();
+                    const hadEditMode = Boolean(editingPermlink);
                     setContent(draft.body);
                     setPubTitle(draft.title);
+                    if (draft.tags !== undefined) setPubTags(draft.tags);
+                    setCurrentDraftId(draft.id);
+                    setEditingPermlink?.(draft.editingPermlink || null);
+                    setIsPubTitleManuallyEdited?.(false);
+                    setAllowTitleChangeInEdit?.(false);
+                    if (draft.editingPermlink) {
+                      notify(t('draftEditModeLoadedNotify'), 'info');
+                    } else if (hadEditMode) {
+                      notify(t('editModeExitedNotify'), 'info');
+                    }
                     setActiveModal('publish');
                   }}
                   title={t('publish')}

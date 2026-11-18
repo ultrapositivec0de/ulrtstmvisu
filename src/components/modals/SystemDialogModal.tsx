@@ -1,6 +1,8 @@
 import React, { useRef, useEffect } from 'react';
 import { AlertCircle, HelpCircle, MessageSquare } from 'lucide-react';
 import { BaseModal } from './BaseModal';
+import { useDeviceStore } from '../../store/deviceStore';
+import { cn } from '../../lib/utils';
 
 export interface SystemDialogState {
   type: 'alert' | 'confirm' | 'prompt';
@@ -24,6 +26,9 @@ export const SystemDialogModal: React.FC<SystemDialogModalProps> = ({
   t
 }) => {
   const inputRef = useRef<HTMLInputElement>(null);
+  const isKeyboardOpen = useDeviceStore(s => s.isKeyboardOpen);
+  const viewportHeight = useDeviceStore(s => s.viewportHeight);
+  const isCompactKeyboard = isKeyboardOpen && viewportHeight > 0 && viewportHeight < 520;
 
   useEffect(() => {
     if (systemDialog?.type === 'prompt' && inputRef.current) {
@@ -84,12 +89,15 @@ export const SystemDialogModal: React.FC<SystemDialogModalProps> = ({
       modalKey="modal-system-dialog"
       className="max-w-[420px]"
       footer={
-        <div className="flex justify-end items-center gap-2.5 p-4 border-t border-[var(--border-color)] bg-[var(--bg-main)]/60">
+        <div className={cn(
+          'flex justify-end items-center gap-2.5 border-t border-[var(--border-color)] bg-[var(--bg-main)]/60',
+          isCompactKeyboard ? 'p-3' : 'p-4'
+        )}>
           {systemDialog.type !== 'alert' && (
             <button 
               type="button"
               onClick={handleCancel}
-              className="px-4 py-2 text-[var(--text-muted)] hover:text-[var(--text-main)] hover:bg-[var(--bg-card)] rounded-xl transition-colors text-xs font-bold uppercase cursor-pointer"
+              className="px-4 py-2 min-h-[40px] text-[var(--text-muted)] hover:text-[var(--text-main)] hover:bg-[var(--bg-card)] rounded-xl transition-colors text-xs font-bold uppercase cursor-pointer"
             >
               {t('cancel')}
             </button>
@@ -97,14 +105,16 @@ export const SystemDialogModal: React.FC<SystemDialogModalProps> = ({
           <button 
             type="button"
             onClick={handleConfirm}
-            className="px-5 py-2 bg-cyan-600 hover:bg-cyan-500 text-white rounded-xl text-xs font-bold transition-all shadow-md shadow-cyan-900/20 uppercase cursor-pointer active:scale-95"
+            className="px-5 py-2 min-h-[40px] bg-cyan-600 hover:bg-cyan-500 text-white rounded-xl text-xs font-bold transition-all shadow-md shadow-cyan-900/20 uppercase cursor-pointer active:scale-95"
           >
             {systemDialog.type === 'alert' ? 'OK' : t('confirm')}
           </button>
         </div>
       }
     >
-      <div className="p-4 sm:p-5 space-y-4">
+      <div className={cn(
+        isCompactKeyboard ? 'p-3.5 space-y-2.5' : 'p-4 sm:p-5 space-y-4'
+      )}>
         <p className="text-sm text-[var(--text-main)] leading-relaxed whitespace-pre-wrap">
           {systemDialog.message}
         </p>
@@ -113,6 +123,8 @@ export const SystemDialogModal: React.FC<SystemDialogModalProps> = ({
           <input
             ref={inputRef}
             type={systemDialog.inputType || "text"}
+            enterKeyHint="done"
+            autoComplete={systemDialog.inputType === 'password' ? 'current-password' : 'off'}
             defaultValue={systemDialog.defaultValue}
             placeholder={systemDialog.placeholder}
             className="w-full px-3.5 py-2.5 bg-[var(--bg-main)] border border-[var(--border-color)] rounded-xl text-[var(--text-main)] placeholder:text-[var(--text-muted)] text-sm outline-none focus:ring-1 focus:ring-cyan-500 focus:border-cyan-500 transition-all font-mono"

@@ -1169,6 +1169,25 @@ export const translations = {
   "removeKeychainAccountConfirm": "¿Eliminar la cuenta @{acc} de la lista de Keychain?",
   "signingMethod": "Método de firma",
   "addVaultAccount": "Agregar cuenta a la bóveda",
+  "inboxCheckAgain": "Comprobar de nuevo",
+  "inboxAllHiddenDesc": "Todas las respuestas cargadas están ocultas localmente.",
+  "inboxShowHiddenBtn": "Mostrar ocultos ({count})",
+  "inboxHideHiddenBtn": "Ocultar ocultos",
+  "loadAllFavoriteTags": "Núcleo favorito",
+  "loadAllFavoriteTagsTitle": "Cargar secuencialmente publicaciones de todas las etiquetas favoritas",
+  "pinPost": "Fijar en caché de lectura",
+  "unpinPost": "Desfijar del caché",
+  "pinnedPostsTitle": "Fijados para leer",
+  "readerLoadMorePosts": "Cargar más publicaciones",
+  "curationOlderHint": "Nota: las publicaciones de más de 7 días tienen la ventana de recompensas cerrada, pero aún se pueden ver y comentar.",
+  "editModeBannerTitle": "Modo de edición de publicación",
+  "editModePermlinkLocked": "El enlace permanente (permlink) en la cadena de bloques está bloqueado para actualizar esta publicación.",
+  "editModeAllowTitleChange": "Permitir cambiar el título visible (el permlink no cambiará)",
+  "exitEditModeBtn": "Restablecer",
+  "editModeExitedNotify": "Modo de edición restablecido: la próxima publicación creará una entrada nueva.",
+  "draftEditModeSavedNotify": "Guardado en borradores junto con los metadatos de edición.",
+  "draftEditModeLoadedNotify": "Borrador cargado en modo de edición de publicación existente.",
+  "draftEditBadge": "EDICIÓN"
 } as const;
 
 export default { meta, translations };

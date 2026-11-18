@@ -117,7 +117,7 @@ export const ReaderSettingsView: React.FC<ReaderSettingsViewProps> = React.memo(
               <input
                 type="range"
                 min="1"
-                max="30"
+                max="180"
                 value={config.daysLimit}
                 onChange={(e) =>
                   setConfig((c) => ({
@@ -127,7 +127,7 @@ export const ReaderSettingsView: React.FC<ReaderSettingsViewProps> = React.memo(
                 }
                 className="flex-1 accent-cyan-500"
               />
-              <span className="text-sm font-mono text-cyan-400 w-4">
+              <span className="text-sm font-mono text-cyan-400 min-w-[2.5rem] text-right">
                 {config.daysLimit}
               </span>
             </div>

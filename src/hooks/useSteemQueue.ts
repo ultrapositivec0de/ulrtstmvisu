@@ -55,6 +55,9 @@ export interface SteemQueueConfig {
   authType: AuthType | 'VAULT';
   username: string;
   selectedVaultUser: string;
+  editingPermlink?: string | null;
+  setEditingPermlink?: (permlink: string | null) => void;
+  onExitEditMode?: () => void;
 }
 
 export function useSteemQueue(config: SteemQueueConfig) {
@@ -179,7 +182,7 @@ export function useSteemQueue(config: SteemQueueConfig) {
     
     try {
       const author = item.authType === 'VAULT' ? item.selectedVaultUser : item.username;
-      await performBroadcast(author, item.title, item.body, item.tags, item.authType);
+      await performBroadcast(author, item.title, item.body, item.tags, item.authType, '50', [], item.editingPermlink || undefined);
       
       const updated = queue.map(i => i.id === id ? { ...i, status: 'published' as const } : i);
       setQueue(updated);
@@ -201,7 +204,7 @@ export function useSteemQueue(config: SteemQueueConfig) {
     }
     
     let actualContent = currentMarkdown;
-    if (config.removeTitleLine) {
+    if (config.removeTitleLine && !config.editingPermlink) {
       const lines = currentMarkdown.split('\n');
       actualContent = lines.slice(1).join('\n').trim();
     }
@@ -216,12 +219,18 @@ export function useSteemQueue(config: SteemQueueConfig) {
       username: config.username,
       selectedVaultUser: config.selectedVaultUser,
       scheduledTime: scheduledTime,
-      status: 'pending'
+      status: 'pending',
+      ...(config.editingPermlink ? { editingPermlink: config.editingPermlink } : {}),
     };
 
     const updated = [...queue, newItem];
     setQueue(updated);
     localStorage.setItem(STORAGE_KEY_QUEUE, JSON.stringify(updated));
+    if (config.editingPermlink) {
+      config.setEditingPermlink?.(null);
+      config.onExitEditMode?.();
+      config.notify(config.t('editModeExitedNotify'), 'success');
+    }
     config.setPubLog({ msg: config.t('published'), type: 'success' });
     setTimeout(() => config.setActiveModal(null), 1000);
   }, [queue, scheduledTime, config]);

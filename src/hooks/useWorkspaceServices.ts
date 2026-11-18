@@ -152,6 +152,7 @@ export function useWorkspaceServices(params: UseWorkspaceServicesParams) {
   const {
     drafts,
     setDrafts,
+    setCurrentDraftId,
     saveDraft: saveDraftHook,
   } = draftsManager;
 
@@ -338,6 +339,12 @@ export function useWorkspaceServices(params: UseWorkspaceServicesParams) {
     setContent,
     setPubTags,
     setEditingPermlink,
+    editingPermlink,
+    pubTags,
+    pubTitle,
+    setCurrentDraftId,
+    setIsPubTitleManuallyEdited: publishingSuite.setIsPubTitleManuallyEdited,
+    setAllowTitleChangeInEdit: publishingSuite.setAllowTitleChangeInEdit,
     setActiveView,
     lastSyncContentRef,
     syncCursorMarkdownToVisual,

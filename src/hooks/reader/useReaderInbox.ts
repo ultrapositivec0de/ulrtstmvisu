@@ -53,12 +53,31 @@ export function useReaderInbox({
   const [replyingTo, setReplyingTo] = useState<SteemPost | null>(null);
   const [floatingCommentBody, setFloatingCommentBody] = useState("");
 
+  useEffect(() => {
+    try {
+      localStorage.setItem("steem_hidden_replies", JSON.stringify(Array.from(hiddenReplies)));
+    } catch {
+      // ignore storage errors
+    }
+  }, [hiddenReplies]);
+
   const unreadRepliesCount = inbox.filter((r) => !hiddenReplies.has(r.permlink)).length;
 
-  const fetchInbox = async (more: boolean = false, silent: boolean = false): Promise<boolean> => {
+  const fetchInbox = async (
+    arg1: boolean | { forceNetwork?: boolean; loadMore?: boolean; silent?: boolean } = false,
+    silentArg: boolean = false,
+  ): Promise<boolean> => {
     if (!currentUser) return false;
 
-    const newLimit = Math.min(more ? inboxLimit + 50 : 50, 100);
+    const opts =
+      typeof arg1 === "object" && arg1 !== null
+        ? arg1
+        : { loadMore: Boolean(arg1), silent: Boolean(silentArg), forceNetwork: false };
+    const more = Boolean(opts.loadMore);
+    const silent = Boolean(opts.silent);
+    const forceNetwork = Boolean(opts.forceNetwork);
+
+    const newLimit = Math.min(more ? inboxLimit + 50 : Math.max(inboxLimit, 50), 100);
     if (more) setInboxLimit(newLimit);
 
     if (silent) setIsRefreshingInbox(true);
@@ -67,7 +86,7 @@ export function useReaderInbox({
     try {
       let results: SteemPost[] = [];
 
-      if (!more && rawInboxData && rawInboxData.length > 0) {
+      if (!more && !forceNetwork && rawInboxData && rawInboxData.length > 0) {
         results = rawInboxData;
       } else {
         results = await callWithFallback("bridge.get_account_posts", {
@@ -227,7 +246,7 @@ export function useReaderInbox({
 
   useEffect(() => {
     if (showInbox && rawInboxData && rawInboxData.length > 0) {
-      fetchInbox(false, true);
+      fetchInbox({ forceNetwork: true, silent: true });
     }
   }, [rawInboxData, showInbox]);
 
@@ -250,7 +269,7 @@ export function useReaderInbox({
     if (targetReaderPost) {
       if (targetReaderPost.commentPermlink || targetReaderPost.permlink) {
         setShowInbox(true);
-        fetchInbox(true).then(() => {
+        fetchInbox({ forceNetwork: true }).then(() => {
           setTimeout(() => {
             const targetId = targetReaderPost.commentPermlink || targetReaderPost.permlink;
             const el = document.getElementById(`inbox-item-${targetId}`);

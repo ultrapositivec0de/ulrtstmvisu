@@ -3,6 +3,7 @@ import { ReaderConfig, SteemPost } from '../types';
 
 export const STORAGE_KEY_READER_CONFIG = 'steem_reader_config_v1';
 export const STORAGE_KEY_RESPONDED = 'steem_responded_v1';
+export const STORAGE_KEY_PINNED_POSTS = 'steem_pinned_posts_v1';
 
 export const DEFAULT_READER_CONFIG: ReaderConfig = {
   whiteList: [],
@@ -62,6 +63,17 @@ export function loadInitialRespondedReplies(): Record<string, string> {
   }
 }
 
+export function loadInitialPinnedPosts(): SteemPost[] {
+  if (typeof localStorage === 'undefined') return [];
+  const saved = localStorage.getItem(STORAGE_KEY_PINNED_POSTS);
+  try {
+    const parsed = saved ? JSON.parse(saved) : [];
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+}
+
 function safeSetItem(key: string, value: string) {
   if (typeof localStorage === 'undefined') return;
   try {
@@ -98,6 +110,11 @@ export interface ReaderStoreState {
     replies: Record<string, string> | ((prev: Record<string, string>) => Record<string, string>),
   ) => void;
   recordRespondedReply: (permlink: string, body: string) => void;
+
+  // Pinned / Kept-in-cache posts
+  pinnedPosts: SteemPost[];
+  togglePinPost: (post: SteemPost) => void;
+  clearPinnedPosts: () => void;
 
   // Muted Manager
   showMutedManager: boolean;
@@ -196,6 +213,29 @@ export const useReaderStore = create<ReaderStoreState>((set) => ({
       safeSetItem(STORAGE_KEY_RESPONDED, JSON.stringify(next));
       return { respondedReplies: next };
     });
+  },
+
+  pinnedPosts: loadInitialPinnedPosts(),
+  togglePinPost: (post) => {
+    set((state) => {
+      const key = `${post.author}/${post.permlink}`;
+      const exists = state.pinnedPosts.some((p) => `${p.author}/${p.permlink}` === key);
+      const next = exists
+        ? state.pinnedPosts.filter((p) => `${p.author}/${p.permlink}` !== key)
+        : [post, ...state.pinnedPosts].slice(0, 50);
+      safeSetItem(STORAGE_KEY_PINNED_POSTS, JSON.stringify(next));
+      return { pinnedPosts: next };
+    });
+  },
+  clearPinnedPosts: () => {
+    if (typeof localStorage !== 'undefined') {
+      try {
+        localStorage.removeItem(STORAGE_KEY_PINNED_POSTS);
+      } catch (e) {
+        console.debug(e);
+      }
+    }
+    set({ pinnedPosts: [] });
   },
 
   showMutedManager: false,

@@ -1169,6 +1169,25 @@ export const translations = {
   "removeKeychainAccountConfirm": "Видалити акаунт @{acc} зі списку Keychain?",
   "signingMethod": "Метод підпису",
   "addVaultAccount": "Додати акаунт у сховище",
+  "inboxCheckAgain": "Перевірити знову",
+  "inboxAllHiddenDesc": "Усі завантажені відповіді наразі приховані локально.",
+  "inboxShowHiddenBtn": "Показати приховані ({count})",
+  "inboxHideHiddenBtn": "Сховати приховані",
+  "loadAllFavoriteTags": "Ядро вподобань",
+  "loadAllFavoriteTagsTitle": "Послідовно завантажити дописи з усіх улюблених тегів",
+  "pinPost": "Закріпити в кеші читання",
+  "unpinPost": "Відкріпити з кешу",
+  "pinnedPostsTitle": "Закріплені для читання",
+  "readerLoadMorePosts": "Завантажити ще дописів",
+  "curationOlderHint": "Примітка: дописи старші 7 діб мають закрите вікно винагород, але їх можна переглядати та коментувати.",
+  "editModeBannerTitle": "Режим редагування допису",
+  "editModePermlinkLocked": "Постійне посилання (permlink) на блокчейні зафіксоване для оновлення саме цього допису.",
+  "editModeAllowTitleChange": "Дозволити змінити видимий заголовок (технічний permlink не зміниться)",
+  "exitEditModeBtn": "Скинути",
+  "editModeExitedNotify": "Режим редагування допису скинуто — наступна публікація створить новий допис.",
+  "draftEditModeSavedNotify": "Збережено до чернеток разом із метаданими редагування допису.",
+  "draftEditModeLoadedNotify": "Чернетку завантажено у режимі редагування існуючого допису.",
+  "draftEditBadge": "РЕДАГУВАННЯ"
 } as const;
 
 export default { meta, translations };

@@ -3,13 +3,15 @@ import DOMPurify from 'dompurify';
 import { convertBareImageUrlsToMarkdown } from '../lib/editorSync';
 
 export const DOM_PURIFY_CONFIG = {
-  ALLOWED_TAGS: ['b', 'i', 'em', 'strong', 'a', 'div', 'p', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'ul', 'ol', 'li', 'blockquote', 'pre', 'code', 'table', 'thead', 'tbody', 'tr', 'th', 'td', 'img', 'hr', 'br', 'span', 'strike', 'sup', 'sub', 'center'],
-  ALLOWED_ATTR: ['href', 'src', 'alt', 'class', 'className', 'style', 'title', 'target', 'rel', 'referrerpolicy', 'id'],
+  ALLOWED_TAGS: ['b', 'i', 'em', 'strong', 'a', 'div', 'p', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'ul', 'ol', 'li', 'blockquote', 'pre', 'code', 'table', 'thead', 'tbody', 'tr', 'th', 'td', 'img', 'hr', 'br', 'span', 'strike', 'sup', 'sub', 'center', 'details', 'summary'],
+  ALLOWED_ATTR: ['href', 'src', 'alt', 'class', 'className', 'style', 'title', 'target', 'rel', 'referrerpolicy', 'id', 'open'],
   ADD_CLASSES: {
-    div: ['pull-left', 'pull-right', 'text-justify', 'text-right', 'text-center', 'clearfix', 'phishy', 'text-blue', 'text-green'],
+    div: ['pull-left', 'pull-right', 'text-justify', 'text-right', 'text-center', 'clearfix', 'phishy', 'text-blue', 'text-green', 'steem-code-scroll'],
     p: ['pull-left', 'pull-right', 'text-justify', 'text-right', 'text-center', 'clearfix', 'phishy', 'text-blue', 'text-green'],
-    span: ['phishy', 'text-blue', 'text-green'],
-    img: ['pull-left', 'pull-right', 'text-justify', 'text-right', 'text-center']
+    span: ['phishy', 'text-blue', 'text-green', 'steem-code-lang', 'steem-code-meta', 'steem-code-toggle-hint'],
+    img: ['pull-left', 'pull-right', 'text-justify', 'text-right', 'text-center'],
+    details: ['steem-code-block'],
+    summary: ['steem-code-summary']
   }
 };
 
@@ -87,27 +89,25 @@ export const getMarked = () => {
           return '\n\n' + Array(count).fill('<br>').join('') + '\n\n';
         });
 
-        // Prevent distinct list blocks separated by blank lines from merging into a single list; generate a real break/paragraph so cursor can be placed between them
-        let prevLists = '';
-        while (prevLists !== normalizedText) {
-          prevLists = normalizedText;
-          normalizedText = normalizedText.replace(/(```[\s\S]*?```|`[^`\n]*`)|(^|\n)([\t ]*(?:[-*+]|\d+\.)[^\n]+)(\n\s*\n)([\t ]*(?:[-*+]|\d+\.)[^\n]+)/g, (match, code, pre, item1, newlines, item2) => {
+        // Prevent distinct list blocks separated by blank lines from merging into a single list in a single O(n) pass
+        normalizedText = normalizedText.replace(
+          /(```[\s\S]*?```|`[^`\n]*`)|((?:^|\n)[\t ]*(?:[-*+]|\d+\.)[^\n]+)(?=\n\s*\n[\t ]*(?:[-*+]|\d+\.)[^\n]+)/g,
+          (match, code, item1) => {
             if (code) return code;
-            return `${pre || ''}${item1}\n\n<br>\n\n${item2}`;
-          });
-        }
+            return `${item1}\n\n<br>`;
+          }
+        );
 
-        // Prevent distinct tables separated by blank lines from sticking together; generate a real break/paragraph so cursor can be placed between them (standalone and quoted)
-        let prevTables = '';
-        while (prevTables !== normalizedText) {
-          prevTables = normalizedText;
-          normalizedText = normalizedText.replace(/(```[\s\S]*?```|`[^`\n]*`)|((?:(?:>\s*)*)\|[^\n]+\|)(\n(?:\s*(?:>\s*)*\n)+)((?:(?:>\s*)*)\|[^\n]+\|)/g, (match, code, row1, newlines, row2) => {
+        // Prevent distinct tables separated by blank lines from sticking together in a single O(n) pass
+        normalizedText = normalizedText.replace(
+          /(```[\s\S]*?```|`[^`\n]*`)|((?:(?:>\s*)*)\|[^\n]+\|)(?=\n(?:\s*(?:>\s*)*\n)+(?:(?:>\s*)*)\|[^\n]+\|)/g,
+          (match, code, row1) => {
             if (code) return code;
             const qMatch = row1.match(/^(\s*(?:>\s*)+)/);
             const prefix = qMatch ? qMatch[1] : '';
-            return `${row1}\n${prefix}\n${prefix}<br>\n${prefix}\n${row2}`;
-          });
-        }
+            return `${row1}\n${prefix}\n${prefix}<br>`;
+          }
+        );
 
         let textWithImageMarkdown = convertBareImageUrlsToMarkdown(normalizedText);
         

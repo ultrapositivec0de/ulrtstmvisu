@@ -15,6 +15,7 @@ import { useModalStore } from '../stores/useModalStore';
 export interface UseAppWorkspaceSuiteParams {
   // Domain Suites
   auth: any;
+  publishingSuite?: any;
   postSettings: any;
   draftsManager: any;
   publishingQueue: any;
@@ -133,6 +134,7 @@ export interface UseAppWorkspaceSuiteParams {
 export function useAppWorkspaceSuite(params: UseAppWorkspaceSuiteParams) {
   const {
     auth,
+    publishingSuite,
     postSettings,
     draftsManager,
     publishingQueue,
@@ -238,6 +240,8 @@ export function useAppWorkspaceSuite(params: UseAppWorkspaceSuiteParams) {
   const newMention = editorState?.newMention ?? params.newMention ?? '';
   const setNewMention = (editorState?.setNewMention ?? params.setNewMention)!;
   const currentUser = editorState?.currentUser ?? params.currentUser ?? '';
+  const editingPermlink = editorState?.editingPermlink ?? null;
+  const setEditingPermlink = editorState?.setEditingPermlink;
   const showTableSelector = useModalStore((s) => s.isTableSelectorOpen);
   const setShowTableSelector = useModalStore((s) => s.setIsTableSelectorOpen);
 
@@ -500,6 +504,12 @@ export function useAppWorkspaceSuite(params: UseAppWorkspaceSuiteParams) {
     quickTags,
     setQuickTags,
     pinTag,
+    editingPermlink,
+    setEditingPermlink,
+    isPubTitleManuallyEdited: publishingSuite?.isPubTitleManuallyEdited ?? false,
+    setIsPubTitleManuallyEdited: publishingSuite?.setIsPubTitleManuallyEdited,
+    allowTitleChangeInEdit: publishingSuite?.allowTitleChangeInEdit ?? false,
+    setAllowTitleChangeInEdit: publishingSuite?.setAllowTitleChangeInEdit,
     t,
   });
 
@@ -557,6 +567,11 @@ export function useAppWorkspaceSuite(params: UseAppWorkspaceSuiteParams) {
     setSettingsTab,
     isTauriEnv,
     isNeutralinoEnv,
+    editingPermlink,
+    setEditingPermlink,
+    setIsPubTitleManuallyEdited: publishingSuite?.setIsPubTitleManuallyEdited,
+    setAllowTitleChangeInEdit: publishingSuite?.setAllowTitleChangeInEdit,
+    notify,
     t,
   };
 

@@ -116,6 +116,11 @@ export interface HeaderProps {
   updateWysiwygEmptyStatus: (ref: any) => void;
   isTauriEnv: () => boolean;
   isNeutralinoEnv: () => boolean;
+  editingPermlink?: string | null;
+  setEditingPermlink?: (p: string | null) => void;
+  setIsPubTitleManuallyEdited?: (v: boolean) => void;
+  setAllowTitleChangeInEdit?: (v: boolean) => void;
+  notify?: (msg: string, type?: any) => void;
   t: (key: any) => string;
 }
 
@@ -181,6 +186,11 @@ export const Header: React.FC<HeaderProps> = (props) => {
     isTauriEnv,
     isNeutralinoEnv,
     toolsMap,
+    editingPermlink,
+    setEditingPermlink,
+    setIsPubTitleManuallyEdited,
+    setAllowTitleChangeInEdit,
+    notify,
     t
   } = props;
 
@@ -720,7 +730,14 @@ export const Header: React.FC<HeaderProps> = (props) => {
                       if (saveFirst) saveDraft();
                       else if (!await confirmDialog(t('confirmNewPost'))) return;
                     }
+                    const wasEditing = Boolean(editingPermlink);
                     setPubTitle(''); setContent(''); setPubTags(''); setCurrentDraftId(null);
+                    setEditingPermlink?.(null);
+                    setIsPubTitleManuallyEdited?.(false);
+                    setAllowTitleChangeInEdit?.(false);
+                    if (wasEditing) {
+                      notify?.(t('editModeExitedNotify'), 'info');
+                    }
                     localStorage.removeItem('steem_autosave_temp_visual_html');
                     if (wysiwygRef.current) {
                       wysiwygRef.current.innerHTML = '<p><br></p>';

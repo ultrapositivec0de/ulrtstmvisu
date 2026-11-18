@@ -101,7 +101,7 @@ export function sanitizeImageFilename(name: string): string {
     .toLowerCase()
     .replace(/\s+/g, '_')
     .replace(/[^a-z0-9_.-]/g, '')
-    .substring(0, 40);
+    .substring(0, 120);
   return cleanBase + (ext ? '.' + ext : '');
 }
 

@@ -5,6 +5,13 @@ import { zipSync, unzipSync, strToU8, strFromU8 } from 'fflate';
 export const STORAGE_KEY_DRAFTS = 'steem_drafts_v2';
 export const STORAGE_KEY_TEMPLATES = 'steem_templates_v2';
 
+export interface SaveDraftMeta {
+  editingPermlink?: string | null;
+  tags?: string;
+  pubTitle?: string;
+  editingOriginalTitle?: string;
+}
+
 export function useDrafts(saveFileNatively: (blob: Blob, defaultFilename: string, mimeType?: string) => Promise<boolean>) {
   const [currentDraftId, setCurrentDraftId] = useState<string | null>(null);
 
@@ -28,8 +35,18 @@ export function useDrafts(saveFileNatively: (blob: Blob, defaultFilename: string
   });
 
   // Save draft
-  const saveDraft = useCallback((currentMarkdown: string, status: 'working' | 'ready' = 'working', notify: any, t: any) => {
-    const title = currentMarkdown.split('\n')[0].replace(/[#*`]/g, '').trim().substring(0, 50) || t('untitled');
+  const saveDraft = useCallback((
+    currentMarkdown: string,
+    status: 'working' | 'ready' = 'working',
+    notify: any,
+    t: any,
+    meta?: SaveDraftMeta
+  ) => {
+    const lineTitle = currentMarkdown.split('\n')[0].replace(/[#*`]/g, '').trim().substring(0, 70);
+    const isEditingLive = Boolean(meta?.editingPermlink);
+    const title = (isEditingLive && meta?.pubTitle?.trim())
+      ? meta.pubTitle.trim().substring(0, 100)
+      : (lineTitle || meta?.pubTitle?.trim().substring(0, 100) || t('untitled'));
     const existingDrafts = [...drafts];
     
     let updatedDrafts: Draft[];
@@ -38,7 +55,16 @@ export function useDrafts(saveFileNatively: (blob: Blob, defaultFilename: string
     if (currentDraftId) {
       updatedDrafts = existingDrafts.map((d: Draft) => {
         if (d.id === currentDraftId) {
-          return { ...d, title, body: currentMarkdown, date: new Date().toLocaleString(), status };
+          return {
+            ...d,
+            title,
+            body: currentMarkdown,
+            date: new Date().toLocaleString(),
+            status,
+            tags: meta?.tags !== undefined ? meta.tags : d.tags,
+            editingPermlink: isEditingLive ? meta?.editingPermlink : undefined,
+            editingOriginalTitle: isEditingLive ? (meta?.editingOriginalTitle || meta?.pubTitle || d.editingOriginalTitle) : undefined,
+          };
         }
         return d;
       });
@@ -49,7 +75,12 @@ export function useDrafts(saveFileNatively: (blob: Blob, defaultFilename: string
         title,
         body: currentMarkdown,
         date: new Date().toLocaleString(),
-        status
+        status,
+        ...(meta?.tags !== undefined ? { tags: meta.tags } : {}),
+        ...(isEditingLive ? {
+          editingPermlink: meta?.editingPermlink,
+          editingOriginalTitle: meta?.editingOriginalTitle || meta?.pubTitle,
+        } : {}),
       };
       updatedDrafts = [newDraft, ...existingDrafts];
       targetDraftId = newId;
@@ -58,7 +89,7 @@ export function useDrafts(saveFileNatively: (blob: Blob, defaultFilename: string
 
     setDrafts(updatedDrafts);
     localStorage.setItem(STORAGE_KEY_DRAFTS, JSON.stringify(updatedDrafts));
-    notify(t('saveSuccess'));
+    notify(isEditingLive ? t('draftEditModeSavedNotify') : t('saveSuccess'));
     return targetDraftId;
   }, [currentDraftId, drafts]);
 

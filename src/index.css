@@ -473,15 +473,100 @@ body {
   margin-top: 0.5rem !important;
   margin-bottom: 0.85rem !important;
 }
-.markdown-body code, .wysiwyg-editor code { @apply bg-slate-800 px-1.5 py-0.5 rounded text-sm font-mono text-cyan-400; }
-.markdown-body pre, .wysiwyg-editor pre { @apply bg-slate-900 p-4 rounded-xl mb-4 overflow-x-auto border border-slate-800; }
-.markdown-body pre code, .wysiwyg-editor pre code { @apply bg-transparent p-0 text-slate-300; }
-.markdown-body table, .wysiwyg-editor table { @apply w-full border-collapse mb-4; max-width: 100%; overflow-x: auto; }
+.markdown-body, .wysiwyg-editor {
+  min-width: 0;
+  max-width: 100%;
+  overflow-wrap: anywhere;
+}
+.markdown-body code, .wysiwyg-editor code {
+  @apply bg-slate-800 px-1.5 py-0.5 rounded text-sm font-mono text-cyan-400;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+  white-space: normal;
+}
+.markdown-body pre, .wysiwyg-editor pre {
+  @apply bg-slate-900 p-3 sm:p-4 rounded-xl mb-4 overflow-x-auto border border-slate-800;
+  max-width: 100%;
+  white-space: pre;
+}
+.markdown-body pre code, .wysiwyg-editor pre code {
+  @apply bg-transparent p-0 text-slate-300;
+  white-space: pre;
+  word-break: normal;
+  overflow-wrap: normal;
+}
+.steem-code-block {
+  max-width: 100%;
+  min-width: 0;
+  margin-bottom: 1rem;
+  border-radius: 0.75rem;
+  border: 1px solid var(--border-color, #1e293b);
+  background-color: rgba(15, 23, 42, 0.85);
+  overflow: hidden;
+}
+.steem-code-summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  min-height: 40px;
+  padding: 0.45rem 0.75rem;
+  cursor: pointer;
+  list-style: none;
+  user-select: none;
+  background-color: rgba(30, 41, 59, 0.7);
+  color: var(--text-muted, #94a3b8);
+  font-size: 0.75rem;
+  font-family: var(--font-mono);
+}
+.steem-code-summary::-webkit-details-marker {
+  display: none;
+}
+.steem-code-meta {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  min-width: 0;
+}
+.steem-code-chevron {
+  display: inline-block;
+  transition: transform 0.15s ease;
+  color: var(--accent-hex, #06b6d4);
+}
+details.steem-code-block[open] .steem-code-chevron {
+  transform: rotate(90deg);
+}
+.steem-code-lang {
+  font-weight: 700;
+  color: var(--text-main, #f1f5f9);
+}
+.steem-code-lines {
+  opacity: 0.75;
+}
+.steem-code-toggle-hint::after {
+  content: '▾';
+  opacity: 0.8;
+}
+details.steem-code-block[open] .steem-code-toggle-hint::after {
+  content: '▴';
+}
+.steem-code-scroll {
+  max-width: 100%;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+.steem-code-scroll > pre {
+  margin-bottom: 0 !important;
+  border: none !important;
+  border-radius: 0 !important;
+  background-color: transparent !important;
+}
+.markdown-body table, .wysiwyg-editor table { @apply w-full border-collapse mb-4; max-width: 100%; overflow-x: auto; display: block; }
 .markdown-body th, .markdown-body td, .wysiwyg-editor th, .wysiwyg-editor td { @apply border border-slate-800 p-2 text-left; }
 .markdown-body th, .wysiwyg-editor th { @apply bg-slate-900 font-bold; }
 .markdown-body img, .wysiwyg-editor img { @apply rounded-xl max-w-full h-auto object-contain; max-height: 500px; }
 .markdown-body hr, .wysiwyg-editor hr { @apply border-slate-800 my-8; }
-.markdown-body a, .wysiwyg-editor a { @apply text-cyan-400 hover:underline; }
+.markdown-body a, .wysiwyg-editor a { @apply text-cyan-400 hover:underline; overflow-wrap: anywhere; }
 
 /* Light Theme Markdown Overrides */
 .theme-light .markdown-body, .theme-light .wysiwyg-editor { color: var(--text-main); }
@@ -492,6 +577,9 @@ body {
 .theme-light .markdown-body code, .theme-light .wysiwyg-editor code { background-color: #e2e8f0; color: var(--accent); }
 .theme-light .markdown-body pre, .theme-light .wysiwyg-editor pre { background-color: #f1f5f9; border-color: #cbd5e1; }
 .theme-light .markdown-body pre code, .theme-light .wysiwyg-editor pre code { background-color: transparent; color: #0f172a; }
+.theme-light .steem-code-block { background-color: #f8fafc; border-color: #cbd5e1; }
+.theme-light .steem-code-summary { background-color: #e2e8f0; color: #334155; }
+.theme-light .steem-code-lang { color: #0f172a; }
 .theme-light .markdown-body hr, .theme-light .wysiwyg-editor hr { border-color: #cbd5e1; }
 .theme-light .markdown-body th, .theme-light .wysiwyg-editor th,
 .theme-light .markdown-body td, .theme-light .wysiwyg-editor td { border-color: #cbd5e1; }

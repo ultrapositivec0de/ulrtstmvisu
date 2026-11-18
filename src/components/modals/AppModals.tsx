@@ -197,6 +197,12 @@ export interface AppModalsProps {
   quickTags: string[];
   setQuickTags: (tags: string[]) => void;
   pinTag: (tag: string) => void;
+  editingPermlink?: string | null;
+  setEditingPermlink?: (p: string | null) => void;
+  isPubTitleManuallyEdited?: boolean;
+  setIsPubTitleManuallyEdited?: (v: boolean) => void;
+  allowTitleChangeInEdit?: boolean;
+  setAllowTitleChangeInEdit?: (v: boolean) => void;
 
   t: (key: any) => string;
 }
@@ -362,6 +368,12 @@ export const AppModals: React.FC<AppModalsProps> = (props) => {
     quickTags,
     setQuickTags,
     pinTag,
+    editingPermlink,
+    setEditingPermlink,
+    isPubTitleManuallyEdited,
+    setIsPubTitleManuallyEdited,
+    allowTitleChangeInEdit,
+    setAllowTitleChangeInEdit,
     t
   } = props;
 
@@ -481,6 +493,11 @@ export const AppModals: React.FC<AppModalsProps> = (props) => {
           quickTags={quickTags}
           setQuickTags={setQuickTags}
           pinTag={pinTag}
+          editingPermlink={editingPermlink}
+          setEditingPermlink={setEditingPermlink}
+          setIsPubTitleManuallyEdited={setIsPubTitleManuallyEdited}
+          allowTitleChangeInEdit={allowTitleChangeInEdit}
+          setAllowTitleChangeInEdit={setAllowTitleChangeInEdit}
           t={t}
         />
 
@@ -554,6 +571,10 @@ export const AppModals: React.FC<AppModalsProps> = (props) => {
           drafts={drafts}
           deleteDraft={deleteDraft}
           toggleDraftStatus={toggleDraftStatus}
+          editingPermlink={editingPermlink}
+          setEditingPermlink={setEditingPermlink}
+          setIsPubTitleManuallyEdited={setIsPubTitleManuallyEdited}
+          setAllowTitleChangeInEdit={setAllowTitleChangeInEdit}
         />
 
         <MentionsModal

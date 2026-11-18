@@ -79,6 +79,11 @@ export interface PublishModalProps {
   quickTags: string[];
   setQuickTags: (tags: string[]) => void;
   pinTag: (tag: string) => void;
+  editingPermlink?: string | null;
+  setEditingPermlink?: (p: string | null) => void;
+  setIsPubTitleManuallyEdited?: (v: boolean) => void;
+  allowTitleChangeInEdit?: boolean;
+  setAllowTitleChangeInEdit?: (v: boolean) => void;
   t: (key: any) => string;
 }
 
@@ -131,6 +136,11 @@ export const PublishModal: React.FC<PublishModalProps> = (props) => {
     quickTags,
     setQuickTags,
     pinTag,
+    editingPermlink = null,
+    setEditingPermlink,
+    setIsPubTitleManuallyEdited,
+    allowTitleChangeInEdit = false,
+    setAllowTitleChangeInEdit,
     t
   } = props;
 
@@ -310,6 +320,39 @@ export const PublishModal: React.FC<PublishModalProps> = (props) => {
         </div>
       }
     >
+      {/* Edit Mode Banner */}
+      {editingPermlink && (
+        <div className="p-3.5 bg-amber-500/10 border border-amber-500/30 rounded-xl space-y-2">
+          <div className="flex items-start justify-between gap-2">
+            <div className="min-w-0 flex-1 space-y-1">
+              <div className="flex items-center gap-1.5 text-xs font-bold text-amber-300">
+                <Lock size={14} className="shrink-0" />
+                <span>{t('editModeBannerTitle')}</span>
+              </div>
+              <p className="text-[11px] text-amber-200/80 leading-relaxed">
+                {t('editModePermlinkLocked')}
+              </p>
+              <div className="text-[11px] font-mono text-amber-100/90 bg-black/25 px-2.5 py-1 rounded-lg border border-amber-500/20 truncate">
+                @{(authType === 'VAULT' ? selectedVaultUser : username) || '...'}/{editingPermlink}
+              </div>
+            </div>
+            {setEditingPermlink && (
+              <button
+                type="button"
+                onClick={() => {
+                  setEditingPermlink(null);
+                  setAllowTitleChangeInEdit?.(false);
+                  notify(t('editModeExitedNotify'), 'info');
+                }}
+                className="shrink-0 px-2.5 py-1.5 rounded-lg text-[11px] font-bold bg-amber-500/20 hover:bg-amber-500/30 text-amber-200 border border-amber-500/30 transition-colors cursor-pointer"
+              >
+                {t('exitEditModeBtn')}
+              </button>
+            )}
+          </div>
+        </div>
+      )}
+
       {/* Auth Selector */}
       <div className="flex gap-2 p-1 bg-[var(--bg-main)]/80 rounded-xl border border-[var(--border-color)]">
         <button 
@@ -466,19 +509,48 @@ export const PublishModal: React.FC<PublishModalProps> = (props) => {
           <input 
             type="text" 
             value={pubTitle || ""}
-            onChange={e => setPubTitle(e.target.value)}
-            className="w-full bg-[var(--bg-card)] border border-[var(--border-color)] text-[var(--text-main)] rounded-xl px-3.5 py-2.5 text-xs sm:text-sm outline-none focus:ring-1 focus:ring-cyan-500 transition-all"
+            readOnly={Boolean(editingPermlink && !allowTitleChangeInEdit)}
+            onChange={e => {
+              const val = e.target.value;
+              setPubTitle(val);
+              if (!editingPermlink) {
+                setIsPubTitleManuallyEdited?.(val.trim().length > 0);
+              }
+            }}
+            className={cn(
+              "w-full border border-[var(--border-color)] text-[var(--text-main)] rounded-xl px-3.5 py-2.5 text-xs sm:text-sm outline-none focus:ring-1 focus:ring-cyan-500 transition-all",
+              editingPermlink && !allowTitleChangeInEdit
+                ? "bg-[var(--bg-main)]/60 opacity-80 cursor-not-allowed"
+                : "bg-[var(--bg-card)]"
+            )}
             placeholder={t('title')}
           />
-          <label className="flex items-center gap-2 mt-2 cursor-pointer group">
-            <div className="relative flex items-center justify-center">
-              <input type="checkbox" checked={removeTitleLine} onChange={(e) => { setRemoveTitleLine(e.target.checked); localStorage.setItem('steem_remove_title_line', e.target.checked.toString()); }} className="sr-only" />
-              <div className={cn("w-4 h-4 rounded border flex items-center justify-center transition-colors", removeTitleLine ? "bg-cyan-500 border-cyan-500" : "border-[var(--border-color)] group-hover:border-slate-500")}>
-                {removeTitleLine && <Check size={12} className="text-white" />}
+          {editingPermlink ? (
+            <label className="flex items-center gap-2 mt-2 min-h-[40px] cursor-pointer group">
+              <div className="relative flex items-center justify-center">
+                <input
+                  type="checkbox"
+                  checked={Boolean(allowTitleChangeInEdit)}
+                  onChange={(e) => setAllowTitleChangeInEdit?.(e.target.checked)}
+                  className="sr-only"
+                />
+                <div className={cn("w-4 h-4 rounded border flex items-center justify-center transition-colors", allowTitleChangeInEdit ? "bg-amber-500 border-amber-500" : "border-[var(--border-color)] group-hover:border-slate-500")}>
+                  {allowTitleChangeInEdit && <Check size={12} className="text-white" />}
+                </div>
               </div>
-            </div>
-            <span className="text-xs text-[var(--text-muted)] group-hover:text-[var(--text-main)]">{t('removeFirstLine')}</span>
-          </label>
+              <span className="text-xs text-[var(--text-muted)] group-hover:text-[var(--text-main)] leading-snug">{t('editModeAllowTitleChange')}</span>
+            </label>
+          ) : (
+            <label className="flex items-center gap-2 mt-2 cursor-pointer group">
+              <div className="relative flex items-center justify-center">
+                <input type="checkbox" checked={removeTitleLine} onChange={(e) => { setRemoveTitleLine(e.target.checked); localStorage.setItem('steem_remove_title_line', e.target.checked.toString()); }} className="sr-only" />
+                <div className={cn("w-4 h-4 rounded border flex items-center justify-center transition-colors", removeTitleLine ? "bg-cyan-500 border-cyan-500" : "border-[var(--border-color)] group-hover:border-slate-500")}>
+                  {removeTitleLine && <Check size={12} className="text-white" />}
+                </div>
+              </div>
+              <span className="text-xs text-[var(--text-muted)] group-hover:text-[var(--text-main)]">{t('removeFirstLine')}</span>
+            </label>
+          )}
         </div>
 
         {/* Tags input */}

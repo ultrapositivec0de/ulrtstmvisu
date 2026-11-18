@@ -5,6 +5,7 @@ import {
   Search,
   BellRing,
   RefreshCw,
+  Layers,
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { cn } from '../../lib/utils';
@@ -28,6 +29,7 @@ export interface ReaderQuickPanelProps {
   handleIncreaseFontSize: () => void;
   currentFontSize: number;
   fetchPosts: (customTag?: string) => void;
+  fetchFavoriteCorePosts?: () => void;
   loading: boolean;
   isCurationLoading: boolean;
   posts: SteemPost[];
@@ -61,6 +63,7 @@ export const ReaderQuickPanel: React.FC<ReaderQuickPanelProps> = React.memo(({
   handleIncreaseFontSize,
   currentFontSize,
   fetchPosts,
+  fetchFavoriteCorePosts,
   loading,
   isCurationLoading,
   posts,
@@ -183,6 +186,29 @@ export const ReaderQuickPanel: React.FC<ReaderQuickPanelProps> = React.memo(({
             {/* Quick Favorite Tag Chips for Mobile */}
             {viewMode === 'feed' && (
               <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar py-1">
+                {(config.favoriteTags || []).length > 1 && fetchFavoriteCorePosts && (() => {
+                  const favsJoined = (config.favoriteTags || []).map(ft => ft.replace(/^[#@]+/, '').toLowerCase()).join(' ');
+                  const isCoreActive = (searchTag || '').trim().toLowerCase() === favsJoined;
+                  return (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        fetchFavoriteCorePosts();
+                        setShowQuickPanel(false);
+                      }}
+                      title={t('loadAllFavoriteTagsTitle')}
+                      className={cn(
+                        "px-2.5 py-1 rounded-full text-[11px] font-semibold transition-all shrink-0 border flex items-center gap-1 cursor-pointer",
+                        isCoreActive
+                          ? "bg-amber-500/20 text-amber-300 border-amber-500/50 shadow-sm"
+                          : "bg-slate-950 text-amber-300/90 border-amber-500/30 hover:bg-amber-500/15"
+                      )}
+                    >
+                      <Layers size={12} />
+                      <span>{t('loadAllFavoriteTags')}</span>
+                    </button>
+                  );
+                })()}
                 {(config.favoriteTags || []).map((tag) => {
                   const cleanTag = tag.replace(/^#/, '');
                   const isActive = (searchTag || '').trim().toLowerCase() === cleanTag.toLowerCase();

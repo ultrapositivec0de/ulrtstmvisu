@@ -3,6 +3,7 @@ import { motion } from 'motion/react';
 import { X } from 'lucide-react';
 import { cn } from '../../lib/utils';
 import { useEditorStore } from '../../store';
+import { useDeviceStore } from '../../store/deviceStore';
 import { getTranslation, TranslationKey } from '../../locales';
 
 export type ModalSize = 'pin' | 'sm' | 'md' | 'lg' | 'xl' | '2xl' | 'fit';
@@ -56,6 +57,9 @@ export const BaseModal: React.FC<BaseModalProps> = ({
   modalKey,
 }) => {
   const currentLang = useEditorStore(s => s.currentLang);
+  const isKeyboardOpen = useDeviceStore(s => s.isKeyboardOpen);
+  const viewportHeight = useDeviceStore(s => s.viewportHeight);
+  const offsetTop = useDeviceStore(s => s.offsetTop);
   const t = (key: TranslationKey) => getTranslation(currentLang, key);
 
   // Close on Escape key press
@@ -107,15 +111,21 @@ export const BaseModal: React.FC<BaseModalProps> = ({
 
   const isCritical = priority === 'critical';
   const zIndexClass = isCritical ? 'z-[var(--z-modal-critical,1000)]' : 'z-[var(--z-modal,500)]';
+  const isCompactKeyboard = isKeyboardOpen && viewportHeight > 0 && viewportHeight < 520;
 
   return (
     <div
       key={modalKey}
       className={cn(
-        'fixed inset-0 flex items-center justify-center p-3 sm:p-4 overscroll-contain select-none',
+        'fixed inset-x-0 flex items-center justify-center overscroll-contain select-none',
+        isCompactKeyboard ? 'p-2' : 'p-3 sm:p-4',
         zIndexClass
       )}
-      style={{ touchAction: 'none' }}
+      style={{
+        touchAction: 'none',
+        top: `${offsetTop || 0}px`,
+        height: 'var(--vv-height, 100dvh)',
+      }}
     >
       {/* Universal Backdrop: Transparent overlay to keep application workspace fully visible as a pure window */}
       <motion.div
@@ -137,7 +147,10 @@ export const BaseModal: React.FC<BaseModalProps> = ({
         exit={{ scale: 0.95, opacity: 0, y: 12 }}
         transition={{ duration: 0.18, ease: 'easeOut' }}
         className={cn(
-          'relative w-full bg-[var(--modal-bg)] rounded-2xl sm:rounded-3xl overflow-hidden flex flex-col max-h-[90vh] text-[var(--text-main)] select-text',
+          'relative w-full bg-[var(--modal-bg)] rounded-2xl sm:rounded-3xl overflow-hidden flex flex-col text-[var(--text-main)] select-text',
+          isCompactKeyboard
+            ? 'max-h-[calc(var(--vv-height,100dvh)-0.75rem)]'
+            : 'max-h-[calc(var(--vv-height,100dvh)-1.5rem)] sm:max-h-[90vh]',
           'border border-[var(--modal-border)] shadow-[0_25px_70px_rgba(0,0,0,0.55)] dark:shadow-[0_30px_90px_rgba(0,0,0,0.85)] ring-1 ring-white/10 dark:ring-white/10',
           'overscroll-contain',
           SIZE_CLASSES[size],
@@ -148,7 +161,10 @@ export const BaseModal: React.FC<BaseModalProps> = ({
         {/* Optional Universal Header */}
         {!hideHeader && (title || onClose) && (
           <div 
-            className="flex items-center justify-between px-5 py-4 border-b border-[var(--modal-border)] bg-[var(--modal-bg)] shrink-0 select-none"
+            className={cn(
+              'flex items-center justify-between border-b border-[var(--modal-border)] bg-[var(--modal-bg)] shrink-0 select-none',
+              isCompactKeyboard ? 'px-4 py-2.5' : 'px-5 py-4'
+            )}
             style={{ touchAction: 'none' }}
           >
             <div className="flex items-center gap-2.5 min-w-0">

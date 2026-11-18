@@ -23,6 +23,7 @@ export const CodeEditor = forwardRef<HTMLTextAreaElement, CodeEditorProps>((prop
   const caretRafRef = useRef<number | null>(null);
   const caretThrottleTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lastCaretCheckTimeRef = useRef<number>(0);
+  const lastPasteTimeRef = useRef<number>(0);
 
   const latestContentRef = useRef(initialState.content);
   const latestSelectionStartRef = useRef(initialState.selectionStart);
@@ -208,14 +209,15 @@ export const CodeEditor = forwardRef<HTMLTextAreaElement, CodeEditorProps>((prop
   };
 
   const scheduleCaretVisibilityCheck = (target: HTMLTextAreaElement, immediate = false) => {
-    if (!target) return;
+    if (!target || (typeof document !== 'undefined' && document.hidden)) return;
+    if (!immediate && Date.now() - lastPasteTimeRef.current < 350) return;
     const runCheck = () => {
       if (caretRafRef.current !== null) {
         cancelAnimationFrame(caretRafRef.current);
       }
       caretRafRef.current = requestAnimationFrame(() => {
         caretRafRef.current = null;
-        if (localRef.current) {
+        if (localRef.current && !document.hidden) {
           lastCaretCheckTimeRef.current = Date.now();
           ensureCaretVisibleInView(localRef.current);
         }
@@ -361,13 +363,18 @@ export const CodeEditor = forwardRef<HTMLTextAreaElement, CodeEditorProps>((prop
     const val = target.value;
     const start = target.selectionStart;
     const end = target.selectionEnd;
+    const prevLen = latestContentRef.current.length;
+    const isBulkChange = Math.abs(val.length - prevLen) > 250;
+    if (isBulkChange) {
+      lastPasteTimeRef.current = Date.now();
+    }
 
     latestContentRef.current = val;
     latestSelectionStartRef.current = start;
     latestSelectionEndRef.current = end;
     
-    // Debounce Zustand update (including row/col calculation)
-    const syncDelay = 100;
+    // Debounce Zustand update (including row/col calculation); defer slightly longer on large pastes
+    const syncDelay = isBulkChange ? 220 : 100;
     if (syncContentTimeoutRef.current) clearTimeout(syncContentTimeoutRef.current);
     syncContentTimeoutRef.current = setTimeout(() => {
       syncContentTimeoutRef.current = null;
@@ -517,6 +524,9 @@ export const CodeEditor = forwardRef<HTMLTextAreaElement, CodeEditorProps>((prop
     <textarea
       ref={handleRef}
       defaultValue={initialContentRef.current}
+      onPaste={() => {
+        lastPasteTimeRef.current = Date.now();
+      }}
       onChange={handleChange}
       onKeyDown={handleKeyDown}
       onSelect={handleSelect}

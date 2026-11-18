@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useRef } from 'react';
 import { cn } from '../../lib/utils';
 import { useEditorStore } from '../../store';
 import { useLightboxStore } from '../../store/lightboxStore';
@@ -30,6 +30,20 @@ export interface WysiwygCanvasProps {
   t: (key: any) => string;
 }
 
+const escapeHtmlText = (str: string) =>
+  str
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;');
+
+const plainTextToParagraphHtml = (text: string) => {
+  const normalized = text.replace(/\r\n/g, '\n');
+  const blocks = normalized.split(/\n{2,}/);
+  return blocks
+    .map((block) => `<p>${escapeHtmlText(block).replace(/\n/g, '<br>') || '<br>'}</p>`)
+    .join('');
+};
+
 export const WysiwygCanvas: React.FC<WysiwygCanvasProps> = React.memo(({
   wysiwygRef,
   isSyncingRef,
@@ -55,6 +69,8 @@ export const WysiwygCanvas: React.FC<WysiwygCanvasProps> = React.memo(({
   bottomSpacingClass,
   t,
 }) => {
+  const lastPasteTimeRef = useRef<number>(0);
+
   return (
     <div
       ref={wysiwygRef}
@@ -69,6 +85,8 @@ export const WysiwygCanvas: React.FC<WysiwygCanvasProps> = React.memo(({
         const textData = e.clipboardData.getData('text/plain');
         
         if (!textData && !htmlData) return;
+
+        lastPasteTimeRef.current = Date.now();
 
         // Convert current spacer to standard paragraph before pasting if selection is inside
         const sel = window.getSelection();
@@ -92,22 +110,36 @@ export const WysiwygCanvas: React.FC<WysiwygCanvasProps> = React.memo(({
             if (!document.execCommand('insertHTML', false, imgHtml)) {
               insertHtmlAtCursor(imgHtml);
             }
-            updateContentFromWysiwyg();
+            updateContentFromWysiwyg(false);
             return;
           }
         }
 
-        const m = getMarked();
-        if (!m) return;
+        const isLargePaste = (textData?.length || 0) > 1200 || (htmlData?.length || 0) > 2500;
+        if (isLargePaste) {
+          // Yield a frame so Android keyboard/clipboard overlay finishes dismissing without freezing UI
+          await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
+        }
 
         let finalHtml = '';
-        
-        if (htmlData) {
-          const md = htmlToMarkdown(htmlData);
-          finalHtml = await m.parse(md);
-        } else if (textData) {
-          const processed = convertBareImageUrlsToMarkdown(textData);
-          finalHtml = await m.parse(processed);
+
+        // Fast path for large plain-text pastes without Markdown tokens or URLs
+        const hasMarkdownOrUrls =
+          !!textData && /([*_`#>[\]!~|]|https?:\/\/|^[\t ]*[-*+\d]+\.)/m.test(textData);
+
+        if (!htmlData && textData && !hasMarkdownOrUrls) {
+          finalHtml = plainTextToParagraphHtml(textData);
+        } else {
+          const m = getMarked();
+          if (!m) return;
+
+          if (htmlData) {
+            const md = htmlToMarkdown(htmlData);
+            finalHtml = await m.parse(md);
+          } else if (textData) {
+            const processed = convertBareImageUrlsToMarkdown(textData);
+            finalHtml = await m.parse(processed);
+          }
         }
         
         if (finalHtml) {
@@ -115,12 +147,13 @@ export const WysiwygCanvas: React.FC<WysiwygCanvasProps> = React.memo(({
           if (finalHtml.startsWith('<p>') && finalHtml.endsWith('</p>') && (finalHtml.match(/<p>/g) || []).length === 1) {
             finalHtml = finalHtml.substring(3, finalHtml.length - 4);
           }
-          
+
+          lastPasteTimeRef.current = Date.now();
           if (!document.execCommand('insertHTML', false, finalHtml)) {
             insertHtmlAtCursor(finalHtml as string);
           }
 
-          if (wysiwygRef.current) {
+          if (wysiwygRef.current && wysiwygRef.current.querySelector('.table-spacer, [data-empty]')) {
             wysiwygRef.current.querySelectorAll('.table-spacer, [data-placeholder], [data-empty]').forEach((el) => {
               const txt = el.textContent || '';
               if (txt.trim() !== '' || el.children.length > 1 || (el.children.length === 1 && el.firstElementChild?.tagName !== 'BR')) {
@@ -131,7 +164,8 @@ export const WysiwygCanvas: React.FC<WysiwygCanvasProps> = React.memo(({
             });
           }
 
-          updateContentFromWysiwyg();
+          // Always schedule debounced sync (never force immediate double-serialization on paste)
+          updateContentFromWysiwyg(false);
         }
       }}
       onInput={(e) => {
@@ -139,21 +173,23 @@ export const WysiwygCanvas: React.FC<WysiwygCanvasProps> = React.memo(({
         const target = e.target as HTMLDivElement;
         updateWysiwygEmptyStatus(target);
 
-        target.querySelectorAll('.table-spacer, [data-placeholder], [data-empty]').forEach((spacerEl) => {
-          const isTop = spacerEl === target.firstElementChild && spacerEl.classList.contains('top-spacer');
-          const isBottom = spacerEl === target.lastElementChild && spacerEl.classList.contains('bottom-spacer');
-          const textStr = spacerEl.textContent || '';
-          const hasContent = textStr.trim() !== '' || spacerEl.children.length > 1 || (spacerEl.children.length === 1 && spacerEl.firstElementChild?.tagName !== 'BR');
-          if (!isTop && !isBottom) {
-            spacerEl.removeAttribute('data-empty');
-            spacerEl.removeAttribute('data-placeholder');
-            spacerEl.classList.remove('table-spacer', 'top-spacer', 'bottom-spacer');
-          } else if (hasContent) {
-            spacerEl.removeAttribute('data-empty');
-            spacerEl.removeAttribute('data-placeholder');
-            spacerEl.classList.remove('table-spacer', 'top-spacer', 'bottom-spacer');
-          }
-        });
+        if (target.getElementsByClassName('table-spacer').length > 0 || target.querySelector('[data-empty]')) {
+          target.querySelectorAll('.table-spacer, [data-placeholder], [data-empty]').forEach((spacerEl) => {
+            const isTop = spacerEl === target.firstElementChild && spacerEl.classList.contains('top-spacer');
+            const isBottom = spacerEl === target.lastElementChild && spacerEl.classList.contains('bottom-spacer');
+            const textStr = spacerEl.textContent || '';
+            const hasContent = textStr.trim() !== '' || spacerEl.children.length > 1 || (spacerEl.children.length === 1 && spacerEl.firstElementChild?.tagName !== 'BR');
+            if (!isTop && !isBottom) {
+              spacerEl.removeAttribute('data-empty');
+              spacerEl.removeAttribute('data-placeholder');
+              spacerEl.classList.remove('table-spacer', 'top-spacer', 'bottom-spacer');
+            } else if (hasContent) {
+              spacerEl.removeAttribute('data-empty');
+              spacerEl.removeAttribute('data-placeholder');
+              spacerEl.classList.remove('table-spacer', 'top-spacer', 'bottom-spacer');
+            }
+          });
+        }
 
         const blockTags = ['TABLE'];
 
@@ -183,7 +219,11 @@ export const WysiwygCanvas: React.FC<WysiwygCanvasProps> = React.memo(({
 
         // Use the unified sync function from useWysiwygSync hook
         updateContentFromWysiwyg(false);
-        if (scrollCaretIntoView) {
+        if (
+          scrollCaretIntoView &&
+          !document.hidden &&
+          Date.now() - lastPasteTimeRef.current >= 350
+        ) {
           requestAnimationFrame(() => {
             scrollCaretIntoView('nearest');
           });
@@ -206,7 +246,11 @@ export const WysiwygCanvas: React.FC<WysiwygCanvasProps> = React.memo(({
       onKeyUp={() => {
         updateWysiwygEmptyStatus(wysiwygRef.current);
         saveVisualSelection();
-        if (scrollCaretIntoView) {
+        if (
+          scrollCaretIntoView &&
+          !document.hidden &&
+          Date.now() - lastPasteTimeRef.current >= 350
+        ) {
           requestAnimationFrame(() => {
             scrollCaretIntoView('nearest');
           });

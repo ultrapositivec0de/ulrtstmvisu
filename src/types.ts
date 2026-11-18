@@ -5,6 +5,8 @@ export interface Draft {
   date: string;
   status?: 'working' | 'ready';
   tags?: string;
+  editingPermlink?: string | null;
+  editingOriginalTitle?: string;
 }
 
 export interface Template {
@@ -103,4 +105,5 @@ export interface QueueItem {
   scheduledTime?: string;
   status: 'pending' | 'published' | 'error';
   error?: string;
+  editingPermlink?: string | null;
 }

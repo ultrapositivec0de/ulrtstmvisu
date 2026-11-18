@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { Tag } from 'lucide-react';
 import { cn } from '../../lib/utils';
-import { formatPostHtml, PostFormatOptions } from '../../utils/postFormatting';
+import { formatPostHtml, PostFormatOptions, getCanonicalImageUrl } from '../../utils/postFormatting';
 import { useLightboxStore } from '../../store/lightboxStore';
 import { useEditorStore } from '../../store';
 import { getTranslation, TranslationKey } from '../../locales';
@@ -102,10 +102,11 @@ export const PostRenderer: React.FC<PostRendererProps> = React.memo(({
     if (img && img.src) {
       e.preventDefault();
       e.stopPropagation();
+      const canonical = getCanonicalImageUrl(img.src);
       if (onImageClick) {
-        onImageClick(img.src, img.alt || '');
+        onImageClick(canonical, img.alt || '');
       } else {
-        useLightboxStore.getState().openLightbox(img.src, img.alt || '');
+        useLightboxStore.getState().openLightbox(canonical, img.alt || '');
       }
       return;
     }
@@ -139,7 +140,7 @@ export const PostRenderer: React.FC<PostRendererProps> = React.memo(({
   return (
     <article
       className={cn(
-        "w-full transition-all selection:bg-cyan-500/30",
+        "w-full min-w-0 max-w-full overflow-x-hidden transition-all selection:bg-cyan-500/30",
         mode === 'preview' && (beautifyEnabled ? "max-w-4xl mx-auto px-4 sm:px-8 py-8 sm:py-12" : "w-full max-w-none px-4 sm:px-8 py-8 sm:py-12"),
         mode === 'feed-item' && "px-0 py-1",
         mode === 'full' && "px-4 sm:px-6 py-6",
@@ -189,7 +190,7 @@ export const PostRenderer: React.FC<PostRendererProps> = React.memo(({
           ref={containerRef}
           onClick={handleContentClick}
           className={cn(
-            "post-renderer-body markdown-body max-w-none break-words [overflow-wrap:anywhere] hyphens-auto",
+            "post-renderer-body markdown-body w-full min-w-0 max-w-full overflow-x-hidden break-words [overflow-wrap:anywhere] hyphens-auto",
             "[&_h1]:scroll-mt-20 [&_h2]:scroll-mt-20 [&_h3]:scroll-mt-20 [&_h4]:scroll-mt-20 [&_h5]:scroll-mt-20 [&_h6]:scroll-mt-20",
             "[&_h1]:break-words [&_h1]:[overflow-wrap:anywhere] [&_h1]:hyphens-auto",
             "[&_h2]:break-words [&_h2]:[overflow-wrap:anywhere] [&_h2]:hyphens-auto",

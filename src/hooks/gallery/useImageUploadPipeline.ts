@@ -26,7 +26,7 @@ export const sanitizeFilename = (name: string): string => {
     .toLowerCase()
     .replace(/\s+/g, '_')
     .replace(/[^a-z0-9_.-]/g, '')
-    .substring(0, 40) + (ext ? '.' + ext : '');
+    .substring(0, 120) + (ext ? '.' + ext : '');
 };
 
 export interface UseImageUploadPipelineConfig {

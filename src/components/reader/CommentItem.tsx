@@ -11,6 +11,7 @@ import { callWithFallback } from '../../lib/steem';
 import { SteemPost } from '../../types';
 import { getTranslation, type TranslationKey } from '../../locales';
 import { useLightboxStore } from '../../store/lightboxStore';
+import { getCanonicalImageUrl } from '../../utils/postFormatting';
 import { ReplyBox } from './ReplyBox';
 
 export interface CommentItemProps {
@@ -106,7 +107,7 @@ export const CommentItem: React.FC<CommentItemProps> = React.memo(({
   return (
     <div
       id={`comment-${localComment.permlink}`}
-      className="pl-4 border-l-2 border-slate-800 space-y-2 relative group transition-colors duration-500"
+      className="pl-4 border-l-2 border-slate-800 space-y-2 relative group transition-colors duration-500 min-w-0 max-w-full overflow-x-hidden"
       onMouseUp={(e) => onSelection?.(localComment, e)}
     >
       {isDeleting && (
@@ -197,7 +198,7 @@ export const CommentItem: React.FC<CommentItemProps> = React.memo(({
         </div>
       ) : (
         <div
-          className="text-sm markdown-body opacity-90 leading-relaxed transition-all [&_img]:cursor-zoom-in [&_img]:transition-transform hover:[&_img]:opacity-95"
+          className="text-sm markdown-body min-w-0 max-w-full overflow-x-hidden opacity-90 leading-relaxed transition-all [&_img]:cursor-zoom-in [&_img]:transition-transform hover:[&_img]:opacity-95"
           onClick={(e) => {
             const target = e.target as HTMLElement | null;
             if (!target) return;
@@ -205,7 +206,7 @@ export const CommentItem: React.FC<CommentItemProps> = React.memo(({
             if (img && img.src) {
               e.preventDefault();
               e.stopPropagation();
-              useLightboxStore.getState().openLightbox(img.src, img.alt || '');
+              useLightboxStore.getState().openLightbox(getCanonicalImageUrl(img.src), img.alt || '');
             }
           }}
           style={fontSize ? { fontSize: `${Math.max(12, fontSize - 2)}px` } : undefined}

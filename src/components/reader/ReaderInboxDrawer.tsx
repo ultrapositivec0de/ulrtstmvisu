@@ -12,19 +12,22 @@ import {
   Image as ImageIcon, 
   ThumbsUp, 
   Quote as QuoteIcon, 
-  MessageSquare 
+  MessageSquare,
+  Eye 
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { cn } from '../../lib/utils';
 import { ReaderConfig, SteemPost } from '../../types';
 import { ReplyBox } from './ReplyBox';
+import { getCanonicalImageUrl } from '../../utils/postFormatting';
+import { useLightboxStore } from '../../store/lightboxStore';
 
 export interface ReaderInboxDrawerProps {
   showInbox: boolean;
   setShowInbox: (show: boolean | ((prev: boolean) => boolean)) => void;
   isRefreshingInbox: boolean;
   currentUser?: string | null;
-  fetchInbox: (force?: boolean, loadMore?: boolean) => void;
+  fetchInbox: (arg1?: boolean | { forceNetwork?: boolean; loadMore?: boolean; silent?: boolean }, silentArg?: boolean) => void;
   loadingInbox: boolean;
   inbox: SteemPost[];
   hiddenReplies: Set<string>;
@@ -100,6 +103,19 @@ export const ReaderInboxDrawer: React.FC<ReaderInboxDrawerProps> = React.memo(({
   inboxLimit,
   t,
 }) => {
+  const [showHiddenInDrawer, setShowHiddenInDrawer] = React.useState(false);
+
+  const handleInboxImageClick = React.useCallback((e: React.MouseEvent) => {
+    const target = e.target as HTMLElement | null;
+    if (!target) return;
+    const img = target.tagName === 'IMG' ? (target as HTMLImageElement) : target.closest('img');
+    if (img && img.src) {
+      e.preventDefault();
+      e.stopPropagation();
+      useLightboxStore.getState().openLightbox(getCanonicalImageUrl(img.src), img.alt || '');
+    }
+  }, []);
+
   return (
     <AnimatePresence>
       {showInbox && (
@@ -150,7 +166,7 @@ export const ReaderInboxDrawer: React.FC<ReaderInboxDrawerProps> = React.memo(({
               {currentUser && (
                 <button
                   type="button"
-                  onClick={() => fetchInbox(true)}
+                  onClick={() => fetchInbox({ forceNetwork: true, silent: true })}
                   className="p-1.5 sm:p-2 bg-slate-800/60 hover:bg-slate-800 border border-slate-700/60 rounded-xl text-slate-400 hover:text-cyan-400 transition-colors cursor-pointer"
                   title={t("readerNavRefresh")}
                 >
@@ -199,24 +215,27 @@ export const ReaderInboxDrawer: React.FC<ReaderInboxDrawerProps> = React.memo(({
               <div className="text-center py-20 text-slate-500">
                 <p>{t("noRepliesFound")}</p>
                 <button
-                  onClick={() => fetchInbox(false)}
+                  onClick={() => fetchInbox({ forceNetwork: true })}
                   className="mt-4 text-xs text-cyan-500 hover:underline"
                 >
-                  Check again
+                  {t("inboxCheckAgain")}
                 </button>
               </div>
             ) : (
               (() => {
                 const groupedMap: Record<string, SteemPost[]> = {};
-                inbox
-                  .filter((r) => !hiddenReplies.has(r.permlink))
-                  .forEach((reply) => {
-                    const key = `${reply.parent_author}/${reply.parent_permlink}`;
-                    if (!groupedMap[key]) {
-                      groupedMap[key] = [];
-                    }
-                    groupedMap[key].push(reply);
-                  });
+                const hiddenInLoadedCount = inbox.filter((r) => hiddenReplies.has(r.permlink)).length;
+                const repliesToDisplay = showHiddenInDrawer
+                  ? inbox
+                  : inbox.filter((r) => !hiddenReplies.has(r.permlink));
+
+                repliesToDisplay.forEach((reply) => {
+                  const key = `${reply.parent_author}/${reply.parent_permlink}`;
+                  if (!groupedMap[key]) {
+                    groupedMap[key] = [];
+                  }
+                  groupedMap[key].push(reply);
+                });
 
                 const sortedThreadKeys = Object.keys(groupedMap).sort((keyA, keyB) => {
                   const latestA = Math.max(...groupedMap[keyA].map(r => new Date(r.created).getTime()));
@@ -224,7 +243,51 @@ export const ReaderInboxDrawer: React.FC<ReaderInboxDrawerProps> = React.memo(({
                   return latestB - latestA;
                 });
 
-                return sortedThreadKeys.map((threadKey) => {
+                if (sortedThreadKeys.length === 0) {
+                  return (
+                    <div className="text-center py-16 px-4 text-slate-400 bg-slate-950/40 border border-slate-800/60 rounded-2xl space-y-3">
+                      <p className="text-sm font-medium text-slate-300">{t("inboxAllHiddenDesc")}</p>
+                      <div className="flex flex-wrap items-center justify-center gap-2 pt-1">
+                        {hiddenInLoadedCount > 0 && (
+                          <button
+                            type="button"
+                            onClick={() => setShowHiddenInDrawer(true)}
+                            className="px-3 py-1.5 rounded-xl bg-cyan-600/20 hover:bg-cyan-600/30 text-cyan-300 border border-cyan-500/30 text-xs font-semibold flex items-center gap-1.5 cursor-pointer"
+                          >
+                            <Eye size={14} />
+                            <span>{t("inboxShowHiddenBtn").replace("{count}", String(hiddenInLoadedCount))}</span>
+                          </button>
+                        )}
+                        <button
+                          type="button"
+                          onClick={() => fetchInbox({ forceNetwork: true })}
+                          className="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 text-xs font-semibold flex items-center gap-1.5 cursor-pointer"
+                        >
+                          <RefreshCw size={14} />
+                          <span>{t("readerNavRefresh")}</span>
+                        </button>
+                      </div>
+                    </div>
+                  );
+                }
+
+                return (
+                  <>
+                    {showHiddenInDrawer && hiddenInLoadedCount > 0 && (
+                      <div className="flex items-center justify-between px-3 py-2 bg-slate-900/80 border border-slate-800 rounded-xl text-xs">
+                        <span className="text-slate-400">
+                          {t("inboxShowHiddenBtn").replace("{count}", String(hiddenInLoadedCount))}
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => setShowHiddenInDrawer(false)}
+                          className="text-cyan-400 hover:text-cyan-300 font-semibold cursor-pointer"
+                        >
+                          {t("inboxHideHiddenBtn")}
+                        </button>
+                      </div>
+                    )}
+                    {sortedThreadKeys.map((threadKey) => {
                   const threadReplies = groupedMap[threadKey];
                   const sortedReplies = [...threadReplies].sort(
                     (a, b) => new Date(a.created).getTime() - new Date(b.created).getTime()
@@ -422,9 +485,10 @@ export const ReaderInboxDrawer: React.FC<ReaderInboxDrawerProps> = React.memo(({
                                 </span>
                               </div>
 
-                              <div className="space-y-2">
+                              <div className="space-y-2 min-w-0">
                                 <div
-                                  className="text-xs markdown-body opacity-90"
+                                  onClick={handleInboxImageClick}
+                                  className="text-xs markdown-body min-w-0 max-w-full overflow-x-hidden opacity-90 [&_img]:cursor-zoom-in [&_img]:max-w-full [&_img]:h-auto"
                                   dangerouslySetInnerHTML={{
                                     __html: renderContent(
                                       displayBody,
@@ -533,7 +597,8 @@ export const ReaderInboxDrawer: React.FC<ReaderInboxDrawerProps> = React.memo(({
                                       ) : (
                                         <>
                                           <div
-                                            className="markdown-body text-[10px]"
+                                            onClick={handleInboxImageClick}
+                                            className="markdown-body text-[10px] min-w-0 max-w-full overflow-x-hidden [&_img]:cursor-zoom-in [&_img]:max-w-full [&_img]:h-auto"
                                             dangerouslySetInnerHTML={{
                                               __html: renderContent(item.body, item.permlink),
                                             }}
@@ -675,13 +740,15 @@ export const ReaderInboxDrawer: React.FC<ReaderInboxDrawerProps> = React.memo(({
                       </div>
                     </div>
                   );
-                });
+                })}
+                  </>
+                );
               })()
             )}
             {inbox.length >= inboxLimit && (
               <div className="p-4 pt-0">
                 <button
-                  onClick={() => fetchInbox(false, true)}
+                  onClick={() => fetchInbox({ forceNetwork: true, loadMore: true })}
                   disabled={loadingInbox}
                   className="w-full py-3 bg-slate-800 hover:bg-slate-710/50 border border-slate-700/50 rounded-xl text-slate-400 text-[10px] font-bold transition-all disabled:opacity-50 flex items-center justify-center gap-2"
                 >

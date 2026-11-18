@@ -15,7 +15,8 @@ import {
   Inbox,
   Plus,
   X,
-  Tag
+  Tag,
+  Layers
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { cn } from '../../lib/utils';
@@ -48,6 +49,7 @@ export interface ReaderTopHeaderProps {
   curationPosts: any[];
   setExpandedPosts: (posts: Set<string>) => void;
   fetchPosts: (customTag?: string) => void;
+  fetchFavoriteCorePosts?: () => void;
   loading: boolean;
   curationTagInput: string;
   setCurationTagInput: (val: string) => void;
@@ -91,6 +93,7 @@ export const ReaderTopHeader: React.FC<ReaderTopHeaderProps> = React.memo(({
   curationPosts,
   setExpandedPosts,
   fetchPosts,
+  fetchFavoriteCorePosts,
   loading,
   curationTagInput,
   setCurationTagInput,
@@ -182,6 +185,26 @@ export const ReaderTopHeader: React.FC<ReaderTopHeaderProps> = React.memo(({
                 {/* Quick Favorite Tag Chips */}
                 {config && (
                   <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar py-0.5 max-w-full">
+                    {(config.favoriteTags || []).length > 1 && fetchFavoriteCorePosts && (() => {
+                      const favsJoined = (config.favoriteTags || []).map(ft => ft.replace(/^[#@]+/, '').toLowerCase()).join(' ');
+                      const isCoreActive = (searchTag || '').trim().toLowerCase() === favsJoined;
+                      return (
+                        <button
+                          type="button"
+                          onClick={fetchFavoriteCorePosts}
+                          title={t("loadAllFavoriteTagsTitle")}
+                          className={cn(
+                            "px-2.5 py-1 rounded-full text-[11px] font-semibold transition-all shrink-0 border flex items-center gap-1 cursor-pointer",
+                            isCoreActive
+                              ? "bg-amber-500/20 text-amber-300 border-amber-500/50 shadow-sm"
+                              : "bg-slate-800/80 text-amber-300/90 border-amber-500/30 hover:bg-amber-500/15 hover:border-amber-500/50"
+                          )}
+                        >
+                          <Layers size={12} />
+                          <span>{t("loadAllFavoriteTags")}</span>
+                        </button>
+                      );
+                    })()}
                     {(config.favoriteTags || []).map((tag) => {
                       const cleanTag = tag.replace(/^#/, '');
                       const isActive = (searchTag || '').trim().toLowerCase() === cleanTag.toLowerCase();

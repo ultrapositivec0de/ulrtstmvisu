@@ -4,13 +4,12 @@ import React, {
   useCallback,
   useRef,
 } from "react";
-import {
-  Search,
-} from "lucide-react";
 import { AnimatePresence } from "motion/react";
 import { marked } from "marked";
 import DOMPurify from "dompurify";
 import { cn } from "../lib/utils";
+import { DOM_PURIFY_CONFIG } from "../utils/markdownParser";
+import { enhanceCodeBlocksInHtml } from "../utils/postFormatting";
 import { ReaderConfig, SteemPost, AuthType } from "../types";
 import { getTranslation, type TranslationKey } from "../locales";
 import { ReaderMobileBottomBar } from "./reader/ReaderMobileBottomBar";
@@ -165,6 +164,8 @@ export default function Reader({
     posts,
     setPosts,
     loading,
+    loadingMore,
+    hasMoreFeed,
     expandedPosts,
     setExpandedPosts,
     postComments,
@@ -178,6 +179,8 @@ export default function Reader({
     commentBody,
     setCommentBody,
     fetchPosts,
+    loadMorePosts,
+    fetchFavoriteCorePosts,
     fetchComments,
     togglePost,
     handleSearch,
@@ -325,15 +328,13 @@ export default function Reader({
         [parentPermlink]: body,
       }));
 
-      inboxHook.setHiddenReplies((prev) => new Set(prev).add(parentPermlink));
-
       setTimeout(() => {
         fetchComments(parentAuthor, parentPermlink);
       }, 4000);
 
       if (inboxHook.showInbox) {
         setTimeout(() => {
-          inboxHook.fetchInbox(false, true);
+          inboxHook.fetchInbox({ forceNetwork: true, silent: true });
         }, 3000);
       }
     } catch (err) {
@@ -422,8 +423,9 @@ export default function Reader({
   };
 
   const renderContent = (body: string, permlink?: string) => {
+    if (!body) return "";
     if (!marked || !DOMPurify) return body;
-    let html = marked.parse(body) as string;
+    let html = marked.parse(body, { breaks: true, gfm: true, async: false }) as string;
 
     const shouldLoadImages = config.loadImages !== false || (permlink && revealedImages.has(permlink));
 
@@ -435,7 +437,8 @@ export default function Reader({
     }
 
     html = html.replace(/<img /g, '<img referrerpolicy="no-referrer" ');
-    return DOMPurify.sanitize(html);
+    const sanitized = (DOMPurify.sanitize(html, DOM_PURIFY_CONFIG as any) as unknown) as string;
+    return enhanceCodeBlocksInHtml(sanitized);
   };
 
   return (
@@ -459,6 +462,7 @@ export default function Reader({
         curationPosts={curationHook.curationPosts}
         setExpandedPosts={setExpandedPosts}
         fetchPosts={fetchPosts}
+        fetchFavoriteCorePosts={fetchFavoriteCorePosts}
         loading={loading}
         curationTagInput={curationHook.curationTagInput}
         setCurationTagInput={curationHook.setCurationTagInput}
@@ -539,8 +543,12 @@ export default function Reader({
               <ReaderFeedView
                 posts={posts}
                 loading={loading}
+                loadingMore={loadingMore}
+                hasMoreFeed={hasMoreFeed}
+                loadMorePosts={loadMorePosts}
                 hasInitiatedFeed={hasInitiatedFeed}
                 fetchPosts={fetchPosts}
+                fetchFavoriteCorePosts={fetchFavoriteCorePosts}
                 expandedPosts={expandedPosts}
                 togglePost={togglePost}
                 currentUser={currentUser}
@@ -644,14 +652,6 @@ export default function Reader({
             ) : null}
           </AnimatePresence>
         </div>
-
-        {posts.length === 0 && !loading && (
-          <div className="flex flex-col items-center justify-center py-20 text-slate-500/50">
-            <Search size={64} className="mb-4" />
-            <p className="text-xl font-medium">{t("noVoicesHeard")}</p>
-            <p className="text-sm">{t("noVoicesHint")}</p>
-          </div>
-        )}
       </div>
 
       <ReaderQuoteTooltip
@@ -690,6 +690,7 @@ export default function Reader({
         handleIncreaseFontSize={handleIncreaseFontSize}
         currentFontSize={currentFontSize}
         fetchPosts={fetchPosts}
+        fetchFavoriteCorePosts={fetchFavoriteCorePosts}
         loading={loading}
         isCurationLoading={curationHook.isCurationLoading}
         posts={posts}

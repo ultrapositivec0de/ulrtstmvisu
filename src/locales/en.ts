@@ -1169,6 +1169,25 @@ export const translations = {
   "removeKeychainAccountConfirm": "Remove account @{acc} from Keychain list?",
   "signingMethod": "Signing Method",
   "addVaultAccount": "Add Account to Vault",
+  "inboxCheckAgain": "Check again",
+  "inboxAllHiddenDesc": "All loaded replies are currently hidden locally.",
+  "inboxShowHiddenBtn": "Show hidden ({count})",
+  "inboxHideHiddenBtn": "Hide hidden",
+  "loadAllFavoriteTags": "Favorites Core",
+  "loadAllFavoriteTagsTitle": "Sequentially load posts from all favorite tags",
+  "pinPost": "Pin in reading cache",
+  "unpinPost": "Unpin from cache",
+  "pinnedPostsTitle": "Pinned for Reading",
+  "readerLoadMorePosts": "Load more posts",
+  "curationOlderHint": "Note: posts older than 7 days have closed reward windows, but can still be viewed and commented on.",
+  "editModeBannerTitle": "Post Edit Mode",
+  "editModePermlinkLocked": "The blockchain permlink is locked to update this existing post instead of creating a duplicate.",
+  "editModeAllowTitleChange": "Allow changing visible title (blockchain permlink stays locked)",
+  "exitEditModeBtn": "Reset",
+  "editModeExitedNotify": "Edit mode cleared — your next publish will create a new post.",
+  "draftEditModeSavedNotify": "Saved to drafts along with post edit metadata.",
+  "draftEditModeLoadedNotify": "Draft loaded in existing post edit mode.",
+  "draftEditBadge": "EDIT"
 } as const;
 
 export default { meta, translations };

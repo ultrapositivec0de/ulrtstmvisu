@@ -92,6 +92,7 @@ export function useReaderCuration({
     const cleanTag = tagToUse.replace("@", "").trim();
 
     try {
+      const maxScanCap = curationDays > 14 ? 4000 : 2000;
       const results: SteemPost[] = [];
       if (curationType === "comments") {
         let isDone = false;
@@ -99,7 +100,7 @@ export function useReaderCuration({
         let startPermlink = "";
         let totalFetched = 0;
 
-        while (!isDone && totalFetched < 2000) {
+        while (!isDone && totalFetched < maxScanCap) {
           const query: any = { start_author: startAuthor || cleanTag, limit: 100 };
           if (startPermlink) {
             query.start_permlink = startPermlink;
@@ -134,7 +135,7 @@ export function useReaderCuration({
         let startPermlink = "";
         let totalFetched = 0;
 
-        while (!isDone && totalFetched < 2000) {
+        while (!isDone && totalFetched < maxScanCap) {
           const query: any = { tag: cleanTag, limit: 100 };
           if (startAuthor) {
             query.start_author = startAuthor;
