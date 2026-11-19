@@ -27,6 +27,7 @@ jobs:
         uses: dtolnay/rust-toolchain@stable
 
       - name: "Verify Cargo Dependency Resolution"
+        shell: bash
         run: cargo metadata --manifest-path src-tauri/Cargo.toml --format-version 1 > /dev/null
 
       - name: "Install Frontend Dependencies"
