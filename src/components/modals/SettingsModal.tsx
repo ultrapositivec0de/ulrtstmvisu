@@ -29,6 +29,7 @@ import { APP_CHANGELOG, getChangelogText } from '../../data/changelog';
 import { DEFAULT_APP_AGENT } from '../../hooks/usePostSettings';
 import { UiScalePreset } from '../../hooks/useThemeAndStyles';
 import { useDeviceStore } from '../../store/deviceStore';
+import { usePerformanceStore } from '../../stores/usePerformanceStore';
 
 export interface SettingsModalProps {
   isOpen: boolean;
@@ -176,6 +177,9 @@ export const SettingsModal: React.FC<SettingsModalProps> = (props) => {
     t
   } = props;
 
+  const lowGpuMode = usePerformanceStore((s) => s.lowGpuMode);
+  const setLowGpuMode = usePerformanceStore((s) => s.setLowGpuMode);
+
   return (
     <BaseModal
       isOpen={isOpen}
@@ -219,13 +223,37 @@ export const SettingsModal: React.FC<SettingsModalProps> = (props) => {
               <button 
                 onClick={() => setPerformanceMode(!performanceMode)}
                 className={cn(
-                  "w-10 h-5 rounded-full transition-all relative cursor-pointer border border-transparent",
+                  "w-10 h-5 rounded-full transition-all relative cursor-pointer border border-transparent shrink-0",
                   performanceMode ? "bg-cyan-600 border-cyan-500" : "bg-[var(--bg-card)] border-[var(--border-color)]"
                 )}
               >
                 <div className={cn(
                   "absolute top-0.5 w-3.5 h-3.5 rounded-full bg-white transition-all shadow-xs",
                   performanceMode ? "left-5" : "left-0.5"
+                )} />
+              </button>
+            </div>
+
+            {/* Low GPU / Minimal Compositing Mode (Linux / Android WebView) */}
+            <div className="flex items-center justify-between gap-3 p-4 bg-[var(--bg-main)]/50 border border-[var(--border-color)] rounded-2xl">
+              <div className="flex items-center gap-3 min-w-0">
+                <div className="p-2 bg-emerald-500/10 text-emerald-400 rounded-lg shrink-0"><Sliders size={18} /></div>
+                <div className="min-w-0">
+                  <p className="text-sm font-bold text-[var(--text-main)]">{t('lowGpuMode')}</p>
+                  <p className="text-[10px] text-[var(--text-muted)] tracking-wider leading-relaxed mt-0.5">{t('lowGpuModeDesc')}</p>
+                </div>
+              </div>
+              <button 
+                type="button"
+                onClick={() => setLowGpuMode(!lowGpuMode)}
+                className={cn(
+                  "w-10 h-5 rounded-full transition-all relative cursor-pointer border border-transparent shrink-0",
+                  lowGpuMode ? "bg-emerald-600 border-emerald-500" : "bg-[var(--bg-card)] border-[var(--border-color)]"
+                )}
+              >
+                <div className={cn(
+                  "absolute top-0.5 w-3.5 h-3.5 rounded-full bg-white transition-all shadow-xs",
+                  lowGpuMode ? "left-5" : "left-0.5"
                 )} />
               </button>
             </div>

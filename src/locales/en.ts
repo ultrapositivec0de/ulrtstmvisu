@@ -1187,7 +1187,12 @@ export const translations = {
   "editModeExitedNotify": "Edit mode cleared — your next publish will create a new post.",
   "draftEditModeSavedNotify": "Saved to drafts along with post edit metadata.",
   "draftEditModeLoadedNotify": "Draft loaded in existing post edit mode.",
-  "draftEditBadge": "EDIT"
+  "draftEditBadge": "EDIT",
+  "lowGpuMode": "Low GPU Compositing (Linux / Android)",
+  "lowGpuModeDesc": "Flattens compositing layers, disables gradients, alpha blending, blur, shadows, and JS motion to minimize GPU overhead in Linux WebKitGTK & Android WebView.",
+  "addToKeychainBtn": "+ Keychain",
+  "addToKeychainTitle": "Copy @{acc} to Keychain list",
+  "addedToKeychainNotify": "Account @{acc} added to Keychain list"
 } as const;
 
 export default { meta, translations };

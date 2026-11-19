@@ -2,6 +2,8 @@ import { useState, useEffect, useCallback } from 'react';
 import { SecurityService } from '../services/securityService';
 import { AuthType } from '../types';
 
+const ACCOUNT_PROMPT_SEEN_KEY = 'steem_account_prompt_seen';
+
 export function useSteemAuth() {
   const [authType, setAuthTypeState] = useState<AuthType | 'VAULT'>(() => {
     if (typeof window !== 'undefined') {
@@ -82,7 +84,12 @@ export function useSteemAuth() {
           } catch {
             // ignore JSON parse error
           }
-          localStorage.setItem('steem_username', nextUser);
+          if (nextUser) {
+            localStorage.setItem('steem_username', nextUser);
+          } else {
+            localStorage.removeItem('steem_username');
+          }
+          localStorage.setItem(ACCOUNT_PROMPT_SEEN_KEY, 'true');
         }
         return nextUser;
       }
@@ -114,35 +121,61 @@ export function useSteemAuth() {
   }, [addKeychainAccount]);
 
   const [selectedVaultUser, setSelectedVaultUser] = useState('');
-  const [showAccountPrompt, setShowAccountPrompt] = useState(() => {
+  const [showAccountPrompt, setShowAccountPromptState] = useState(() => {
     if (typeof window !== 'undefined') {
-      return !localStorage.getItem('steem_username');
+      if (localStorage.getItem(ACCOUNT_PROMPT_SEEN_KEY) === 'true') return false;
+      if (localStorage.getItem('steem_username')) return false;
+      try {
+        const saved = localStorage.getItem('steem_keychain_accounts');
+        if (saved) {
+          const parsed = JSON.parse(saved);
+          if (Array.isArray(parsed) && parsed.length > 0) return false;
+        }
+      } catch {
+        // ignore JSON parse error
+      }
+      return true;
     }
     return true;
   });
+
+  const setShowAccountPrompt = useCallback((show: boolean | ((prev: boolean) => boolean)) => {
+    setShowAccountPromptState(prev => {
+      const next = typeof show === 'function' ? show(prev) : show;
+      if (!next && typeof window !== 'undefined') {
+        localStorage.setItem(ACCOUNT_PROMPT_SEEN_KEY, 'true');
+      }
+      return next;
+    });
+  }, []);
 
   const [vaultPin, setVaultPin] = useState('');
   const [isVaultInitialized, setIsVaultInitialized] = useState(false);
   const [vaultAccounts, setVaultAccounts] = useState<string[]>([]);
 
   const switchIdentity = useCallback((user: string, type: 'KEYCHAIN' | 'VAULT') => {
-    const clean = user.trim().replace(/^@/, '').toLowerCase();
-    if (!clean) return;
+    const clean = (user || '').trim().replace(/^@/, '').toLowerCase();
     if (type === 'KEYCHAIN') {
       setAuthType('KEYCHAIN');
-      setUsername(clean);
       if (typeof window !== 'undefined') {
         localStorage.removeItem('steem_prefer_vault');
         localStorage.setItem('steem_auth_type', 'KEYCHAIN');
-        localStorage.setItem('steem_username', clean);
       }
-      addKeychainAccount(clean);
+      if (clean) {
+        setUsername(clean);
+        if (typeof window !== 'undefined') {
+          localStorage.setItem('steem_username', clean);
+        }
+        addKeychainAccount(clean);
+      }
     } else {
       setAuthType('VAULT');
-      setSelectedVaultUser(clean);
       if (typeof window !== 'undefined') {
         localStorage.setItem('steem_prefer_vault', 'true');
         localStorage.setItem('steem_auth_type', 'VAULT');
+      }
+      if (clean) {
+        setSelectedVaultUser(clean);
       }
     }
   }, [setAuthType, setUsername, addKeychainAccount]);
@@ -162,7 +195,7 @@ export function useSteemAuth() {
     return null;
   });
 
-  const activeUser = authType === 'VAULT' ? selectedVaultUser : username;
+  const activeUser = authType === 'VAULT' ? (selectedVaultUser || username) : username;
 
   const initVault = useCallback(async () => {
     const initialized = await SecurityService.isInitialized();
@@ -175,6 +208,10 @@ export function useSteemAuth() {
     if (usernames.length > 0) {
       const firstUser = usernames[0];
       setSelectedVaultUser(prev => prev || firstUser);
+      if (typeof window !== 'undefined') {
+        localStorage.setItem(ACCOUNT_PROMPT_SEEN_KEY, 'true');
+      }
+      setShowAccountPromptState(false);
     }
     
     const rawPxKey = localStorage.getItem('steem_pexels_key_raw');

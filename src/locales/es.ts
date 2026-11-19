@@ -1187,7 +1187,12 @@ export const translations = {
   "editModeExitedNotify": "Modo de edición restablecido: la próxima publicación creará una entrada nueva.",
   "draftEditModeSavedNotify": "Guardado en borradores junto con los metadatos de edición.",
   "draftEditModeLoadedNotify": "Borrador cargado en modo de edición de publicación existente.",
-  "draftEditBadge": "EDICIÓN"
+  "draftEditBadge": "EDICIÓN",
+  "lowGpuMode": "Bajo uso de GPU (Linux / Android)",
+  "lowGpuModeDesc": "Aplana capas de composición y desactiva degradados, transparencia, desenfoque, sombras y animaciones JS para reducir carga en Linux WebKitGTK y Android WebView.",
+  "addToKeychainBtn": "+ Keychain",
+  "addToKeychainTitle": "Copiar @{acc} a la lista de Keychain",
+  "addedToKeychainNotify": "Cuenta @{acc} añadida a la lista de Keychain"
 } as const;
 
 export default { meta, translations };

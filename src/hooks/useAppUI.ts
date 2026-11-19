@@ -44,11 +44,9 @@ export function useAppUI(options: UseAppUIOptions = {}) {
   const settingsTab = useAppUIStore((s) => s.settingsTab);
   const setSettingsTab = useAppUIStore((s) => s.setSettingsTab);
 
-  // Sync sidebar open state with desktop layout so it is never lost on PC
+  // Keep sidebar open on desktop and closed by default on mobile so editor input is never covered
   useEffect(() => {
-    if (!isMobileLayout) {
-      setIsSidebarOpen(true);
-    }
+    setIsSidebarOpen(!isMobileLayout);
   }, [isMobileLayout, setIsSidebarOpen]);
 
   useEffect(() => {

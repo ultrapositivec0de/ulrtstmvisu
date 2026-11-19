@@ -3,6 +3,7 @@ import { Images, Plus, X, Check, ChevronLeft, ChevronRight } from 'lucide-react'
 import { motion, AnimatePresence } from 'motion/react';
 import { cn } from '../../lib/utils';
 import { getMiniGalleryBottomStyle } from '../../lib/viewportLayout';
+import { usePerformanceStore } from '../../stores/usePerformanceStore';
 
 export interface MiniGalleryStripProps {
   isOpen: boolean;
@@ -114,7 +115,10 @@ export const MiniGalleryStrip: React.FC<MiniGalleryStripProps> = React.memo(({
               <button
                 type="button"
                 onMouseDown={(e) => e.preventDefault()}
-                onClick={() => scrollRef.current?.scrollBy({ left: -180, behavior: 'smooth' })}
+                onClick={() => {
+                  const { performanceMode, lowGpuMode } = usePerformanceStore.getState();
+                  scrollRef.current?.scrollBy({ left: -180, behavior: (performanceMode || lowGpuMode) ? 'auto' : 'smooth' });
+                }}
                 className="p-1 rounded-lg text-[var(--text-muted)] hover:text-cyan-400 hover:bg-slate-800/40 transition-colors shrink-0"
                 title={t('moveLeft')}
                 aria-label={t('moveLeft')}
@@ -216,7 +220,10 @@ export const MiniGalleryStrip: React.FC<MiniGalleryStripProps> = React.memo(({
               <button
                 type="button"
                 onMouseDown={(e) => e.preventDefault()}
-                onClick={() => scrollRef.current?.scrollBy({ left: 180, behavior: 'smooth' })}
+                onClick={() => {
+                  const { performanceMode, lowGpuMode } = usePerformanceStore.getState();
+                  scrollRef.current?.scrollBy({ left: 180, behavior: (performanceMode || lowGpuMode) ? 'auto' : 'smooth' });
+                }}
                 className="p-1 rounded-lg text-[var(--text-muted)] hover:text-cyan-400 hover:bg-slate-800/40 transition-colors shrink-0"
                 title={t('moveRight')}
                 aria-label={t('moveRight')}

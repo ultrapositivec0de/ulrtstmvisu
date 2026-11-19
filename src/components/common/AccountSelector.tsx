@@ -34,9 +34,12 @@ export const AccountSelector: React.FC<AccountSelectorProps> = ({
   const [isAdding, setIsAdding] = useState(false);
   const [newAccountInput, setNewAccountInput] = useState('');
 
-  // Unify and deduplicate all keychain accounts so none are lost
+  // Unify and deduplicate all keychain accounts without leaking active Vault user
   const allKeychainAccounts = Array.from(
-    new Set([...(keychainAccounts || []), currentUsername].map(a => (a || '').trim().replace(/^@/, '').toLowerCase()).filter(Boolean))
+    new Set([
+      ...(keychainAccounts || []),
+      ...(authType !== 'VAULT' && currentUsername ? [currentUsername] : []),
+    ].map(a => (a || '').trim().replace(/^@/, '').toLowerCase()).filter(Boolean))
   );
 
   // Unify and deduplicate all vault accounts

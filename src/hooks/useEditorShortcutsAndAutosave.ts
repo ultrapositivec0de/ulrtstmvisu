@@ -5,6 +5,7 @@ import { Idiomorph } from 'idiomorph';
 import DOMPurify from 'dompurify';
 import { DOM_PURIFY_CONFIG } from '../utils/markdownParser';
 import { processContentForSteem } from './useSteemQueue';
+import { usePerformanceStore } from '../stores/usePerformanceStore';
 
 export interface UseEditorShortcutsAndAutosaveProps {
   editorMode: 'visual' | 'markdown' | 'reading';
@@ -244,16 +245,21 @@ export function useEditorShortcutsAndAutosave({
       return;
     }
 
+    const getPreviewDelay = () => {
+      const { performanceMode, lowGpuMode } = usePerformanceStore.getState();
+      return (performanceMode || lowGpuMode) ? 700 : 300;
+    };
+
     let timer: any;
     if (!isLivePreviewEnabled) updatePreview(); 
     else {
-      timer = setTimeout(updatePreview, 300);
+      timer = setTimeout(updatePreview, getPreviewDelay());
     }
     const unsubscribe = useEditorStore.subscribe((state, prevState) => {
       if (state.content !== prevState.content) {
         if (editorMode === 'visual') return;
         if (timer) clearTimeout(timer);
-        timer = setTimeout(updatePreview, 300);
+        timer = setTimeout(updatePreview, getPreviewDelay());
       }
     });
 

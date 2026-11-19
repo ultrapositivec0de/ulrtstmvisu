@@ -1,5 +1,7 @@
 import React from 'react';
+import { MotionConfig } from 'motion/react';
 import { cn } from '../../lib/utils';
+import { usePerformanceStore } from '../../stores/usePerformanceStore';
 import { Header, type HeaderProps } from '../header/Header';
 import { GlobalEditorStyles } from '../common/GlobalEditorStyles';
 import { EditorScreen, type EditorScreenProps } from './EditorScreen';
@@ -40,42 +42,49 @@ export const AppWorkspaceHost: React.FC<AppWorkspaceHostProps> = ({
   editorProps,
   modalsHostProps,
 }) => {
+  const globalPerfMode = usePerformanceStore((s) => s.performanceMode);
+  const lowGpuMode = usePerformanceStore((s) => s.lowGpuMode);
+  const effectivePerf = performanceMode || globalPerfMode;
+
   return (
-    <div
-      className={cn(
-        "flex flex-col w-full h-full relative font-sans overflow-hidden transition-colors duration-500 selection:bg-[rgb(var(--accent-color)/0.3)]",
-        visualStyle === 'neon'
-          ? "theme-neon bg-slate-950 text-cyan-400"
-          : isDarkMode
-          ? "bg-slate-950 text-slate-100"
-          : "theme-light bg-white text-slate-900 border-slate-200",
-        performanceMode && "perf-mode"
-      )}
-      style={{
-        height: isKeyboardOpen && vvHeight ? `${vvHeight}px` : '100dvh',
-      }}
-    >
-      {/* Dynamic Theme & Editor Styles */}
-      <GlobalEditorStyles visualStyle={visualStyle} neonTextColored={neonTextColored} />
+    <MotionConfig reducedMotion={(effectivePerf || lowGpuMode) ? 'always' : 'user'}>
+      <div
+        className={cn(
+          "flex flex-col w-full h-full relative font-sans overflow-hidden transition-colors duration-500 selection:bg-[rgb(var(--accent-color)/0.3)]",
+          visualStyle === 'neon'
+            ? "theme-neon bg-slate-950 text-cyan-400"
+            : isDarkMode
+            ? "bg-slate-950 text-slate-100"
+            : "theme-light bg-white text-slate-900 border-slate-200",
+          effectivePerf && "perf-mode",
+          lowGpuMode && "low-gpu-mode"
+        )}
+        style={{
+          height: isKeyboardOpen && vvHeight ? `${vvHeight}px` : '100dvh',
+        }}
+      >
+        {/* Dynamic Theme & Editor Styles */}
+        <GlobalEditorStyles visualStyle={visualStyle} neonTextColored={neonTextColored} />
 
-      {/* Header / Main Toolbar */}
-      <Header {...headerProps} />
+        {/* Header / Main Toolbar */}
+        <Header {...headerProps} />
 
-      {/* Main Workspace Area: Reader Screen & Editor Screen */}
-      <div className="flex flex-1 overflow-hidden relative">
-        <ReaderScreen
-          isVisible={activeView === 'reader'}
-          {...readerProps}
-        />
+        {/* Main Workspace Area: Reader Screen & Editor Screen */}
+        <div className="flex flex-1 overflow-hidden relative">
+          <ReaderScreen
+            isVisible={activeView === 'reader'}
+            {...readerProps}
+          />
 
-        <EditorScreen
-          isVisible={activeView === 'editor'}
-          {...editorProps}
-        />
+          <EditorScreen
+            isVisible={activeView === 'editor'}
+            {...editorProps}
+          />
+        </div>
+
+        {/* Global Modals, Dialogs and Popups Host */}
+        <AppModalsHost {...modalsHostProps} />
       </div>
-
-      {/* Global Modals, Dialogs and Popups Host */}
-      <AppModalsHost {...modalsHostProps} />
-    </div>
+    </MotionConfig>
   );
 };

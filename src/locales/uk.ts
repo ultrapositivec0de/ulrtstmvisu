@@ -1187,7 +1187,12 @@ export const translations = {
   "editModeExitedNotify": "Режим редагування допису скинуто — наступна публікація створить новий допис.",
   "draftEditModeSavedNotify": "Збережено до чернеток разом із метаданими редагування допису.",
   "draftEditModeLoadedNotify": "Чернетку завантажено у режимі редагування існуючого допису.",
-  "draftEditBadge": "РЕДАГУВАННЯ"
+  "draftEditBadge": "РЕДАГУВАННЯ",
+  "lowGpuMode": "Мінімальне навантаження GPU (Linux / Android)",
+  "lowGpuModeDesc": "Спрощує прошарки композитингу, прибирає градієнти, прозорі накладання, розмиття та JS-анімації для зменшення навантаження на графічний процесор у Linux та Android WebView.",
+  "addToKeychainBtn": "+ Keychain",
+  "addToKeychainTitle": "Скопіювати @{acc} до списку Keychain",
+  "addedToKeychainNotify": "Акаунт @{acc} додано до списку Keychain"
 } as const;
 
 export default { meta, translations };

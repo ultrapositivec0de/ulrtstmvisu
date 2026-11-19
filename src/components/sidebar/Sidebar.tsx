@@ -431,9 +431,7 @@ export const Sidebar: React.FC<SidebarProps> = (props) => {
                                   <button
                                     title={t('performanceDesc')}
                                     onClick={() => {
-                                      const next = !performanceMode;
-                                      setPerformanceMode?.(next);
-                                      localStorage.setItem('steem_performance_mode', next.toString());
+                                      setPerformanceMode?.(!performanceMode);
                                     }}
                                     className={cn("flex justify-between items-center px-1.5 py-1 rounded border", performanceMode ? "bg-cyan-900/30 border-cyan-800 text-cyan-400" : "bg-slate-800/30 border-slate-700/30 text-slate-500")}
                                   >

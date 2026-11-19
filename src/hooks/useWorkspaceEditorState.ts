@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useEditorStore } from '../store';
 import { useAppUIStore, type SettingsTab } from '../stores/useAppUIStore';
 import { useModalStore } from '../stores/useModalStore';
+import { usePerformanceStore } from '../stores/usePerformanceStore';
 
 const LEGACY_ONDEMAND_SYNC_KEY = 'steem_on_demand_sync';
 
@@ -56,7 +57,8 @@ export function useWorkspaceEditorState({
   storageKeyUsers,
 }: UseWorkspaceEditorStateParams): WorkspaceEditorState {
   const [splitWords, setSplitWords] = useState(300);
-  const [performanceMode, setPerformanceMode] = useState(() => localStorage.getItem('steem_performance_mode') !== 'false');
+  const performanceMode = usePerformanceStore((s) => s.performanceMode);
+  const setPerformanceMode = usePerformanceStore((s) => s.setPerformanceMode);
   const [activeMobileTab, setActiveMobileTab] = useState<'editor' | 'preview'>('editor');
   const [isEditorFocused, setIsEditorFocused] = useState(false);
   const [isMiniGalleryOpen, setIsMiniGalleryOpen] = useState(false);
@@ -72,10 +74,6 @@ export function useWorkspaceEditorState({
     }
     return false;
   });
-
-  useEffect(() => {
-    localStorage.setItem('steem_performance_mode', String(performanceMode));
-  }, [performanceMode]);
 
   useEffect(() => {
     localStorage.setItem('steem_ondemand_sync', String(onDemandSyncEnabled));
@@ -104,10 +102,14 @@ export function useWorkspaceEditorState({
     }
   });
   const [newMention, setNewMention] = useState('');
-  const currentUser = authType === 'VAULT' ? selectedVaultUser : username;
+  const currentUser = authType === 'VAULT' ? (selectedVaultUser || username) : username;
 
   useEffect(() => {
-    localStorage.setItem('steem_username', username);
+    if (username) {
+      localStorage.setItem('steem_username', username);
+    } else {
+      localStorage.removeItem('steem_username');
+    }
   }, [username]);
 
   const [targetReaderPost, setTargetReaderPost] = useState<{ author: string; permlink: string; commentAuthor?: string; commentPermlink?: string } | null>(null);

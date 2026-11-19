@@ -1187,7 +1187,12 @@ export const translations = {
   "editModeExitedNotify": "편집 모드가 해제되었습니다 — 다음 발행 시 새 게시물이 생성됩니다.",
   "draftEditModeSavedNotify": "게시물 편집 메타데이터와 함께 임시보관함에 저장되었습니다.",
   "draftEditModeLoadedNotify": "기존 게시물 편집 모드로 초안을 불러왔습니다.",
-  "draftEditBadge": "편집"
+  "draftEditBadge": "편집",
+  "lowGpuMode": "저GPU 합성 모드 (Linux / Android)",
+  "lowGpuModeDesc": "합성 레이어를 평탄화하고 그라데이션, 반투명 블렌딩, 블러, 그림자 및 JS 애니메이션을 비활성화하여 Linux WebKitGTK 및 Android WebView의 GPU 부하를 줄입니다.",
+  "addToKeychainBtn": "+ Keychain",
+  "addToKeychainTitle": "@{acc} 계정을 Keychain 목록으로 복사",
+  "addedToKeychainNotify": "@{acc} 계정이 Keychain 목록에 추가되었습니다"
 } as const;
 
 export default { meta, translations };

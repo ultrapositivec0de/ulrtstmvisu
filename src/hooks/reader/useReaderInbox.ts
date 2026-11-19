@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { SteemPost, ReaderConfig } from "../../types";
 import { callWithFallback } from "../../lib/steem";
+import { usePerformanceStore } from "../../stores/usePerformanceStore";
 
 interface UseReaderInboxProps {
   currentUser?: string | null;
@@ -274,7 +275,8 @@ export function useReaderInbox({
             const targetId = targetReaderPost.commentPermlink || targetReaderPost.permlink;
             const el = document.getElementById(`inbox-item-${targetId}`);
             if (el) {
-              el.scrollIntoView({ behavior: "smooth", block: "center" });
+              const { performanceMode, lowGpuMode } = usePerformanceStore.getState();
+              el.scrollIntoView({ behavior: (performanceMode || lowGpuMode) ? "auto" : "smooth", block: "center" });
               el.classList.add("ring-2", "ring-cyan-500", "bg-cyan-500/10");
               setTimeout(() => {
                 el.classList.remove("ring-2", "ring-cyan-500", "bg-cyan-500/10");

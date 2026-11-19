@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
-import { SteemNotification, AuthType } from '../types';
+import { SteemNotification } from '../types';
 import { callWithFallback } from '../lib/steem';
+import { usePerformanceStore } from '../stores/usePerformanceStore';
 
 interface UsePwaAndNotificationsProps {
   t: (key: any) => string;
@@ -172,8 +173,19 @@ export function usePwaAndNotifications({
       }
     };
 
+    const { performanceMode, lowGpuMode } = usePerformanceStore.getState();
+    const isReduced = performanceMode || lowGpuMode;
+    const pollMs = isReduced ? 150000 : 60000;
+
+    const runPoll = () => {
+      if (isReduced && typeof document !== 'undefined' && document.visibilityState === 'hidden') {
+        return;
+      }
+      fetchNotifs();
+    };
+
     fetchNotifs();
-    const interval = setInterval(fetchNotifs, 60000); // 60s
+    const interval = setInterval(runPoll, pollMs);
     return () => clearInterval(interval);
   }, [currentUser, notifEnabled, mutedUsers]);
 

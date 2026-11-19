@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'react';
 import { useEditorStore } from '../store';
+import { usePerformanceStore } from '../stores/usePerformanceStore';
 
 export interface EditorStats {
   words: number;
@@ -49,6 +50,8 @@ export function useEditorWorker(
     
     const calculate = (content: string) => {
       if (timer) clearTimeout(timer);
+      const { performanceMode, lowGpuMode } = usePerformanceStore.getState();
+      const debounceMs = (performanceMode || lowGpuMode) ? 350 : 100;
       timer = setTimeout(() => {
         if (workerRef.current) {
           workerRef.current.postMessage({
@@ -62,7 +65,7 @@ export function useEditorWorker(
           const rawChars = content.length;
           onStatsRef.current({ words: rawWords, chars: rawChars }, { words: rawWords, chars: rawChars });
         }
-      }, 100);
+      }, debounceMs);
     };
 
     calculate(useEditorStore.getState().content); // initial

@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import { useDeviceStore } from '../store/deviceStore';
 
 export type AppView = 'editor' | 'reader';
 export type SettingsTab = 'general' | 'gallery' | 'vault' | 'keys' | 'about' | 'pwa';
@@ -32,7 +33,7 @@ const getInitialActiveView = (): AppView => {
 
 export const useAppUIStore = create<AppUIStoreState>((set) => ({
   activeView: getInitialActiveView(),
-  isSidebarOpen: true,
+  isSidebarOpen: typeof window !== 'undefined' ? !useDeviceStore.getState().isMobileLayout : false,
   isFullScreen: false,
   isEditorFullScreen: false,
   settingsTab: 'general',

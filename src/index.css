@@ -783,9 +783,25 @@ details.steem-code-block[open] .steem-code-toggle-hint::after {
   transition-duration: 0s !important;
 }
 
-/* Remove full-page radial gradients in neon mode when performance mode is active */
+/* Environment-based Backdrop-filter & Transparency controls */
+.perf-mode,
+.low-gpu-mode,
+.is-tauri,
+[data-tauri="true"],
+.low-spec-mode {
+  --backdrop-filter-val: none !important;
+}
+
+.low-gpu-mode {
+  --bg-overlay-surface: var(--bg-sidebar);
+  --modal-shadow: none;
+}
+
+/* Remove full-page radial gradients in neon mode when performance or low-gpu mode is active */
 .perf-mode.theme-neon body,
-.perf-mode.theme-neon {
+.perf-mode.theme-neon,
+.low-gpu-mode.theme-neon body,
+.low-gpu-mode.theme-neon {
   background-image: none !important;
 }
 
@@ -794,7 +810,12 @@ details.steem-code-block[open] .steem-code-toggle-hint::after {
 .perf-mode .backdrop-blur-sm,
 .perf-mode .backdrop-blur-md,
 .perf-mode .backdrop-blur-lg,
-.perf-mode .backdrop-blur-\[1px\] {
+.perf-mode .backdrop-blur-\[1px\],
+.low-gpu-mode [class*="backdrop-blur"],
+.low-gpu-mode .backdrop-blur-sm,
+.low-gpu-mode .backdrop-blur-md,
+.low-gpu-mode .backdrop-blur-lg,
+.low-gpu-mode .backdrop-blur-\[1px\] {
   background-color: var(--bg-sidebar, #0f172a) !important;
 }
 
@@ -802,7 +823,43 @@ details.steem-code-block[open] .steem-code-toggle-hint::after {
 .theme-light.perf-mode .backdrop-blur-sm,
 .theme-light.perf-mode .backdrop-blur-md,
 .theme-light.perf-mode .backdrop-blur-lg,
-.theme-light.perf-mode .backdrop-blur-\[1px\] {
+.theme-light.perf-mode .backdrop-blur-\[1px\],
+.theme-light.low-gpu-mode [class*="backdrop-blur"],
+.theme-light.low-gpu-mode .backdrop-blur-sm,
+.theme-light.low-gpu-mode .backdrop-blur-md,
+.theme-light.low-gpu-mode .backdrop-blur-lg,
+.theme-light.low-gpu-mode .backdrop-blur-\[1px\] {
+  background-color: var(--bg-sidebar, #f8fafc) !important;
+}
+
+/* --- LOW GPU / MINIMAL COMPOSITING MODE (LINUX WEBKITGTK & ANDROID WEBVIEW) --- */
+.low-gpu-mode,
+.low-gpu-mode * {
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+  box-shadow: none !important;
+  text-shadow: none !important;
+  filter: none !important;
+  mix-blend-mode: normal !important;
+  will-change: auto !important;
+  scroll-behavior: auto !important;
+  animation: none !important;
+  transition: none !important;
+  animation-duration: 0s !important;
+  transition-duration: 0s !important;
+}
+
+.low-gpu-mode [class*="bg-gradient"] {
+  background-image: none !important;
+}
+
+.low-gpu-mode .overlay-surface,
+.low-gpu-mode .bg-overlay-surface {
+  background-color: var(--bg-sidebar, #0f172a) !important;
+}
+
+.low-gpu-mode.theme-light .overlay-surface,
+.low-gpu-mode.theme-light .bg-overlay-surface {
   background-color: var(--bg-sidebar, #f8fafc) !important;
 }
 

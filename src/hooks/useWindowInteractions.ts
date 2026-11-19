@@ -1,4 +1,5 @@
 import { useState, useCallback, useEffect } from 'react';
+import { usePerformanceStore } from '../stores/usePerformanceStore';
 
 export interface UseWindowInteractionsProps {
   performanceMode: boolean;
@@ -11,6 +12,8 @@ export function useWindowInteractions({
   hasLoadedRef,
   setShowNotificationList,
 }: UseWindowInteractionsProps) {
+  const lowGpuMode = usePerformanceStore((s) => s.lowGpuMode);
+  const reduceMotion = performanceMode || lowGpuMode;
   // 1. Mobile & Header Dropdown States
   const [showMobileToolsOpen, setShowMobileToolsOpen] = useState(false);
   const [showLangMenu, setShowLangMenu] = useState(false);
@@ -68,7 +71,7 @@ export function useWindowInteractions({
 
   // 4. Performance-Adaptive Motion Animation Configurations
   const getMotionConfig = useCallback((custom?: { initial?: any; animate?: any; exit?: any }) => {
-    if (performanceMode) {
+    if (reduceMotion) {
       return {
         initial: false,
         animate: custom?.animate || { opacity: 1, scale: 1, y: 0, x: 0 },
@@ -82,10 +85,10 @@ export function useWindowInteractions({
       exit: custom?.exit || { opacity: 0, y: 10, scale: 0.95 },
       transition: { duration: 0.15 },
     };
-  }, [performanceMode]);
+  }, [reduceMotion]);
 
   const getSidebarMotionConfig = useCallback(() => {
-    if (performanceMode) {
+    if (reduceMotion) {
       return {
         initial: false,
         animate: { x: 0, opacity: 1 },
@@ -99,7 +102,7 @@ export function useWindowInteractions({
       exit: { x: -300, opacity: 0 },
       transition: { duration: 0.3 },
     };
-  }, [performanceMode]);
+  }, [reduceMotion]);
 
   return {
     showMobileToolsOpen,

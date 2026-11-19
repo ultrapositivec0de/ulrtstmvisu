@@ -5,6 +5,7 @@ import { SecurityService } from '../../services/securityService';
 import { NativeHttpService } from '../../services/nativeHttpService';
 import { findWorkingPredictedImageUrl } from '../../utils/steemImagePrediction';
 import { ImageItem, AuthType } from '../../types';
+import { useDeviceStore } from '../../store/deviceStore';
 
 export const sanitizeFilename = (name: string): string => {
   const ukrToLatin: Record<string, string> = {
@@ -581,7 +582,7 @@ export function useImageUploadPipeline({
           type: 'success',
         });
         setTimeout(() => setPubLog({ msg: '', type: null }), 3000);
-        if (files.length > 1) {
+        if (files.length > 1 && useDeviceStore.getState().isMobileLayout) {
           setIsMiniGalleryOpen(true);
         }
       } else {

@@ -325,22 +325,20 @@ export const KeysModal: React.FC<KeysModalProps> = (props) => {
                         {t('setActive')}
                       </button>
                     )}
-                    {allKeychainAccounts.length > 1 && (
-                      <button
-                        type="button"
-                        onClick={async () => {
-                          if (await confirmDialog(t('removeKeychainAccountConfirm').replace('{acc}', acc))) {
-                            if (removeKeychainAccount) {
-                              removeKeychainAccount(acc);
-                            }
+                    <button
+                      type="button"
+                      onClick={async () => {
+                        if (await confirmDialog(t('removeKeychainAccountConfirm').replace('{acc}', acc))) {
+                          if (removeKeychainAccount) {
+                            removeKeychainAccount(acc);
                           }
-                        }}
-                        className="p-1.5 bg-red-500/10 text-red-400 rounded-lg hover:bg-red-500/20 transition-colors cursor-pointer"
-                        title={t('delete')}
-                      >
-                        <Trash2 size={15} />
-                      </button>
-                    )}
+                        }
+                      }}
+                      className="p-1.5 bg-red-500/10 text-red-400 rounded-lg hover:bg-red-500/20 transition-colors cursor-pointer"
+                      title={t('delete')}
+                    >
+                      <Trash2 size={15} />
+                    </button>
                   </div>
                 </div>
               );
@@ -502,6 +500,20 @@ export const KeysModal: React.FC<KeysModalProps> = (props) => {
                           </div>
                         </div>
                         <div className="flex items-center gap-2">
+                          {addKeychainAccount && !allKeychainAccounts.includes(acc) && (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                addKeychainAccount(acc);
+                                notify(t('addedToKeychainNotify').replace('{acc}', acc));
+                              }}
+                              className="px-2 py-1 text-[10px] font-semibold bg-cyan-500/10 hover:bg-cyan-500/20 text-cyan-400 border border-cyan-500/30 rounded-lg transition-colors flex items-center gap-1 cursor-pointer"
+                              title={t('addToKeychainTitle').replace('{acc}', acc)}
+                            >
+                              <Shield size={11} />
+                              <span>{t('addToKeychainBtn')}</span>
+                            </button>
+                          )}
                           {!isActive && (
                             <button
                               type="button"
@@ -567,15 +579,13 @@ export const KeysModal: React.FC<KeysModalProps> = (props) => {
 
         <div className="flex flex-col gap-4 bg-[var(--bg-main)]/40 p-4 rounded-xl border border-[var(--border-color)]">
           <div className="flex items-center justify-between">
-            <div className="flex flex-col">
+            <div className="flex flex-col pr-3">
               <span className="text-xs font-bold text-[var(--text-main)]">{t('performanceMode')}</span>
-              <span className="text-[10px] text-[var(--text-muted)]">{t('enableThumbnails')}</span>
+              <span className="text-[10px] text-[var(--text-muted)]">{t('performanceDesc')}</span>
             </div>
             <button 
               onClick={() => {
-                const next = !performanceMode;
-                setPerformanceMode?.(next);
-                localStorage.setItem('steem_performance_mode', next.toString());
+                setPerformanceMode?.(!performanceMode);
               }}
               className={cn(
                 "w-10 h-5 rounded-full transition-all relative cursor-pointer border border-transparent",
