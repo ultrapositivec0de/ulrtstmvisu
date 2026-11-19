@@ -51,20 +51,31 @@ export class KeyHashDispatcher {
     if (inputType === 'insertLineBreak' || inputType === 'insertParagraph') {
       return { category: 'enter', specialKeyId: 'enter' };
     }
-    if (inputType === 'deleteContentBackward' || inputType === 'deleteContent') {
+    if (
+      inputType === 'deleteContentBackward' ||
+      inputType === 'deleteContent' ||
+      inputType === 'deleteWordBackward' ||
+      inputType === 'deleteSoftLineBackward' ||
+      inputType === 'deleteHardLineBackward'
+    ) {
       return { category: 'backspace', specialKeyId: 'backspace' };
     }
-    if (inputType === 'deleteContentForward') {
+    if (
+      inputType === 'deleteContentForward' ||
+      inputType === 'deleteWordForward' ||
+      inputType === 'deleteSoftLineForward' ||
+      inputType === 'deleteHardLineForward'
+    ) {
       return { category: 'delete', specialKeyId: 'delete' };
     }
 
     const lowerKey = (key || '').toLowerCase();
     const codeName = code || '';
 
-    if (key === ' ' || codeName === 'Space' || inputType === 'insertText' && key === ' ') {
+    if (key === ' ' || codeName === 'Space' || lowerKey === 'space') {
       return { category: 'space', specialKeyId: 'space' };
     }
-    if (key === 'Enter' || codeName === 'Enter' || codeName === 'NumpadEnter') {
+    if (key === 'Enter' || key === '\n' || key === '\r' || codeName === 'Enter' || codeName === 'NumpadEnter') {
       return { category: 'enter', specialKeyId: 'enter' };
     }
     if (key === 'Backspace' || codeName === 'Backspace') {
@@ -103,13 +114,47 @@ export class KeyHashDispatcher {
     return { category: 'other' };
   }
 
+  private normalizeDispatchKey(key?: string, code?: string, inputType?: string): string {
+    if (code === 'Space' || key === 'Space') return ' ';
+    if (key && key.length > 0) {
+      if (key === '\n' || key === '\r') return 'Enter';
+      const namedSpecialKeys = new Set([
+        'Enter', 'Backspace', 'Delete', 'Tab',
+        'Shift', 'Control', 'Alt', 'Meta', 'CapsLock', 'Escape'
+      ]);
+      if (key.length > 1 && !namedSpecialKeys.has(key)) {
+        return key.slice(-1);
+      }
+      return key;
+    }
+    if (inputType === 'insertLineBreak' || inputType === 'insertParagraph') return 'Enter';
+    if (
+      inputType === 'deleteContentBackward' ||
+      inputType === 'deleteContent' ||
+      inputType === 'deleteWordBackward' ||
+      inputType === 'deleteSoftLineBackward' ||
+      inputType === 'deleteHardLineBackward'
+    ) {
+      return 'Backspace';
+    }
+    if (
+      inputType === 'deleteContentForward' ||
+      inputType === 'deleteWordForward' ||
+      inputType === 'deleteSoftLineForward' ||
+      inputType === 'deleteHardLineForward'
+    ) {
+      return 'Delete';
+    }
+    return '';
+  }
+
   /**
    * Main dispatch method: computes key variance and triggers procedural synthesis
    */
   public async dispatch(preset: SoundPreset, options: KeySoundTriggerOptions = {}): Promise<void> {
-    const rawKey = options.key || '';
     const rawCode = options.code || '';
     const inputType = options.inputType;
+    const rawKey = this.normalizeDispatchKey(options.key, rawCode, inputType);
 
     const { category, specialKeyId } = this.getCharCategory(rawKey, rawCode, inputType);
 
@@ -155,7 +200,12 @@ export class KeyHashDispatcher {
     }
 
     // 3. Dispatch to Audio Synthesis Engine
-    await soundSynthEngine.playKeySound(preset, options, pitchOffsetHz, modifier);
+    await soundSynthEngine.playKeySound(
+      preset,
+      rawKey ? { ...options, key: rawKey } : options,
+      pitchOffsetHz,
+      modifier
+    );
   }
 
   /**

@@ -137,14 +137,14 @@ export class SoundSynthEngine {
 
     // High-frequency keys, common letters (Latin & Ukrainian), digits, space, enter, and punctuation marks
     const keysToRender = [
-      ' ', 'Enter', 'Backspace',
+      ' ', 'Enter', 'Backspace', 'Delete', 'Tab',
       // Latin letters
       'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l', 'm', 'n', 'o', 'p', 'q', 'r', 's', 't', 'u', 'v', 'w', 'x', 'y', 'z',
       // Ukrainian Cyrillic letters
       'а', 'б', 'в', 'г', 'ґ', 'д', 'е', 'є', 'ж', 'з', 'и', 'і', 'ї', 'й', 'к', 'л', 'м', 'н', 'о', 'п', 'р', 'с', 'т', 'у', 'ф', 'х', 'ц', 'ч', 'ш', 'щ', 'ь', 'ю', 'я',
       // Digits & Punctuation
       '0', '1', '2', '3', '4', '5', '6', '7', '8', '9',
-      ',', '.', '!', '?', '\'', '’'
+      ',', '.', '!', '?', '\'', '’', '-', ':', ';', '(', ')', '"'
     ];
 
     // Stagger rendering in micro-batches to allow UI thread to process events smoothly
@@ -191,6 +191,9 @@ export class SoundSynthEngine {
     } else if (key === 'Delete') {
       category = 'delete';
       specialKeyId = 'delete';
+    } else if (key === 'Tab') {
+      category = 'tab';
+      specialKeyId = 'tab';
     } else if (/^[0-9]$/.test(key)) {
       category = 'number';
       specialKeyId = 'numbers';
@@ -313,6 +316,48 @@ export class SoundSynthEngine {
   }
 
   /**
+   * Resolves effective key identity from key/code/inputType before cache lookup
+   */
+  private resolveEffectiveKey(options: KeySoundTriggerOptions): string {
+    const inputType = options.inputType;
+    if (options.code === 'Space' || options.key === 'Space') {
+      return ' ';
+    }
+    if (options.key && options.key.length > 0) {
+      if (options.key === '\n' || options.key === '\r') return 'Enter';
+      const namedSpecialKeys = new Set([
+        'Enter', 'Backspace', 'Delete', 'Tab',
+        'Shift', 'Control', 'Alt', 'Meta', 'CapsLock', 'Escape'
+      ]);
+      if (options.key.length > 1 && !namedSpecialKeys.has(options.key)) {
+        return options.key.slice(-1);
+      }
+      return options.key;
+    }
+    if (inputType === 'insertLineBreak' || inputType === 'insertParagraph') {
+      return 'Enter';
+    }
+    if (
+      inputType === 'deleteContentBackward' ||
+      inputType === 'deleteContent' ||
+      inputType === 'deleteWordBackward' ||
+      inputType === 'deleteSoftLineBackward' ||
+      inputType === 'deleteHardLineBackward'
+    ) {
+      return 'Backspace';
+    }
+    if (
+      inputType === 'deleteContentForward' ||
+      inputType === 'deleteWordForward' ||
+      inputType === 'deleteSoftLineForward' ||
+      inputType === 'deleteHardLineForward'
+    ) {
+      return 'Delete';
+    }
+    return 'a';
+  }
+
+  /**
    * Main entry point to play a key sound
    */
   public async playKeySound(
@@ -328,7 +373,7 @@ export class SoundSynthEngine {
     // Trigger pre-rendering of current preset in background if not already started/done
     this.preRenderPresetSounds(preset).catch(() => {});
 
-    const rawKey = options.key || 'a';
+    const rawKey = this.resolveEffectiveKey(options);
     const normalizedKey = rawKey.length === 1 ? rawKey.toLowerCase() : rawKey;
 
     // Query pre-rendered buffer cache

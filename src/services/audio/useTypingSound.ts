@@ -20,6 +20,128 @@ import {
 import { audioContextManager } from './AudioContextManager';
 import { keyHashDispatcher } from './KeyHashDispatcher';
 import { soundSynthEngine } from './SoundSynthEngine';
+import { useDeviceStore } from '../../store/deviceStore';
+
+type ActiveKeyboardMode = 'physical' | 'virtual';
+
+function isTextTypingTarget(target: EventTarget | null): target is HTMLElement {
+  const el = target as HTMLElement | null;
+  if (!el || typeof el.tagName !== 'string') return false;
+  if (el.tagName === 'TEXTAREA' || el.isContentEditable) return true;
+  if (el.tagName === 'INPUT') {
+    const inputType = ((el as HTMLInputElement).type || 'text').toLowerCase();
+    return !['checkbox', 'radio', 'range', 'file', 'button', 'submit', 'reset', 'color'].includes(inputType);
+  }
+  return Boolean(el.closest('[contenteditable="true"]') || el.closest('.editor-area'));
+}
+
+function buildStrokeSignature(key?: string, code?: string, inputType?: string): string {
+  if (code === 'Space' || key === ' ' || key === 'Space') return 'space';
+  if (
+    key === 'Enter' ||
+    key === '\n' ||
+    key === '\r' ||
+    code === 'Enter' ||
+    code === 'NumpadEnter' ||
+    inputType === 'insertLineBreak' ||
+    inputType === 'insertParagraph'
+  ) {
+    return 'enter';
+  }
+  if (
+    key === 'Backspace' ||
+    code === 'Backspace' ||
+    inputType === 'deleteContentBackward' ||
+    inputType === 'deleteContent' ||
+    inputType === 'deleteWordBackward' ||
+    inputType === 'deleteSoftLineBackward' ||
+    inputType === 'deleteHardLineBackward'
+  ) {
+    return 'backspace';
+  }
+  if (
+    key === 'Delete' ||
+    code === 'Delete' ||
+    inputType === 'deleteContentForward' ||
+    inputType === 'deleteWordForward' ||
+    inputType === 'deleteSoftLineForward' ||
+    inputType === 'deleteHardLineForward'
+  ) {
+    return 'delete';
+  }
+  if (key === 'Tab' || code === 'Tab') return 'tab';
+  if (key && key.length > 0) {
+    const single = key.length > 1 ? key.slice(-1) : key;
+    return `char:${single.toLowerCase()}`;
+  }
+  return inputType ? `type:${inputType}` : 'unknown';
+}
+
+function extractCompositionDelta(
+  prevText: string,
+  nextText: string
+): { key: string; code: string; inputType: string; signature: string } | null {
+  if (nextText === prevText) {
+    return null;
+  }
+
+  if (nextText.length < prevText.length) {
+    // Composition shrunk -> Backspace key inside virtual IME composition
+    if (nextText === '' || prevText.startsWith(nextText) || prevText.includes(nextText)) {
+      return {
+        key: 'Backspace',
+        code: 'Backspace',
+        inputType: 'deleteContentBackward',
+        signature: 'backspace'
+      };
+    }
+  }
+
+  let extractedChar: string;
+  if (nextText.length > prevText.length) {
+    if (nextText.length - prevText.length === 1) {
+      let idx = 0;
+      while (idx < prevText.length && prevText[idx] === nextText[idx]) {
+        idx++;
+      }
+      extractedChar = nextText[idx] ?? nextText.slice(-1);
+    } else {
+      extractedChar = nextText.slice(-1);
+    }
+  } else if (nextText.length === prevText.length && nextText.length > 0) {
+    let idx = 0;
+    while (idx < prevText.length && prevText[idx] === nextText[idx]) {
+      idx++;
+    }
+    extractedChar = nextText[idx] ?? nextText.slice(-1);
+  } else if (nextText.length === 1) {
+    extractedChar = nextText;
+  } else {
+    return {
+      key: 'Backspace',
+      code: 'Backspace',
+      inputType: 'deleteContentBackward',
+      signature: 'backspace'
+    };
+  }
+
+  if (!extractedChar) return null;
+  if (extractedChar === '\n' || extractedChar === '\r') {
+    return {
+      key: 'Enter',
+      code: 'Enter',
+      inputType: 'insertLineBreak',
+      signature: 'enter'
+    };
+  }
+  const code = extractedChar === ' ' ? 'Space' : '';
+  return {
+    key: extractedChar,
+    code,
+    inputType: 'insertCompositionText',
+    signature: buildStrokeSignature(extractedChar, code)
+  };
+}
 
 export function useTypingSound() {
   const [settings, setSettings] = useState<AudioTypingSettings>(() => loadAudioSettings());
@@ -141,11 +263,33 @@ export function useTypingSound() {
     });
   }, []);
 
-  const lastPhysicalKeyDownTimeRef = useRef<number>(0);
-  const lastVirtualKeyDownTimeRef = useRef<number>(0);
   const lastKeyRepeatTimeRef = useRef<number>(0);
+  const activeKeyboardRef = useRef<ActiveKeyboardMode>(
+    (() => {
+      const d = useDeviceStore.getState();
+      return d.isKeyboardOpen || d.isAndroid || d.isIOS || d.isNativeMobile ? 'virtual' : 'physical';
+    })()
+  );
+  const lastVirtualSignalTimeRef = useRef<number>(0);
+  const lastPhysicalSignalTimeRef = useRef<number>(0);
+  const pendingImeKeyDownRef = useRef<{ time: number; target: EventTarget | null }>({
+    time: 0,
+    target: null
+  });
+  const compositionTextRef = useRef<string>('');
+  const lastHandledCompositionDataRef = useRef<string | null>(null);
+  const lastEndedCompositionRef = useRef<{ time: number; text: string }>({ time: 0, text: '' });
+  const lastDispatchedRef = useRef<{
+    time: number;
+    source: 'keydown' | 'beforeinput' | 'compositionupdate' | 'pointerdown';
+    signature: string;
+  }>({
+    time: 0,
+    source: 'keydown',
+    signature: ''
+  });
 
-  // Listeners for physical typing, user gesture wake-up, and mobile touch input
+  // Listeners for physical typing, user gesture wake-up, virtual keyboard input, and touch keys
   useEffect(() => {
     if (!settings.enabled) return;
 
@@ -154,44 +298,109 @@ export function useTypingSound() {
       audioContextManager.ensureRunning().catch(() => {});
     };
 
-    window.addEventListener('touchstart', handleGestureWake, { passive: true });
-    window.addEventListener('touchend', handleGestureWake, { passive: true });
-    window.addEventListener('pointerdown', handleGestureWake, { passive: true });
-    window.addEventListener('click', handleGestureWake, { passive: true });
-    window.addEventListener('keydown', handleGestureWake, { passive: true });
+    const resolveKeyDownIsVirtual = (
+      e: KeyboardEvent,
+      now: number,
+      device: ReturnType<typeof useDeviceStore.getState>
+    ): boolean => {
+      if (device.isKeyboardOpen) return true;
+      // Hardware keyboards always provide a non-empty physical scan code (e.g. 'KeyA', 'Enter', 'Space').
+      // Virtual/soft keyboards on Android/iOS commonly leave e.code empty.
+      if (!e.code) return true;
 
-    // 1. Keyboard listener (both Physical and Android soft keyboard keydown)
+      const isMobilePlatform = device.isAndroid || device.isIOS || device.isNativeMobile;
+      if (isMobilePlatform) {
+        const isActionKey = ['Enter', ' ', 'Backspace', 'Delete', 'Tab'].includes(e.key);
+        if (
+          isActionKey &&
+          lastVirtualSignalTimeRef.current > lastPhysicalSignalTimeRef.current &&
+          now - lastVirtualSignalTimeRef.current < 15000
+        ) {
+          return true;
+        }
+        if (
+          activeKeyboardRef.current === 'virtual' &&
+          isActionKey &&
+          now - lastPhysicalSignalTimeRef.current > 15000
+        ) {
+          return true;
+        }
+      }
+      return false;
+    };
+
+    const resolveBeforeInputIsVirtual = (
+      now: number,
+      device: ReturnType<typeof useDeviceStore.getState>
+    ): boolean => {
+      if (device.isKeyboardOpen) return true;
+      if (now - pendingImeKeyDownRef.current.time < 150) {
+        return activeKeyboardRef.current === 'virtual';
+      }
+      if (device.isAndroid || device.isIOS || device.isNativeMobile) {
+        return lastVirtualSignalTimeRef.current >= lastPhysicalSignalTimeRef.current;
+      }
+      return activeKeyboardRef.current === 'virtual';
+    };
+
+    // 1. Keyboard listener (triggers on key press down, NOT release)
     const handleKeyDown = (e: KeyboardEvent) => {
+      if (!e.isTrusted) return;
       handleGestureWake();
       const now = performance.now();
 
-      const target = e.target as HTMLElement | null;
-      const isInputOrEditor = target && (
-        target.tagName === 'INPUT' ||
-        target.tagName === 'TEXTAREA' ||
-        target.isContentEditable ||
-        target.closest('[contenteditable="true"]') ||
-        target.closest('.editor-area')
-      );
+      if (!isTextTypingTarget(e.target)) return;
 
-      // Handle Android Virtual Keyboard (keyCode 229 / Unidentified) immediately on key press touch
-      if (e.keyCode === 229 || e.which === 229 || e.key === 'Unidentified') {
-        if (isInputOrEditor) {
-          lastPhysicalKeyDownTimeRef.current = now;
-          lastVirtualKeyDownTimeRef.current = now;
-          triggerSound({
-            key: 'KeyA',
-            isVirtual: true,
-            isRepeat: false
-          });
+      const device = useDeviceStore.getState();
+      const isImeUnidentified =
+        e.keyCode === 229 ||
+        e.which === 229 ||
+        e.key === 'Unidentified' ||
+        e.key === 'Process';
+
+      // Android / soft-keyboard IME fires keyCode 229 (Unidentified) before delivering
+      // the actual character via beforeinput/compositionupdate. Never play a hardcoded dummy
+      // key ('KeyA') and never block beforeinput; instead mark active keyboard state and let
+      // beforeinput resolve the exact pressed character right before DOM commit.
+      if (isImeUnidentified) {
+        if (
+          device.isKeyboardOpen ||
+          device.isAndroid ||
+          device.isIOS ||
+          device.isNativeMobile ||
+          !e.code
+        ) {
+          activeKeyboardRef.current = 'virtual';
+          lastVirtualSignalTimeRef.current = now;
+        } else {
+          activeKeyboardRef.current = 'physical';
+          lastPhysicalSignalTimeRef.current = now;
         }
+        pendingImeKeyDownRef.current = { time: now, target: e.target };
         return;
       }
 
-      // Ignore IME composing sessions (handled via beforeinput)
-      if (e.isComposing) return;
+      // Filter out lone modifier/navigation keys that do not represent typed keystrokes
+      const isLoneModifier = [
+        'Shift', 'Control', 'Alt', 'Meta', 'CapsLock', 'NumLock', 'ScrollLock',
+        'Escape', 'ContextMenu', 'Insert', 'Pause'
+      ].includes(e.key);
+      if (isLoneModifier) return;
 
-      // Throttle OS key-repeat events to ~13Hz (min 75ms) to prevent sound buffer flooding when holding keys down
+      // Ignore shortcuts like Ctrl+C, Ctrl+V, Cmd+Z from producing sound unless editing whitespace/deletion keys
+      if ((e.ctrlKey || e.metaKey || e.altKey) && !['Backspace', 'Delete', 'Enter', ' '].includes(e.key)) {
+        return;
+      }
+
+      const isActionKey = ['Enter', ' ', 'Backspace', 'Delete', 'Tab'].includes(e.key);
+
+      // Composing dead keys / IME character composition with non-229 keys are handled by beforeinput
+      // so the composed result is played once, whereas Enter/Space/Backspace fire immediately on keydown.
+      if (e.isComposing && !isActionKey) {
+        return;
+      }
+
+      // Throttle OS key-repeat events (~13Hz / min 75ms) to prevent voice flooding when holding a key
       if (e.repeat) {
         if (now - lastKeyRepeatTimeRef.current < 75) {
           return;
@@ -199,86 +408,294 @@ export function useTypingSound() {
         lastKeyRepeatTimeRef.current = now;
       }
 
-      // Filter out lone modifier keys to avoid glitch sounds when using keyboard shortcuts (e.g. Ctrl, Alt, Shift, Meta)
-      const isLoneModifier = [
-        'Shift', 'Control', 'Alt', 'Meta', 'CapsLock', 'NumLock', 'ScrollLock',
-        'Escape', 'ContextMenu', 'Insert', 'Pause'
-      ].includes(e.key);
-      if (isLoneModifier) return;
-
-      // Ignore shortcuts like Ctrl+C, Ctrl+V, Cmd+Z from producing sound unless space/enter/backspace
-      if ((e.ctrlKey || e.metaKey || e.altKey) && !['Backspace', 'Delete', 'Enter', ' '].includes(e.key)) {
-        return;
+      const isVirtual = resolveKeyDownIsVirtual(e, now, device);
+      if (isVirtual) {
+        activeKeyboardRef.current = 'virtual';
+        lastVirtualSignalTimeRef.current = now;
+      } else {
+        activeKeyboardRef.current = 'physical';
+        lastPhysicalSignalTimeRef.current = now;
       }
 
-      // We focus on text input elements to avoid triggering sound on general page hotkeys
-      if (!isInputOrEditor) return;
-
-      lastPhysicalKeyDownTimeRef.current = now;
+      const signature = buildStrokeSignature(e.key, e.code);
+      lastDispatchedRef.current = { time: now, source: 'keydown', signature };
 
       triggerSound({
         key: e.key,
         code: e.code,
-        isVirtual: false,
+        isVirtual,
         isRepeat: !!e.repeat
       });
     };
 
-    // 2. Mobile Touch Keyboard & IME (beforeinput event)
+    // 2. Virtual Keyboard & IME pre-mutation listener (fires before DOM update & before keyup)
     const handleBeforeInput = (e: InputEvent) => {
-      const now = performance.now();
-      // Deduplicate: if a physical or virtual keydown just fired within 160ms, skip beforeinput to prevent double sound
-      if (now - lastPhysicalKeyDownTimeRef.current < 160 || now - lastVirtualKeyDownTimeRef.current < 160) {
+      if (!e.isTrusted) return;
+      if (!isTextTypingTarget(e.target)) return;
+
+      const inputType = e.inputType || '';
+
+      // Ignore non-typing mutations (paste, undo/redo, drag/drop, cut, toolbar formatting)
+      if (
+        inputType === 'insertFromPaste' ||
+        inputType === 'insertFromDrop' ||
+        inputType === 'insertFromYank' ||
+        inputType === 'deleteByCut' ||
+        inputType === 'deleteByDrag' ||
+        inputType === 'historyUndo' ||
+        inputType === 'historyRedo' ||
+        inputType.startsWith('format')
+      ) {
         return;
       }
 
-      const target = e.target as HTMLElement | null;
-      const isInputOrEditor = target && (
-        target.tagName === 'INPUT' ||
-        target.tagName === 'TEXTAREA' ||
-        target.isContentEditable ||
-        target.closest('[contenteditable="true"]') ||
-        target.closest('.editor-area')
-      );
-      if (!isInputOrEditor) return;
+      const now = performance.now();
+      let resolvedKey: string | undefined;
+      let resolvedCode: string;
+      let resolvedInputType: string = inputType;
+      let signature: string;
 
-      const inputType = e.inputType;
-      const data = e.data || '';
+      if (inputType === 'insertLineBreak' || inputType === 'insertParagraph') {
+        compositionTextRef.current = '';
+        lastHandledCompositionDataRef.current = null;
+        resolvedKey = 'Enter';
+        resolvedCode = 'Enter';
+        signature = 'enter';
+      } else if (
+        inputType === 'deleteContentBackward' ||
+        inputType === 'deleteContent' ||
+        inputType === 'deleteWordBackward' ||
+        inputType === 'deleteSoftLineBackward' ||
+        inputType === 'deleteHardLineBackward'
+      ) {
+        compositionTextRef.current = '';
+        lastHandledCompositionDataRef.current = null;
+        resolvedKey = 'Backspace';
+        resolvedCode = 'Backspace';
+        signature = 'backspace';
+      } else if (
+        inputType === 'deleteContentForward' ||
+        inputType === 'deleteWordForward' ||
+        inputType === 'deleteSoftLineForward' ||
+        inputType === 'deleteHardLineForward'
+      ) {
+        compositionTextRef.current = '';
+        lastHandledCompositionDataRef.current = null;
+        resolvedKey = 'Delete';
+        resolvedCode = 'Delete';
+        signature = 'delete';
+      } else if (inputType === 'insertCompositionText') {
+        if (e.data === null || e.data === undefined) {
+          // Some WebViews supply composition data only on compositionupdate
+          return;
+        }
+        const delta = extractCompositionDelta(compositionTextRef.current, e.data);
+        compositionTextRef.current = e.data;
+        lastHandledCompositionDataRef.current = e.data;
+        if (!delta) return;
+        resolvedKey = delta.key;
+        resolvedCode = delta.code;
+        resolvedInputType = delta.inputType;
+        signature = delta.signature;
+      } else if (inputType === 'insertFromComposition') {
+        const data = e.data || '';
+        const prevComp = compositionTextRef.current;
+        const recentlyEndedSame =
+          now - lastEndedCompositionRef.current.time < 120 &&
+          data === lastEndedCompositionRef.current.text;
+        compositionTextRef.current = '';
+        if (
+          !data ||
+          data === prevComp ||
+          data === lastHandledCompositionDataRef.current ||
+          recentlyEndedSame
+        ) {
+          lastHandledCompositionDataRef.current = null;
+          return;
+        }
+        lastHandledCompositionDataRef.current = null;
+        const ch = data.slice(-1);
+        resolvedKey = ch === '\n' || ch === '\r' ? 'Enter' : ch;
+        resolvedCode = resolvedKey === ' ' ? 'Space' : resolvedKey === 'Enter' ? 'Enter' : '';
+        signature = buildStrokeSignature(resolvedKey, resolvedCode, inputType);
+      } else if (inputType === 'insertText' || inputType === 'insertReplacementText') {
+        compositionTextRef.current = '';
+        lastHandledCompositionDataRef.current = null;
+        const data = e.data || '';
+        if (!data) return;
+        const ch = data.slice(-1);
+        if (ch === '\n' || ch === '\r') {
+          resolvedKey = 'Enter';
+          resolvedCode = 'Enter';
+          resolvedInputType = 'insertLineBreak';
+          signature = 'enter';
+        } else {
+          resolvedKey = ch;
+          resolvedCode = ch === ' ' ? 'Space' : '';
+          signature = buildStrokeSignature(ch, resolvedCode, inputType);
+        }
+      } else {
+        return;
+      }
+
+      // Deduplicate against keydown or pointerdown for the exact same keystroke
+      const prevDispatch = lastDispatchedRef.current;
+      if (
+        (prevDispatch.source === 'keydown' || prevDispatch.source === 'pointerdown') &&
+        now - prevDispatch.time < 120 &&
+        prevDispatch.signature === signature
+      ) {
+        return;
+      }
+
+      // Throttle rapid repeated virtual Backspace/Delete holds (~13Hz)
+      if (
+        prevDispatch.source === 'beforeinput' &&
+        (signature === 'backspace' || signature === 'delete') &&
+        prevDispatch.signature === signature &&
+        now - prevDispatch.time < 75
+      ) {
+        return;
+      }
+
+      const device = useDeviceStore.getState();
+      const isVirtual = resolveBeforeInputIsVirtual(now, device);
+      if (isVirtual) {
+        activeKeyboardRef.current = 'virtual';
+        lastVirtualSignalTimeRef.current = now;
+      }
+
+      pendingImeKeyDownRef.current.time = 0;
+      lastDispatchedRef.current = { time: now, source: 'beforeinput', signature };
 
       triggerSound({
-        key: data || undefined,
-        inputType,
-        isVirtual: true
+        key: resolvedKey,
+        code: resolvedCode || undefined,
+        inputType: resolvedInputType,
+        isVirtual
       });
     };
 
-    // 3. PointerDown listener for in-app virtual keys & toolbar buttons (instant touch response)
+    const handleCompositionStart = (e: CompositionEvent) => {
+      if (!isTextTypingTarget(e.target)) return;
+      compositionTextRef.current = e.data || '';
+      lastHandledCompositionDataRef.current = null;
+    };
+
+    const handleCompositionUpdate = (e: CompositionEvent) => {
+      if (!e.isTrusted || !isTextTypingTarget(e.target)) return;
+      const nextData = e.data ?? '';
+      if (lastHandledCompositionDataRef.current === nextData) {
+        compositionTextRef.current = nextData;
+        return;
+      }
+
+      const delta = extractCompositionDelta(compositionTextRef.current, nextData);
+      compositionTextRef.current = nextData;
+      lastHandledCompositionDataRef.current = nextData;
+      if (!delta) return;
+
+      const now = performance.now();
+      const prevDispatch = lastDispatchedRef.current;
+      if (
+        (prevDispatch.source === 'keydown' || prevDispatch.source === 'beforeinput' || prevDispatch.source === 'pointerdown') &&
+        now - prevDispatch.time < 100 &&
+        prevDispatch.signature === delta.signature
+      ) {
+        return;
+      }
+
+      const device = useDeviceStore.getState();
+      const isVirtual = resolveBeforeInputIsVirtual(now, device);
+      if (isVirtual) {
+        activeKeyboardRef.current = 'virtual';
+        lastVirtualSignalTimeRef.current = now;
+      }
+
+      lastDispatchedRef.current = { time: now, source: 'compositionupdate', signature: delta.signature };
+      triggerSound({
+        key: delta.key,
+        code: delta.code || undefined,
+        inputType: delta.inputType,
+        isVirtual
+      });
+    };
+
+    const resetCompositionTracking = () => {
+      if (compositionTextRef.current) {
+        lastEndedCompositionRef.current = {
+          time: performance.now(),
+          text: compositionTextRef.current
+        };
+      }
+      compositionTextRef.current = '';
+      lastHandledCompositionDataRef.current = null;
+      pendingImeKeyDownRef.current.time = 0;
+    };
+
+    // 3. PointerDown listener: instant touch-down response for in-app virtual keys
+    //    and active touch keyboard hint when tapping into an editor
     const handlePointerDown = (e: PointerEvent) => {
+      if (!e.isTrusted) return;
+      handleGestureWake();
       const target = e.target as HTMLElement | null;
       if (!target) return;
+
+      const now = performance.now();
       const virtualBtn = target.closest('[data-sound-key], .virtual-key');
       if (virtualBtn) {
-        const keyName = virtualBtn.getAttribute('data-sound-key') || virtualBtn.getAttribute('data-key') || 'Space';
-        lastPhysicalKeyDownTimeRef.current = performance.now();
+        const rawAttr =
+          virtualBtn.getAttribute('data-sound-key') ||
+          virtualBtn.getAttribute('data-key') ||
+          'Space';
+        const keyName = rawAttr === 'Space' ? ' ' : rawAttr;
+        const codeName = rawAttr === 'Space' || keyName === ' ' ? 'Space' : '';
+        const signature = buildStrokeSignature(keyName, codeName);
+
+        activeKeyboardRef.current = 'virtual';
+        lastVirtualSignalTimeRef.current = now;
+        lastDispatchedRef.current = { time: now, source: 'pointerdown', signature };
+
         triggerSound({
           key: keyName,
+          code: codeName || undefined,
           isVirtual: true
         });
+        return;
+      }
+
+      if (e.pointerType === 'touch' && isTextTypingTarget(target)) {
+        activeKeyboardRef.current = 'virtual';
+        if (useDeviceStore.getState().isKeyboardOpen) {
+          lastVirtualSignalTimeRef.current = now;
+        }
+        resetCompositionTracking();
       }
     };
 
+    window.addEventListener('touchstart', handleGestureWake, { passive: true });
+    window.addEventListener('touchend', handleGestureWake, { passive: true });
+    window.addEventListener('click', handleGestureWake, { passive: true });
     window.addEventListener('keydown', handleKeyDown, { passive: true, capture: true });
     window.addEventListener('beforeinput', handleBeforeInput as EventListener, { passive: true, capture: true });
+    window.addEventListener('compositionstart', handleCompositionStart as EventListener, { passive: true, capture: true });
+    window.addEventListener('compositionupdate', handleCompositionUpdate as EventListener, { passive: true, capture: true });
+    window.addEventListener('compositionend', resetCompositionTracking, { passive: true, capture: true });
+    window.addEventListener('focusin', resetCompositionTracking, { passive: true, capture: true });
+    window.addEventListener('focusout', resetCompositionTracking, { passive: true, capture: true });
     window.addEventListener('pointerdown', handlePointerDown, { passive: true, capture: true });
 
     return () => {
       window.removeEventListener('touchstart', handleGestureWake);
       window.removeEventListener('touchend', handleGestureWake);
-      window.removeEventListener('pointerdown', handleGestureWake);
       window.removeEventListener('click', handleGestureWake);
-      window.removeEventListener('keydown', handleGestureWake);
       window.removeEventListener('keydown', handleKeyDown, { capture: true });
       window.removeEventListener('beforeinput', handleBeforeInput as EventListener, { capture: true });
+      window.removeEventListener('compositionstart', handleCompositionStart as EventListener, { capture: true });
+      window.removeEventListener('compositionupdate', handleCompositionUpdate as EventListener, { capture: true });
+      window.removeEventListener('compositionend', resetCompositionTracking, { capture: true });
+      window.removeEventListener('focusin', resetCompositionTracking, { capture: true });
+      window.removeEventListener('focusout', resetCompositionTracking, { capture: true });
       window.removeEventListener('pointerdown', handlePointerDown, { capture: true });
     };
   }, [settings.enabled, triggerSound]);
