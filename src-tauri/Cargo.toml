@@ -10,10 +10,10 @@ name = "tauri_app"
 crate-type = ["staticlib", "cdylib", "rlib"]
 
 [build-dependencies]
-tauri-build = { version = "2.12", features = [] }
+tauri-build = { version = "2.7.6", features = [] }
 
 [dependencies]
-tauri = { version = "2.12", features = [] }
+tauri = { version = "2.12.5", features = [] }
 tauri-plugin-fs = "2.7.1"
 tauri-plugin-dialog = "2.8.4"
 tauri-plugin-os = "2.4.0"

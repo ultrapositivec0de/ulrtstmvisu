@@ -20,13 +20,17 @@ jobs:
           node-version: 24
           cache: 'npm'
 
+      - name: "Verify Tauri & Crate Versions"
+        run: npm run check:tauri
+
       - name: "Install Rust"
         uses: dtolnay/rust-toolchain@stable
 
+      - name: "Verify Cargo Dependency Resolution"
+        run: cargo metadata --manifest-path src-tauri/Cargo.toml --format-version 1 > /dev/null
+
       - name: "Install Frontend Dependencies"
-        run: |
-          npm install --legacy-peer-deps
-          npm install -g @tauri-apps/cli
+        run: npm install --legacy-peer-deps
 
       - name: "Quick Tauri Check"
         run: |
@@ -53,9 +57,7 @@ jobs:
         uses: dtolnay/rust-toolchain@stable
 
       - name: Install dependencies
-        run: |
-          npm install --legacy-peer-deps
-          npm install -g @tauri-apps/cli
+        run: npm install --legacy-peer-deps
 
       - name: Generate Icons
         run: npm run icon

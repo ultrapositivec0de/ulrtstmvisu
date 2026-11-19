@@ -17,7 +17,8 @@
     "tauri": "tauri",
     "icon": "tauri icon app-icon.png",
     "bump": "node scripts/bump-version.js",
-    "bump-version": "node scripts/bump-version.js"
+    "bump-version": "node scripts/bump-version.js",
+    "check:tauri": "node scripts/check-tauri-versions.mjs"
   },
   "dependencies": {
     "@blazeapps/dsteem": "^0.12.2",
