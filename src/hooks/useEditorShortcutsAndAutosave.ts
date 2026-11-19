@@ -27,6 +27,7 @@ export interface UseEditorShortcutsAndAutosaveProps {
   saveLargeStorage: (key: string, val: string) => void;
   STORAGE_KEY_AUTOSAVE: string;
   isLivePreviewEnabled: boolean;
+  onDemandSyncEnabled?: boolean;
   syncScrollEnabled: boolean;
   lang: string;
   getMarked: () => any;
@@ -53,6 +54,7 @@ export function useEditorShortcutsAndAutosave({
   saveLargeStorage,
   STORAGE_KEY_AUTOSAVE,
   isLivePreviewEnabled,
+  onDemandSyncEnabled = false,
   syncScrollEnabled,
   lang,
   getMarked,
@@ -60,50 +62,63 @@ export function useEditorShortcutsAndAutosave({
 }: UseEditorShortcutsAndAutosaveProps) {
   // 1. Selection change listener
   useEffect(() => {
-    const handleSelectionChange = () => {
-      if (editorMode === 'visual') {
-        saveVisualSelection();
-        if (wysiwygRef.current) {
-          const sel = window.getSelection();
-          if (sel && sel.rangeCount > 0) {
-            try {
-              const range = sel.getRangeAt(0);
-              if (wysiwygRef.current.contains(range.commonAncestorContainer)) {
-                savedVisualRangeRef.current = range.cloneRange();
-                
-                let node: Node | null = range.commonAncestorContainer;
-                if (node.nodeType === 3) node = node.parentNode;
-                const table = ((node as Element)?.closest?.('table') as HTMLTableElement) || null;
-                const row = ((node as Element)?.closest?.('tr') as HTMLTableRowElement) || null;
-                const cell = ((node as Element)?.closest?.('td, th') as HTMLTableCellElement) || null;
+    let visualSelTimer: ReturnType<typeof setTimeout> | null = null;
+    const runVisualSelectionCheck = () => {
+      saveVisualSelection();
+      if (wysiwygRef.current) {
+        const sel = window.getSelection();
+        if (sel && sel.rangeCount > 0) {
+          try {
+            const range = sel.getRangeAt(0);
+            if (wysiwygRef.current.contains(range.commonAncestorContainer)) {
+              savedVisualRangeRef.current = range.cloneRange();
+              
+              let node: Node | null = range.commonAncestorContainer;
+              if (node.nodeType === 3) node = node.parentNode;
+              const table = ((node as Element)?.closest?.('table') as HTMLTableElement) || null;
+              const row = ((node as Element)?.closest?.('tr') as HTMLTableRowElement) || null;
+              const cell = ((node as Element)?.closest?.('td, th') as HTMLTableCellElement) || null;
 
-                if (activeTableRef.current !== table) {
-                  activeTableRef.current = table;
-                  setActiveTable(table);
-                }
-                if (activeTableRowRef.current !== row) {
-                  activeTableRowRef.current = row;
-                  setActiveTableRow(row);
-                }
-                if (activeTableCellRef.current !== cell) {
-                  activeTableCellRef.current = cell;
-                  setActiveTableCell(cell);
-                }
-              } else {
-                if (activeTableRef.current !== null) { activeTableRef.current = null; setActiveTable(null); }
-                if (activeTableRowRef.current !== null) { activeTableRowRef.current = null; setActiveTableRow(null); }
-                if (activeTableCellRef.current !== null) { activeTableCellRef.current = null; setActiveTableCell(null); }
+              if (activeTableRef.current !== table) {
+                activeTableRef.current = table;
+                setActiveTable(table);
               }
-            } catch {
+              if (activeTableRowRef.current !== row) {
+                activeTableRowRef.current = row;
+                setActiveTableRow(row);
+              }
+              if (activeTableCellRef.current !== cell) {
+                activeTableCellRef.current = cell;
+                setActiveTableCell(cell);
+              }
+            } else {
               if (activeTableRef.current !== null) { activeTableRef.current = null; setActiveTable(null); }
               if (activeTableRowRef.current !== null) { activeTableRowRef.current = null; setActiveTableRow(null); }
               if (activeTableCellRef.current !== null) { activeTableCellRef.current = null; setActiveTableCell(null); }
             }
-          } else {
+          } catch {
             if (activeTableRef.current !== null) { activeTableRef.current = null; setActiveTable(null); }
             if (activeTableRowRef.current !== null) { activeTableRowRef.current = null; setActiveTableRow(null); }
             if (activeTableCellRef.current !== null) { activeTableCellRef.current = null; setActiveTableCell(null); }
           }
+        } else {
+          if (activeTableRef.current !== null) { activeTableRef.current = null; setActiveTable(null); }
+          if (activeTableRowRef.current !== null) { activeTableRowRef.current = null; setActiveTableRow(null); }
+          if (activeTableCellRef.current !== null) { activeTableCellRef.current = null; setActiveTableCell(null); }
+        }
+      }
+    };
+
+    const handleSelectionChange = () => {
+      if (editorMode === 'visual') {
+        if (onDemandSyncEnabled) {
+          if (visualSelTimer) clearTimeout(visualSelTimer);
+          visualSelTimer = setTimeout(() => {
+            visualSelTimer = null;
+            runVisualSelectionCheck();
+          }, 220);
+        } else {
+          runVisualSelectionCheck();
         }
       } else if (editorMode === 'markdown') {
         saveCursorPosition();
@@ -115,9 +130,10 @@ export function useEditorShortcutsAndAutosave({
 
     document.addEventListener('selectionchange', handleSelectionChange);
     return () => {
+      if (visualSelTimer) clearTimeout(visualSelTimer);
       document.removeEventListener('selectionchange', handleSelectionChange);
     };
-  }, [editorMode, saveVisualSelection, saveCursorPosition, activeTableRef, activeTableRowRef, activeTableCellRef, setActiveTable, setActiveTableRow, setActiveTableCell, savedVisualRangeRef, wysiwygRef]);
+  }, [editorMode, onDemandSyncEnabled, saveVisualSelection, saveCursorPosition, activeTableRef, activeTableRowRef, activeTableCellRef, setActiveTable, setActiveTableRow, setActiveTableCell, savedVisualRangeRef, wysiwygRef]);
 
   // 2. Debounced persistence for auto-save
   useEffect(() => {
@@ -246,6 +262,7 @@ export function useEditorShortcutsAndAutosave({
     }
 
     const getPreviewDelay = () => {
+      if (onDemandSyncEnabled) return 1500;
       const { performanceMode, lowGpuMode } = usePerformanceStore.getState();
       return (performanceMode || lowGpuMode) ? 700 : 300;
     };
@@ -267,5 +284,5 @@ export function useEditorShortcutsAndAutosave({
       if (timer) clearTimeout(timer);
       unsubscribe();
     };
-  }, [t, syncScrollEnabled, isLivePreviewEnabled, lang, editorMode, previewPaneRef, getMarked, isFirstRender]);
+  }, [t, syncScrollEnabled, isLivePreviewEnabled, onDemandSyncEnabled, lang, editorMode, previewPaneRef, getMarked, isFirstRender]);
 }

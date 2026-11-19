@@ -300,6 +300,7 @@ export function useWorkspaceServices(params: UseWorkspaceServicesParams) {
     saveLargeStorage,
     STORAGE_KEY_AUTOSAVE,
     isLivePreviewEnabled,
+    onDemandSyncEnabled: editorState?.onDemandSyncEnabled ?? false,
     syncScrollEnabled,
     lang,
     getMarked,

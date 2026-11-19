@@ -170,6 +170,17 @@ export const CodeEditor = forwardRef<HTMLTextAreaElement, CodeEditorProps>((prop
     };
   }, []);
 
+  // Flush pending changes if real-time sync is turned back on or live preview is activated
+  const isLivePreviewEnabled = useEditorStore((s) => s.isLivePreviewEnabled);
+  useEffect(() => {
+    if ((!props.onDemandSyncEnabled || isLivePreviewEnabled) && localRef.current) {
+      const val = localRef.current.value;
+      if (syncContentTimeoutRef.current !== null || val !== useEditorStore.getState().content) {
+        flushChanges(localRef.current);
+      }
+    }
+  }, [props.onDemandSyncEnabled, isLivePreviewEnabled]);
+
   // Synchronously flush changes to the store before reload/unload so they are not lost
   useEffect(() => {
     const handleBeforeUnload = () => {
@@ -373,8 +384,9 @@ export const CodeEditor = forwardRef<HTMLTextAreaElement, CodeEditorProps>((prop
     latestSelectionStartRef.current = start;
     latestSelectionEndRef.current = end;
     
-    // Debounce Zustand update (including row/col calculation); defer slightly longer on large pastes
-    const syncDelay = isBulkChange ? 220 : 100;
+    // Debounce Zustand update (including row/col calculation); defer substantially when real-time sync is off
+    const isOnDemand = props.onDemandSyncEnabled === true;
+    const syncDelay = isOnDemand ? 2500 : (isBulkChange ? 220 : 100);
     if (syncContentTimeoutRef.current) clearTimeout(syncContentTimeoutRef.current);
     syncContentTimeoutRef.current = setTimeout(() => {
       syncContentTimeoutRef.current = null;
@@ -398,10 +410,10 @@ export const CodeEditor = forwardRef<HTMLTextAreaElement, CodeEditorProps>((prop
       });
     }, syncDelay);
 
-    // Fast debounced save directly to localStorage to prevent any data loss on refresh/unload
+    // Debounced save directly to localStorage to prevent data loss on refresh/unload
     const STORAGE_KEY_AUTOSAVE = 'steem_autosave_temp';
     
-    const backupDelay = props.onDemandSyncEnabled === false ? 350 : 1500;
+    const backupDelay = isOnDemand ? 2500 : 350;
     if (localSaveTimeoutRef.current) clearTimeout(localSaveTimeoutRef.current);
     localSaveTimeoutRef.current = setTimeout(() => {
       localSaveTimeoutRef.current = null;
@@ -435,6 +447,7 @@ export const CodeEditor = forwardRef<HTMLTextAreaElement, CodeEditorProps>((prop
     latestSelectionStartRef.current = start;
     latestSelectionEndRef.current = end;
 
+    const cursorDelay = props.onDemandSyncEnabled ? 450 : 100;
     if (syncCursorTimeoutRef.current) clearTimeout(syncCursorTimeoutRef.current);
     syncCursorTimeoutRef.current = setTimeout(() => {
       syncCursorTimeoutRef.current = null;
@@ -463,7 +476,7 @@ export const CodeEditor = forwardRef<HTMLTextAreaElement, CodeEditorProps>((prop
           selectionEnd: liveEnd
         });
       }
-    }, 100);
+    }, cursorDelay);
   };
 
   const handleSelect = (e: React.SyntheticEvent<HTMLTextAreaElement>) => {

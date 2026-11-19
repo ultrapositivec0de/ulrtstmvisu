@@ -473,10 +473,12 @@ body {
   margin-top: 0.5rem !important;
   margin-bottom: 0.85rem !important;
 }
-.markdown-body, .wysiwyg-editor {
-  min-width: 0;
-  max-width: 100%;
-  overflow-wrap: anywhere;
+@layer components {
+  .markdown-body, .wysiwyg-editor {
+    min-width: 0;
+    max-width: 100%;
+    overflow-wrap: anywhere;
+  }
 }
 .markdown-body code, .wysiwyg-editor code {
   @apply bg-slate-800 px-1.5 py-0.5 rounded text-sm font-mono text-cyan-400;

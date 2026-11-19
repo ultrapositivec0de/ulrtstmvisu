@@ -608,6 +608,7 @@ export function useWysiwygSync(options: UseWysiwygSyncOptions) {
         return;
       }
 
+      if (wysiwygLocalBackupTimeoutRef.current) clearTimeout(wysiwygLocalBackupTimeoutRef.current);
       if (wysiwygSyncTimeoutRef.current) clearTimeout(wysiwygSyncTimeoutRef.current);
 
       const doSync = () => {
@@ -630,14 +631,27 @@ export function useWysiwygSync(options: UseWysiwygSyncOptions) {
 
       if (forceImmediate) {
         doSync();
+      } else if (onDemandSyncEnabled) {
+        wysiwygLocalBackupTimeoutRef.current = setTimeout(() => {
+          if (!wysiwygRef.current) return;
+          try {
+            localStorage.setItem('steem_autosave_temp_visual_html', wysiwygRef.current.innerHTML);
+          } catch (e) {
+            console.debug(e);
+          }
+        }, 2500) as any;
+
+        wysiwygSyncTimeoutRef.current = setTimeout(doSync, 4000) as any;
       } else {
         wysiwygSyncTimeoutRef.current = setTimeout(doSync, 300) as any;
       }
     },
     [
+      onDemandSyncEnabled,
       saveVisualSelection,
       setContent,
       updateWysiwygEmptyStatus,
+      wysiwygLocalBackupTimeoutRef,
       wysiwygRef,
       wysiwygSyncTimeoutRef,
     ]

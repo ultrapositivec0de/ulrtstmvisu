@@ -229,6 +229,17 @@ jobs:
           VERSION=$(node -p "require('./package.json').version")
           echo "version=$VERSION" >> $GITHUB_OUTPUT
 
+      - name: "Add version to Android APK filenames"
+        run: |
+          VERSION="${{ steps.package-version.outputs.version }}"
+          while IFS= read -r -d '' apk; do
+            dir=$(dirname "$apk")
+            base=$(basename "$apk" .apk)
+            if [[ "$base" != *"-v${VERSION}" ]]; then
+              mv "$apk" "${dir}/${base}-v${VERSION}.apk"
+            fi
+          done < <(find src-tauri/gen/android/app/build/outputs/apk -type f -name "*.apk" -print0)
+
       - name: "Upload Android Binaries to GitHub Draft Release"
         uses: softprops/action-gh-release@v2
         with:

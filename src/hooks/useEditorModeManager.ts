@@ -20,6 +20,7 @@ interface UseEditorModeManagerProps {
   syncCursorVisualToMarkdown: () => { md: string } | null;
   htmlToMarkdown: (html: string) => string;
   setContent: (content: string) => void;
+  onDemandSyncEnabled?: boolean;
 }
 
 export function useEditorModeManager({
@@ -39,6 +40,7 @@ export function useEditorModeManager({
   syncCursorVisualToMarkdown,
   htmlToMarkdown,
   setContent,
+  onDemandSyncEnabled = false,
 }: UseEditorModeManagerProps) {
   const [editorMode, setEditorMode] = useState<'visual' | 'markdown' | 'reading'>(() => {
     const saved = localStorage.getItem('steem_editor_mode') as 'visual' | 'markdown' | 'reading';
@@ -186,8 +188,8 @@ export function useEditorModeManager({
     saveCursorTimerRef.current = setTimeout(() => {
       saveCursorTimerRef.current = null;
       flushCursorAnalysis();
-    }, 100);
-  }, [editorRef, isSyncingRef, flushCursorAnalysis]);
+    }, onDemandSyncEnabled ? 450 : 100);
+  }, [editorRef, isSyncingRef, flushCursorAnalysis, onDemandSyncEnabled]);
 
   const numIconSize = typeof toolbarIconSize === 'number' ? toolbarIconSize : (toolbarIconSize === 'large' ? 24 : toolbarIconSize === 'small' ? 16 : 20);
 

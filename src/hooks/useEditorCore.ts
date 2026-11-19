@@ -93,6 +93,7 @@ export function useEditorCore({
     syncCursorVisualToMarkdown: useCallback(() => syncCursorVisualToMarkdownRef.current(), []),
     htmlToMarkdown,
     setContent,
+    onDemandSyncEnabled,
   });
 
   const {
@@ -138,7 +139,7 @@ export function useEditorCore({
 
   // 5. Selection & Word Extractor Utility
   const getSelectionOrWord = useCallback(() => {
-    const content = useEditorStore.getState().content;
+    const content = editorRef.current?.value ?? useEditorStore.getState().content;
     const start = editorRef.current?.selectionStart ?? 0;
     const end = editorRef.current?.selectionEnd ?? 0;
     if (start !== end) {

@@ -156,7 +156,7 @@ const insertHtmlAtCursor = useCallback((html: string) => {
   }, [restoreVisualSelection, focusVisualEditorEnd, updateContentFromWysiwyg, savedVisualRangeRef, wysiwygRef]);
 
   const insertAtCursor = useCallback((text: string, selectionMode: 'end' | 'select' = 'end') => {
-    const content = useEditorStore.getState().content;
+    const content = editorMode === 'markdown' ? (editorRef.current?.value ?? useEditorStore.getState().content) : useEditorStore.getState().content;
     if (editorMode === 'visual') {
       const runParse = async () => {
         const m = getMarked();
@@ -963,10 +963,11 @@ function unwrapPhishyFromRange(range: Range, wysiwyg: HTMLElement): boolean {
     }
 
     const range = getSelectionOrWord();
+    const liveMarkdownContent = editorRef.current?.value ?? useEditorStore.getState().content;
     
     if (range.text.length === 0) {
       const textToInsert = prefix + suffix;
-      const newContent = useEditorStore.getState().content.substring(0, range.s) + textToInsert + useEditorStore.getState().content.substring(range.e);
+      const newContent = liveMarkdownContent.substring(0, range.s) + textToInsert + liveMarkdownContent.substring(range.e);
       useEditorStore.getState().setContent(newContent);
       setTimeout(() => {
         if (!editorRef.current) return;
@@ -977,7 +978,7 @@ function unwrapPhishyFromRange(range: Range, wysiwyg: HTMLElement): boolean {
       const trailingSpaces = range.text.slice(range.text.trimEnd().length);
       const trimmed = range.text.trim();
       const newText = trimmed ? (leadingSpaces + prefix + trimmed + suffix + trailingSpaces) : (prefix + suffix);
-      const newContent = useEditorStore.getState().content.substring(0, range.s) + newText + useEditorStore.getState().content.substring(range.e);
+      const newContent = liveMarkdownContent.substring(0, range.s) + newText + liveMarkdownContent.substring(range.e);
       useEditorStore.getState().setContent(newContent);
       setTimeout(() => {
         if (!editorRef.current) return;
@@ -1354,7 +1355,7 @@ function unwrapPhishyFromRange(range: Range, wysiwyg: HTMLElement): boolean {
   }, [restoreVisualSelection, focusVisualEditorEnd, updateContentFromWysiwyg, savedVisualRangeRef, wysiwygRef, scrollCaretIntoView]);
 
   const fmtLine = useCallback((prefix: string) => {
-    const content = useEditorStore.getState().content;
+    const content = editorMode === 'markdown' ? (editorRef.current?.value ?? useEditorStore.getState().content) : useEditorStore.getState().content;
     if (editorMode === 'visual') {
       if (prefix === '- ') {
         toggleVisualList('ul');
@@ -1478,7 +1479,7 @@ function unwrapPhishyFromRange(range: Range, wysiwyg: HTMLElement): boolean {
   }, [ editorMode, insertHtmlAtCursor, getVisualSelectionHtml, restoreVisualSelection, updateContentFromWysiwyg, saveCursorPosition]);
 
   const handleLink = useCallback(async () => {
-    const content = useEditorStore.getState().content;
+    const content = editorMode === 'markdown' ? (editorRef.current?.value ?? useEditorStore.getState().content) : useEditorStore.getState().content;
     if (editorMode === 'visual') {
       restoreVisualSelection(true);
       const selectionHtml = getVisualSelectionHtml() || '';
@@ -1552,7 +1553,7 @@ function unwrapPhishyFromRange(range: Range, wysiwyg: HTMLElement): boolean {
   }, [ t, getSelectionOrWord, fmt, promptDialog, editorMode, restoreVisualSelection, getVisualSelectionHtml, insertHtmlAtCursor, updateContentFromWysiwyg, editorRef]);
 
   const handleIndent = useCallback(() => {
-    const content = useEditorStore.getState().content;
+    const content = editorMode === 'markdown' ? (editorRef.current?.value ?? useEditorStore.getState().content) : useEditorStore.getState().content;
     if (editorMode === 'visual') {
       restoreVisualSelection(false);
       const sel = window.getSelection();
