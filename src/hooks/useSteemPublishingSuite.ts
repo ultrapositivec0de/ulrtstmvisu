@@ -18,6 +18,8 @@ export interface UseSteemPublishingSuiteProps {
   setPubTitle: (val: string) => void;
   editingPermlink: string | null;
   setEditingPermlink: (val: string | null) => void;
+  editingOriginalTitle?: string | null;
+  setEditingOriginalTitle?: (val: string | null) => void;
   authType: any;
   setAuthType: (val: any) => void;
   selectedVaultUser: string;
@@ -47,6 +49,8 @@ export function useSteemPublishingSuite({
   setPubTitle,
   editingPermlink,
   setEditingPermlink,
+  editingOriginalTitle = null,
+  setEditingOriginalTitle,
   authType,
   setAuthType,
   selectedVaultUser,
@@ -100,14 +104,16 @@ export function useSteemPublishingSuite({
         const latestContent = syncWysiwygToContentIfVisual() || useEditorStore.getState().content;
         const firstLine = extractFirstLineTitle(latestContent);
         setPubTitle(firstLine);
+      } else if (editingPermlink && !allowTitleChangeInEdit && editingOriginalTitle != null) {
+        setPubTitle(editingOriginalTitle);
       }
     }
-  }, [activeModal, editingPermlink, isPubTitleManuallyEdited, setAuthType, setPubTitle, syncWysiwygToContentIfVisual]);
+  }, [activeModal, editingPermlink, isPubTitleManuallyEdited, allowTitleChangeInEdit, editingOriginalTitle, setAuthType, setPubTitle, syncWysiwygToContentIfVisual]);
 
   useEffect(() => {
     const unsubscribe = useEditorStore.subscribe((state, prevState) => {
       if (state.content === prevState.content) return;
-      if (editingPermlink || isPubTitleManuallyEdited) return;
+      if (state.editingPermlink || editingPermlink || isPubTitleManuallyEdited) return;
       const prevFirst = extractFirstLineTitle(prevState.content);
       const nextFirst = extractFirstLineTitle(state.content);
       if (nextFirst !== prevFirst) {
@@ -135,7 +141,10 @@ export function useSteemPublishingSuite({
     selectedVaultUser,
     editingPermlink,
     setEditingPermlink,
+    editingOriginalTitle,
+    allowTitleChangeInEdit,
     onExitEditMode: () => {
+      setEditingOriginalTitle?.(null);
       setIsPubTitleManuallyEdited(false);
       setAllowTitleChangeInEdit(false);
     },
@@ -165,6 +174,9 @@ export function useSteemPublishingSuite({
     isEditingPost: editingPermlink !== null,
     editingPermlink,
     setEditingPermlink,
+    editingOriginalTitle,
+    setEditingOriginalTitle,
+    allowTitleChangeInEdit,
     setIsPubTitleManuallyEdited,
     setAllowTitleChangeInEdit,
     authType,

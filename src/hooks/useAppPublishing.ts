@@ -15,6 +15,8 @@ export interface UseAppPublishingProps {
   setPubTags: React.Dispatch<React.SetStateAction<string>> | ((tags: any) => void);
   editingPermlink?: string | null;
   setEditingPermlink: (permlink: string | null) => void;
+  editingOriginalTitle?: string | null;
+  setEditingOriginalTitle?: (title: string | null) => void;
   setCurrentDraftId?: (id: string | null) => void;
   setIsPubTitleManuallyEdited?: (val: boolean) => void;
   setAllowTitleChangeInEdit?: (val: boolean) => void;
@@ -41,6 +43,8 @@ export function useAppPublishing({
   setPubTags,
   editingPermlink,
   setEditingPermlink,
+  editingOriginalTitle,
+  setEditingOriginalTitle,
   setCurrentDraftId,
   setIsPubTitleManuallyEdited,
   setAllowTitleChangeInEdit,
@@ -68,10 +72,11 @@ export function useAppPublishing({
     const currentMarkdown = syncWysiwygToContentIfVisual();
     saveDraftHook(currentMarkdown, status, notify, t, {
       editingPermlink: editingPermlink || null,
+      editingOriginalTitle: editingPermlink ? (editingOriginalTitle ?? pubTitle) : undefined,
       tags: pubTags,
       pubTitle,
     });
-  }, [syncWysiwygToContentIfVisual, saveDraftHook, notify, t, editingPermlink, pubTags, pubTitle]);
+  }, [syncWysiwygToContentIfVisual, saveDraftHook, notify, t, editingPermlink, editingOriginalTitle, pubTags, pubTitle]);
 
   const handleEditPost = useCallback(async (post: SteemPost) => {
     const currentMarkdown = syncWysiwygToContentIfVisual();
@@ -85,13 +90,27 @@ export function useAppPublishing({
       }
     }
 
+    let parsedTags = post.category || '';
+    try {
+      const meta = JSON.parse(post.json_metadata || '{}');
+      if (Array.isArray(meta?.tags) && meta.tags.length > 0) {
+        parsedTags = meta.tags.join(' ');
+      }
+    } catch {
+      parsedTags = post.category || '';
+    }
+
+    const originalTitle = post.title ?? '';
+
     setCurrentDraftId?.(null);
     setIsPubTitleManuallyEdited?.(false);
     setAllowTitleChangeInEdit?.(false);
-    setPubTitle(post.title);
-    setContent(post.body);
-    setPubTags(JSON.parse(post.json_metadata || '{}').tags?.join(' ') || post.category);
+    // Set edit metadata synchronously before updating content so auto-title subscribers preserve post.title
     setEditingPermlink(post.permlink);
+    setEditingOriginalTitle?.(originalTitle);
+    setPubTitle(originalTitle);
+    setPubTags(parsedTags);
+    setContent(post.body);
     setActiveView('editor');
     lastSyncContentRef.current = post.body;
     setTimeout(() => {
@@ -110,6 +129,7 @@ export function useAppPublishing({
     setContent,
     setPubTags,
     setEditingPermlink,
+    setEditingOriginalTitle,
     setActiveView,
     lastSyncContentRef,
     syncCursorMarkdownToVisual,

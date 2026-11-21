@@ -17,6 +17,9 @@ export interface UsePublishingManagerOptions {
   isEditingPost?: boolean;
   editingPermlink?: string | null;
   setEditingPermlink?: (permlink: string | null) => void;
+  editingOriginalTitle?: string | null;
+  setEditingOriginalTitle?: (title: string | null) => void;
+  allowTitleChangeInEdit?: boolean;
   setIsPubTitleManuallyEdited?: (val: boolean) => void;
   setAllowTitleChangeInEdit?: (val: boolean) => void;
   authType: AuthType;
@@ -58,6 +61,9 @@ export function usePublishingManager(options: UsePublishingManagerOptions) {
     isEditingPost,
     editingPermlink,
     setEditingPermlink,
+    editingOriginalTitle,
+    setEditingOriginalTitle,
+    allowTitleChangeInEdit,
     setIsPubTitleManuallyEdited,
     setAllowTitleChangeInEdit,
     authType,
@@ -184,7 +190,13 @@ export function usePublishingManager(options: UsePublishingManagerOptions) {
     const currentMarkdown = syncWysiwygToContentIfVisual();
     const lines = currentMarkdown.split('\n');
     const firstLine = lines[0].trim();
-    let finalTitle = pubTitle;
+    const hasLockedOriginalTitle = Boolean(
+      isEditingPost &&
+      !allowTitleChangeInEdit &&
+      editingOriginalTitle != null &&
+      editingOriginalTitle.trim() !== ''
+    );
+    let finalTitle = hasLockedOriginalTitle ? (editingOriginalTitle as string) : pubTitle;
     let actualContent = currentMarkdown;
 
     if (!finalTitle) {
@@ -230,6 +242,7 @@ export function usePublishingManager(options: UsePublishingManagerOptions) {
       if (setEditingPermlink) {
         setEditingPermlink(null);
       }
+      setEditingOriginalTitle?.(null);
       setIsPubTitleManuallyEdited?.(false);
       setAllowTitleChangeInEdit?.(false);
       if (isEditingPost) {
@@ -249,6 +262,9 @@ export function usePublishingManager(options: UsePublishingManagerOptions) {
     isEditingPost,
     editingPermlink,
     setEditingPermlink,
+    editingOriginalTitle,
+    setEditingOriginalTitle,
+    allowTitleChangeInEdit,
     setIsPubTitleManuallyEdited,
     setAllowTitleChangeInEdit,
     notify,

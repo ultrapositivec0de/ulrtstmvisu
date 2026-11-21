@@ -6,6 +6,13 @@ export interface ChangelogEntry {
 
 export const APP_CHANGELOG: ChangelogEntry[] = [
   {
+    version: "v4.8.14",
+    date: "2026-11-20",
+    changes: [
+      "Isolated IndexedDB Reader tag cache, strict multi-tag Favorites Core filtering, sequential tag loading, cached tag group switcher, slow-internet RPC settings, smart Reader Settings exit, and edit mode title preservation."
+    ]
+  },
+  {
     version: "v4.8.13",
     date: "2026-11-19",
     changes: [

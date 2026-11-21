@@ -162,10 +162,12 @@ export default function Reader({
   // Feed Hook
   const {
     posts,
+    displayedPosts,
     setPosts,
     loading,
     loadingMore,
     hasMoreFeed,
+    fetchProgress,
     expandedPosts,
     setExpandedPosts,
     postComments,
@@ -178,12 +180,19 @@ export default function Reader({
     setCommentingPost,
     commentBody,
     setCommentBody,
+    cachedTagBuckets,
+    selectedCacheTags,
+    toggleSelectedCacheTag,
+    clearSelectedCacheTags,
+    clearAllTagCache,
     fetchPosts,
     loadMorePosts,
     fetchFavoriteCorePosts,
     fetchComments,
     togglePost,
     handleSearch,
+    resetActiveFeedTag,
+    refilterExistingFeed,
   } = useReaderFeedData({
     config,
     setConfig,
@@ -458,7 +467,7 @@ export default function Reader({
         setVoteWeight={setVoteWeight}
         viewMode={viewMode}
         setViewMode={setViewMode}
-        posts={posts}
+        posts={displayedPosts}
         curationPosts={curationHook.curationPosts}
         setExpandedPosts={setExpandedPosts}
         fetchPosts={fetchPosts}
@@ -541,7 +550,7 @@ export default function Reader({
           <AnimatePresence>
             {viewMode === "feed" ? (
               <ReaderFeedView
-                posts={posts}
+                posts={displayedPosts}
                 loading={loading}
                 loadingMore={loadingMore}
                 hasMoreFeed={hasMoreFeed}
@@ -549,6 +558,12 @@ export default function Reader({
                 hasInitiatedFeed={hasInitiatedFeed}
                 fetchPosts={fetchPosts}
                 fetchFavoriteCorePosts={fetchFavoriteCorePosts}
+                fetchProgress={fetchProgress}
+                cachedTagBuckets={cachedTagBuckets}
+                selectedCacheTags={selectedCacheTags}
+                onToggleCacheTag={toggleSelectedCacheTag}
+                onClearSelectedCacheTags={clearSelectedCacheTags}
+                onClearAllTagCache={clearAllTagCache}
                 expandedPosts={expandedPosts}
                 togglePost={togglePost}
                 currentUser={currentUser}
@@ -646,7 +661,14 @@ export default function Reader({
                 setFetchedMutedUsers={setFetchedMutedUsers}
                 onMuteUser={onMuteUser}
                 setViewMode={setViewMode}
+                searchTag={searchTag}
+                setSearchTag={setSearchTag}
+                hasInitiatedFeed={hasInitiatedFeed}
+                postsCount={posts.length}
                 fetchPosts={fetchPosts}
+                resetActiveFeedTag={resetActiveFeedTag}
+                refilterExistingFeed={(nextConfig) => refilterExistingFeed(nextConfig, mutedUsersRef.current)}
+                refilterCurationPosts={(nextConfig) => curationHook.refilterCurationPosts(nextConfig, mutedUsersRef.current)}
                 t={t}
               />
             ) : null}
@@ -693,7 +715,7 @@ export default function Reader({
         fetchFavoriteCorePosts={fetchFavoriteCorePosts}
         loading={loading}
         isCurationLoading={curationHook.isCurationLoading}
-        posts={posts}
+        posts={displayedPosts}
         curationPosts={curationHook.curationPosts}
         expandedPosts={expandedPosts}
         setExpandedPosts={setExpandedPosts}
@@ -719,7 +741,7 @@ export default function Reader({
         onToggleQuickPanel={() => setShowQuickPanel((prev) => !prev)}
         onRefresh={() => {
           if (viewMode === "feed") {
-            fetchPosts();
+            fetchPosts(undefined, { forceRefresh: true });
           } else if (viewMode === "curation") {
             curationHook.fetchCurationFeed();
           }

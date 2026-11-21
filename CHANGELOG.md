@@ -1,4 +1,8 @@
 # Changelog
+## [2026-11-20] - Version 4.8.14 (ultrasteemeditor/4.8.14)
+### Added & Improved
+- **Release Updates**: Isolated IndexedDB Reader tag cache, strict multi-tag Favorites Core filtering, sequential tag loading, cached tag group switcher, slow-internet RPC settings, smart Reader Settings exit, and edit mode title preservation.
+
 ## [2026-11-19] - Version 4.8.13 (ultrasteemeditor/4.8.13)
 ### Added & Improved
 - **Мобільна галерея та міні-галерея**: Бічна панель і смужка міні-галереї за замовчуванням закриті при старті на мобільних пристроях; автоматичне відкриття міні-галереї відбувається лише на мобільних після пакетного завантаження кількох зображень (`> 1`), без дублювання поруч із відкритою панеллю на ПК.

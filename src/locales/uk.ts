@@ -1192,7 +1192,26 @@ export const translations = {
   "lowGpuModeDesc": "Спрощує прошарки композитингу, прибирає градієнти, прозорі накладання, розмиття та JS-анімації для зменшення навантаження на графічний процесор у Linux та Android WebView.",
   "addToKeychainBtn": "+ Keychain",
   "addToKeychainTitle": "Скопіювати @{acc} до списку Keychain",
-  "addedToKeychainNotify": "Акаунт @{acc} додано до списку Keychain"
+  "addedToKeychainNotify": "Акаунт @{acc} додано до списку Keychain",
+  "cachedTagsViewLabel": "Кешовані групи тегів сесії",
+  "cachedTagsAll": "Усі активні",
+  "cachedAllFeedLabel": "Загальна стрічка",
+  "clearTagCache": "Очистити кеш тегів",
+  "fetchingTagProgress": "Завантаження тегу {tag} ({current} з {total})...",
+  "settingsSectionFeed": "Параметри стрічки",
+  "settingsSectionReadingUi": "Оформлення та поведінка читання",
+  "settingsSectionNetwork": "Мережа та слабкий інтернет",
+  "rpcTimeoutSetting": "Таймаут відповіді ноди (сек)",
+  "rpcTimeoutSettingDesc": "Час очікування відповіді одного вузла перед переходом до резервного",
+  "rpcBatchSizeSetting": "Дописів за один запит",
+  "rpcBatchSizeSettingDesc": "Менші пакети (15–25) стабільніші на повільному з’єднанні",
+  "settingsSectionSharedFilters": "Спільні фільтри (Стрічка та Кураторство)",
+  "settingsSharedFiltersNote": "Списки ігнорованих, білий та чорний списки діють одночасно для Стрічки й Кураторства.",
+  "settingsTargetFeedTag": "Активний тег для повернення у Стрічку",
+  "resetActiveTag": "Скинути тег",
+  "settingsExitNetworkHint": "Після переходу буде оновлено вибірку з ноди за обраним критерієм.",
+  "settingsExitLocalFilterHint": "Наявні дописи Стрічки та Кураторства буде перефільтровано локально без запиту до ноди.",
+  "settingsExitNoReloadHint": "Зміни застосуються миттєво без перезавантаження стрічки та запиту до ноди."
 } as const;
 
 export default { meta, translations };

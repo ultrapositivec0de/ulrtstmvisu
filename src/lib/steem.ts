@@ -189,17 +189,33 @@ export const broadcastWithFallback = async (ops: any[], privateKey: any, timeout
   throw lastError || new Error("All Steem RPC nodes failed during broadcast.");
 };
 
+export interface CallFallbackOptions {
+  preferActiveNode?: boolean;
+  retries?: number;
+}
+
 /**
- * Calls a Steem RPC method by querying existing nodes in parallel (competitive race).
- * The fastest node to return a valid response wins, while other pending node requests
- * are cleanly aborted to minimize network latency and prevent UI freezes.
+ * Calls a Steem RPC method with automatic node failover.
+ * - Default mode: competitive parallel race across nodes for fast single-item calls.
+ * - `preferActiveNode`: queries the active node first and falls back sequentially to reduce
+ *   redundant bandwidth load on weak mobile/slow internet connections during batch fetching.
  */
-export const callWithFallback = async (method: string, params: any, timeoutMs = 25000) => {
+export const callWithFallback = async (
+  method: string,
+  params: any,
+  timeoutMs = 25000,
+  options?: CallFallbackOptions,
+) => {
   // Bridge API (Hivemind) calls are supported exclusively on nodes running the bridge plugin (e.g. api.steemit.com)
   const isBridgeMethod = method.startsWith('bridge.');
-  const targetNodes = isBridgeMethod 
+  const baseNodes = isBridgeMethod
     ? STEEM_NODES.filter(n => n.includes('steemit.com'))
     : STEEM_NODES;
+
+  const current = getActiveNode();
+  const orderedNodes = baseNodes.includes(current)
+    ? [current, ...baseNodes.filter(n => n !== current)]
+    : baseNodes;
 
   const querySingleNode = async (node: string, signal: AbortSignal) => {
     const response = await fetch(node, {
@@ -237,8 +253,32 @@ export const callWithFallback = async (method: string, params: any, timeoutMs = 
     return data.result;
   };
 
-  // Perform parallel race with increased 25s timeout
-  const executeParallelRace = async (nodes = targetNodes): Promise<any> => {
+  if (options?.preferActiveNode) {
+    const errors: any[] = [];
+    for (const node of orderedNodes) {
+      const controller = new AbortController();
+      const timer = setTimeout(() => {
+        if (!controller.signal.aborted) {
+          controller.abort();
+        }
+      }, timeoutMs);
+      try {
+        const result = await querySingleNode(node, controller.signal);
+        clearTimeout(timer);
+        return result;
+      } catch (err: any) {
+        clearTimeout(timer);
+        if (err?.isFatal) throw err;
+        errors.push(err);
+        console.warn(`[Steem RPC] Sequential attempt failed on ${node} (${method}):`, err?.message || err);
+      }
+    }
+    const lastMsg = errors.map((e: any) => e?.message || String(e)).join('; ');
+    throw new Error(`All Steem nodes failed for ${method}. Errors: ${lastMsg}`);
+  }
+
+  // Perform parallel race with configured timeout
+  const executeParallelRace = async (nodes = orderedNodes): Promise<any> => {
     const controllers = nodes.map(() => new AbortController());
     const overallTimeoutId = setTimeout(() => {
       controllers.forEach(c => {
@@ -274,6 +314,12 @@ export const callWithFallback = async (method: string, params: any, timeoutMs = 
     const fatalErr = rawErrors.find((e: any) => e?.isFatal);
     if (fatalErr) {
       throw fatalErr;
+    }
+
+    const retryCount = options?.retries ?? 1;
+    if (retryCount <= 0) {
+      const lastMsg = rawErrors.map((e: any) => e?.message || String(e)).join('; ');
+      throw new Error(`All Steem nodes failed for ${method}. Errors: ${lastMsg}`, { cause: firstWaveError });
     }
 
     // Perform one fallback retry wave if temporary network timeout occurred

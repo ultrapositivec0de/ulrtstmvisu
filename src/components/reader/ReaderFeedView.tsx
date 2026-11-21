@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import {
   Layout,
   RefreshCw,
@@ -25,11 +25,14 @@ import {
   Pin,
   PinOff,
   Layers,
+  Trash2,
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { cn } from '../../lib/utils';
 import { ReaderConfig, SteemPost } from '../../types';
 import { useReaderStore } from '../../store/readerStore';
+import { ReaderTagCacheBucket } from '../../services/readerCacheDb';
+import { FetchProgressState, filterPostsForTag } from '../../hooks/reader/useReaderFeedData';
 import { PostRenderer } from './PostRenderer';
 import { ReplyBox } from './ReplyBox';
 import { CommentItem } from './CommentItem';
@@ -41,8 +44,14 @@ export interface ReaderFeedViewProps {
   hasMoreFeed?: boolean;
   loadMorePosts?: () => void;
   hasInitiatedFeed: boolean;
-  fetchPosts: (customTag?: string) => void;
+  fetchPosts: (customTag?: string, options?: { forceRefresh?: boolean }) => void;
   fetchFavoriteCorePosts?: () => void;
+  fetchProgress?: FetchProgressState | null;
+  cachedTagBuckets?: Record<string, ReaderTagCacheBucket>;
+  selectedCacheTags?: string[];
+  onToggleCacheTag?: (tagKey: string) => void;
+  onClearSelectedCacheTags?: () => void;
+  onClearAllTagCache?: () => void;
   searchTag?: string;
   expandedPosts: Set<string>;
   togglePost: (post: SteemPost) => void;
@@ -91,6 +100,12 @@ export const ReaderFeedView: React.FC<ReaderFeedViewProps> = React.memo(({
   hasInitiatedFeed,
   fetchPosts,
   fetchFavoriteCorePosts,
+  fetchProgress = null,
+  cachedTagBuckets,
+  selectedCacheTags = [],
+  onToggleCacheTag,
+  onClearSelectedCacheTags,
+  onClearAllTagCache,
   expandedPosts,
   togglePost,
   currentUser,
@@ -129,10 +144,44 @@ export const ReaderFeedView: React.FC<ReaderFeedViewProps> = React.memo(({
   const pinnedPosts = useReaderStore((s) => s.pinnedPosts);
   const togglePinPost = useReaderStore((s) => s.togglePinPost);
 
+  const pinnedKeys = useMemo(
+    () => new Set(pinnedPosts.map((p) => `${p.author}/${p.permlink}`)),
+    [pinnedPosts],
+  );
+
+  const feedPosts = useMemo(
+    () =>
+      pinnedKeys.size === 0
+        ? posts
+        : posts.filter((p) => !pinnedKeys.has(`${p.author}/${p.permlink}`)),
+    [posts, pinnedKeys],
+  );
+
+  const cachedTagEntries = useMemo(() => {
+    const entries = Object.values(cachedTagBuckets || {}) as ReaderTagCacheBucket[];
+    return entries
+      .map((bucket) => {
+        const filtered = filterPostsForTag(bucket.posts, bucket.tag, config, mutedUsers).filter(
+          (p) => !pinnedKeys.has(`${p.author}/${p.permlink}`),
+        );
+        return {
+          tag: bucket.tag,
+          count: filtered.length,
+          fetchedAt: bucket.fetchedAt,
+        };
+      })
+      .filter((entry) => entry.count > 0 || selectedCacheTags.includes(entry.tag))
+      .sort((a, b) => {
+        if (a.tag === '__all__') return 1;
+        if (b.tag === '__all__') return -1;
+        return b.fetchedAt - a.fetchedAt;
+      });
+  }, [cachedTagBuckets, config, mutedUsers, pinnedKeys, selectedCacheTags]);
+
   const hasActiveTag = Boolean(
     (searchTag || (config.tags && config.tags.length > 0 ? config.tags.join(' ') : '')).trim(),
   );
-  const isNoTagAndDisabled = !hasActiveTag && !config.loadFeedWithoutTag;
+  const isNoTagAndDisabled = !hasActiveTag && !config.loadFeedWithoutTag && selectedCacheTags.length === 0;
 
   const insertText = (before: string, after: string = '') => {
     const textarea = document.getElementById('inline-comment-editor') as HTMLTextAreaElement;
@@ -156,8 +205,8 @@ export const ReaderFeedView: React.FC<ReaderFeedViewProps> = React.memo(({
 
   const renderPostCard = (post: SteemPost, variant: 'pinned' | 'feed') => {
     const postKey = `${post.author}/${post.permlink}`;
-    const isPinned = pinnedPosts.some((p) => `${p.author}/${p.permlink}` === postKey);
-    const isExpanded = expandedPosts.has(post.permlink);
+    const isPinned = pinnedKeys.has(postKey);
+    const isExpanded = expandedPosts.has(postKey);
     const isOwn = currentUser === post.author;
     const hasVoted = (post.active_votes || []).some(
       (v) => v.voter === currentUser,
@@ -299,7 +348,7 @@ export const ReaderFeedView: React.FC<ReaderFeedViewProps> = React.memo(({
                   type="button"
                   onClick={(e) => {
                     e.stopPropagation();
-                    if (!expandedPosts.has(post.permlink)) {
+                    if (!expandedPosts.has(postKey)) {
                       togglePost(post);
                     }
                     fetchComments(post.author, post.permlink);
@@ -783,6 +832,88 @@ export const ReaderFeedView: React.FC<ReaderFeedViewProps> = React.memo(({
         </div>
       )}
 
+      {/* Session Cached Tag Group Switcher (Local filter, zero RPC calls) */}
+      {cachedTagEntries.length > 0 && onToggleCacheTag && onClearSelectedCacheTags && (
+        <div className="bg-[var(--bg-card)] border border-[var(--border-color)] rounded-2xl p-3 flex flex-col gap-2">
+          <div className="flex items-center justify-between gap-2">
+            <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-400 flex items-center gap-1.5">
+              <Layers size={14} className="text-cyan-400 shrink-0" />
+              <span>{t("cachedTagsViewLabel")}</span>
+            </span>
+            {onClearAllTagCache && (
+              <button
+                type="button"
+                onClick={onClearAllTagCache}
+                className="min-h-[36px] px-2.5 py-1 rounded-lg text-[11px] font-medium text-slate-400 hover:text-red-400 hover:bg-slate-800/70 transition-colors flex items-center gap-1 cursor-pointer shrink-0 whitespace-nowrap"
+                title={t("clearTagCache")}
+              >
+                <Trash2 size={13} />
+                <span className="hidden sm:inline">{t("clearTagCache")}</span>
+              </button>
+            )}
+          </div>
+          <div className="flex flex-wrap items-center gap-1.5">
+            <button
+              type="button"
+              onClick={onClearSelectedCacheTags}
+              className={cn(
+                "min-h-[40px] sm:min-h-[34px] px-3 py-1.5 rounded-xl text-xs font-semibold border transition-colors cursor-pointer whitespace-nowrap flex items-center gap-1.5",
+                selectedCacheTags.length === 0
+                  ? "bg-cyan-500/20 text-cyan-300 border-cyan-500/50"
+                  : "bg-slate-900/70 text-slate-400 border-slate-700/70 hover:text-slate-200 hover:border-slate-600",
+              )}
+            >
+              <span>{t("cachedTagsAll")}</span>
+              <span className="font-mono text-[11px] opacity-80 tabular-nums">
+                ({feedPosts.length})
+              </span>
+            </button>
+            {cachedTagEntries.map((entry) => {
+              const isSelected = selectedCacheTags.includes(entry.tag);
+              const label = entry.tag === '__all__' ? t("cachedAllFeedLabel") : `#${entry.tag}`;
+              return (
+                <button
+                  key={entry.tag}
+                  type="button"
+                  onClick={() => onToggleCacheTag(entry.tag)}
+                  className={cn(
+                    "min-h-[40px] sm:min-h-[34px] px-3 py-1.5 rounded-xl text-xs font-semibold border transition-colors cursor-pointer whitespace-nowrap flex items-center gap-1.5",
+                    isSelected
+                      ? "bg-amber-500/20 text-amber-300 border-amber-500/50"
+                      : "bg-slate-900/70 text-slate-300 border-slate-700/70 hover:text-white hover:border-slate-600",
+                  )}
+                >
+                  <span>{label}</span>
+                  <span className="font-mono text-[11px] opacity-80 tabular-nums">
+                    ({entry.count})
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* Non-blocking sequential progress strip when multi-tag loading */}
+      {loading && fetchProgress && (
+        <div className="bg-[var(--bg-card)] border border-cyan-500/30 rounded-xl px-4 py-2.5 flex items-center justify-between gap-3 text-xs text-slate-300">
+          <div className="flex items-center gap-2 min-w-0">
+            <RefreshCw size={15} className="animate-spin text-cyan-400 shrink-0" />
+            <span className="truncate">
+              {fetchProgress.currentTag
+                ? t("fetchingTagProgress")
+                    .replace("{tag}", `#${fetchProgress.currentTag}`)
+                    .replace("{current}", String(fetchProgress.completed + 1))
+                    .replace("{total}", String(fetchProgress.total))
+                : t("fetchingPosts")}
+            </span>
+          </div>
+          <span className="font-mono text-cyan-400 tabular-nums shrink-0">
+            {fetchProgress.completed + 1}/{fetchProgress.total}
+          </span>
+        </div>
+      )}
+
       {isNoTagAndDisabled && !loading && posts.length === 0 && (
         <div className="text-center py-20 px-4 text-slate-500 bg-slate-900/30 rounded-2xl border border-slate-800/50 flex flex-col items-center">
           <div className="size-16 rounded-2xl bg-cyan-500/10 border border-cyan-500/20 flex items-center justify-center text-cyan-400 mb-4 shadow-sm">
@@ -854,7 +985,7 @@ export const ReaderFeedView: React.FC<ReaderFeedViewProps> = React.memo(({
         </div>
       )}
 
-      {loading && posts.length === 0 && (
+      {loading && posts.length === 0 && !fetchProgress && (
         <div className="flex flex-col items-center justify-center py-20 text-slate-500">
           <RefreshCw
             className="animate-spin mb-4 text-slate-600"
@@ -873,7 +1004,7 @@ export const ReaderFeedView: React.FC<ReaderFeedViewProps> = React.memo(({
           </p>
           <button
             type="button"
-            onClick={() => fetchPosts()}
+            onClick={() => fetchPosts(undefined, { forceRefresh: true })}
             className="mt-4 text-cyan-500 hover:underline flex items-center gap-2 mx-auto cursor-pointer"
           >
             <RefreshCw size={18} /> {t("tryAgain")}
@@ -881,9 +1012,9 @@ export const ReaderFeedView: React.FC<ReaderFeedViewProps> = React.memo(({
         </div>
       )}
 
-      {posts.map((post) => renderPostCard(post, 'feed'))}
+      {feedPosts.map((post) => renderPostCard(post, 'feed'))}
 
-      {hasMoreFeed && loadMorePosts && posts.length > 0 && (
+      {hasMoreFeed && loadMorePosts && posts.length > 0 && selectedCacheTags.length === 0 && (
         <div className="flex justify-center pt-2 pb-4">
           <button
             type="button"

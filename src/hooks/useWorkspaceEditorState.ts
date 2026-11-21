@@ -43,7 +43,9 @@ export interface WorkspaceEditorState {
   targetReaderPost: { author: string; permlink: string; commentAuthor?: string; commentPermlink?: string } | null;
   setTargetReaderPost: React.Dispatch<React.SetStateAction<{ author: string; permlink: string; commentAuthor?: string; commentPermlink?: string } | null>>;
   editingPermlink: string | null;
-  setEditingPermlink: React.Dispatch<React.SetStateAction<string | null>>;
+  setEditingPermlink: (permlink: string | null) => void;
+  editingOriginalTitle: string | null;
+  setEditingOriginalTitle: (title: string | null) => void;
   isSMenuOpen: boolean;
   setIsSMenuOpen: React.Dispatch<React.SetStateAction<boolean>>;
   beautifyEnabled: boolean;
@@ -113,7 +115,10 @@ export function useWorkspaceEditorState({
   }, [username]);
 
   const [targetReaderPost, setTargetReaderPost] = useState<{ author: string; permlink: string; commentAuthor?: string; commentPermlink?: string } | null>(null);
-  const [editingPermlink, setEditingPermlink] = useState<string | null>(null);
+  const editingPermlink = useEditorStore((s) => s.editingPermlink);
+  const setEditingPermlink = useEditorStore((s) => s.setEditingPermlink);
+  const editingOriginalTitle = useEditorStore((s) => s.editingOriginalTitle);
+  const setEditingOriginalTitle = useEditorStore((s) => s.setEditingOriginalTitle);
 
   return {
     splitWords,
@@ -146,6 +151,8 @@ export function useWorkspaceEditorState({
     setTargetReaderPost,
     editingPermlink,
     setEditingPermlink,
+    editingOriginalTitle,
+    setEditingOriginalTitle,
     isSMenuOpen,
     setIsSMenuOpen,
     beautifyEnabled,

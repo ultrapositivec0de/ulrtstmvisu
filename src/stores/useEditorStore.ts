@@ -56,6 +56,12 @@ export interface EditorState {
 
   activeFormats: ActiveFormats;
   setActiveFormats: (formats: Partial<ActiveFormats> | ((prev: ActiveFormats) => ActiveFormats)) => void;
+
+  // Live post editing metadata (synchronous mirror to prevent content-subscribe races)
+  editingPermlink: string | null;
+  setEditingPermlink: (permlink: string | null) => void;
+  editingOriginalTitle: string | null;
+  setEditingOriginalTitle: (title: string | null) => void;
 }
 
 const DEFAULT_ACTIVE_FORMATS: ActiveFormats = {
@@ -190,6 +196,11 @@ export const useEditorStore = create<EditorState>()(
         }
         return { activeFormats: next };
       }),
+
+    editingPermlink: null,
+    setEditingPermlink: (editingPermlink) => set({ editingPermlink }),
+    editingOriginalTitle: null,
+    setEditingOriginalTitle: (editingOriginalTitle) => set({ editingOriginalTitle }),
   }))
 );
 

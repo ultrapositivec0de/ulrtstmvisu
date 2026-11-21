@@ -62,6 +62,7 @@ export function useReaderCuration({
   const [individualComments, setIndividualComments] = useState<Record<string, string>>({});
   const [hasInitiatedCuration, setHasInitiatedCuration] = useState(false);
   const [isCurationSettingsOpen, setIsCurationSettingsOpen] = useState(true);
+  const [curationRawPool, setCurationRawPool] = useState<SteemPost[]>([]);
 
   useEffect(() => {
     localStorage.setItem("steem_reader_curation_cols", curationColumns.toString());
@@ -72,6 +73,54 @@ export function useReaderCuration({
       localStorage.setItem("steem_cached_curation_posts", JSON.stringify(curationPosts.slice(0, 50)));
     }
   }, [curationPosts]);
+
+  const applyCurationFilters = (
+    rawList: SteemPost[],
+    targetConfig: ReaderConfig,
+    targetMuted: string[],
+  ) => {
+    const now = Date.now();
+    const maxAgeMs = curationDays * 24 * 60 * 60 * 1000;
+
+    let filtered = rawList.filter((p) => {
+      const age = now - new Date(p.created + "Z").getTime();
+      const hasVoted = p.active_votes?.some((v) => v.voter === currentUser);
+      const isCommMuted = (p as any).stats?.gray === true;
+      const isMuted = targetConfig.excludeMuted && targetMuted.includes(p.author);
+
+      return age < maxAgeMs && !hasVoted && !isCommMuted && !isMuted;
+    });
+
+    filtered = filtered.filter((post) => !targetConfig.blackList.includes(post.author));
+
+    if (targetConfig.onlyWhitelist) {
+      filtered = filtered.filter((p) => targetConfig.whiteList.includes(p.author));
+    }
+
+    if (targetConfig.strictTagMode && targetConfig.tags.length > 0) {
+      filtered = filtered.filter((p) => {
+        try {
+          const meta = JSON.parse(p.json_metadata || "{}");
+          const pTags = Array.isArray(meta.tags) ? meta.tags : [];
+          return targetConfig.tags.every((tTag) => pTags.includes(tTag));
+        } catch {
+          return false;
+        }
+      });
+    }
+
+    if (curationSort === "length") {
+      filtered.sort((a, b) => b.body.length - a.body.length);
+    }
+
+    return filtered;
+  };
+
+  const refilterCurationPosts = (nextConfig: ReaderConfig, nextMuted: string[] = mutedUsers) => {
+    const source = curationRawPool.length > 0 ? curationRawPool : curationPosts;
+    if (source.length === 0) return;
+    setCurationPosts(applyCurationFilters(source, nextConfig, nextMuted));
+  };
 
   const fetchCurationFeed = async (overrideTag?: string | React.MouseEvent) => {
     const tagToUse = (typeof overrideTag === "string" ? overrideTag : curationTag) || "";
@@ -90,6 +139,8 @@ export function useReaderCuration({
     setIsCurationLoading(true);
     setCurationError(null);
     const cleanTag = tagToUse.replace("@", "").trim();
+    const batchLimit = Math.min(100, Math.max(10, config.rpcBatchSize || 25));
+    const timeoutMs = (config.rpcTimeoutSec || 30) * 1000;
 
     try {
       const maxScanCap = curationDays > 14 ? 4000 : 2000;
@@ -101,13 +152,15 @@ export function useReaderCuration({
         let totalFetched = 0;
 
         while (!isDone && totalFetched < maxScanCap) {
-          const query: any = { start_author: startAuthor || cleanTag, limit: 100 };
+          const query: any = { start_author: startAuthor || cleanTag, limit: batchLimit };
           if (startPermlink) {
             query.start_permlink = startPermlink;
           }
           const batch = await callWithFallback(
             "condenser_api.get_discussions_by_comments",
             [query],
+            timeoutMs,
+            { preferActiveNode: true },
           );
           if (!batch || (batch.length <= 1 && startAuthor)) break;
           if (!batch || batch.length === 0) break;
@@ -125,7 +178,7 @@ export function useReaderCuration({
           startPermlink = lastPost.permlink;
 
           const age = Date.now() - new Date(lastPost.created + "Z").getTime();
-          if (age > curationDays * 24 * 60 * 60 * 1000) {
+          if (age > curationDays * 24 * 60 * 60 * 1000 || batch.length < batchLimit) {
             isDone = true;
           }
         }
@@ -136,7 +189,7 @@ export function useReaderCuration({
         let totalFetched = 0;
 
         while (!isDone && totalFetched < maxScanCap) {
-          const query: any = { tag: cleanTag, limit: 100 };
+          const query: any = { tag: cleanTag, limit: batchLimit };
           if (startAuthor) {
             query.start_author = startAuthor;
             query.start_permlink = startPermlink;
@@ -144,6 +197,8 @@ export function useReaderCuration({
           const batch = await callWithFallback(
             "condenser_api.get_discussions_by_created",
             [query],
+            timeoutMs,
+            { preferActiveNode: true },
           );
           if (!batch || (batch.length <= 1 && startAuthor)) break;
           if (!batch || batch.length === 0) break;
@@ -161,7 +216,7 @@ export function useReaderCuration({
           startPermlink = lastPost.permlink;
 
           const age = Date.now() - new Date(lastPost.created + "Z").getTime();
-          if (age > curationDays * 24 * 60 * 60 * 1000) {
+          if (age > curationDays * 24 * 60 * 60 * 1000 || batch.length < batchLimit) {
             isDone = true;
           }
         }
@@ -173,43 +228,10 @@ export function useReaderCuration({
             index ===
             self.findIndex((tPost) => tPost.author === p.author && tPost.permlink === p.permlink),
         );
-
-        const now = Date.now();
-        const maxAgeMs = curationDays * 24 * 60 * 60 * 1000;
-
-        let filtered = uniqueResults.filter((p) => {
-          const age = now - new Date(p.created + "Z").getTime();
-          const hasVoted = p.active_votes?.some((v) => v.voter === currentUser);
-          const isCommMuted = (p as any).stats?.gray === true;
-          const isMuted = config.excludeMuted && mutedUsers.includes(p.author);
-
-          return age < maxAgeMs && !hasVoted && !isCommMuted && !isMuted;
-        });
-
-        filtered = filtered.filter((post) => !config.blackList.includes(post.author));
-
-        if (config.onlyWhitelist) {
-          filtered = filtered.filter((p) => config.whiteList.includes(p.author));
-        }
-
-        if (config.strictTagMode && config.tags.length > 0) {
-          filtered = filtered.filter((p) => {
-            try {
-              const meta = JSON.parse(p.json_metadata);
-              const pTags = Array.isArray(meta.tags) ? meta.tags : [];
-              return config.tags.every((tTag) => pTags.includes(tTag));
-            } catch {
-              return false;
-            }
-          });
-        }
-
-        if (curationSort === "length") {
-          filtered.sort((a, b) => b.body.length - a.body.length);
-        }
-
-        setCurationPosts(filtered);
+        setCurationRawPool(uniqueResults);
+        setCurationPosts(applyCurationFilters(uniqueResults, config, mutedUsers));
       } else {
+        setCurationRawPool([]);
         setCurationPosts([]);
       }
     } catch (e: any) {
@@ -296,6 +318,7 @@ export function useReaderCuration({
     isCurationSettingsOpen,
     setIsCurationSettingsOpen,
     fetchCurationFeed,
+    refilterCurationPosts,
     processBatchVotes,
   };
 }

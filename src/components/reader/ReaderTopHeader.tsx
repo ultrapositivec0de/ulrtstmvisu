@@ -48,7 +48,7 @@ export interface ReaderTopHeaderProps {
   posts: SteemPost[];
   curationPosts: any[];
   setExpandedPosts: (posts: Set<string>) => void;
-  fetchPosts: (customTag?: string) => void;
+  fetchPosts: (customTag?: string, options?: { forceRefresh?: boolean }) => void;
   fetchFavoriteCorePosts?: () => void;
   loading: boolean;
   curationTagInput: string;
@@ -115,16 +115,23 @@ export const ReaderTopHeader: React.FC<ReaderTopHeaderProps> = React.memo(({
   const [isEditingTags, setIsEditingTags] = useState(false);
 
   const handleAddNewTag = () => {
-    const clean = newTagInput.trim().replace(/^[#@]+/, '').toLowerCase();
-    if (clean && config && setConfig) {
-      if (!config.favoriteTags?.includes(clean)) {
-        setConfig((c) => ({
-          ...c,
-          favoriteTags: [...(c.favoriteTags || []), clean],
-        }));
-      }
-      setSearchTag(clean);
-      fetchPosts(clean);
+    const parsed = Array.from(
+      new Set(
+        newTagInput
+          .split(/[\s,#]+/)
+          .map((s) => s.trim().replace(/^[#@]+/, '').toLowerCase())
+          .filter(Boolean),
+      ),
+    );
+    if (parsed.length > 0 && config && setConfig) {
+      const merged = Array.from(new Set([...(config.favoriteTags || []), ...parsed]));
+      setConfig((c) => ({
+        ...c,
+        favoriteTags: merged,
+      }));
+      const joined = parsed.join(' ');
+      setSearchTag(joined);
+      fetchPosts(joined);
     }
     setNewTagInput('');
     setIsAddingTag(false);
@@ -453,7 +460,7 @@ export const ReaderTopHeader: React.FC<ReaderTopHeaderProps> = React.memo(({
               <button
                 onClick={() => {
                    const postList = viewMode === "feed" ? posts : curationPosts;
-                   setExpandedPosts(new Set(postList.map((p) => p.permlink)));
+                   setExpandedPosts(new Set(postList.map((p) => `${p.author}/${p.permlink}`)));
                 }}
                 className="px-2 py-1 bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white rounded-lg text-[10px] font-bold transition-colors flex items-center gap-1"
                 title={t("expandAll")}
@@ -476,7 +483,7 @@ export const ReaderTopHeader: React.FC<ReaderTopHeaderProps> = React.memo(({
           {viewMode === "feed" && (
             <>
               <button
-                onClick={() => fetchPosts()}
+                onClick={() => fetchPosts(undefined, { forceRefresh: true })}
                 disabled={loading}
                 className="p-1.5 bg-slate-800/60 border border-slate-700/70 text-slate-300 hover:bg-slate-800 rounded-xl hover:text-white transition-colors shrink-0"
               >

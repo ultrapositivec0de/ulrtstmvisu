@@ -28,7 +28,7 @@ export interface ReaderQuickPanelProps {
   handleDecreaseFontSize: () => void;
   handleIncreaseFontSize: () => void;
   currentFontSize: number;
-  fetchPosts: (customTag?: string) => void;
+  fetchPosts: (customTag?: string, options?: { forceRefresh?: boolean }) => void;
   fetchFavoriteCorePosts?: () => void;
   loading: boolean;
   isCurationLoading: boolean;
@@ -289,7 +289,7 @@ export const ReaderQuickPanel: React.FC<ReaderQuickPanelProps> = React.memo(({
               type="button"
               onClick={() => {
                 if (viewMode === 'feed') {
-                  fetchPosts();
+                  fetchPosts(undefined, { forceRefresh: true });
                 } else if (viewMode === 'curation') {
                   fetchCurationFeed();
                 }
@@ -312,7 +312,7 @@ export const ReaderQuickPanel: React.FC<ReaderQuickPanelProps> = React.memo(({
                   if (expandedPosts.size > 0) {
                     setExpandedPosts(new Set());
                   } else {
-                    setExpandedPosts(new Set(postList.map((p) => p.permlink)));
+                    setExpandedPosts(new Set(postList.map((p) => `${p.author}/${p.permlink}`)));
                   }
                 }}
                 className="px-3 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 rounded-xl text-xs font-bold transition-all cursor-pointer"

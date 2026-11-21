@@ -242,6 +242,8 @@ export function useAppWorkspaceSuite(params: UseAppWorkspaceSuiteParams) {
   const currentUser = editorState?.currentUser ?? params.currentUser ?? '';
   const editingPermlink = editorState?.editingPermlink ?? null;
   const setEditingPermlink = editorState?.setEditingPermlink;
+  const editingOriginalTitle = editorState?.editingOriginalTitle ?? null;
+  const setEditingOriginalTitle = editorState?.setEditingOriginalTitle;
   const showTableSelector = useModalStore((s) => s.isTableSelectorOpen);
   const setShowTableSelector = useModalStore((s) => s.setIsTableSelectorOpen);
 
@@ -506,6 +508,8 @@ export function useAppWorkspaceSuite(params: UseAppWorkspaceSuiteParams) {
     pinTag,
     editingPermlink,
     setEditingPermlink,
+    editingOriginalTitle,
+    setEditingOriginalTitle,
     isPubTitleManuallyEdited: publishingSuite?.isPubTitleManuallyEdited ?? false,
     setIsPubTitleManuallyEdited: publishingSuite?.setIsPubTitleManuallyEdited,
     allowTitleChangeInEdit: publishingSuite?.allowTitleChangeInEdit ?? false,
@@ -569,6 +573,7 @@ export function useAppWorkspaceSuite(params: UseAppWorkspaceSuiteParams) {
     isNeutralinoEnv,
     editingPermlink,
     setEditingPermlink,
+    setEditingOriginalTitle,
     setIsPubTitleManuallyEdited: publishingSuite?.setIsPubTitleManuallyEdited,
     setAllowTitleChangeInEdit: publishingSuite?.setAllowTitleChangeInEdit,
     notify,

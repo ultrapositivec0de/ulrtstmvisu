@@ -256,6 +256,8 @@ export interface CompositeModalsPropsInput {
   pinTag: (tag: string) => void;
   editingPermlink?: string | null;
   setEditingPermlink?: (p: string | null) => void;
+  editingOriginalTitle?: string | null;
+  setEditingOriginalTitle?: (t: string | null) => void;
   isPubTitleManuallyEdited?: boolean;
   setIsPubTitleManuallyEdited?: (v: boolean) => void;
   allowTitleChangeInEdit?: boolean;
@@ -452,6 +454,8 @@ export function buildModalsProps(props: BuildModalsPropsInput | CompositeModalsP
       pinTag: rest.pinTag,
       editingPermlink: rest.editingPermlink ?? null,
       setEditingPermlink: rest.setEditingPermlink,
+      editingOriginalTitle: rest.editingOriginalTitle ?? null,
+      setEditingOriginalTitle: rest.setEditingOriginalTitle,
       isPubTitleManuallyEdited: rest.isPubTitleManuallyEdited ?? false,
       setIsPubTitleManuallyEdited: rest.setIsPubTitleManuallyEdited,
       allowTitleChangeInEdit: rest.allowTitleChangeInEdit ?? false,

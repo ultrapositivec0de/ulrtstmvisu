@@ -23,6 +23,8 @@ export const DEFAULT_READER_CONFIG: ReaderConfig = {
   enableVoteLogging: true,
   onlyWhitelist: false,
   loadFeedWithoutTag: false,
+  rpcTimeoutSec: 30,
+  rpcBatchSize: 25,
 };
 
 export function loadInitialReaderConfig(): ReaderConfig {

@@ -81,6 +81,8 @@ export interface PublishModalProps {
   pinTag: (tag: string) => void;
   editingPermlink?: string | null;
   setEditingPermlink?: (p: string | null) => void;
+  editingOriginalTitle?: string | null;
+  setEditingOriginalTitle?: (t: string | null) => void;
   setIsPubTitleManuallyEdited?: (v: boolean) => void;
   allowTitleChangeInEdit?: boolean;
   setAllowTitleChangeInEdit?: (v: boolean) => void;
@@ -138,6 +140,8 @@ export const PublishModal: React.FC<PublishModalProps> = (props) => {
     pinTag,
     editingPermlink = null,
     setEditingPermlink,
+    editingOriginalTitle = null,
+    setEditingOriginalTitle,
     setIsPubTitleManuallyEdited,
     allowTitleChangeInEdit = false,
     setAllowTitleChangeInEdit,
@@ -341,6 +345,7 @@ export const PublishModal: React.FC<PublishModalProps> = (props) => {
                 type="button"
                 onClick={() => {
                   setEditingPermlink(null);
+                  setEditingOriginalTitle?.(null);
                   setAllowTitleChangeInEdit?.(false);
                   notify(t('editModeExitedNotify'), 'info');
                 }}
@@ -508,7 +513,7 @@ export const PublishModal: React.FC<PublishModalProps> = (props) => {
           <label className="text-[10px] font-bold text-[var(--text-muted)] uppercase mb-1 block">{t('title')}</label>
           <input 
             type="text" 
-            value={pubTitle || ""}
+            value={(editingPermlink && !allowTitleChangeInEdit && editingOriginalTitle != null) ? editingOriginalTitle : (pubTitle || "")}
             readOnly={Boolean(editingPermlink && !allowTitleChangeInEdit)}
             onChange={e => {
               const val = e.target.value;
@@ -531,7 +536,13 @@ export const PublishModal: React.FC<PublishModalProps> = (props) => {
                 <input
                   type="checkbox"
                   checked={Boolean(allowTitleChangeInEdit)}
-                  onChange={(e) => setAllowTitleChangeInEdit?.(e.target.checked)}
+                  onChange={(e) => {
+                    const checked = e.target.checked;
+                    setAllowTitleChangeInEdit?.(checked);
+                    if (!checked && editingOriginalTitle != null) {
+                      setPubTitle(editingOriginalTitle);
+                    }
+                  }}
                   className="sr-only"
                 />
                 <div className={cn("w-4 h-4 rounded border flex items-center justify-center transition-colors", allowTitleChangeInEdit ? "bg-amber-500 border-amber-500" : "border-[var(--border-color)] group-hover:border-slate-500")}>

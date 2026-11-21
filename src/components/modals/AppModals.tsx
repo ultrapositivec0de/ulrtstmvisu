@@ -199,6 +199,8 @@ export interface AppModalsProps {
   pinTag: (tag: string) => void;
   editingPermlink?: string | null;
   setEditingPermlink?: (p: string | null) => void;
+  editingOriginalTitle?: string | null;
+  setEditingOriginalTitle?: (t: string | null) => void;
   isPubTitleManuallyEdited?: boolean;
   setIsPubTitleManuallyEdited?: (v: boolean) => void;
   allowTitleChangeInEdit?: boolean;
@@ -370,6 +372,8 @@ export const AppModals: React.FC<AppModalsProps> = (props) => {
     pinTag,
     editingPermlink,
     setEditingPermlink,
+    editingOriginalTitle,
+    setEditingOriginalTitle,
     isPubTitleManuallyEdited,
     setIsPubTitleManuallyEdited,
     allowTitleChangeInEdit,
@@ -495,6 +499,8 @@ export const AppModals: React.FC<AppModalsProps> = (props) => {
           pinTag={pinTag}
           editingPermlink={editingPermlink}
           setEditingPermlink={setEditingPermlink}
+          editingOriginalTitle={editingOriginalTitle}
+          setEditingOriginalTitle={setEditingOriginalTitle}
           setIsPubTitleManuallyEdited={setIsPubTitleManuallyEdited}
           allowTitleChangeInEdit={allowTitleChangeInEdit}
           setAllowTitleChangeInEdit={setAllowTitleChangeInEdit}
@@ -573,6 +579,7 @@ export const AppModals: React.FC<AppModalsProps> = (props) => {
           toggleDraftStatus={toggleDraftStatus}
           editingPermlink={editingPermlink}
           setEditingPermlink={setEditingPermlink}
+          setEditingOriginalTitle={setEditingOriginalTitle}
           setIsPubTitleManuallyEdited={setIsPubTitleManuallyEdited}
           setAllowTitleChangeInEdit={setAllowTitleChangeInEdit}
         />

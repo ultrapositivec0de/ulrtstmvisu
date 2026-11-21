@@ -1192,7 +1192,26 @@ export const translations = {
   "lowGpuModeDesc": "합성 레이어를 평탄화하고 그라데이션, 반투명 블렌딩, 블러, 그림자 및 JS 애니메이션을 비활성화하여 Linux WebKitGTK 및 Android WebView의 GPU 부하를 줄입니다.",
   "addToKeychainBtn": "+ Keychain",
   "addToKeychainTitle": "@{acc} 계정을 Keychain 목록으로 복사",
-  "addedToKeychainNotify": "@{acc} 계정이 Keychain 목록에 추가되었습니다"
+  "addedToKeychainNotify": "@{acc} 계정이 Keychain 목록에 추가되었습니다",
+  "cachedTagsViewLabel": "세션 캐시 태그 그룹",
+  "cachedTagsAll": "전체 활성",
+  "cachedAllFeedLabel": "일반 피드",
+  "clearTagCache": "태그 캐시 비우기",
+  "fetchingTagProgress": "태그 {tag} 불러오는 중 ({current}/{total})...",
+  "settingsSectionFeed": "피드 범위 설정",
+  "settingsSectionReadingUi": "읽기 화면 및 동작",
+  "settingsSectionNetwork": "네트워크 및 저속 인터넷",
+  "rpcTimeoutSetting": "노드 응답 제한 시간 (초)",
+  "rpcTimeoutSettingDesc": "백업 노드로 전환하기 전 RPC 노드의 최대 대기 시간",
+  "rpcBatchSizeSetting": "요청당 게시물 수",
+  "rpcBatchSizeSettingDesc": "작은 묶음(15–25)이 느린 인터넷 환경에서 더 안정적입니다",
+  "settingsSectionSharedFilters": "공통 필터 (피드 및 큐레이션)",
+  "settingsSharedFiltersNote": "음소거, 허용 목록 및 차단 목록은 피드와 큐레이션에 동시에 적용됩니다.",
+  "settingsTargetFeedTag": "복귀 시 활성 피드 태그",
+  "resetActiveTag": "태그 초기화",
+  "settingsExitNetworkHint": "복귀 시 선택한 조건으로 노드에서 게시물을 새로 불러옵니다.",
+  "settingsExitLocalFilterHint": "이미 불러온 피드와 큐레이션 게시물을 노드 요청 없이 로컬에서 다시 필터링합니다.",
+  "settingsExitNoReloadHint": "피드 새로고침이나 노드 요청 없이 변경 사항이 즉시 적용됩니다."
 } as const;
 
 export default { meta, translations };

@@ -78,7 +78,7 @@ export const MobileBottomBar: React.FC<MobileBottomBarProps> = ({
       <div className="relative flex justify-center items-center">
         <button 
           onClick={() => {
-            if (!pubTitle) {
+            if (!pubTitle && !useEditorStore.getState().editingPermlink) {
               const firstLine = useEditorStore.getState().content.split('\n')[0].replace(/[#*`]/g, '').trim().substring(0, 100);
               setPubTitle(firstLine);
             }

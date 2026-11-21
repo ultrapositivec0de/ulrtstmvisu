@@ -1192,7 +1192,26 @@ export const translations = {
   "lowGpuModeDesc": "Aplana capas de composición y desactiva degradados, transparencia, desenfoque, sombras y animaciones JS para reducir carga en Linux WebKitGTK y Android WebView.",
   "addToKeychainBtn": "+ Keychain",
   "addToKeychainTitle": "Copiar @{acc} a la lista de Keychain",
-  "addedToKeychainNotify": "Cuenta @{acc} añadida a la lista de Keychain"
+  "addedToKeychainNotify": "Cuenta @{acc} añadida a la lista de Keychain",
+  "cachedTagsViewLabel": "Grupos de etiquetas en caché de sesión",
+  "cachedTagsAll": "Todas activas",
+  "cachedAllFeedLabel": "Feed general",
+  "clearTagCache": "Limpiar caché de etiquetas",
+  "fetchingTagProgress": "Cargando etiqueta {tag} ({current} de {total})...",
+  "settingsSectionFeed": "Parámetros de alcance del feed",
+  "settingsSectionReadingUi": "Visualización y comportamiento de lectura",
+  "settingsSectionNetwork": "Red e internet lento",
+  "rpcTimeoutSetting": "Tiempo de espera del nodo (seg)",
+  "rpcTimeoutSettingDesc": "Espera máxima por nodo RPC antes de pasar al nodo de respaldo",
+  "rpcBatchSizeSetting": "Publicaciones por solicitud RPC",
+  "rpcBatchSizeSettingDesc": "Los lotes más pequeños (15–25) son más estables en conexiones lentas",
+  "settingsSectionSharedFilters": "Filtros compartidos (Feed y Curación)",
+  "settingsSharedFiltersNote": "Las cuentas silenciadas, lista blanca y lista negra se aplican simultáneamente al Feed y Curación.",
+  "settingsTargetFeedTag": "Etiqueta activa del feed al regresar",
+  "resetActiveTag": "Restablecer etiqueta",
+  "settingsExitNetworkHint": "Al regresar se obtendrán publicaciones actualizadas del nodo según sus criterios.",
+  "settingsExitLocalFilterHint": "Las publicaciones ya cargadas del Feed y Curación se filtrarán localmente sin consultar al nodo.",
+  "settingsExitNoReloadHint": "Los cambios se aplican de inmediato sin recargar el feed ni consultar nodos."
 } as const;
 
 export default { meta, translations };

@@ -57,6 +57,8 @@ export interface SteemQueueConfig {
   selectedVaultUser: string;
   editingPermlink?: string | null;
   setEditingPermlink?: (permlink: string | null) => void;
+  editingOriginalTitle?: string | null;
+  allowTitleChangeInEdit?: boolean;
   onExitEditMode?: () => void;
 }
 
@@ -198,7 +200,15 @@ export function useSteemQueue(config: SteemQueueConfig) {
 
   const addToQueue = useCallback((currentMarkdown: string) => {
     const activeUser = config.authType === 'VAULT' ? config.selectedVaultUser : config.username;
-    if (!activeUser || !config.pubTitle || !config.pubTags) {
+    const hasLockedOriginalTitle = Boolean(
+      config.editingPermlink &&
+      !config.allowTitleChangeInEdit &&
+      config.editingOriginalTitle != null &&
+      config.editingOriginalTitle.trim() !== ''
+    );
+    const effectiveTitle = hasLockedOriginalTitle ? (config.editingOriginalTitle as string) : config.pubTitle;
+
+    if (!activeUser || !effectiveTitle || !config.pubTags) {
       config.setPubLog({ msg: config.t('error'), type: 'error' });
       return;
     }
@@ -212,7 +222,7 @@ export function useSteemQueue(config: SteemQueueConfig) {
 
     const newItem: QueueItem = {
       id: Date.now().toString(),
-      title: config.pubTitle,
+      title: effectiveTitle,
       body: processedContent,
       tags: config.pubTags,
       authType: config.authType === 'VAULT' ? 'VAULT' : 'KEYCHAIN',

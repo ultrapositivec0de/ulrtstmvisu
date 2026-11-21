@@ -103,4 +103,6 @@ export interface ReaderConfig {
   onlyWhitelist?: boolean;
   mutedUsers?: string[];
   loadFeedWithoutTag?: boolean;
+  rpcTimeoutSec?: number;
+  rpcBatchSize?: number;
 }

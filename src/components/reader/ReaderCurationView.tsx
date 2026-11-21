@@ -701,8 +701,9 @@ export const ReaderCurationView: React.FC<ReaderCurationViewProps> = React.memo(
                     )}
                   >
                     {curationPosts.map((post) => {
+                      const postKey = `${post.author}/${post.permlink}`;
                       const isSelected = selectedForVote.has(post.permlink);
-                      const isExpanded = expandedPosts.has(post.permlink);
+                      const isExpanded = expandedPosts.has(postKey);
                       const counts = getWordCounts(post.body);
                       const weight = customWeights[post.permlink] || voteWeight;
   
@@ -858,9 +859,9 @@ export const ReaderCurationView: React.FC<ReaderCurationViewProps> = React.memo(
                                 e.stopPropagation();
                                 setExpandedPosts((prev) => {
                                   const next = new Set(prev);
-                                  if (next.has(post.permlink))
-                                    next.delete(post.permlink);
-                                  else next.add(post.permlink);
+                                  if (next.has(postKey))
+                                    next.delete(postKey);
+                                  else next.add(postKey);
                                   return next;
                                 });
                               }}

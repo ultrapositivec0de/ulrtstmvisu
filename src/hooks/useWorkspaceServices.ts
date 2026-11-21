@@ -117,6 +117,8 @@ export function useWorkspaceServices(params: UseWorkspaceServicesParams) {
   const splitWords = editorState?.splitWords ?? params.splitWords ?? 300;
   const editingPermlink = editorState?.editingPermlink ?? params.editingPermlink ?? null;
   const setEditingPermlink = (editorState?.setEditingPermlink ?? params.setEditingPermlink)!;
+  const editingOriginalTitle = editorState?.editingOriginalTitle ?? null;
+  const setEditingOriginalTitle = editorState?.setEditingOriginalTitle;
   const mentions = editorState?.mentions ?? params.mentions ?? [];
   const setMentions = editorState?.setMentions ?? params.setMentions;
   const newMention = editorState?.newMention ?? params.newMention ?? '';
@@ -186,6 +188,8 @@ export function useWorkspaceServices(params: UseWorkspaceServicesParams) {
     setPubTitle,
     editingPermlink,
     setEditingPermlink,
+    editingOriginalTitle,
+    setEditingOriginalTitle,
     authType,
     setAuthType,
     selectedVaultUser,
@@ -341,6 +345,8 @@ export function useWorkspaceServices(params: UseWorkspaceServicesParams) {
     setPubTags,
     setEditingPermlink,
     editingPermlink,
+    editingOriginalTitle,
+    setEditingOriginalTitle,
     pubTags,
     pubTitle,
     setCurrentDraftId,

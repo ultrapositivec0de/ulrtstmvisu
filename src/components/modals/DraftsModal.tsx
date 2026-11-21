@@ -39,6 +39,7 @@ export interface DraftsModalProps {
   // Edit metadata
   editingPermlink?: string | null;
   setEditingPermlink?: (p: string | null) => void;
+  setEditingOriginalTitle?: (t: string | null) => void;
   setIsPubTitleManuallyEdited?: (v: boolean) => void;
   setAllowTitleChangeInEdit?: (v: boolean) => void;
 }
@@ -66,6 +67,7 @@ export const DraftsModal: React.FC<DraftsModalProps> = (props) => {
     toggleDraftStatus,
     editingPermlink,
     setEditingPermlink,
+    setEditingOriginalTitle,
     setIsPubTitleManuallyEdited,
     setAllowTitleChangeInEdit
   } = props;
@@ -135,13 +137,17 @@ export const DraftsModal: React.FC<DraftsModalProps> = (props) => {
               onClick={async () => {
                 if (await confirmDialog(t('loadDraftConfirm'))) {
                   const hadEditMode = Boolean(editingPermlink);
-                  setContent(draft.body);
-                  setPubTitle(draft.title);
-                  if (draft.tags !== undefined) setPubTags(draft.tags);
-                  setCurrentDraftId(draft.id);
-                  setEditingPermlink?.(draft.editingPermlink || null);
+                  const restoredTitle = draft.editingPermlink
+                    ? (draft.editingOriginalTitle ?? draft.title)
+                    : draft.title;
                   setIsPubTitleManuallyEdited?.(false);
                   setAllowTitleChangeInEdit?.(false);
+                  setEditingPermlink?.(draft.editingPermlink || null);
+                  setEditingOriginalTitle?.(draft.editingPermlink ? restoredTitle : null);
+                  setPubTitle(restoredTitle);
+                  if (draft.tags !== undefined) setPubTags(draft.tags);
+                  setCurrentDraftId(draft.id);
+                  setContent(draft.body);
                   localStorage.removeItem('steem_autosave_temp_visual_html');
                   
                   if (editorMode === 'visual' && wysiwygRef.current) {
@@ -190,13 +196,17 @@ export const DraftsModal: React.FC<DraftsModalProps> = (props) => {
                   onClick={(e) => {
                     e.stopPropagation();
                     const hadEditMode = Boolean(editingPermlink);
-                    setContent(draft.body);
-                    setPubTitle(draft.title);
-                    if (draft.tags !== undefined) setPubTags(draft.tags);
-                    setCurrentDraftId(draft.id);
-                    setEditingPermlink?.(draft.editingPermlink || null);
+                    const restoredTitle = draft.editingPermlink
+                      ? (draft.editingOriginalTitle ?? draft.title)
+                      : draft.title;
                     setIsPubTitleManuallyEdited?.(false);
                     setAllowTitleChangeInEdit?.(false);
+                    setEditingPermlink?.(draft.editingPermlink || null);
+                    setEditingOriginalTitle?.(draft.editingPermlink ? restoredTitle : null);
+                    setPubTitle(restoredTitle);
+                    if (draft.tags !== undefined) setPubTags(draft.tags);
+                    setCurrentDraftId(draft.id);
+                    setContent(draft.body);
                     if (draft.editingPermlink) {
                       notify(t('draftEditModeLoadedNotify'), 'info');
                     } else if (hadEditMode) {

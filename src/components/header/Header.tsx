@@ -118,6 +118,7 @@ export interface HeaderProps {
   isNeutralinoEnv: () => boolean;
   editingPermlink?: string | null;
   setEditingPermlink?: (p: string | null) => void;
+  setEditingOriginalTitle?: (t: string | null) => void;
   setIsPubTitleManuallyEdited?: (v: boolean) => void;
   setAllowTitleChangeInEdit?: (v: boolean) => void;
   notify?: (msg: string, type?: any) => void;
@@ -188,6 +189,7 @@ export const Header: React.FC<HeaderProps> = (props) => {
     toolsMap,
     editingPermlink,
     setEditingPermlink,
+    setEditingOriginalTitle,
     setIsPubTitleManuallyEdited,
     setAllowTitleChangeInEdit,
     notify,
@@ -733,6 +735,7 @@ export const Header: React.FC<HeaderProps> = (props) => {
                     const wasEditing = Boolean(editingPermlink);
                     setPubTitle(''); setContent(''); setPubTags(''); setCurrentDraftId(null);
                     setEditingPermlink?.(null);
+                    setEditingOriginalTitle?.(null);
                     setIsPubTitleManuallyEdited?.(false);
                     setAllowTitleChangeInEdit?.(false);
                     if (wasEditing) {

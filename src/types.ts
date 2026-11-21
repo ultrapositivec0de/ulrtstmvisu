@@ -49,6 +49,8 @@ export interface ReaderConfig {
   loadImages?: boolean;
   enableVoteLogging?: boolean;
   loadFeedWithoutTag?: boolean;
+  rpcTimeoutSec?: number;
+  rpcBatchSize?: number;
 }
 
 export interface SteemNotification {

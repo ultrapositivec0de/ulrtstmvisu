@@ -1192,7 +1192,26 @@ export const translations = {
   "lowGpuModeDesc": "Flattens compositing layers, disables gradients, alpha blending, blur, shadows, and JS motion to minimize GPU overhead in Linux WebKitGTK & Android WebView.",
   "addToKeychainBtn": "+ Keychain",
   "addToKeychainTitle": "Copy @{acc} to Keychain list",
-  "addedToKeychainNotify": "Account @{acc} added to Keychain list"
+  "addedToKeychainNotify": "Account @{acc} added to Keychain list",
+  "cachedTagsViewLabel": "Session Cached Tag Groups",
+  "cachedTagsAll": "All Active",
+  "cachedAllFeedLabel": "General Feed",
+  "clearTagCache": "Clear tag cache",
+  "fetchingTagProgress": "Loading tag {tag} ({current} of {total})...",
+  "settingsSectionFeed": "Feed Scope Parameters",
+  "settingsSectionReadingUi": "Reading Display & Behavior",
+  "settingsSectionNetwork": "Network & Weak Internet",
+  "rpcTimeoutSetting": "Node Response Timeout (sec)",
+  "rpcTimeoutSettingDesc": "Maximum wait time per RPC node before failing over to backup",
+  "rpcBatchSizeSetting": "Posts per RPC Request",
+  "rpcBatchSizeSettingDesc": "Smaller batches (15–25) are more reliable on slow connections",
+  "settingsSectionSharedFilters": "Shared Filters (Feed & Curation)",
+  "settingsSharedFiltersNote": "Muted accounts, whitelist, and blacklist apply simultaneously to both Feed and Curation.",
+  "settingsTargetFeedTag": "Active Feed Tag on Return",
+  "resetActiveTag": "Reset Tag",
+  "settingsExitNetworkHint": "Returning will fetch updated posts from the node for your selected criteria.",
+  "settingsExitLocalFilterHint": "Loaded Feed & Curation posts will be re-filtered locally with no node request.",
+  "settingsExitNoReloadHint": "Changes apply immediately without reloading the feed or querying nodes."
 } as const;
 
 export default { meta, translations };
