@@ -1,10 +1,11 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { Eye, EyeOff, MoveVertical, Maximize2, X } from 'lucide-react';
 import { cn } from '../../lib/utils';
 import { useDeviceStore } from '../../store/deviceStore';
 import { useLightboxStore } from '../../store/lightboxStore';
 import { useEditorStore } from '../../store';
 import { useAppUIStore } from '../../stores/useAppUIStore';
+import { hydrateCachedImagesInContainer, restoreCanonicalUrl } from '../../services/imageCacheDb';
 
 export interface PreviewPaneProps {
   previewRef?: React.RefObject<any>;
@@ -51,6 +52,29 @@ export const PreviewPane: React.FC<PreviewPaneProps> = ({
   const handleSetSyncScroll = setSyncScrollEnabled ?? storeSetSyncScrollEnabled;
   const fullScreen = isFullScreen ?? storeIsFullScreen;
   const handleToggleFullScreen = toggleFullScreen ?? storeToggleFullScreen;
+
+  useEffect(() => {
+    const pane = document.getElementById('steem-preview-pane');
+    if (!pane) return;
+
+    const runHydration = () => {
+      hydrateCachedImagesInContainer(pane, { cacheOnLoad: false }).catch(() => {});
+    };
+
+    runHydration();
+    const observer = new MutationObserver(() => {
+      runHydration();
+    });
+    observer.observe(pane, { childList: true, subtree: true });
+
+    const onCacheUpdated = () => runHydration();
+    window.addEventListener('steem-image-cache-updated', onCacheUpdated);
+
+    return () => {
+      observer.disconnect();
+      window.removeEventListener('steem-image-cache-updated', onCacheUpdated);
+    };
+  }, [livePreview, editorMode]);
 
   return (
     <div 
@@ -111,7 +135,8 @@ export const PreviewPane: React.FC<PreviewPaneProps> = ({
           if (img && img.src) {
             e.preventDefault();
             e.stopPropagation();
-            useLightboxStore.getState().openLightbox(img.src, img.alt || '');
+            const canonical = restoreCanonicalUrl(img.getAttribute('data-canonical-src') || img.src);
+            useLightboxStore.getState().openLightbox(canonical, img.alt || '');
           }
         }}
         className={cn(

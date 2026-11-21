@@ -6,6 +6,13 @@ export interface ChangelogEntry {
 
 export const APP_CHANGELOG: ChangelogEntry[] = [
   {
+    version: "v4.8.15",
+    date: "2026-11-21",
+    changes: [
+      "Unified IndexedDB image cache & filename binding, Cached Images Gallery tab, categorized Cache Manager with Tauri/Neutralino Linux directory cleanup, and org.ultraeditor.neutralino ID/Linux export fix."
+    ]
+  },
+  {
     version: "v4.8.14",
     date: "2026-11-20",
     changes: [

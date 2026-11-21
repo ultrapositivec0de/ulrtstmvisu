@@ -2,6 +2,12 @@ import { useCallback } from 'react';
 import { saveFileNatively } from '../utils/fileSaver';
 import { Draft, Language } from '../types';
 
+import {
+  type CacheClearSelection,
+  DEFAULT_CACHE_CLEAR_SELECTION,
+  clearSelectedCacheCategories,
+} from '../services/cacheManagerService';
+
 interface UseAppBackupProps {
   lang: Language;
   drafts: Draft[];
@@ -31,121 +37,41 @@ export function useAppBackup({
   confirmDialog,
   t,
 }: UseAppBackupProps) {
-  const handleClearCache = async () => {
-    const confirmed = await confirmDialog(t('confirmClearCachePrompt'));
-    if (!confirmed) return;
+  const handleClearCache = useCallback(async (
+    selection?: CacheClearSelection,
+    selectedNativePaths?: string[]
+  ): Promise<boolean> => {
+    const activeSelection = selection || DEFAULT_CACHE_CLEAR_SELECTION;
+    const hasAny =
+      activeSelection.feedCache ||
+      activeSelection.curationAndInbox ||
+      activeSelection.pinnedPosts ||
+      activeSelection.imageBlobs ||
+      activeSelection.stockAndSw ||
+      activeSelection.nativeAndLinux;
 
-    const cleared = true;
-    
-    // Clear Web LocalStorage caches (safe temporary keys only)
-    localStorage.removeItem('steem_gallery_cache_results');
-    localStorage.removeItem('steem_pexels_settings');
-    localStorage.removeItem('steem_hidden_replies');
-    
-    // Clear session storage
-    sessionStorage.clear();
-
-    // Clear Service Worker / CacheStorage API caches if present (Web & PWA & WebView)
-    if (typeof caches !== 'undefined') {
-      try {
-        const cacheKeys = await caches.keys();
-        await Promise.all(cacheKeys.map(k => caches.delete(k)));
-      } catch (cErr) {
-        console.debug("CacheStorage clear skipped:", cErr);
-      }
+    if (!hasAny) {
+      notify(t('cacheNothingSelected'), 'error');
+      return false;
     }
+
+    const confirmed = await confirmDialog(t('confirmClearCachePrompt'));
+    if (!confirmed) return false;
 
     try {
-      // Tauri Native Cache Clear
-      const isTauri = typeof window !== 'undefined' && (!!(window as any).__TAURI__ || !!(window as any).__TAURI_INTERNALS__);
-      if (isTauri) {
-        let pathModule: any, fsModule: any;
-        try {
-          pathModule = await import('@tauri-apps/api/path');
-          fsModule = await import('@tauri-apps/plugin-fs');
-        } catch {
-          try {
-            // @ts-ignore
-            pathModule = await import(String('@tauri-apps/api/path'));
-            // @ts-ignore
-            fsModule = await import(String('@tauri-apps/api/fs'));
-          } catch {
-            const tauri = (window as any).__TAURI__;
-            if (tauri) {
-              pathModule = tauri.path;
-              fsModule = tauri.fs;
-            }
-          }
-        }
-
-        if (pathModule && fsModule) {
-          try {
-            const cacheDir = await pathModule.appCacheDir();
-            const localDataDir = await pathModule.appLocalDataDir();
-
-            const clearCachesInDir = async (dirToScan: string, isStrictlyCacheDir: boolean) => {
-              try {
-                const entries = await fsModule.readDir(dirToScan);
-                for (const entry of entries) {
-                  if (!entry.name) continue;
-                  const lowerName = entry.name.toLowerCase();
-                  
-                  if (entry.isDirectory && (lowerName.includes('cache') || lowerName === 'fscacheddata')) {
-                    const targetPath = await pathModule.join(dirToScan, entry.name);
-                    try {
-                      await fsModule.remove(targetPath, { recursive: true });
-                    } catch (err: any) {
-                      console.debug("Failed to remove cache path:", err);
-                    }
-                  } else if (entry.isDirectory && entry.name === 'EBWebView') {
-                    const defaultPath = await pathModule.join(dirToScan, 'EBWebView', 'Default');
-                    try {
-                      const defEntries = await fsModule.readDir(defaultPath);
-                      for (const defEntry of defEntries) {
-                        if (defEntry.isDirectory && defEntry.name && defEntry.name.toLowerCase().includes('cache')) {
-                          const targetPath = await pathModule.join(defaultPath, defEntry.name);
-                          try {
-                            await fsModule.remove(targetPath, { recursive: true });
-                          } catch (err: any) {
-                            console.debug("Failed to remove webview cache path:", err);
-                          }
-                        }
-                      }
-                    } catch (err: any) {
-                      console.debug("Failed to read EBWebView path:", err);
-                    }
-                  } else if (isStrictlyCacheDir && entry.isDirectory && lowerName === 'webkit') {
-                    const targetPath = await pathModule.join(dirToScan, entry.name);
-                    try {
-                      await fsModule.remove(targetPath, { recursive: true });
-                    } catch (err: any) {
-                      console.debug("Failed to remove webkit dir:", err);
-                    }
-                  }
-                }
-              } catch (err: any) {
-                console.debug("Failed to scan cache directory:", err);
-              }
-            };
-
-            await clearCachesInDir(cacheDir, cacheDir !== localDataDir);
-            if (cacheDir !== localDataDir) {
-              await clearCachesInDir(localDataDir, false);
-            }
-          } catch (pathErr) {
-            console.debug("Tauri path resolution error:", pathErr);
-          }
-        }
+      const result = await clearSelectedCacheCategories(activeSelection, selectedNativePaths);
+      if (result.errors.length > 0 && result.clearedCategories.length === 0) {
+        notify(`${t('nativeCacheError')}: ${result.errors[0]}`, 'error');
+        return false;
       }
-
-      if (cleared) {
-        notify(t('cacheClearedSuccess'), "success");
-      }
+      notify(t('cacheClearedSuccess'), 'success');
+      return true;
     } catch (err: any) {
       console.error(err);
-      notify(t('nativeCacheError') + ": " + err.message, "error");
+      notify(t('nativeCacheError') + ': ' + (err?.message || String(err)), 'error');
+      return false;
     }
-  };
+  }, [confirmDialog, notify, t]);
 
   const handleExportBackup = useCallback(async () => {
     await exportBackup(drafts, notify);

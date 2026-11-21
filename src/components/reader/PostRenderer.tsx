@@ -2,6 +2,7 @@ import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react'
 import { Tag } from 'lucide-react';
 import { cn } from '../../lib/utils';
 import { formatPostHtml, PostFormatOptions, getCanonicalImageUrl } from '../../utils/postFormatting';
+import { hydrateCachedImagesInContainer, restoreCanonicalUrl } from '../../services/imageCacheDb';
 import { useLightboxStore } from '../../store/lightboxStore';
 import { useEditorStore } from '../../store';
 import { getTranslation, TranslationKey } from '../../locales';
@@ -78,6 +79,14 @@ export const PostRenderer: React.FC<PostRendererProps> = React.memo(({
     };
   }, [body, loadImages, mode, currentLang]);
 
+  useEffect(() => {
+    if (!renderedHtml || !containerRef.current) return;
+    hydrateCachedImagesInContainer(containerRef.current, {
+      cacheOnLoad: loadImages,
+      source: 'post_cache',
+    }).catch(() => {});
+  }, [renderedHtml, loadImages]);
+
   const tagList = useMemo(() => {
     if (!tags) return [];
     return tags.trim().split(/\s+/).filter(Boolean);
@@ -102,7 +111,9 @@ export const PostRenderer: React.FC<PostRendererProps> = React.memo(({
     if (img && img.src) {
       e.preventDefault();
       e.stopPropagation();
-      const canonical = getCanonicalImageUrl(img.src);
+      const canonical = getCanonicalImageUrl(
+        restoreCanonicalUrl(img.getAttribute('data-canonical-src') || img.src)
+      );
       if (onImageClick) {
         onImageClick(canonical, img.alt || '');
       } else {

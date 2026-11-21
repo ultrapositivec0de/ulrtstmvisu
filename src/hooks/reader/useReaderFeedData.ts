@@ -196,8 +196,23 @@ export function useReaderFeedData({
       }
     });
 
+    const handleExternalFeedCacheCleared = () => {
+      fetchRequestIdRef.current++;
+      tagBucketsRef.current = {};
+      activeTagsRef.current = [];
+      setCachedTagBuckets({});
+      setSelectedCacheTags([]);
+      setPosts([]);
+      setHasMoreFeed(false);
+      setLoading(false);
+      setFetchProgress(null);
+      setHasInitiatedFeed(false);
+    };
+    window.addEventListener("steem-feed-cache-cleared", handleExternalFeedCacheCleared);
+
     return () => {
       cancelled = true;
+      window.removeEventListener("steem-feed-cache-cleared", handleExternalFeedCacheCleared);
     };
   }, []);
 

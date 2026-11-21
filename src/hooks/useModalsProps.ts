@@ -80,7 +80,7 @@ export interface CompositeModalsPropsInput {
     processTableImport: () => void;
   };
   appBackup?: {
-    handleClearCache?: () => void;
+    handleClearCache?: (selection?: any, nativePaths?: string[]) => Promise<boolean> | void;
     handleExportBackup?: () => void;
     handleImportBackup?: (e: any) => void;
   };
@@ -243,7 +243,7 @@ export interface CompositeModalsPropsInput {
   pexelsSettings?: any;
   setPexelsSettings?: (s: any) => void;
   images?: any[];
-  handleClearCache?: () => void;
+  handleClearCache?: (selection?: any, nativePaths?: string[]) => Promise<boolean> | void;
   showPwaBanner?: boolean;
   setShowPwaBanner?: (show: boolean) => void;
   isEditorFullScreen?: boolean;

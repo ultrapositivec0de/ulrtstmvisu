@@ -19,7 +19,11 @@ import {
   Code,
   RotateCcw,
   Sliders,
-  Maximize2
+  Maximize2,
+  RefreshCw,
+  FolderOpen,
+  Shield,
+  Database
 } from 'lucide-react';
 import { BaseModal } from './BaseModal';
 import { cn } from '../../lib/utils';
@@ -30,6 +34,13 @@ import { DEFAULT_APP_AGENT } from '../../hooks/usePostSettings';
 import { UiScalePreset } from '../../hooks/useThemeAndStyles';
 import { useDeviceStore } from '../../store/deviceStore';
 import { usePerformanceStore } from '../../stores/usePerformanceStore';
+import {
+  type CacheBreakdown,
+  type CacheClearSelection,
+  DEFAULT_CACHE_CLEAR_SELECTION,
+  formatBytesCompact,
+  getCacheBreakdown,
+} from '../../services/cacheManagerService';
 
 export interface SettingsModalProps {
   isOpen: boolean;
@@ -91,7 +102,7 @@ export interface SettingsModalProps {
   setPexelsSettings: React.Dispatch<React.SetStateAction<any>>;
   images: ImageItem[];
   templates: Template[];
-  handleClearCache: () => void;
+  handleClearCache: (selection?: CacheClearSelection, nativePaths?: string[]) => Promise<boolean> | void;
   // Vault
   isUnlocked: boolean;
   vaultAccounts: string[];
@@ -178,6 +189,30 @@ export const SettingsModal: React.FC<SettingsModalProps> = (props) => {
   } = props;
 
   const lowGpuMode = usePerformanceStore((s) => s.lowGpuMode);
+  const [cacheSelection, setCacheSelection] = React.useState<CacheClearSelection>(() => ({
+    ...DEFAULT_CACHE_CLEAR_SELECTION,
+  }));
+  const [cacheBreakdown, setCacheBreakdown] = React.useState<CacheBreakdown | null>(null);
+  const [isScanningCache, setIsScanningCache] = React.useState(false);
+  const [isClearingCache, setIsClearingCache] = React.useState(false);
+
+  const refreshCacheStats = React.useCallback(async () => {
+    setIsScanningCache(true);
+    try {
+      const stats = await getCacheBreakdown();
+      setCacheBreakdown(stats);
+    } catch {
+      // ignore scan error
+    } finally {
+      setIsScanningCache(false);
+    }
+  }, []);
+
+  React.useEffect(() => {
+    if (isOpen && settingsTab === 'general') {
+      void refreshCacheStats();
+    }
+  }, [isOpen, settingsTab, refreshCacheStats]);
   const setLowGpuMode = usePerformanceStore((s) => s.setLowGpuMode);
 
   return (
@@ -787,25 +822,231 @@ export const SettingsModal: React.FC<SettingsModalProps> = (props) => {
               </div>
             </div>
 
-            {/* CACHE CLEAR (Visible in all platforms: Tauri, Android, PWA, Web) */}
-            <div className="flex items-center justify-between p-4 bg-rose-500/5 border border-rose-500/20 rounded-2xl">
-              <div className="flex items-center gap-3">
-                <div className="p-2 bg-rose-500/10 text-rose-400 rounded-lg"><Trash2 size={18} /></div>
-                <div>
-                  <h3 className="text-sm font-bold text-[var(--text-main)]">
-                    {t('clearAppCache')}
-                  </h3>
-                  <p className="text-[10px] text-[var(--text-muted)] max-w-[200px] sm:max-w-[300px] leading-tight mt-0.5">
-                    {t('clearAppCacheDesc')}
-                  </p>
+            {/* CATEGORIZED CACHE MANAGER (Web, PWA, Android, Tauri, Neutralino) */}
+            <div className="p-4 bg-[var(--bg-main)]/50 border border-[var(--border-color)] rounded-xl space-y-3">
+              <div className="flex items-center justify-between gap-2">
+                <div className="flex items-center gap-2.5 min-w-0">
+                  <Database size={16} className="text-rose-400 shrink-0" />
+                  <div className="min-w-0">
+                    <h3 className="text-xs font-bold text-[var(--text-main)] truncate">
+                      {t('clearAppCache')}
+                    </h3>
+                    <p className="text-[10px] text-[var(--text-muted)] leading-tight">
+                      {t('cacheProtectedNote')}
+                    </p>
+                  </div>
                 </div>
+                <button
+                  type="button"
+                  onClick={() => void refreshCacheStats()}
+                  disabled={isScanningCache}
+                  className="px-2.5 py-1 rounded-lg border border-[var(--border-color)] bg-[var(--bg-card)] hover:border-cyan-500/40 text-[10px] font-semibold text-[var(--text-main)] flex items-center gap-1.5 whitespace-nowrap shrink-0 cursor-pointer"
+                >
+                  <RefreshCw size={12} className={isScanningCache ? 'animate-spin' : ''} />
+                  <span>{t('cacheScanBtn')}</span>
+                </button>
               </div>
-              <button 
-                onClick={handleClearCache}
-                className="px-4 py-2 bg-rose-600/80 hover:bg-rose-500 text-white rounded-xl text-xs font-bold transition-all shadow-md shadow-rose-900/20 shrink-0 cursor-pointer"
-              >
-                {t('clearAction')}
-              </button>
+
+              <div className="divide-y divide-[var(--border-color)] border border-[var(--border-color)] rounded-lg bg-[var(--bg-card)] overflow-hidden">
+                {(
+                  [
+                    {
+                      key: 'feedCache' as const,
+                      label: t('cacheCategoryFeed'),
+                      desc: t('cacheCategoryFeedDesc'),
+                      stat: cacheBreakdown ? `${cacheBreakdown.feedCache.count} · ${formatBytesCompact(cacheBreakdown.feedCache.bytes)}` : '...',
+                    },
+                    {
+                      key: 'curationAndInbox' as const,
+                      label: t('cacheCategoryCuration'),
+                      desc: t('cacheCategoryCurationDesc'),
+                      stat: cacheBreakdown ? `${cacheBreakdown.curationAndInbox.count} · ${formatBytesCompact(cacheBreakdown.curationAndInbox.bytes)}` : '...',
+                    },
+                    {
+                      key: 'pinnedPosts' as const,
+                      label: t('cacheCategoryPinned'),
+                      desc: t('cacheCategoryPinnedDesc'),
+                      stat: cacheBreakdown ? `${cacheBreakdown.pinnedPosts.count} · ${formatBytesCompact(cacheBreakdown.pinnedPosts.bytes)}` : '...',
+                    },
+                    {
+                      key: 'imageBlobs' as const,
+                      label: t('cacheCategoryImageBlobs'),
+                      desc: t('cacheCategoryImageBlobsDesc'),
+                      stat: cacheBreakdown ? `${cacheBreakdown.imageBlobs.blobCount} · ${formatBytesCompact(cacheBreakdown.imageBlobs.bytes)}` : '...',
+                    },
+                    {
+                      key: 'stockAndSw' as const,
+                      label: t('cacheCategoryStockSw'),
+                      desc: t('cacheCategoryStockSwDesc'),
+                      stat: cacheBreakdown ? `${cacheBreakdown.stockAndSw.count} · ${formatBytesCompact(cacheBreakdown.stockAndSw.bytes)}` : '...',
+                    },
+                    {
+                      key: 'nativeAndLinux' as const,
+                      label: t('cacheCategoryNativeLinux'),
+                      desc: t('cacheCategoryNativeLinuxDesc'),
+                      stat: cacheBreakdown ? `${cacheBreakdown.nativeAndLinux.count} · ${formatBytesCompact(cacheBreakdown.nativeAndLinux.bytes)}` : '...',
+                    },
+                  ]
+                ).map((item) => {
+                  const checked = cacheSelection[item.key];
+                  return (
+                    <div key={item.key} className="px-3 py-2 flex flex-col gap-1.5">
+                      <label className="flex items-start justify-between gap-3 cursor-pointer">
+                        <div className="flex items-start gap-2.5 min-w-0">
+                          <input
+                            type="checkbox"
+                            checked={checked}
+                            onChange={(e) => {
+                              const nextChecked = e.target.checked;
+                              setCacheSelection((prev) => ({
+                                ...prev,
+                                [item.key]: nextChecked,
+                                alsoRemoveImageLinks:
+                                  item.key === 'imageBlobs' && !nextChecked
+                                    ? false
+                                    : prev.alsoRemoveImageLinks,
+                              }));
+                            }}
+                            className="mt-0.5 accent-cyan-500 shrink-0"
+                          />
+                          <div className="min-w-0">
+                            <div className="text-[11px] font-semibold text-[var(--text-main)] leading-snug">
+                              {item.label}
+                            </div>
+                            <div className="text-[10px] text-[var(--text-muted)] leading-snug">
+                              {item.desc}
+                            </div>
+                          </div>
+                        </div>
+                        <span className="text-[10px] font-mono tabular-nums text-[var(--text-muted)] whitespace-nowrap shrink-0 pt-0.5">
+                          {item.stat}
+                        </span>
+                      </label>
+
+                      {item.key === 'imageBlobs' && cacheSelection.imageBlobs && (
+                        <label className="pl-6 flex items-center justify-between gap-2 cursor-pointer">
+                          <div className="flex items-center gap-2 min-w-0">
+                            <input
+                              type="checkbox"
+                              checked={cacheSelection.alsoRemoveImageLinks}
+                              onChange={(e) =>
+                                setCacheSelection((prev) => ({
+                                  ...prev,
+                                  alsoRemoveImageLinks: e.target.checked,
+                                }))
+                              }
+                              className="accent-rose-500 shrink-0"
+                            />
+                            <span className="text-[10px] text-rose-400 leading-tight">
+                              {t('cacheAlsoRemoveLinks')}
+                            </span>
+                          </div>
+                          <span className="text-[10px] font-mono tabular-nums text-[var(--text-muted)] whitespace-nowrap shrink-0">
+                            {cacheBreakdown?.imageBlobs.uploadedLinksCount ?? 0}
+                          </span>
+                        </label>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+
+              {cacheBreakdown && cacheBreakdown.nativeAndLinux.platform !== 'web' && (
+                <div className="border border-[var(--border-color)] rounded-lg bg-[var(--bg-card)] px-3 py-2 space-y-1.5">
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-[var(--text-muted)] flex items-center gap-1.5">
+                      <FolderOpen size={12} />
+                      {t('linuxDirsDetectedLabel')}
+                    </span>
+                    {cacheBreakdown.nativeAndLinux.dirs.some((d) => !d.isProtectedInfo && d.cachePaths.length > 0) && (
+                      <button
+                        type="button"
+                        disabled={isClearingCache}
+                        onClick={async () => {
+                          setIsClearingCache(true);
+                          try {
+                            const onlyNative: CacheClearSelection = {
+                              feedCache: false,
+                              curationAndInbox: false,
+                              pinnedPosts: false,
+                              imageBlobs: false,
+                              alsoRemoveImageLinks: false,
+                              stockAndSw: false,
+                              nativeAndLinux: true,
+                            };
+                            const targets = cacheBreakdown.nativeAndLinux.dirs
+                              .filter((d) => !d.isProtectedInfo)
+                              .flatMap((d) => d.cachePaths);
+                            await handleClearCache(onlyNative, targets);
+                            await refreshCacheStats();
+                          } finally {
+                            setIsClearingCache(false);
+                          }
+                        }}
+                        className="px-2 py-0.5 rounded border border-rose-500/30 bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 text-[10px] font-semibold whitespace-nowrap shrink-0 cursor-pointer"
+                      >
+                        {t('linuxDirClearBtn')}
+                      </button>
+                    )}
+                  </div>
+
+                  {cacheBreakdown.nativeAndLinux.dirs.length === 0 ? (
+                    <p className="text-[10px] text-[var(--text-muted)]">{t('linuxDirsNone')}</p>
+                  ) : (
+                    <div className="space-y-1 max-h-28 overflow-y-auto custom-scrollbar pr-1">
+                      {cacheBreakdown.nativeAndLinux.dirs.map((dir) => (
+                        <div
+                          key={dir.baseDir}
+                          className="flex items-center justify-between gap-2 text-[10px] font-mono tabular-nums"
+                        >
+                          <div className="flex items-center gap-1.5 min-w-0 text-[var(--text-main)]">
+                            {dir.isProtectedInfo && <Shield size={10} className="text-emerald-400 shrink-0" />}
+                            <span className="truncate" title={dir.baseDir}>
+                              {dir.label}
+                              {dir.isCurrentApp ? ` · ${t('linuxDirActiveTag')}` : ''}
+                            </span>
+                          </div>
+                          <span className="text-[var(--text-muted)] whitespace-nowrap shrink-0">
+                            {formatBytesCompact(dir.sizeBytes)}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+
+              <div className="flex items-center justify-end gap-2 pt-0.5">
+                {(() => {
+                  const selectedCount = [
+                    cacheSelection.feedCache,
+                    cacheSelection.curationAndInbox,
+                    cacheSelection.pinnedPosts,
+                    cacheSelection.imageBlobs,
+                    cacheSelection.stockAndSw,
+                    cacheSelection.nativeAndLinux,
+                  ].filter(Boolean).length;
+                  return (
+                    <button
+                      type="button"
+                      disabled={isClearingCache || selectedCount === 0}
+                      onClick={async () => {
+                        setIsClearingCache(true);
+                        try {
+                          await handleClearCache(cacheSelection);
+                          await refreshCacheStats();
+                        } finally {
+                          setIsClearingCache(false);
+                        }
+                      }}
+                      className="px-4 py-2 bg-rose-600/85 hover:bg-rose-500 disabled:opacity-45 text-white rounded-lg text-xs font-bold transition-colors flex items-center gap-1.5 whitespace-nowrap shrink-0 cursor-pointer"
+                    >
+                      <Trash2 size={13} />
+                      <span>{t('cacheClearSelectedBtn').replace('{count}', String(selectedCount))}</span>
+                    </button>
+                  );
+                })()}
+              </div>
             </div>
           </section>
         )}

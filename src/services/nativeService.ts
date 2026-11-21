@@ -112,6 +112,50 @@ export async function initStorageRestore() {
   }
 }
 
+export async function getNeutralinoBackupStats(): Promise<{ path: string; sizeBytes: number } | null> {
+  if (!isNeutralino()) return null;
+  const path = await getBackupPath();
+  if (!path) return null;
+  try {
+    const { Neutralino } = window as any;
+    const stats = await Neutralino.filesystem.getStats(path);
+    return { path, sizeBytes: Number(stats?.size || 0) };
+  } catch {
+    return null;
+  }
+}
+
+function collectBackupDataFromLocalStorage(): Record<string, string> {
+  const dataToSave: Record<string, string> = {};
+  if (typeof localStorage === 'undefined') return dataToSave;
+  for (let i = 0; i < localStorage.length; i++) {
+    const key = localStorage.key(i);
+    if (key && (key.startsWith('steem_') || key.startsWith('widget_'))) {
+      const val = localStorage.getItem(key);
+      if (val !== null) {
+        dataToSave[key] = val;
+      }
+    }
+  }
+  return dataToSave;
+}
+
+export async function syncNeutralinoBackupNow(): Promise<boolean> {
+  if (!isNeutralino()) return false;
+  const path = await getBackupPath();
+  if (!path) return false;
+  try {
+    const { Neutralino } = window as any;
+    const dataToSave = collectBackupDataFromLocalStorage();
+    const jsonStr = JSON.stringify(dataToSave, null, 2);
+    await Neutralino.filesystem.writeFile(path, jsonStr);
+    return true;
+  } catch (err) {
+    console.error('[Neutralino Backup] Immediate backup sync failed:', err);
+    return false;
+  }
+}
+
 // SAVE: Periodically checks localStorage for updates and saves them physically to the disk
 export function startStorageAutosave() {
   if (!isNeutralino()) return;
@@ -123,21 +167,9 @@ export function startStorageAutosave() {
 
     try {
       const { Neutralino } = window as any;
-      const dataToSave: Record<string, string> = {};
-      let hasKeys = false;
+      const dataToSave = collectBackupDataFromLocalStorage();
 
-      for (let i = 0; i < localStorage.length; i++) {
-        const key = localStorage.key(i);
-        if (key && (key.startsWith('steem_') || key.startsWith('widget_'))) {
-          const val = localStorage.getItem(key);
-          if (val !== null) {
-            dataToSave[key] = val;
-            hasKeys = true;
-          }
-        }
-      }
-
-      if (hasKeys) {
+      if (Object.keys(dataToSave).length > 0) {
         const jsonStr = JSON.stringify(dataToSave, null, 2);
         if (jsonStr !== lastSavedJson) {
           await Neutralino.filesystem.writeFile(path, jsonStr);
@@ -234,7 +266,12 @@ export const NativeService = {
       }
     }
     
-    // Web and Neutralino fallback
+    if (isNeutralino()) {
+      const { saveFileNatively } = await import('../utils/fileSaver');
+      return saveFileNatively(blob, filename, blob.type || 'application/octet-stream');
+    }
+
+    // Web fallback
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;

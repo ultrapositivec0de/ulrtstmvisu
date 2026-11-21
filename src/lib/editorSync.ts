@@ -2,6 +2,7 @@
  * Utility functions for bidirectional synchronization between Markdown
  * state and HTML rich editor content, customized for Steem layout formats.
  */
+import { restoreCanonicalUrl } from '../services/imageCacheDb';
 
 function applyInlineFormat(inner: string, open: string, close: string): string {
   if (!inner) return '';
@@ -165,7 +166,8 @@ export function htmlToMarkdown(html: string): string {
         return `[${inner}](${href})`;
       }
       case 'img': {
-        const src = el.getAttribute('src') || '';
+        const rawSrc = el.getAttribute('data-canonical-src') || el.getAttribute('src') || '';
+        const src = restoreCanonicalUrl(rawSrc);
         const alt = el.getAttribute('alt') || '';
         const className = el.getAttribute('class') || '';
         return className ? `![${alt}](${src} "${className}")` : `![${alt}](${src})`;

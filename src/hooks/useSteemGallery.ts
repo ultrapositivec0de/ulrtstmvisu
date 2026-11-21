@@ -3,6 +3,15 @@ import { ImageItem, AuthType } from '../types';
 import { useStockPhotos } from './gallery/useStockPhotos';
 import { useGalleryLayoutMarkup } from './gallery/useGalleryLayoutMarkup';
 import { useImageUploadPipeline, sanitizeFilename } from './gallery/useImageUploadPipeline';
+import {
+  CachedImageRecord,
+  getAllCachedImages,
+  upsertCachedImage,
+  removeImageBlobOnly,
+  deleteCachedImageFull,
+} from '../services/imageCacheDb';
+import { getCanonicalImageUrl } from '../utils/postFormatting';
+import { CachedImageFilter } from '../components/gallery/CachedImagesPanel';
 
 export { sanitizeFilename };
 
@@ -41,6 +50,9 @@ export function useSteemGallery(config: SteemGalleryConfig) {
     return localStorage.getItem('steem_gallery_collapsed') === 'true';
   });
   const [galleryView, setGalleryView] = useState<'grid' | 'list'>('grid');
+  const [cachedImages, setCachedImages] = useState<CachedImageRecord[]>([]);
+  const [cachedFilter, setCachedFilter] = useState<CachedImageFilter>('all');
+  const [selectedCachedUrls, setSelectedCachedUrls] = useState<Set<string>>(() => new Set());
 
   useEffect(() => {
     if (typeof localStorage !== 'undefined') {
@@ -190,10 +202,149 @@ export function useSteemGallery(config: SteemGalleryConfig) {
     }
   }, [sourceInput]);
 
+  // Load and sync unified image cache records
+  const refreshCachedImages = useCallback(async () => {
+    const list = await getAllCachedImages();
+    setCachedImages(list);
+  }, []);
+
+  useEffect(() => {
+    refreshCachedImages();
+    const handler = () => {
+      refreshCachedImages();
+    };
+    const linksClearedHandler = () => {
+      setImages([]);
+      setSourceInput('');
+      setSelectedCachedUrls(new Set());
+      refreshCachedImages();
+    };
+    window.addEventListener('steem-image-cache-updated', handler);
+    window.addEventListener('steem-gallery-links-cleared', linksClearedHandler);
+    return () => {
+      window.removeEventListener('steem-image-cache-updated', handler);
+      window.removeEventListener('steem-gallery-links-cleared', linksClearedHandler);
+    };
+  }, [refreshCachedImages]);
+
+  // Ensure previously saved gallery links exist in the unified cache index with original names
+  const didBackfillCacheRef = useRef(false);
+  useEffect(() => {
+    if (didBackfillCacheRef.current || images.length === 0) return;
+    didBackfillCacheRef.current = true;
+    Promise.all(
+      images.map((img) =>
+        upsertCachedImage({
+          url: img.url,
+          originalName: img.name,
+          source: 'uploaded',
+          keepLink: true,
+          exif: img.exif,
+          silent: true,
+        })
+      )
+    ).then(() => refreshCachedImages()).catch(() => {});
+  }, [images, refreshCachedImages]);
+
+  const filteredCachedImages = useMemo(() => {
+    const q = stockPhotos.gallerySearch.trim().toLowerCase();
+    return cachedImages.filter((rec) => {
+      if (cachedFilter !== 'all' && rec.source !== cachedFilter) return false;
+      if (!q) return true;
+      return (
+        rec.originalName.toLowerCase().includes(q) ||
+        rec.serverHashName.toLowerCase().includes(q) ||
+        rec.canonicalUrl.toLowerCase().includes(q)
+      );
+    });
+  }, [cachedImages, cachedFilter, stockPhotos.gallerySearch]);
+
+  const selectedCachedImages = useMemo<ImageItem[]>(() => {
+    if (selectedCachedUrls.size === 0) return [];
+    return cachedImages
+      .filter((r) => selectedCachedUrls.has(r.canonicalUrl))
+      .map((r) => ({
+        url: r.canonicalUrl,
+        name: r.originalName,
+        selected: true,
+        exif: r.exif,
+      }));
+  }, [cachedImages, selectedCachedUrls]);
+
+  const toggleCachedSelection = useCallback((canonicalUrl: string) => {
+    setSelectedCachedUrls((prev) => {
+      const next = new Set(prev);
+      if (next.has(canonicalUrl)) next.delete(canonicalUrl);
+      else next.add(canonicalUrl);
+      return next;
+    });
+  }, []);
+
+  const selectAllCached = useCallback(() => {
+    setSelectedCachedUrls(new Set(filteredCachedImages.map((r) => r.canonicalUrl)));
+  }, [filteredCachedImages]);
+
+  const clearCachedSelection = useCallback(() => {
+    setSelectedCachedUrls(new Set());
+  }, []);
+
+  const stripUrlFromGalleryLists = useCallback((targetUrls: Set<string>) => {
+    setImages((prev) => prev.filter((img) => !targetUrls.has(getCanonicalImageUrl(img.url))));
+    setSourceInput((prev) =>
+      prev
+        .split('\n')
+        .filter((line) => {
+          const trimmed = line.trim();
+          if (!trimmed) return false;
+          return !targetUrls.has(getCanonicalImageUrl(trimmed));
+        })
+        .join('\n')
+    );
+  }, []);
+
+  const deleteSingleCachedImage = useCallback(async (canonicalUrl: string, mode: 'blob_only' | 'full') => {
+    if (mode === 'blob_only') {
+      await removeImageBlobOnly(canonicalUrl);
+      config.notify(config.t('cachedBlobPurgedNotify'), 'success');
+    } else {
+      await deleteCachedImageFull(canonicalUrl);
+      stripUrlFromGalleryLists(new Set([canonicalUrl]));
+      setSelectedCachedUrls((prev) => {
+        const next = new Set(prev);
+        next.delete(canonicalUrl);
+        return next;
+      });
+      config.notify(config.t('cachedDeletedNotify'), 'success');
+    }
+  }, [config, stripUrlFromGalleryLists]);
+
+  const deleteSelectedCachedImages = useCallback(async (mode: 'blob_only' | 'full') => {
+    const targets = Array.from(selectedCachedUrls);
+    if (targets.length === 0) return;
+
+    if (mode === 'blob_only') {
+      await Promise.all(targets.map((u) => removeImageBlobOnly(u)));
+      config.notify(config.t('cachedBlobPurgedNotify'), 'success');
+    } else {
+      await Promise.all(targets.map((u) => deleteCachedImageFull(u)));
+      stripUrlFromGalleryLists(new Set(targets));
+      setSelectedCachedUrls(new Set());
+      config.notify(config.t('cachedDeletedNotify'), 'success');
+    }
+  }, [selectedCachedUrls, config, stripUrlFromGalleryLists]);
+
+  const deleteLocalImage = useCallback(async (rawUrl: string) => {
+    const canonical = getCanonicalImageUrl(rawUrl);
+    stripUrlFromGalleryLists(new Set([canonical]));
+    await deleteCachedImageFull(canonical);
+  }, [stripUrlFromGalleryLists]);
+
   // 3. Layout and Markup Hook
   const layoutMarkup = useGalleryLayoutMarkup({
     images,
     setImages,
+    selectedCachedImages,
+    clearCachedSelection,
     pexelsResults: stockPhotos.pexelsResults,
     setPexelsResults: stockPhotos.setPexelsResults,
     galleryMode: stockPhotos.galleryMode,
@@ -235,6 +386,19 @@ export function useSteemGallery(config: SteemGalleryConfig) {
     parseImages,
     toggleImageSelection,
     moveImageLocal,
+    deleteLocalImage,
+
+    // Cached images unified library
+    cachedImages,
+    filteredCachedImages,
+    cachedFilter,
+    setCachedFilter,
+    selectedCachedUrls,
+    toggleCachedSelection,
+    selectAllCached,
+    clearCachedSelection,
+    deleteSingleCachedImage,
+    deleteSelectedCachedImages,
 
     // From stockPhotos
     galleryMode: stockPhotos.galleryMode,

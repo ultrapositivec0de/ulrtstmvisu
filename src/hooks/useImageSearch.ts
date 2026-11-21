@@ -16,7 +16,7 @@ export interface UseImageSearchConfig {
 }
 
 export function useImageSearch(config: UseImageSearchConfig) {
-  const [galleryMode, setGalleryMode] = useState<'local' | 'pexels' | 'unsplash' | 'pixabay'>('local');
+  const [galleryMode, setGalleryMode] = useState<'local' | 'cached' | 'pexels' | 'unsplash' | 'pixabay'>('local');
   const [gallerySearch, setGallerySearch] = useState('');
   const [isSearchingPexels, setIsSearchingPexels] = useState(false);
   const [pexelsPage, setPexelsPage] = useState(1);
@@ -38,11 +38,26 @@ export function useImageSearch(config: UseImageSearchConfig) {
 
   useEffect(() => {
     try {
-      localStorage.setItem('steem_gallery_cache_results', JSON.stringify(pexelsResults.slice(0, 50)));
+      if (pexelsResults.length === 0) {
+        localStorage.removeItem('steem_gallery_cache_results');
+      } else {
+        localStorage.setItem('steem_gallery_cache_results', JSON.stringify(pexelsResults.slice(0, 50)));
+      }
     } catch {
       // ignore
     }
   }, [pexelsResults]);
+
+  useEffect(() => {
+    const handleStockCleared = () => {
+      setPexelsResults([]);
+      setPexelsPage(1);
+    };
+    window.addEventListener('steem-stock-cache-cleared', handleStockCleared);
+    return () => {
+      window.removeEventListener('steem-stock-cache-cleared', handleStockCleared);
+    };
+  }, []);
 
   const handleExternalSearch = useCallback(async (query: string, page: number = 1) => {
     if (!query.trim()) return;

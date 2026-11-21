@@ -1,8 +1,9 @@
-import React, { useRef } from 'react';
+import React, { useRef, useEffect } from 'react';
 import { cn } from '../../lib/utils';
 import { useEditorStore } from '../../store';
 import { useLightboxStore } from '../../store/lightboxStore';
 import { normalizeHtmlForVisualEditor } from '../../utils/markdownParser';
+import { hydrateCachedImagesInContainer, restoreCanonicalUrl } from '../../services/imageCacheDb';
 
 export interface WysiwygCanvasProps {
   wysiwygRef: React.RefObject<HTMLDivElement | null>;
@@ -70,6 +71,28 @@ export const WysiwygCanvas: React.FC<WysiwygCanvasProps> = React.memo(({
   t,
 }) => {
   const lastPasteTimeRef = useRef<number>(0);
+
+  useEffect(() => {
+    const el = wysiwygRef.current;
+    if (!el) return;
+
+    const runHydration = () => {
+      hydrateCachedImagesInContainer(el, { cacheOnLoad: false }).catch(() => {});
+    };
+
+    runHydration();
+    const observer = new MutationObserver(() => {
+      runHydration();
+    });
+    observer.observe(el, { childList: true, subtree: true });
+
+    const onCacheUpdated = () => runHydration();
+    window.addEventListener('steem-image-cache-updated', onCacheUpdated);
+    return () => {
+      observer.disconnect();
+      window.removeEventListener('steem-image-cache-updated', onCacheUpdated);
+    };
+  }, [wysiwygRef]);
 
   return (
     <div
@@ -296,7 +319,8 @@ export const WysiwygCanvas: React.FC<WysiwygCanvasProps> = React.memo(({
         if (img && img.src) {
           e.preventDefault();
           e.stopPropagation();
-          useLightboxStore.getState().openLightbox(img.src, img.alt || '');
+          const canonical = restoreCanonicalUrl(img.getAttribute('data-canonical-src') || img.src);
+          useLightboxStore.getState().openLightbox(canonical, img.alt || '');
         }
       }}
       className={cn(

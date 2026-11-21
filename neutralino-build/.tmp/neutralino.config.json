@@ -1,6 +1,6 @@
 {
   "$schema": "https://raw.githubusercontent.com/neutralinojs/neutralinojs/main/schemas/neutralino.config.schema.json",
-  "applicationId": "org.ultrapositive.steemeditorpro",
+  "applicationId": "org.ultraeditor.neutralino",
   "version": "4.8.5",
   "defaultMode": "window",
   "port": 0,

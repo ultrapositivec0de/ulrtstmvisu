@@ -2,11 +2,12 @@ import { useState, useCallback, Dispatch, SetStateAction } from 'react';
 import { QueueItem, AuthType } from '../types';
 import { SecurityService } from '../services/securityService';
 import { getClient, verifyPostOnChain } from '../lib/steem';
+import { sanitizeContentImageUrls } from '../services/imageCacheDb';
 
 export const STORAGE_KEY_QUEUE = 'steem_queue_v2';
 
 export const processContentForSteem = (raw: string) => {
-  return raw;
+  return sanitizeContentImageUrls(raw);
 };
 
 export const createPermlinkUA = (title: string): string => {

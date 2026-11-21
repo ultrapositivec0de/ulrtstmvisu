@@ -4,6 +4,21 @@ import { motion, AnimatePresence } from 'motion/react';
 import { cn } from '../../lib/utils';
 import { getMiniGalleryBottomStyle } from '../../lib/viewportLayout';
 import { usePerformanceStore } from '../../stores/usePerformanceStore';
+import { useCachedImageUrl } from '../../hooks/useCachedImageUrl';
+
+const MiniGalleryThumb: React.FC<{ url: string; alt: string }> = ({ url, alt }) => {
+  const src = useCachedImageUrl(url, url);
+  return (
+    <img
+      src={src}
+      alt={alt}
+      draggable={false}
+      className="w-full h-full object-cover group-hover:opacity-90 transition-opacity pointer-events-none select-none"
+      referrerPolicy="no-referrer"
+      loading="lazy"
+    />
+  );
+};
 
 export interface MiniGalleryStripProps {
   isOpen: boolean;
@@ -195,14 +210,7 @@ export const MiniGalleryStrip: React.FC<MiniGalleryStripProps> = React.memo(({
                   )}
                   title={`${img.name} - ${t('tapToInsert')}`}
                 >
-                  <img 
-                    src={img.url} 
-                    alt={img.name} 
-                    draggable={false}
-                    className="w-full h-full object-cover group-hover:opacity-90 transition-opacity pointer-events-none select-none"
-                    referrerPolicy="no-referrer"
-                    loading="lazy"
-                  />
+                  <MiniGalleryThumb url={img.url} alt={img.name} />
                   {justInsertedUrl === img.url ? (
                     <div className="absolute inset-0 bg-emerald-950/80 backdrop-blur-xs flex items-center justify-center text-emerald-400">
                       <Check size={18} className="stroke-[3]" />

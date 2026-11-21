@@ -1,4 +1,8 @@
 # Changelog
+## [2026-11-21] - Version 4.8.15 (ultrasteemeditor/4.8.15)
+### Added & Improved
+- **Release Updates**: Unified IndexedDB image cache & filename binding, Cached Images Gallery tab, categorized Cache Manager with Tauri/Neutralino Linux directory cleanup, and org.ultraeditor.neutralino ID/Linux export fix.
+
 ## [2026-11-20] - Version 4.8.14 (ultrasteemeditor/4.8.14)
 ### Added & Improved
 - **Release Updates**: Isolated IndexedDB Reader tag cache, strict multi-tag Favorites Core filtering, sequential tag loading, cached tag group switcher, slow-internet RPC settings, smart Reader Settings exit, and edit mode title preservation.

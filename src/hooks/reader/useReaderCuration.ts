@@ -74,6 +74,19 @@ export function useReaderCuration({
     }
   }, [curationPosts]);
 
+  useEffect(() => {
+    const handleCurationCleared = () => {
+      setCurationPosts([]);
+      setCurationRawPool([]);
+      setSelectedForVote(new Set());
+      setHasInitiatedCuration(false);
+    };
+    window.addEventListener("steem-curation-cache-cleared", handleCurationCleared);
+    return () => {
+      window.removeEventListener("steem-curation-cache-cleared", handleCurationCleared);
+    };
+  }, []);
+
   const applyCurationFilters = (
     rawList: SteemPost[],
     targetConfig: ReaderConfig,

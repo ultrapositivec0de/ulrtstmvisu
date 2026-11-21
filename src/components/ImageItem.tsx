@@ -3,6 +3,7 @@ import { AlignLeft, AlignRight, FileText, CloudUpload, Trash2, ChevronLeft, Chev
 import { cn } from '../lib/utils';
 import { ImageItem as ImageItemType } from '../types';
 import { getCanonicalImageUrl, copyTextWithFallback } from '../utils/postFormatting';
+import { useCachedImageUrl } from '../hooks/useCachedImageUrl';
 
 interface ImageItemProps {
   img: ImageItemType;
@@ -36,9 +37,10 @@ const ImageItem = React.memo(({
   const [copiedUrl, setCopiedUrl] = useState(false);
 
   const canonicalUrl = getCanonicalImageUrl(img.url);
-  const displayUrl = isTrafficOptimized && img.url.startsWith('http')
+  const remoteFallbackUrl = isTrafficOptimized && img.url.startsWith('http')
     ? `https://steemitimages.com/${galleryView === 'grid' ? '640x0' : '128x128'}/${img.url}`
     : img.url;
+  const displayUrl = useCachedImageUrl(canonicalUrl, remoteFallbackUrl);
 
   const handleCopyUrl = async (e: React.MouseEvent) => {
     e.stopPropagation();

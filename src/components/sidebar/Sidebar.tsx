@@ -26,6 +26,8 @@ import { useDeviceStore } from '../../store/deviceStore';
 import ImageItemComp from '../ImageItem';
 import ExternalImageItem from '../ExternalImageItem';
 import { AccountSelector } from '../common/AccountSelector';
+import { CachedImagesPanel, type CachedImageFilter } from '../gallery/CachedImagesPanel';
+import { type CachedImageRecord } from '../../services/imageCacheDb';
 
 export const TextWrapIcon = ({ size = 24, className = "", style }: { size?: number; className?: string; style?: React.CSSProperties }) => (
   <svg 
@@ -87,8 +89,8 @@ export interface SidebarProps {
   onAddKeychainAccount?: (user: string) => void;
   onOpenVaultManager?: () => void;
   // Gallery state
-  galleryMode: 'local' | 'pexels' | 'pixabay' | 'unsplash';
-  toggleGalleryMode: (mode: 'local' | 'pexels' | 'pixabay' | 'unsplash') => void;
+  galleryMode: 'local' | 'cached' | 'pexels' | 'pixabay' | 'unsplash';
+  toggleGalleryMode: (mode: 'local' | 'cached' | 'pexels' | 'pixabay' | 'unsplash') => void;
   galleryView: 'grid' | 'list';
   setGalleryView: (view: 'grid' | 'list') => void;
   gallerySearch: string;
@@ -98,6 +100,16 @@ export interface SidebarProps {
   setImages: React.Dispatch<React.SetStateAction<ImageItem[]>>;
   toggleImageSelection: (index: number) => void;
   moveImageLocal: (filteredIdx: number, direction: -1 | 1) => void;
+  deleteLocalImage?: (url: string) => void | Promise<void>;
+  filteredCachedImages?: CachedImageRecord[];
+  cachedFilter?: CachedImageFilter;
+  setCachedFilter?: (filter: CachedImageFilter) => void;
+  selectedCachedUrls?: Set<string>;
+  toggleCachedSelection?: (url: string) => void;
+  selectAllCached?: () => void;
+  clearCachedSelection?: () => void;
+  deleteSingleCachedImage?: (url: string, mode: 'blob_only' | 'full') => void;
+  deleteSelectedCachedImages?: (mode: 'blob_only' | 'full') => void;
   insertImage: (url: string, name: string, position: 'left' | 'right' | 'center' | 'plain') => void;
   insertExternalImage: (photo: any, position: 'left' | 'right' | 'center' | 'plain') => void;
   uploadExternalImage: (url: string, fileName?: string) => Promise<void>;
@@ -172,6 +184,16 @@ export const Sidebar: React.FC<SidebarProps> = (props) => {
     setImages,
     toggleImageSelection,
     moveImageLocal,
+    deleteLocalImage,
+    filteredCachedImages = [],
+    cachedFilter = 'all',
+    setCachedFilter,
+    selectedCachedUrls,
+    toggleCachedSelection,
+    selectAllCached,
+    clearCachedSelection,
+    deleteSingleCachedImage,
+    deleteSelectedCachedImages,
     insertImage,
     insertExternalImage,
     uploadExternalImage,
@@ -256,6 +278,16 @@ export const Sidebar: React.FC<SidebarProps> = (props) => {
                     >
                       {t('gallery')}
                     </button>
+                    <button
+                      onMouseDown={(e) => e.preventDefault()}
+                      onClick={() => toggleGalleryMode('cached')}
+                      className={cn(
+                        "text-[10px] font-bold uppercase tracking-widest transition-colors shrink-0",
+                        galleryMode === 'cached' ? "text-cyan-400" : "text-slate-500 hover:text-slate-300"
+                      )}
+                    >
+                      {t('galleryCachedTab')}
+                    </button>
                     <div className="w-px h-3 bg-slate-800 shrink-0" />
                     {[
                       { id: 'pexels', label: 'Pexels', key: pexelsApiKey },
@@ -324,7 +356,7 @@ export const Sidebar: React.FC<SidebarProps> = (props) => {
                           className="overflow-hidden"
                         >
                           <div className="md:max-h-none overflow-y-auto custom-scrollbar pr-1 pb-1">
-                            {galleryMode === 'local' ? (
+                            {galleryMode === 'local' || galleryMode === 'cached' ? (
                               <div className="flex flex-col gap-1.5 shrink-0">
                                 <div className="flex flex-wrap items-center justify-between gap-1.5">
                                   <button 
@@ -509,11 +541,23 @@ export const Sidebar: React.FC<SidebarProps> = (props) => {
                                     insertGrid();
                                     // if (window.innerWidth < 1024) setIsWidgetVisible(false); // Kept visible as requested
                                   }}
-                                  disabled={galleryMode === 'local' ? images.filter(i => i.selected).length === 0 : pexelsResults.filter(p => p.selected).length === 0}
+                                  disabled={
+                                    galleryMode === 'local'
+                                      ? images.filter(i => i.selected).length === 0
+                                      : galleryMode === 'cached'
+                                        ? (selectedCachedUrls?.size || 0) === 0
+                                        : pexelsResults.filter(p => p.selected).length === 0
+                                  }
                                   className="flex-1 px-3 py-1.5 bg-slate-800 hover:bg-cyan-900 disabled:opacity-50 border border-slate-700 hover:border-cyan-700 text-cyan-400 rounded-lg text-[10px] font-bold transition-colors flex items-center justify-center gap-1.5 min-w-0"
                                   title={t('createGrid')}
                                 >
-                                  <LayoutGrid className="shrink-0" style={{ width: 'var(--gallery-icon-size, 12px)', height: 'var(--gallery-icon-size, 12px)' }} /> ({galleryMode === 'local' ? images.filter(i => i.selected).length : pexelsResults.filter(p => p.selected).length})
+                                  <LayoutGrid className="shrink-0" style={{ width: 'var(--gallery-icon-size, 12px)', height: 'var(--gallery-icon-size, 12px)' }} /> ({
+                                    galleryMode === 'local'
+                                      ? images.filter(i => i.selected).length
+                                      : galleryMode === 'cached'
+                                        ? (selectedCachedUrls?.size || 0)
+                                        : pexelsResults.filter(p => p.selected).length
+                                  })
                                 </button>
                               </div>
 
@@ -557,6 +601,7 @@ export const Sidebar: React.FC<SidebarProps> = (props) => {
                       type="text"
                       placeholder={
                         galleryMode === 'local' ? t('gallery') + "..." : 
+                        galleryMode === 'cached' ? t('cachedImagesSearchPlaceholder') :
                         galleryMode === 'pexels' ? t('pexelsSearch') + " (Enter)..." : 
                         `Search ${galleryMode === 'unsplash' ? 'Unsplash' : 'Pixabay'} (Enter)...`
                       }
@@ -564,12 +609,12 @@ export const Sidebar: React.FC<SidebarProps> = (props) => {
                       value={gallerySearch}
                       onChange={e => setGallerySearch(e.target.value)}
                       onKeyDown={e => {
-                        if (e.key === 'Enter' && galleryMode !== 'local') {
+                        if (e.key === 'Enter' && galleryMode !== 'local' && galleryMode !== 'cached') {
                           handleExternalSearch(gallerySearch);
                         }
                       }}
                     />
-                    {galleryMode !== 'local' && isSearchingPexels && (
+                    {galleryMode !== 'local' && galleryMode !== 'cached' && isSearchingPexels && (
                       <div className="absolute right-2 top-1/2 -translate-y-1/2">
                         <div className="w-2.5 h-2.5 border-2 border-cyan-500/30 border-t-cyan-500 rounded-full animate-spin" />
                       </div>
@@ -578,6 +623,26 @@ export const Sidebar: React.FC<SidebarProps> = (props) => {
                   </>
                   )}
 
+                  {galleryMode === 'cached' ? (
+                    <div className="flex-1 min-h-0 flex flex-col overflow-hidden px-1 mt-1">
+                      <CachedImagesPanel
+                        records={filteredCachedImages}
+                        galleryView={galleryView}
+                        filter={cachedFilter}
+                        setFilter={setCachedFilter || (() => {})}
+                        selectedUrls={selectedCachedUrls || new Set()}
+                        onToggleSelect={toggleCachedSelection || (() => {})}
+                        onSelectAll={selectAllCached || (() => {})}
+                        onClearSelection={clearCachedSelection || (() => {})}
+                        onInsert={(url, name, pos) => insertImage(url, name, pos)}
+                        onInsertGrid={insertGrid}
+                        onDeleteSingle={deleteSingleCachedImage || (() => {})}
+                        onDeleteSelected={deleteSelectedCachedImages || (() => {})}
+                        isCollapsed={isGalleryCollapsed}
+                        t={t}
+                      />
+                    </div>
+                  ) : (
                   <div className={cn(
                     "overflow-y-auto custom-scrollbar flex-1 min-h-0 px-1 mt-1",
                     !isGalleryCollapsed && galleryView === 'grid' ? "grid grid-cols-[repeat(auto-fill,minmax(110px,1fr))] auto-rows-min gap-3 content-start" : "flex flex-col gap-2"
@@ -598,7 +663,12 @@ export const Sidebar: React.FC<SidebarProps> = (props) => {
                             onHost={uploadExternalImage}
                             onDelete={(i: any) => {
                               const url = filteredLocalImages[i]?.url;
-                              if (url) setImages(prev => prev.filter(x => x.url !== url));
+                              if (!url) return;
+                              if (deleteLocalImage) {
+                                void deleteLocalImage(url);
+                              } else {
+                                setImages(prev => prev.filter(x => x.url !== url));
+                              }
                             }}
                             onMoveLeft={idx > 0 ? (i: any) => moveImageLocal(i, -1) : undefined}
                             onMoveRight={idx < filteredLocalImages.length - 1 ? (i: any) => moveImageLocal(i, 1) : undefined}
@@ -633,8 +703,9 @@ export const Sidebar: React.FC<SidebarProps> = (props) => {
                       )
                     )}
                   </div>
+                  )}
                   
-                  {galleryMode !== 'local' && pexelsResults.length > 0 && !isSearchingPexels && !isGalleryCollapsed && (
+                  {galleryMode !== 'local' && galleryMode !== 'cached' && pexelsResults.length > 0 && !isSearchingPexels && !isGalleryCollapsed && (
                     <div className="mt-2 flex justify-center">
                       <button 
                         onClick={() => handleExternalSearch(gallerySearch, pexelsPage + 1)}
@@ -645,7 +716,7 @@ export const Sidebar: React.FC<SidebarProps> = (props) => {
                     </div>
                   )}
 
-                  {!isGalleryCollapsed && (
+                  {!isGalleryCollapsed && galleryMode === 'local' && (
                   <div className="mt-2 shrink-0 border-t border-slate-800 pt-2">
                     <div className="flex items-center justify-between mb-1">
                       <span className="text-[9px] font-bold text-slate-500 uppercase tracking-widest">{t('links')}</span>

@@ -58,48 +58,138 @@ export const saveFileNatively = async (blob: Blob, defaultFilename: string, mime
 
     // 1. NEUTRALINO.JS (Native desktop app runner)
     if (typeof window !== 'undefined' && (window as any).Neutralino?.filesystem) {
-      try {
-        const neu = (window as any).Neutralino;
-        const ext = defaultFilename.split('.').pop() || '*';
-        let filePath = '';
-        if (typeof neu.os?.showSaveDialog === 'function') {
+      const neu = (window as any).Neutralino;
+      const ext = (defaultFilename.split('.').pop() || 'txt').toLowerCase();
+      const isTextLike =
+        mimeType.startsWith('text/') ||
+        mimeType.includes('json') ||
+        mimeType.includes('markdown');
+
+      const resolveBaseDir = async (): Promise<string> => {
+        const candidates: Array<'downloads' | 'documents' | 'home'> = ['downloads', 'documents', 'home'];
+        for (const kind of candidates) {
           try {
-            filePath = await neu.os.showSaveDialog('Save File', {
-              defaultPath: defaultFilename,
-              filters: [{
-                name: `${ext.toUpperCase()} Files`,
-                extensions: [ext]
-              }]
-            });
+            if (typeof neu.os?.getPath === 'function') {
+              const p = await neu.os.getPath(kind);
+              if (p && typeof p === 'string' && p.trim()) {
+                return p.replace(/[/\\]+$/, '');
+              }
+            }
           } catch {
-            filePath = await neu.os.showSaveDialog({
-              title: 'Save File',
-              defaultPath: defaultFilename,
-              filters: [{
-                name: `${ext.toUpperCase()} Files`,
-                extensions: [ext]
-              }]
-            });
+            // try next standard OS path
           }
         }
-        if (filePath) {
-          if (mimeType.startsWith('text/') || mimeType.includes('json') || mimeType.includes('markdown')) {
-            const text = await blob.text();
-            if (typeof neu.filesystem.writePlainTextFile === 'function') {
-              await neu.filesystem.writePlainTextFile(filePath, text);
-            } else if (typeof neu.filesystem.writeFile === 'function') {
-              await neu.filesystem.writeFile(filePath, text);
-            }
+        return '';
+      };
+
+      const writeToNeutralinoPath = async (targetPath: string): Promise<boolean> => {
+        if (isTextLike) {
+          const text = await blob.text();
+          if (typeof neu.filesystem.writeFile === 'function') {
+            await neu.filesystem.writeFile(targetPath, text);
+            return true;
+          }
+          if (typeof neu.filesystem.writePlainTextFile === 'function') {
+            await neu.filesystem.writePlainTextFile(targetPath, text);
+            return true;
+          }
+        } else {
+          const buffer = await blob.arrayBuffer();
+          if (typeof neu.filesystem.writeBinaryFile === 'function') {
+            await neu.filesystem.writeBinaryFile(targetPath, buffer);
+            return true;
+          }
+        }
+        return false;
+      };
+
+      const baseDir = await resolveBaseDir();
+      const sep = baseDir.includes('\\') ? '\\' : '/';
+      const suggestedFullPath = baseDir ? `${baseDir}${sep}${defaultFilename}` : defaultFilename;
+
+      let filePath = '';
+      let dialogFailed = false;
+
+      if (typeof neu.os?.showSaveDialog === 'function') {
+        const startedAt = Date.now();
+        try {
+          const dialogRes = await neu.os.showSaveDialog('Save File', {
+            defaultPath: suggestedFullPath,
+            filters: [
+              { name: `${ext.toUpperCase()} Files`, extensions: [ext] },
+              { name: 'All Files', extensions: ['*'] }
+            ]
+          });
+          if (dialogRes === null || dialogRes === undefined) {
+            dialogFailed = true;
           } else {
-            const buffer = await blob.arrayBuffer();
-            if (typeof neu.filesystem.writeBinaryFile === 'function') {
-              await neu.filesystem.writeBinaryFile(filePath, buffer);
+            filePath = typeof dialogRes === 'string'
+              ? dialogRes.trim()
+              : (Array.isArray(dialogRes) ? String(dialogRes[0] || '').trim() : '');
+            if (!filePath && Date.now() - startedAt < 80) {
+              dialogFailed = true;
             }
           }
-          return true;
+        } catch {
+          try {
+            const retryStart = Date.now();
+            const dialogRes = await neu.os.showSaveDialog('Save File', {
+              defaultPath: suggestedFullPath
+            });
+            if (dialogRes === null || dialogRes === undefined) {
+              dialogFailed = true;
+            } else {
+              filePath = typeof dialogRes === 'string' ? dialogRes.trim() : '';
+              if (!filePath && Date.now() - retryStart < 80) {
+                dialogFailed = true;
+              }
+            }
+          } catch (dialogErr) {
+            dialogFailed = true;
+            console.warn('Neutralino showSaveDialog failed on Linux, using direct fallback:', dialogErr);
+          }
         }
-      } catch (neuErr) {
-        console.warn('Neutralino native file save error:', neuErr);
+      } else {
+        dialogFailed = true;
+      }
+
+      if (filePath) {
+        try {
+          if (await writeToNeutralinoPath(filePath)) {
+            return true;
+          }
+        } catch (writeErr) {
+          console.warn('Neutralino write to selected path failed, trying fallback:', writeErr);
+          dialogFailed = true;
+        }
+      }
+
+      // If Linux GTK/portal dialog is unavailable or errored (not explicit user cancel), save directly into Downloads/Documents
+      if (dialogFailed && baseDir) {
+        try {
+          let fallbackPath = `${baseDir}${sep}${defaultFilename}`;
+          if (typeof neu.filesystem.getStats === 'function') {
+            try {
+              await neu.filesystem.getStats(fallbackPath);
+              const dotIdx = defaultFilename.lastIndexOf('.');
+              const stem = dotIdx > 0 ? defaultFilename.slice(0, dotIdx) : defaultFilename;
+              const suffix = dotIdx > 0 ? defaultFilename.slice(dotIdx) : '';
+              fallbackPath = `${baseDir}${sep}${stem}_${Date.now()}${suffix}`;
+            } catch {
+              // file does not exist yet
+            }
+          }
+          if (await writeToNeutralinoPath(fallbackPath)) {
+            return true;
+          }
+        } catch (fallbackErr) {
+          console.error('Neutralino direct fallback save failed:', fallbackErr);
+        }
+      }
+
+      // If user explicitly cancelled a working save dialog, do not trigger broken <a download> fallback
+      if (!dialogFailed && !filePath) {
+        return false;
       }
     }
 

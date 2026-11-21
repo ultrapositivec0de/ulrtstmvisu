@@ -6,6 +6,7 @@ import { NativeHttpService } from '../../services/nativeHttpService';
 import { findWorkingPredictedImageUrl } from '../../utils/steemImagePrediction';
 import { ImageItem, AuthType } from '../../types';
 import { useDeviceStore } from '../../store/deviceStore';
+import { upsertCachedImage } from '../../services/imageCacheDb';
 
 export const sanitizeFilename = (name: string): string => {
   const ukrToLatin: Record<string, string> = {
@@ -249,6 +250,13 @@ export function useImageUploadPipeline({
       }
 
       if (finalUrl) {
+        await upsertCachedImage({
+          url: finalUrl,
+          originalName: fileName,
+          blob,
+          source: 'uploaded',
+          keepLink: true,
+        });
         const newImg: ImageItem = { url: finalUrl, name: fileName, selected: false };
         setImages(prev => [newImg, ...prev]);
         setSourceInput(prev => finalUrl + "\n" + prev);
@@ -463,16 +471,24 @@ export function useImageUploadPipeline({
                 const data = await uploadVaultWithProgress(file, signature, cleanUser, i);
                 const url = data.url || data.link || data.data?.url;
                 if (url) {
+                  await upsertCachedImage({
+                    url,
+                    originalName: originalFile.name || file.name,
+                    blob: originalFile,
+                    source: 'uploaded',
+                    keepLink: true,
+                    exif: exifTable || undefined,
+                  });
                   setImages(prev => [
                     ...prev.slice(0, i),
-                    { url, name: file.name, selected: false, exif: exifTable },
+                    { url, name: originalFile.name || file.name, selected: false, exif: exifTable },
                     ...prev.slice(i)
                   ]);
                   setSourceInput(prev => url + "\n" + prev);
                   successCount++;
                   uploaded = true;
                   if (i === 0) {
-                    insertImage(url, file.name, 'plain');
+                    insertImage(url, originalFile.name || file.name, 'plain');
                   }
                 } else {
                   const errMsg = data.error?.message || data.error?.name || data.message || (typeof data.error === 'string' ? data.error : 'No URL returned from image host');
@@ -547,15 +563,23 @@ export function useImageUploadPipeline({
             }
 
             if (url) {
+              await upsertCachedImage({
+                url,
+                originalName: originalFile.name || file.name,
+                blob: originalFile,
+                source: 'uploaded',
+                keepLink: true,
+                exif: exifTable || undefined,
+              });
               setImages(prev => [
                 ...prev.slice(0, i),
-                { url, name: file.name, selected: false, exif: exifTable },
+                { url, name: originalFile.name || file.name, selected: false, exif: exifTable },
                 ...prev.slice(i)
               ]);
               setSourceInput(prev => url + "\n" + prev);
               successCount++;
               if (i === 0) {
-                insertImage(url, file.name, 'plain');
+                insertImage(url, originalFile.name || file.name, 'plain');
               }
             } else {
               throw new Error('Image could not be verified on server');

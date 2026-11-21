@@ -1,6 +1,7 @@
 import { useState, useCallback, useEffect, Dispatch, SetStateAction } from 'react';
 import { ImageItem } from '../../types';
 import { PexelsSettings } from './useStockPhotos';
+import { restoreCanonicalUrl, markCachedImageUsed } from '../../services/imageCacheDb';
 
 export type GalleryGridLayout = 'col' | 'col-table' | 'row' | 'grid-2' | 'col-img-text' | 'col-text-img';
 export type ImagePosition = 'left' | 'right' | 'center' | 'plain';
@@ -9,9 +10,11 @@ export type SingleCaptionAlign = 'center' | 'left' | 'right';
 export interface UseGalleryLayoutMarkupConfig {
   images: ImageItem[];
   setImages: Dispatch<SetStateAction<ImageItem[]>>;
+  selectedCachedImages?: ImageItem[];
+  clearCachedSelection?: () => void;
   pexelsResults: any[];
   setPexelsResults: Dispatch<SetStateAction<any[]>>;
-  galleryMode: 'local' | 'pexels' | 'unsplash' | 'pixabay';
+  galleryMode: 'local' | 'cached' | 'pexels' | 'unsplash' | 'pixabay';
   pexelsSettings: PexelsSettings;
   insertAtCursor: (text: string, selection?: 'select' | 'end') => void;
   onImageInserted?: () => void;
@@ -21,6 +24,8 @@ export interface UseGalleryLayoutMarkupConfig {
 export function useGalleryLayoutMarkup({
   images,
   setImages,
+  selectedCachedImages = [],
+  clearCachedSelection,
   pexelsResults,
   setPexelsResults,
   galleryMode,
@@ -111,9 +116,11 @@ export function useGalleryLayoutMarkup({
     if (onImageInserted) onImageInserted();
   }, [shortenName, pexelsSettings, singleCaptionAlign, imageInsertFormat, isTextWrapEnabled, insertAtCursor, onImageInserted]);
 
-  const insertImage = useCallback((url: string, name: string, position: ImagePosition) => {
+  const insertImage = useCallback((rawUrl: string, name: string, position: ImagePosition) => {
+    const url = restoreCanonicalUrl(rawUrl);
+    markCachedImageUsed(url).catch(() => {});
     const sName = shortenName(name);
-    const localImg = images.find(i => i.url === url);
+    const localImg = images.find(i => restoreCanonicalUrl(i.url) === url);
     const exifTable = localImg?.exif || '';
 
     let attribution = '';
@@ -163,7 +170,9 @@ export function useGalleryLayoutMarkup({
   const insertGrid = useCallback(() => {
     const selected = galleryMode === 'local'
       ? images.filter(img => img.selected)
-      : pexelsResults.filter(p => p.selected);
+      : galleryMode === 'cached'
+        ? selectedCachedImages
+        : pexelsResults.filter(p => p.selected);
 
     if (selected.length === 0) return;
 
@@ -216,7 +225,7 @@ export function useGalleryLayoutMarkup({
       return `${linkedImg}${gridWithCaptions ? `\n\n<div align="${singleCaptionAlign}"><sup>${caption}</sup></div>` : ''}`;
     };
 
-    const isLocal = galleryMode === 'local';
+    const isLocal = galleryMode === 'local' || galleryMode === 'cached';
 
     if (imageInsertFormat === 'markdown') {
       if (gridLayout === 'col') {
@@ -347,7 +356,8 @@ export function useGalleryLayoutMarkup({
 
     setImages(prev => prev.map(img => ({ ...img, selected: false })));
     setPexelsResults(prev => prev.map(p => ({ ...p, selected: false })));
-  }, [galleryMode, images, pexelsResults, pexelsSettings, gridWithCaptions, singleCaptionAlign, imageInsertFormat, gridLayout, insertAtCursor, onImageInserted, t, setImages, setPexelsResults]);
+    clearCachedSelection?.();
+  }, [galleryMode, images, selectedCachedImages, clearCachedSelection, pexelsResults, pexelsSettings, gridWithCaptions, singleCaptionAlign, imageInsertFormat, gridLayout, insertAtCursor, onImageInserted, t, setImages, setPexelsResults]);
 
   return {
     isGallerySettingsCollapsed,

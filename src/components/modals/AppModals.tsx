@@ -184,7 +184,7 @@ export interface AppModalsProps {
   pexelsSettings: any;
   setPexelsSettings: (s: any) => void;
   images: any[];
-  handleClearCache: () => void;
+  handleClearCache: (selection?: any, nativePaths?: string[]) => Promise<boolean> | void;
 
   // PWA Banner & Modal
   showPwaBanner: boolean;

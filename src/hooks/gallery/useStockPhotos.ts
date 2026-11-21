@@ -52,7 +52,7 @@ export function useStockPhotos(config: UseStockPhotosConfig) {
     }
   }, [pexelsSettings]);
 
-  const toggleGalleryMode = useCallback((mode: 'local' | 'pexels' | 'unsplash' | 'pixabay') => {
+  const toggleGalleryMode = useCallback((mode: 'local' | 'cached' | 'pexels' | 'unsplash' | 'pixabay') => {
     setGalleryMode(mode);
     setGallerySearch('');
   }, [setGalleryMode, setGallerySearch]);

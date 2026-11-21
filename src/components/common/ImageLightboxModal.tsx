@@ -5,6 +5,8 @@ import { useLightboxStore } from '../../store/lightboxStore';
 import { useEditorStore } from '../../store';
 import { getTranslation, TranslationKey } from '../../locales';
 import { getCanonicalImageUrl, copyTextWithFallback } from '../../utils/postFormatting';
+import { restoreCanonicalUrl } from '../../services/imageCacheDb';
+import { useCachedImageUrl } from '../../hooks/useCachedImageUrl';
 
 export const ImageLightboxModal: React.FC = () => {
   const { isOpen, imageSrc, imageAlt, closeLightbox } = useLightboxStore();
@@ -73,7 +75,8 @@ export const ImageLightboxModal: React.FC = () => {
     setPosition({ x: 0, y: 0 });
   };
 
-  const canonicalSrc = imageSrc ? getCanonicalImageUrl(imageSrc) : '';
+  const canonicalSrc = imageSrc ? getCanonicalImageUrl(restoreCanonicalUrl(imageSrc)) : '';
+  const displaySrc = useCachedImageUrl(canonicalSrc, imageSrc || '');
   const decodedFilename = React.useMemo(() => {
     if (!canonicalSrc) return '';
     const raw = canonicalSrc.split('/').pop()?.split('?')[0] || '';
@@ -282,7 +285,7 @@ export const ImageLightboxModal: React.FC = () => {
           style={{ cursor: scale > 1 ? (isDragging ? 'grabbing' : 'grab') : 'zoom-out' }}
         >
           <motion.img
-            src={imageSrc}
+            src={displaySrc || imageSrc}
             alt={imageAlt || 'Expanded Image'}
             draggable={false}
             onClick={handleDoubleTap}
