@@ -649,7 +649,7 @@ export const Header: React.FC<HeaderProps> = (props) => {
                 <div className={cn("shrink-0 bg-slate-700", isHeaderCompact ? "w-full h-px my-0.5" : "w-px h-5 mx-0.5")} />
                 <label className="size-8 sm:size-9 bg-cyan-950/20 border border-cyan-500/30 text-cyan-400 hover:text-cyan-300 hover:bg-cyan-900/30 rounded-lg transition-colors cursor-pointer shrink-0 flex items-center justify-center shadow-lg shadow-cyan-950/50" title={t('importMd')}>
                    <FileDown size={18} />
-                   <input type="file" accept=".md,.txt" className="hidden" onChange={(e) => {
+                   <input type="file" accept=".md,.txt,.markdown,text/markdown,text/plain" className="hidden" onChange={(e) => {
                       const f = e.target.files?.[0];
                       if(f) {
                          const reader = new FileReader();

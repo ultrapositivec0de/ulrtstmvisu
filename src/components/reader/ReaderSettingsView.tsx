@@ -22,6 +22,7 @@ import { cn } from '../../lib/utils';
 import { ReaderConfig } from '../../types';
 import { callWithFallback } from '../../lib/steem';
 import { parseTagsInput } from '../../hooks/reader/useReaderFeedData';
+import { saveFileNatively } from '../../utils/fileSaver';
 
 export interface ReaderSettingsViewProps {
   config: ReaderConfig;
@@ -702,7 +703,7 @@ export const ReaderSettingsView: React.FC<ReaderSettingsViewProps> = React.memo(
                     <Upload size={18} />
                     <input
                       type="file"
-                      accept=".json"
+                      accept=".json,application/json"
                       className="hidden"
                       onChange={(e) => {
                         const file = e.target.files?.[0];
@@ -738,17 +739,16 @@ export const ReaderSettingsView: React.FC<ReaderSettingsViewProps> = React.memo(
                   </label>
                   <button
                     type="button"
-                    onClick={() => {
+                    onClick={async () => {
                       const blob = new Blob(
                         [JSON.stringify(config.whiteList, null, 2)],
                         { type: 'application/json' },
                       );
-                      const url = URL.createObjectURL(blob);
-                      const a = document.createElement('a');
-                      a.href = url;
-                      a.download = `whitelist_export_${new Date().toISOString().split('T')[0]}.json`;
-                      a.click();
-                      URL.revokeObjectURL(url);
+                      await saveFileNatively(
+                        blob,
+                        `whitelist_export_${new Date().toISOString().split('T')[0]}.json`,
+                        'application/json',
+                      );
                     }}
                     className="p-1.5 hover:bg-slate-800 rounded text-slate-400 hover:text-white transition-colors cursor-pointer"
                     title={t('exportWhitelist')}
@@ -848,7 +848,7 @@ export const ReaderSettingsView: React.FC<ReaderSettingsViewProps> = React.memo(
                     <Upload size={18} />
                     <input
                       type="file"
-                      accept=".json"
+                      accept=".json,application/json"
                       className="hidden"
                       onChange={(e) => {
                         const file = e.target.files?.[0];
@@ -884,17 +884,16 @@ export const ReaderSettingsView: React.FC<ReaderSettingsViewProps> = React.memo(
                   </label>
                   <button
                     type="button"
-                    onClick={() => {
+                    onClick={async () => {
                       const blob = new Blob(
                         [JSON.stringify(config.blackList, null, 2)],
                         { type: 'application/json' },
                       );
-                      const url = URL.createObjectURL(blob);
-                      const a = document.createElement('a');
-                      a.href = url;
-                      a.download = `blacklist_export_${new Date().toISOString().split('T')[0]}.json`;
-                      a.click();
-                      URL.revokeObjectURL(url);
+                      await saveFileNatively(
+                        blob,
+                        `blacklist_export_${new Date().toISOString().split('T')[0]}.json`,
+                        'application/json',
+                      );
                     }}
                     className="p-1.5 hover:bg-slate-800 rounded text-slate-400 hover:text-white transition-colors cursor-pointer"
                     title={t('exportBlacklist')}

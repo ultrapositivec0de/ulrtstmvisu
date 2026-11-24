@@ -28,18 +28,21 @@ jobs:
       - name: "Build Static Frontend Assets"
         run: npm run build
 
-      - name: "Get package version"
+      - name: "Get package metadata"
         id: package-version
         shell: bash
         run: |
           VERSION=$(node -p "require('./package.json').version")
+          PKG_NAME=$(node -p "require('./package.json').name.replace(/[^a-zA-Z0-9._-]+/g, '-')")
           echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "name=$PKG_NAME" >> $GITHUB_OUTPUT
 
       - name: "Compress built assets into ZIP"
         run: |
           VERSION="${{ steps.package-version.outputs.version }}"
+          PKG_NAME="${{ steps.package-version.outputs.name }}"
           cd dist
-          zip -r ../ultra-steem-editor-web-v${VERSION}.zip .
+          zip -r ../${PKG_NAME}-web-v${VERSION}.zip .
 
       - name: "Upload Static Web ZIP to GitHub Draft Release"
         uses: softprops/action-gh-release@v2
@@ -49,6 +52,7 @@ jobs:
           draft: true
           prerelease: false
           files: |
-            ultra-steem-editor-web-v${{ steps.package-version.outputs.version }}.zip
+            ${{ steps.package-version.outputs.name }}-web-v${{ steps.package-version.outputs.version }}.zip
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+

@@ -32,19 +32,22 @@ jobs:
       - name: Build Neutralino App
         run: npm run build:neu
 
-      - name: Get package version
+      - name: Get package metadata
         id: package-version
         shell: bash
         run: |
           VERSION=$(node -p "require('./package.json').version")
+          PKG_NAME=$(node -p "require('./package.json').name.replace(/[^a-zA-Z0-9._-]+/g, '-')")
           echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "name=$PKG_NAME" >> $GITHUB_OUTPUT
 
       - name: Prepare Neutralino Release Artifact
         shell: bash
         run: |
           VERSION="${{ steps.package-version.outputs.version }}"
+          PKG_NAME="${{ steps.package-version.outputs.name }}"
           DIST_DIR="neutralino-build/dist"
-          TARGET_FILE="$DIST_DIR/ultra-steem-editor-v${VERSION}-neutralino.zip"
+          TARGET_FILE="$DIST_DIR/${PKG_NAME}-v${VERSION}-neutralino.zip"
 
           echo "🔍 Inspecting $DIST_DIR contents:"
           if [ -d "$DIST_DIR" ]; then
@@ -76,6 +79,7 @@ jobs:
           name: "Release v${{ steps.package-version.outputs.version }}"
           draft: true
           files: |
-            neutralino-build/dist/ultra-steem-editor-v${{ steps.package-version.outputs.version }}-neutralino.zip
+            neutralino-build/dist/${{ steps.package-version.outputs.name }}-v${{ steps.package-version.outputs.version }}-neutralino.zip
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+

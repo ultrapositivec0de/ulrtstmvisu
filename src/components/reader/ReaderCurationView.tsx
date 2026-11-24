@@ -1,4 +1,5 @@
 import React from 'react';
+import { saveFileNatively } from '../../utils/fileSaver';
 import {
   Briefcase,
   ChevronUp,
@@ -490,7 +491,7 @@ export const ReaderCurationView: React.FC<ReaderCurationViewProps> = React.memo(
                                   </button>
                                   <button
                                     type="button"
-                                    onClick={(e) => {
+                                    onClick={async (e) => {
                                       try {
                                         const logsStr = localStorage.getItem('steem_vote_logs');
                                         const logs = logsStr ? JSON.parse(logsStr) : [];
@@ -504,11 +505,11 @@ export const ReaderCurationView: React.FC<ReaderCurationViewProps> = React.memo(
                                         const mdHeader = '| Nickname | Link | Weight | Type | Date |\n|---|---|---|---|---|\n';
                                         const mdBody = logs.map((l:any) => `| @${l.author} | [link](https://steemit.com/@${l.author}/${l.permlink}) | ${l.weight}% | ${l.isComment ? 'Comment' : 'Post'} | ${new Date(l.timestamp).toLocaleDateString()} |`).join('\n');
                                         const blob = new Blob([mdHeader + mdBody], { type: 'text/markdown;charset=utf-8;' });
-                                        const url = URL.createObjectURL(blob);
-                                        const a = document.createElement('a');
-                                        a.href = url;
-                                        a.download = `curation-votes-${new Date().toISOString().split('T')[0]}.md`;
-                                        a.click();
+                                        await saveFileNatively(
+                                          blob,
+                                          `curation-votes-${new Date().toISOString().split('T')[0]}.md`,
+                                          'text/markdown',
+                                        );
                                       } catch(err) {
                                         console.error("Export failed", err);
                                       }

@@ -1,4 +1,5 @@
 import React, { useState, useRef } from 'react';
+import { saveFileNatively } from '../../utils/fileSaver';
 import {
   Volume2,
   VolumeX,
@@ -99,16 +100,9 @@ export const AudioPresetsModal: React.FC<AudioPresetsModalProps> = ({
     e.target.value = '';
   };
 
-  const handleDownloadTemplate = () => {
+  const handleDownloadTemplate = async () => {
     const blob = new Blob([PRESET_JSON_TEMPLATE], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = 'sound-preset-template.json';
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
+    await saveFileNatively(blob, 'sound-preset-template.json', 'application/json');
   };
 
   return (
@@ -260,7 +254,7 @@ export const AudioPresetsModal: React.FC<AudioPresetsModalProps> = ({
             <input
               type="file"
               ref={fileInputRef}
-              accept=".json"
+              accept=".json,application/json"
               onChange={handleFileUpload}
               className="hidden"
             />

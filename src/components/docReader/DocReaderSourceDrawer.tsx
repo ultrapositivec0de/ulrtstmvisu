@@ -193,7 +193,7 @@ export const DocReaderSourceDrawer: React.FC<DocReaderSourceDrawerProps> = ({
               type="file"
               ref={fileInputRef}
               onChange={handleFileInputChange}
-              accept=".md,.txt,.html,.markdown"
+              accept=".md,.txt,.html,.markdown,text/markdown,text/plain,text/html"
               className="hidden"
             />
             <button

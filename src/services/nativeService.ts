@@ -285,8 +285,8 @@ export const NativeService = {
 
   /**
    * Tries to trigger permission dialogs on mobile (Tauri).
-   * Note: On modern Android (13+), standard file pickers don't require manifest permissions.
-   * This is mainly for Camera or fine-grained storage access if needed.
+   * Note: File export/import uses Storage Access Framework (SAF) and requires no manifest storage permissions.
+   * This is only for optional Camera capture when explicitly triggered by the user.
    */
   async requestCameraPermission() {
     if (!isTauri()) return true;

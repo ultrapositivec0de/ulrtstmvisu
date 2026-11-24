@@ -193,8 +193,8 @@ export const saveFileNatively = async (blob: Blob, defaultFilename: string, mime
       }
     }
 
-    // 2. TAURI (Native desktop app runner)
-    if (typeof window !== 'undefined' && (window as any).__TAURI__) {
+    // 2. TAURI (Native desktop & Android app runner with SAF dialog)
+    if (typeof window !== 'undefined' && ('__TAURI__' in window || '__TAURI_INTERNALS__' in window)) {
       try {
         let saveFn: any = null;
         let writeFn: any = null;
@@ -214,32 +214,51 @@ export const saveFileNatively = async (blob: Blob, defaultFilename: string, mime
             writeFn = writeFile;
           } catch {
             const tauri = (window as any).__TAURI__;
-            if (tauri.dialog?.save) saveFn = tauri.dialog.save;
-            if (tauri.fs?.writeFile) writeFn = tauri.fs.writeFile;
+            if (tauri?.dialog?.save) saveFn = tauri.dialog.save;
+            if (tauri?.fs?.writeFile) writeFn = tauri.fs.writeFile;
           }
         }
 
-        if (saveFn && writeFn) {
-          const ext = defaultFilename.split('.').pop() || '*';
-          try {
-            const filePath = await saveFn({
-              defaultPath: defaultFilename,
-              filters: [{
-                name: 'Files',
-                extensions: [ext]
-              }]
-            });
-            
-            if (filePath) {
-              const buffer = await blob.arrayBuffer();
-              await writeFn(filePath, new Uint8Array(buffer));
-              return true;
-            } else if (typeof filePath === 'string') {
-              // User explicitly cancelled dialog
-              return false;
+        if (writeFn) {
+          const ext = (defaultFilename.split('.').pop() || 'txt').toLowerCase();
+          const isAndroid = typeof navigator !== 'undefined' && /Android/i.test(navigator.userAgent || '');
+          const cleanMime = (mimeType || '').split(';')[0].trim() || (
+            ext === 'md' || ext === 'markdown' ? 'text/markdown' :
+            ext === 'zip' ? 'application/zip' :
+            ext === 'json' ? 'application/json' : 'application/octet-stream'
+          );
+          const androidMimeFilters =
+            ext === 'zip'
+              ? ['application/zip', 'application/x-zip-compressed', 'application/octet-stream']
+              : ext === 'json'
+                ? ['application/json', 'text/plain']
+                : ext === 'md' || ext === 'markdown'
+                  ? ['text/markdown', 'text/plain']
+                  : [cleanMime];
+
+          const bytes = new Uint8Array(await blob.arrayBuffer());
+
+          if (saveFn) {
+            try {
+              const filePath = await saveFn({
+                defaultPath: defaultFilename,
+                filters: [{
+                  name: isAndroid ? cleanMime : `${ext.toUpperCase()} Files`,
+                  extensions: isAndroid ? androidMimeFilters : [ext]
+                }]
+              });
+
+              if (typeof filePath === 'string' && filePath.trim()) {
+                await writeFn(filePath, bytes);
+                return true;
+              }
+              if (filePath === null || filePath === '') {
+                // User explicitly cancelled the native SAF/save dialog
+                return false;
+              }
+            } catch (dialogErr) {
+              console.debug("Tauri dialog.save unavailable or failed on this platform, falling back to share/web download:", dialogErr);
             }
-          } catch (dialogErr) {
-            console.debug("Tauri dialog.save not fully available on this platform, trying fallbacks:", dialogErr);
           }
         }
       } catch (tauriErr) {

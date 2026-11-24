@@ -176,19 +176,26 @@ jobs:
         run: |
           MANIFEST_PATH="src-tauri/gen/android/app/src/main/AndroidManifest.xml"
           
-          # --- PERMISSION CHEAT SHEET (To add, use metadata.json -> requestFramePermissions) ---
-          # CAMERA, RECORD_AUDIO, ACCESS_FINE_LOCATION, READ_MEDIA_IMAGES (Android 13+), 
-          # READ_EXTERNAL_STORAGE (Android 12-), WRITE_EXTERNAL_STORAGE (Android 12-)
+          # --- PERMISSION CHEAT SHEET (SAF-First & Least-Privilege Policy) ---
+          # CAMERA, RECORD_AUDIO, ACCESS_FINE_LOCATION, ACCESS_COARSE_LOCATION (Optional via metadata.json)
+          # File export/import (.md, .zip, .json) uses Android SAF; broad storage permissions are excluded.
           # ------------------------------------------------------------------------------------
 
           # 1. READ permissions from metadata.json (handling multi-line)
           RAW_PERMS=$(cat metadata.json | tr -d '\n' | grep -oP '(?<="requestFramePermissions":\[).*?(?=\])' | tr -d '" ' | tr ',' ' ')
           
-          # 2. Add defaults & Map frontend names to Android format
-          PERMISSIONS="INTERNET READ_EXTERNAL_STORAGE WRITE_EXTERNAL_STORAGE READ_MEDIA_IMAGES"
+          # 2. Add strict defaults & exclude broad external storage permissions (SAF handles files)
+          PERMISSIONS="INTERNET"
           for P in $RAW_PERMS; do
-            UPPER_P=$(echo $P | tr '[:lower:]' '[:upper:]')
-            PERMISSIONS="$PERMISSIONS $UPPER_P"
+            UPPER_P=$(echo "$P" | tr '[:lower:]' '[:upper:]')
+            case "$UPPER_P" in
+              ""|*EXTERNAL_STORAGE*|*READ_MEDIA_*)
+                echo "Skipping broad storage permission (SAF is used): $UPPER_P"
+                ;;
+              *)
+                PERMISSIONS="$PERMISSIONS $UPPER_P"
+                ;;
+            esac
           done
           
           if [ -f "$MANIFEST_PATH" ]; then

@@ -91,7 +91,7 @@ export const DraftsModal: React.FC<DraftsModalProps> = (props) => {
             title={t('importBackup')}
           >
             <FileDown size={16} />
-            <input type="file" accept=".zip" className="hidden" onChange={importBackup} />
+            <input type="file" accept=".zip,.json,application/zip,application/x-zip-compressed,application/json,application/octet-stream" className="hidden" onChange={importBackup} />
           </label>
           <button 
             onClick={exportBackup}
