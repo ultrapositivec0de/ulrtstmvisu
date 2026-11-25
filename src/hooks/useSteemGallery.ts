@@ -11,11 +11,15 @@ import {
   deleteCachedImageFull,
 } from '../services/imageCacheDb';
 import { getCanonicalImageUrl } from '../utils/postFormatting';
-import { CachedImageFilter } from '../components/gallery/CachedImagesPanel';
+import { CachedImageFilter, CachedImageSortOrder } from '../components/gallery/CachedImagesPanel';
 
 export { sanitizeFilename };
 
+export type LocalImageSortOrder = 'manual' | 'newest' | 'oldest';
+
 const STORAGE_KEY_IMAGES = 'steem_uploaded_images_v2';
+const STORAGE_KEY_CACHED_SORT = 'steem_cached_gallery_sort';
+const STORAGE_KEY_LOCAL_SORT = 'steem_local_gallery_sort';
 
 export interface SteemGalleryConfig {
   t: (key: any) => string;
@@ -54,36 +58,81 @@ export function useSteemGallery(config: SteemGalleryConfig) {
   const [cachedFilter, setCachedFilter] = useState<CachedImageFilter>('all');
   const [selectedCachedUrls, setSelectedCachedUrls] = useState<Set<string>>(() => new Set());
 
+  const [cachedSort, setCachedSort] = useState<CachedImageSortOrder>(() => {
+    if (typeof localStorage === 'undefined') return 'newest';
+    const saved = localStorage.getItem(STORAGE_KEY_CACHED_SORT);
+    return saved === 'oldest' || saved === 'recent' || saved === 'newest' ? saved : 'newest';
+  });
+  const [localSort, setLocalSort] = useState<LocalImageSortOrder>(() => {
+    if (typeof localStorage === 'undefined') return 'manual';
+    const saved = localStorage.getItem(STORAGE_KEY_LOCAL_SORT);
+    return saved === 'newest' || saved === 'oldest' || saved === 'manual' ? saved : 'manual';
+  });
+
   useEffect(() => {
     if (typeof localStorage !== 'undefined') {
       localStorage.setItem('steem_gallery_collapsed', String(isGalleryCollapsed));
     }
   }, [isGalleryCollapsed]);
 
+  useEffect(() => {
+    if (typeof localStorage !== 'undefined') {
+      localStorage.setItem(STORAGE_KEY_CACHED_SORT, cachedSort);
+    }
+  }, [cachedSort]);
+
+  useEffect(() => {
+    if (typeof localStorage !== 'undefined') {
+      localStorage.setItem(STORAGE_KEY_LOCAL_SORT, localSort);
+    }
+  }, [localSort]);
+
   // 1. Stock Photos Hook
   const stockPhotos = useStockPhotos(config);
 
-  // 2. Filtered local images and image management
+  const cachedCreatedAtMap = useMemo(() => {
+    const map = new Map<string, number>();
+    cachedImages.forEach((rec) => {
+      map.set(rec.canonicalUrl, rec.createdAt || rec.lastUsedAt || 0);
+    });
+    return map;
+  }, [cachedImages]);
+
+  // 2. Filtered & sorted local images and image management
   const filteredLocalImages = useMemo(() => {
-    if (!stockPhotos.gallerySearch.trim()) return images;
-    return images.filter(img =>
-      img.name.toLowerCase().includes(stockPhotos.gallerySearch.toLowerCase()) ||
-      img.url.toLowerCase().includes(stockPhotos.gallerySearch.toLowerCase())
-    );
-  }, [images, stockPhotos.gallerySearch]);
+    const q = stockPhotos.gallerySearch.trim().toLowerCase();
+    const list = !q
+      ? [...images]
+      : images.filter(img =>
+          img.name.toLowerCase().includes(q) ||
+          img.url.toLowerCase().includes(q)
+        );
+
+    if (localSort === 'manual') return list;
+
+    const getTime = (img: ImageItem) =>
+      img.addedAt ?? cachedCreatedAtMap.get(getCanonicalImageUrl(img.url)) ?? 0;
+
+    return list.sort((a, b) => {
+      const diff = getTime(a) - getTime(b);
+      return localSort === 'oldest' ? diff : -diff;
+    });
+  }, [images, stockPhotos.gallerySearch, localSort, cachedCreatedAtMap]);
 
   const parseImages = useCallback((input: string) => {
     setSourceInput(input);
     const urlPattern = /(https?:\/\/[^[\]\s<>"'()]+?\.(?:jpg|jpeg|png|webp|gif|svg))/gi;
     const matches = input.match(urlPattern) || [];
     const uniqueUrls = Array.from(new Set(matches));
+    const now = Date.now();
 
     setImages(prev => {
       const existingUrls = new Set(prev.map(img => img.url));
-      const newImages = uniqueUrls.map(url => ({
+      const newImages = uniqueUrls.map((url, idx) => ({
         url,
         name: url.split('/').pop()?.split('?')[0] || 'image',
         selected: false,
+        addedAt: now + idx,
       })).filter(img => !existingUrls.has(img.url));
 
       const keptImages = prev.filter(img => uniqueUrls.includes(img.url));
@@ -248,7 +297,7 @@ export function useSteemGallery(config: SteemGalleryConfig) {
 
   const filteredCachedImages = useMemo(() => {
     const q = stockPhotos.gallerySearch.trim().toLowerCase();
-    return cachedImages.filter((rec) => {
+    const list = cachedImages.filter((rec) => {
       if (cachedFilter !== 'all' && rec.source !== cachedFilter) return false;
       if (!q) return true;
       return (
@@ -257,7 +306,16 @@ export function useSteemGallery(config: SteemGalleryConfig) {
         rec.canonicalUrl.toLowerCase().includes(q)
       );
     });
-  }, [cachedImages, cachedFilter, stockPhotos.gallerySearch]);
+
+    return [...list].sort((a, b) => {
+      if (cachedSort === 'recent') {
+        return (b.lastUsedAt || b.createdAt || 0) - (a.lastUsedAt || a.createdAt || 0);
+      }
+      const timeA = a.createdAt || a.lastUsedAt || 0;
+      const timeB = b.createdAt || b.lastUsedAt || 0;
+      return cachedSort === 'oldest' ? timeA - timeB : timeB - timeA;
+    });
+  }, [cachedImages, cachedFilter, cachedSort, stockPhotos.gallerySearch]);
 
   const selectedCachedImages = useMemo<ImageItem[]>(() => {
     if (selectedCachedUrls.size === 0) return [];
@@ -293,11 +351,29 @@ export function useSteemGallery(config: SteemGalleryConfig) {
     setSourceInput((prev) =>
       prev
         .split('\n')
-        .filter((line) => {
+        .map((line) => {
           const trimmed = line.trim();
-          if (!trimmed) return false;
-          return !targetUrls.has(getCanonicalImageUrl(trimmed));
+          if (!trimmed) return '';
+          const urlMatches = trimmed.match(/(https?:\/\/[^[\]\s<>"'()]+?\.(?:jpg|jpeg|png|webp|gif|svg))/gi);
+          if (!urlMatches || urlMatches.length === 0) {
+            return targetUrls.has(getCanonicalImageUrl(trimmed)) ? '' : line;
+          }
+          let nextLine = line;
+          let removedAny = false;
+          for (const matchUrl of urlMatches) {
+            if (targetUrls.has(getCanonicalImageUrl(matchUrl))) {
+              nextLine = nextLine.split(matchUrl).join('');
+              removedAny = true;
+            }
+          }
+          if (!removedAny) return line;
+          const cleaned = nextLine.trim();
+          if (!cleaned || /^(!\[[^\]]*\]\(\s*\)|[[\]()\s]*)$/.test(cleaned)) {
+            return '';
+          }
+          return cleaned;
         })
+        .filter((line) => line.length > 0)
         .join('\n')
     );
   }, []);
@@ -333,10 +409,11 @@ export function useSteemGallery(config: SteemGalleryConfig) {
     }
   }, [selectedCachedUrls, config, stripUrlFromGalleryLists]);
 
-  const deleteLocalImage = useCallback(async (rawUrl: string) => {
+  // Removing from the regular (session) Gallery tab ONLY removes the item and its link from the links field;
+  // long-term entries in the Cached gallery remain untouched.
+  const deleteLocalImage = useCallback((rawUrl: string) => {
     const canonical = getCanonicalImageUrl(rawUrl);
     stripUrlFromGalleryLists(new Set([canonical]));
-    await deleteCachedImageFull(canonical);
   }, [stripUrlFromGalleryLists]);
 
   // 3. Layout and Markup Hook
@@ -383,6 +460,8 @@ export function useSteemGallery(config: SteemGalleryConfig) {
     galleryView,
     setGalleryView,
     filteredLocalImages,
+    localSort,
+    setLocalSort,
     parseImages,
     toggleImageSelection,
     moveImageLocal,
@@ -393,6 +472,8 @@ export function useSteemGallery(config: SteemGalleryConfig) {
     filteredCachedImages,
     cachedFilter,
     setCachedFilter,
+    cachedSort,
+    setCachedSort,
     selectedCachedUrls,
     toggleCachedSelection,
     selectAllCached,

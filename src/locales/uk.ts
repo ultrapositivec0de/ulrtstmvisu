@@ -1249,7 +1249,13 @@ export const translations = {
   "linuxDirsNone": "Зайвих каталогів кешу Linux не виявлено.",
   "linuxDirActiveTag": "активний",
   "linuxDirClearBtn": "Очистити кеш-теки",
-  "exportSavedPathNotify": "Файл збережено"
+  "exportSavedPathNotify": "Файл збережено",
+  "gallerySortAria": "Сортування галереї",
+  "gallerySortManual": "Порядок: ручний",
+  "gallerySortNewest": "Дата: спочатку нові",
+  "gallerySortOldest": "Дата: спочатку старі",
+  "gallerySortRecent": "Нещодавно використані",
+  "removeFromSessionGallery": "Прибрати зі списку галереї (збережеться в кеші)"
 } as const;
 
 export default { meta, translations };

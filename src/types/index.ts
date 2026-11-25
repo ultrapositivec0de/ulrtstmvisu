@@ -21,6 +21,8 @@ export interface ImageItem {
   url: string;
   name: string;
   selected?: boolean;
+  exif?: string;
+  addedAt?: number;
 }
 
 export type AuthType = 'KEYCHAIN' | 'VAULT' | 'POSTING';

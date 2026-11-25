@@ -1,4 +1,8 @@
 # Changelog
+## [2026-11-25] - Version 4.8.16 (ultrasteemeditor/4.8.16)
+### Added & Improved
+- **Release Updates**: Android SAF least-privilege permissions, decoupled local gallery deletion from image cache, and gallery date sorting.
+
 ## [2026-11-21] - Version 4.8.15 (ultrasteemeditor/4.8.15)
 ### Added & Improved
 - **Release Updates**: Unified IndexedDB image cache & filename binding, Cached Images Gallery tab, categorized Cache Manager with Tauri/Neutralino Linux directory cleanup, and org.ultraeditor.neutralino ID/Linux export fix.

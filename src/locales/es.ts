@@ -1249,7 +1249,13 @@ export const translations = {
   "linuxDirsNone": "No se encontraron directorios residuales de caché en Linux.",
   "linuxDirActiveTag": "activo",
   "linuxDirClearBtn": "Limpiar carpetas",
-  "exportSavedPathNotify": "Archivo guardado"
+  "exportSavedPathNotify": "Archivo guardado",
+  "gallerySortAria": "Orden de la galería",
+  "gallerySortManual": "Orden: manual",
+  "gallerySortNewest": "Fecha: más recientes",
+  "gallerySortOldest": "Fecha: más antiguos",
+  "gallerySortRecent": "Usados recientemente",
+  "removeFromSessionGallery": "Quitar de la lista (se conserva en caché)"
 } as const;
 
 export default { meta, translations };

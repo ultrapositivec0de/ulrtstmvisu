@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import {
   AlignLeft,
   AlignRight,
+  ArrowUpDown,
   Check,
   Copy,
   Database,
@@ -19,6 +20,18 @@ import { useLightboxStore } from '../../store/lightboxStore';
 import { formatBytesCompact } from '../../services/cacheManagerService';
 
 export type CachedImageFilter = 'all' | 'uploaded' | 'post_cache';
+export type CachedImageSortOrder = 'newest' | 'oldest' | 'recent';
+
+function formatCompactDate(ts?: number): { short: string; full: string } {
+  if (!ts || !Number.isFinite(ts)) return { short: '', full: '' };
+  const d = new Date(ts);
+  if (Number.isNaN(d.getTime())) return { short: '', full: '' };
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return {
+    short: `${pad(d.getDate())}.${pad(d.getMonth() + 1)}.${String(d.getFullYear()).slice(-2)}`,
+    full: d.toLocaleString(),
+  };
+}
 
 interface CachedImageCardProps {
   record: CachedImageRecord;
@@ -43,6 +56,7 @@ const CachedImageCard: React.FC<CachedImageCardProps> = React.memo(({
   const [imgError, setImgError] = useState(false);
   const displayUrl = useCachedImageUrl(record.canonicalUrl, record.canonicalUrl);
   const hasBlob = Boolean(record.blob && record.byteSize > 0);
+  const dateInfo = formatCompactDate(record.createdAt || record.lastUsedAt);
 
   const handleCopy = async (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -216,6 +230,12 @@ const CachedImageCard: React.FC<CachedImageCardProps> = React.memo(({
         </p>
         <div className="flex items-center gap-1 text-[9px] text-[var(--text-muted)] font-mono tabular-nums truncate">
           <span>{hasBlob ? formatBytesCompact(record.byteSize) : t('cachedLinkOnlyBadge')}</span>
+          {dateInfo.short && (
+            <>
+              <span aria-hidden="true">·</span>
+              <span title={dateInfo.full}>{dateInfo.short}</span>
+            </>
+          )}
           <span aria-hidden="true">·</span>
           <span className="truncate" title={record.canonicalUrl}>{record.serverHashName}</span>
         </div>
@@ -307,6 +327,8 @@ export interface CachedImagesPanelProps {
   galleryView: 'grid' | 'list';
   filter: CachedImageFilter;
   setFilter: (f: CachedImageFilter) => void;
+  sortOrder?: CachedImageSortOrder;
+  onSortChange?: (s: CachedImageSortOrder) => void;
   selectedUrls: Set<string>;
   onToggleSelect: (url: string) => void;
   onSelectAll: () => void;
@@ -324,6 +346,8 @@ export const CachedImagesPanel: React.FC<CachedImagesPanelProps> = ({
   galleryView,
   filter,
   setFilter,
+  sortOrder = 'newest',
+  onSortChange,
   selectedUrls,
   onToggleSelect,
   onSelectAll,
@@ -358,7 +382,7 @@ export const CachedImagesPanel: React.FC<CachedImagesPanelProps> = ({
 
   return (
     <div className="flex flex-col flex-1 min-h-0 gap-2">
-      <div className="flex items-center justify-between gap-2 shrink-0 border-b border-slate-800 pb-1.5">
+      <div className="flex flex-wrap items-center justify-between gap-1.5 shrink-0 border-b border-[var(--border-color)] pb-1.5">
         <div className="flex items-center gap-1">
           {(
             [
@@ -375,16 +399,33 @@ export const CachedImagesPanel: React.FC<CachedImagesPanelProps> = ({
                 'px-2 py-1 text-[10px] font-semibold rounded-md whitespace-nowrap shrink-0 transition-colors',
                 filter === tab.id
                   ? 'bg-cyan-600/20 text-cyan-400 border border-cyan-500/30'
-                  : 'text-slate-400 hover:text-slate-200 border border-transparent'
+                  : 'text-[var(--text-muted)] hover:text-[var(--text-main)] border border-transparent'
               )}
             >
               {tab.label}
             </button>
           ))}
         </div>
-        <span className="text-[10px] font-mono tabular-nums text-slate-400 whitespace-nowrap shrink-0">
-          {records.length} · {formatBytesCompact(totalBytes)}
-        </span>
+        <div className="flex items-center gap-1.5 ml-auto shrink-0">
+          {onSortChange && (
+            <label className="flex items-center gap-1 px-1.5 py-0.5 rounded-md border border-[var(--border-color)] bg-[var(--bg-card)] text-[10px] text-[var(--text-main)]">
+              <ArrowUpDown size={11} className="text-[var(--text-muted)] shrink-0" />
+              <select
+                aria-label={t('gallerySortAria')}
+                value={sortOrder}
+                onChange={(e) => onSortChange(e.target.value as CachedImageSortOrder)}
+                className="bg-transparent text-[10px] text-[var(--text-main)] outline-none cursor-pointer pr-0.5"
+              >
+                <option value="newest" className="bg-[var(--bg-sidebar)] text-[var(--text-main)]">{t('gallerySortNewest')}</option>
+                <option value="oldest" className="bg-[var(--bg-sidebar)] text-[var(--text-main)]">{t('gallerySortOldest')}</option>
+                <option value="recent" className="bg-[var(--bg-sidebar)] text-[var(--text-main)]">{t('gallerySortRecent')}</option>
+              </select>
+            </label>
+          )}
+          <span className="text-[10px] font-mono tabular-nums text-[var(--text-muted)] whitespace-nowrap shrink-0">
+            {records.length} · {formatBytesCompact(totalBytes)}
+          </span>
+        </div>
       </div>
 
       {records.length > 0 && (

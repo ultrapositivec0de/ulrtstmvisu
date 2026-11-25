@@ -1249,7 +1249,13 @@ export const translations = {
   "linuxDirsNone": "No residual Linux cache directories found.",
   "linuxDirActiveTag": "active",
   "linuxDirClearBtn": "Clean cache dirs",
-  "exportSavedPathNotify": "File saved"
+  "exportSavedPathNotify": "File saved",
+  "gallerySortAria": "Gallery sorting",
+  "gallerySortManual": "Order: Manual",
+  "gallerySortNewest": "Date: Newest first",
+  "gallerySortOldest": "Date: Oldest first",
+  "gallerySortRecent": "Recently used",
+  "removeFromSessionGallery": "Remove from gallery list (kept in cache)"
 } as const;
 
 export default { meta, translations };

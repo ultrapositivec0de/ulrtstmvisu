@@ -17,6 +17,7 @@ import {
   PanelLeft,
   PanelRight,
   Search,
+  ArrowUpDown,
   Image as ImageIcon
 } from 'lucide-react';
 import { cn } from '../../lib/utils';
@@ -26,8 +27,9 @@ import { useDeviceStore } from '../../store/deviceStore';
 import ImageItemComp from '../ImageItem';
 import ExternalImageItem from '../ExternalImageItem';
 import { AccountSelector } from '../common/AccountSelector';
-import { CachedImagesPanel, type CachedImageFilter } from '../gallery/CachedImagesPanel';
+import { CachedImagesPanel, type CachedImageFilter, type CachedImageSortOrder } from '../gallery/CachedImagesPanel';
 import { type CachedImageRecord } from '../../services/imageCacheDb';
+import { type LocalImageSortOrder } from '../../hooks/useSteemGallery';
 
 export const TextWrapIcon = ({ size = 24, className = "", style }: { size?: number; className?: string; style?: React.CSSProperties }) => (
   <svg 
@@ -96,6 +98,8 @@ export interface SidebarProps {
   gallerySearch: string;
   setGallerySearch: (query: string) => void;
   filteredLocalImages: ImageItem[];
+  localSort?: LocalImageSortOrder;
+  setLocalSort?: (sort: LocalImageSortOrder) => void;
   images: ImageItem[];
   setImages: React.Dispatch<React.SetStateAction<ImageItem[]>>;
   toggleImageSelection: (index: number) => void;
@@ -104,6 +108,8 @@ export interface SidebarProps {
   filteredCachedImages?: CachedImageRecord[];
   cachedFilter?: CachedImageFilter;
   setCachedFilter?: (filter: CachedImageFilter) => void;
+  cachedSort?: CachedImageSortOrder;
+  setCachedSort?: (sort: CachedImageSortOrder) => void;
   selectedCachedUrls?: Set<string>;
   toggleCachedSelection?: (url: string) => void;
   selectAllCached?: () => void;
@@ -180,6 +186,8 @@ export const Sidebar: React.FC<SidebarProps> = (props) => {
     gallerySearch,
     setGallerySearch,
     filteredLocalImages,
+    localSort = 'manual',
+    setLocalSort,
     images,
     setImages,
     toggleImageSelection,
@@ -188,6 +196,8 @@ export const Sidebar: React.FC<SidebarProps> = (props) => {
     filteredCachedImages = [],
     cachedFilter = 'all',
     setCachedFilter,
+    cachedSort = 'newest',
+    setCachedSort,
     selectedCachedUrls,
     toggleCachedSelection,
     selectAllCached,
@@ -595,29 +605,46 @@ export const Sidebar: React.FC<SidebarProps> = (props) => {
                     </AnimatePresence>
                   </div>
 
-                  <div className="relative mb-2 shrink-0">
-                    <Search className="absolute left-2 top-1/2 -translate-y-1/2 text-slate-500 shrink-0" style={{ width: 'var(--gallery-icon-size, 16px)', height: 'var(--gallery-icon-size, 16px)' }} />
-                    <input 
-                      type="text"
-                      placeholder={
-                        galleryMode === 'local' ? t('gallery') + "..." : 
-                        galleryMode === 'cached' ? t('cachedImagesSearchPlaceholder') :
-                        galleryMode === 'pexels' ? t('pexelsSearch') + " (Enter)..." : 
-                        `Search ${galleryMode === 'unsplash' ? 'Unsplash' : 'Pixabay'} (Enter)...`
-                      }
-                      className="w-full bg-slate-800 border border-slate-700 rounded-lg py-1 pl-7 pr-2 text-[10px] outline-none focus:ring-1 focus:ring-cyan-500"
-                      value={gallerySearch}
-                      onChange={e => setGallerySearch(e.target.value)}
-                      onKeyDown={e => {
-                        if (e.key === 'Enter' && galleryMode !== 'local' && galleryMode !== 'cached') {
-                          handleExternalSearch(gallerySearch);
+                  <div className="flex items-center gap-1.5 mb-2 shrink-0">
+                    <div className="relative flex-1 min-w-0">
+                      <Search className="absolute left-2 top-1/2 -translate-y-1/2 text-[var(--text-muted)] shrink-0" style={{ width: 'var(--gallery-icon-size, 16px)', height: 'var(--gallery-icon-size, 16px)' }} />
+                      <input 
+                        type="text"
+                        placeholder={
+                          galleryMode === 'local' ? t('gallery') + "..." : 
+                          galleryMode === 'cached' ? t('cachedImagesSearchPlaceholder') :
+                          galleryMode === 'pexels' ? t('pexelsSearch') + " (Enter)..." : 
+                          `Search ${galleryMode === 'unsplash' ? 'Unsplash' : 'Pixabay'} (Enter)...`
                         }
-                      }}
-                    />
-                    {galleryMode !== 'local' && galleryMode !== 'cached' && isSearchingPexels && (
-                      <div className="absolute right-2 top-1/2 -translate-y-1/2">
-                        <div className="w-2.5 h-2.5 border-2 border-cyan-500/30 border-t-cyan-500 rounded-full animate-spin" />
-                      </div>
+                        className="w-full bg-[var(--bg-card)] border border-[var(--border-color)] rounded-lg py-1 pl-7 pr-2 text-[10px] text-[var(--text-main)] outline-none focus:ring-1 focus:ring-cyan-500"
+                        value={gallerySearch}
+                        onChange={e => setGallerySearch(e.target.value)}
+                        onKeyDown={e => {
+                          if (e.key === 'Enter' && galleryMode !== 'local' && galleryMode !== 'cached') {
+                            handleExternalSearch(gallerySearch);
+                          }
+                        }}
+                      />
+                      {galleryMode !== 'local' && galleryMode !== 'cached' && isSearchingPexels && (
+                        <div className="absolute right-2 top-1/2 -translate-y-1/2">
+                          <div className="w-2.5 h-2.5 border-2 border-cyan-500/30 border-t-cyan-500 rounded-full animate-spin" />
+                        </div>
+                      )}
+                    </div>
+                    {galleryMode === 'local' && setLocalSort && (
+                      <label className="flex items-center gap-1 px-1.5 py-1 rounded-lg border border-[var(--border-color)] bg-[var(--bg-card)] text-[10px] text-[var(--text-main)] shrink-0" title={t('gallerySortAria')}>
+                        <ArrowUpDown size={12} className="text-[var(--text-muted)] shrink-0" />
+                        <select
+                          aria-label={t('gallerySortAria')}
+                          value={localSort}
+                          onChange={(e) => setLocalSort(e.target.value as LocalImageSortOrder)}
+                          className="bg-transparent text-[10px] text-[var(--text-main)] outline-none cursor-pointer max-w-[105px]"
+                        >
+                          <option value="manual" className="bg-[var(--bg-sidebar)] text-[var(--text-main)]">{t('gallerySortManual')}</option>
+                          <option value="newest" className="bg-[var(--bg-sidebar)] text-[var(--text-main)]">{t('gallerySortNewest')}</option>
+                          <option value="oldest" className="bg-[var(--bg-sidebar)] text-[var(--text-main)]">{t('gallerySortOldest')}</option>
+                        </select>
+                      </label>
                     )}
                   </div>
                   </>
@@ -630,6 +657,8 @@ export const Sidebar: React.FC<SidebarProps> = (props) => {
                         galleryView={galleryView}
                         filter={cachedFilter}
                         setFilter={setCachedFilter || (() => {})}
+                        sortOrder={cachedSort}
+                        onSortChange={setCachedSort}
                         selectedUrls={selectedCachedUrls || new Set()}
                         onToggleSelect={toggleCachedSelection || (() => {})}
                         onSelectAll={selectAllCached || (() => {})}
@@ -661,6 +690,7 @@ export const Sidebar: React.FC<SidebarProps> = (props) => {
                               // if (window.innerWidth < 1024) setIsWidgetVisible(false); // Kept visible as requested
                             }}
                             onHost={uploadExternalImage}
+                            deleteTitle={t('removeFromSessionGallery')}
                             onDelete={(i: any) => {
                               const url = filteredLocalImages[i]?.url;
                               if (!url) return;
@@ -670,8 +700,8 @@ export const Sidebar: React.FC<SidebarProps> = (props) => {
                                 setImages(prev => prev.filter(x => x.url !== url));
                               }
                             }}
-                            onMoveLeft={idx > 0 ? (i: any) => moveImageLocal(i, -1) : undefined}
-                            onMoveRight={idx < filteredLocalImages.length - 1 ? (i: any) => moveImageLocal(i, 1) : undefined}
+                            onMoveLeft={localSort === 'manual' && idx > 0 ? (i: any) => moveImageLocal(i, -1) : undefined}
+                            onMoveRight={localSort === 'manual' && idx < filteredLocalImages.length - 1 ? (i: any) => moveImageLocal(i, 1) : undefined}
                             t={t}
                             isCollapsed={isGalleryCollapsed}
                           />

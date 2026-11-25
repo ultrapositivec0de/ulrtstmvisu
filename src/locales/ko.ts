@@ -1249,7 +1249,13 @@ export const translations = {
   "linuxDirsNone": "잔여 Linux 캐시 디렉터리가 없습니다.",
   "linuxDirActiveTag": "활성",
   "linuxDirClearBtn": "캐시 폴더 정리",
-  "exportSavedPathNotify": "파일이 저장되었습니다"
+  "exportSavedPathNotify": "파일이 저장되었습니다",
+  "gallerySortAria": "갤러리 정렬",
+  "gallerySortManual": "순서: 수동",
+  "gallerySortNewest": "날짜: 최신순",
+  "gallerySortOldest": "날짜: 오래된순",
+  "gallerySortRecent": "최근 사용순",
+  "removeFromSessionGallery": "갤러리 목록에서 제거 (캐시에는 유지됨)"
 } as const;
 
 export default { meta, translations };

@@ -257,7 +257,7 @@ export function useImageUploadPipeline({
           source: 'uploaded',
           keepLink: true,
         });
-        const newImg: ImageItem = { url: finalUrl, name: fileName, selected: false };
+        const newImg: ImageItem = { url: finalUrl, name: fileName, selected: false, addedAt: Date.now() };
         setImages(prev => [newImg, ...prev]);
         setSourceInput(prev => finalUrl + "\n" + prev);
       } else {
@@ -481,7 +481,7 @@ export function useImageUploadPipeline({
                   });
                   setImages(prev => [
                     ...prev.slice(0, i),
-                    { url, name: originalFile.name || file.name, selected: false, exif: exifTable },
+                    { url, name: originalFile.name || file.name, selected: false, exif: exifTable, addedAt: Date.now() },
                     ...prev.slice(i)
                   ]);
                   setSourceInput(prev => url + "\n" + prev);
@@ -573,7 +573,7 @@ export function useImageUploadPipeline({
               });
               setImages(prev => [
                 ...prev.slice(0, i),
-                { url, name: originalFile.name || file.name, selected: false, exif: exifTable },
+                { url, name: originalFile.name || file.name, selected: false, exif: exifTable, addedAt: Date.now() },
                 ...prev.slice(i)
               ]);
               setSourceInput(prev => url + "\n" + prev);

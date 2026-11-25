@@ -6,6 +6,13 @@ export interface ChangelogEntry {
 
 export const APP_CHANGELOG: ChangelogEntry[] = [
   {
+    version: "v4.8.16",
+    date: "2026-11-25",
+    changes: [
+      "Android SAF least-privilege permissions, decoupled local gallery deletion from image cache, and gallery date sorting."
+    ]
+  },
+  {
     version: "v4.8.15",
     date: "2026-11-21",
     changes: [

@@ -23,6 +23,7 @@ export interface ImageItem {
   name: string;
   selected?: boolean;
   exif?: string;
+  addedAt?: number;
 }
 
 export interface TagGroup {

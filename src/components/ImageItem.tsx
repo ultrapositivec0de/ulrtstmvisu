@@ -14,6 +14,7 @@ interface ImageItemProps {
   onInsert: (url: string, name: string, pos: 'left' | 'plain' | 'right') => void;
   onHost: (url: string, name: string) => void;
   onDelete: (idx: number) => void;
+  deleteTitle?: string;
   onMoveLeft?: (idx: number) => void;
   onMoveRight?: (idx: number) => void;
   t: (key: any) => string;
@@ -29,6 +30,7 @@ const ImageItem = React.memo(({
   onInsert, 
   onHost, 
   onDelete,
+  deleteTitle,
   onMoveLeft,
   onMoveRight, 
   t,
@@ -175,7 +177,7 @@ const ImageItem = React.memo(({
                 <Copy className="shrink-0" style={{ width: 'calc(var(--gallery-icon-size, 16px) * 0.8)', height: 'calc(var(--gallery-icon-size, 16px) * 0.8)' }} />
               )}
             </button>
-            <button onMouseDown={(e) => e.preventDefault()} onClick={(e) => { e.stopPropagation(); onDelete(idx); }} className="p-1.5 bg-slate-800/80 dark:bg-slate-800 rounded flex-1 hover:bg-red-600 hover:text-white outline-none text-slate-100 dark:text-white transition-colors flex justify-center items-center shadow-xs" title={t('delete')}>
+            <button onMouseDown={(e) => e.preventDefault()} onClick={(e) => { e.stopPropagation(); onDelete(idx); }} className="p-1.5 bg-slate-800/80 dark:bg-slate-800 rounded flex-1 hover:bg-red-600 hover:text-white outline-none text-slate-100 dark:text-white transition-colors flex justify-center items-center shadow-xs" title={deleteTitle || t('delete')}>
               <Trash2 className="shrink-0" style={{ width: 'calc(var(--gallery-icon-size, 16px) * 0.8)', height: 'calc(var(--gallery-icon-size, 16px) * 0.8)' }} />
             </button>
           </div>
@@ -206,7 +208,7 @@ const ImageItem = React.memo(({
                   <Copy className="shrink-0" style={{ width: 'calc(var(--gallery-icon-size, 16px) * 0.75)', height: 'calc(var(--gallery-icon-size, 16px) * 0.75)' }} />
                 )}
               </button>
-              <button onMouseDown={(e) => e.preventDefault()} title={t('delete')} onClick={(e) => { e.stopPropagation(); onDelete(idx); }} className="text-[var(--text-muted)] hover:text-red-500">
+              <button onMouseDown={(e) => e.preventDefault()} title={deleteTitle || t('delete')} onClick={(e) => { e.stopPropagation(); onDelete(idx); }} className="text-[var(--text-muted)] hover:text-red-500">
                 <Trash2 className="shrink-0" style={{ width: 'calc(var(--gallery-icon-size, 16px) * 0.75)', height: 'calc(var(--gallery-icon-size, 16px) * 0.75)' }} />
               </button>
            </div>
